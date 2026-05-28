@@ -1021,13 +1021,8 @@ function _congressColors() {
 
 function _drawParliament(canvas, segments, total) {
     if (!canvas) return;
-    const dpr = window.devicePixelRatio || 1;
-    const w = canvas.clientWidth || canvas.width / dpr || 120;
-    const h = canvas.clientHeight || canvas.height / dpr || 60;
-    canvas.width = Math.round(w * dpr);
-    canvas.height = Math.round(h * dpr);
     const ctx = canvas.getContext('2d');
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    const { width: w, height: h } = resizeCanvasDPR(canvas, ctx);
     ctx.clearRect(0, 0, w, h);
 
     const cx = w / 2;
