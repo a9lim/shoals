@@ -1,3 +1,10 @@
+---
+name: Shoals
+title: Shoals — Options Trading and Politics Simulator
+description: Trade stock, bonds, variance, and options through a branching institutional narrative with stochastic pricing, regulations, lobbying, and six endings.
+updated: 2026-07-16
+---
+
 # Shoals — Interactive Options Trading Simulator
 
 Shoals is an options trading simulator that models derivatives pricing under stochastic volatility. It combines quantitative pricing models with a narrative market event engine for scenario-based learning.
@@ -8,27 +15,27 @@ Stock prices follow geometric Brownian motion (GBM) with optional Merton jump di
 
 ## Options Chain
 
-A 25-strike options chain displays calls and puts with real-time Greeks (delta, gamma, theta, vega, rho). Implied volatility surfaces show how the market prices risk across strikes and expirations.
+The options chain spans 21 strikes and eight expiries, displaying calls and puts with real-time Greeks (delta, gamma, theta, vega, rho). Implied-volatility views show how the market prices risk across strikes and maturities.
 
 ## Strategy Builder
 
 The multi-leg strategy builder lets users construct spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy shows a payoff diagram, Greek overlays, maximum profit/loss, and break-even points. A margin system tracks portfolio-level exposure.
 
-## Market Events
+## Instruments and Portfolio
 
-A narrative event engine with over 400 curated scenarios introduces market shocks: earnings surprises, Fed rate decisions, geopolitical events, sector rotations, and black swan events. Each event modifies the underlying price process parameters (drift, volatility, jump intensity) to simulate realistic market dynamics.
+The trading surface includes Lehman stock, bonds, VXPNT variance futures, and American options. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Large trades use an Almgren-Chriss-style temporary and permanent impact overlay without rewriting the underlying stochastic process.
+
+## Institutional Narrative
+
+Shoals is also a branching institutional simulation. A domain-organized event graph connects firm decisions, regulators, the Federal Reserve, counterparties, media, farmers, labor, and political actors. Choices change world state, unlock or foreclose later events, and move six standing dimensions: firm standing, regulatory exposure, federalist support, farmer and labor support, media trust, and Fed relations. Twelve permanent traits and six dynamic tags make the consequences of earlier choices visible in later scenes.
+
+## Policy and Endings
+
+Regulations, lobbying, congressional relationships, and monetary-policy choices feed back into the market model and the event graph. The campaign resolves into six ending families, then generates a five-page adaptive epilogue from the accumulated state rather than attaching a single score to the run.
 
 ## Educational Use
 
-Designed for quantitative finance education. Students learn options pricing theory by building positions and observing how Greeks respond to changes in the underlying price, volatility, time decay, and interest rates. The event engine connects abstract models to real-world market behavior.
-
-## Narrative Event Engine
-
-Over 400 curated market scenarios organized into six categories: earnings, monetary policy, geopolitical, sector rotation, technical signals, and black swan events. Each event modifies drift, volatility, and jump intensity parameters with configurable magnitude and decay. Events can chain — a rate hike may trigger a sector rotation, which triggers a technical breakout. Superevents receive full-screen treatment with chord stabs from the synthesized audio engine. A Poisson scheduler controls event arrival with trait-aware likelihood weighting based on player decisions.
-
-## Faction System
-
-Three market factions — momentum traders, value investors, and market makers — respond differently to events and shift the demand curve. Faction behavior is parameterized by sensitivity to price changes, mean reversion speed, and inventory limits.
+The market layer makes option pricing, volatility, time decay, rates, portfolio Greeks, margin, and price impact tangible. The narrative layer adds the institutional question the equations leave out: who can act, under which rules, and what a financially successful decision costs elsewhere in the system.
 
 ## Accessibility
 

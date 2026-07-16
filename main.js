@@ -358,7 +358,7 @@ function init() {
     if (typeof initAboutPanel === 'function') {
         initAboutPanel({
             title: 'Shoals',
-            lastUpdated: '2026-04-05',
+            lastUpdated: '2026-07-16',
             description: 'Trade stocks, bonds, and American options in a realistic market simulator. Build multi-leg strategies with live payoff diagrams, manage a margin portfolio, and navigate narrative-driven market events during a volatile political term.',
             controls: [
                 { label: 'Buy / sell stock', value: 'Click Buy button or press B' },
