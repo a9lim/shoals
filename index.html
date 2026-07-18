@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shoals — Options Trading and Politics Simulator | a9l.im</title>
     <meta name="description"
-        content="Trade stock, bonds, variance, and options through a branching institutional narrative with stochastic pricing, regulations, lobbying, and six endings.">
+        content="Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta property="og:title" content="Shoals — Options Trading and Politics Simulator">
-    <meta property="og:description" content="Trade stock, bonds, variance, and options through a branching institutional narrative with stochastic pricing, regulations, lobbying, and six endings.">
+    <meta property="og:description" content="Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://a9l.im/shoals">
     <meta property="og:site_name" content="a9l.im">
@@ -24,7 +24,7 @@
     <meta name="twitter:creator" content="@_a9lim">
     <meta property="og:locale" content="en_US">
     <meta name="twitter:title" content="Shoals — Options Trading and Politics Simulator">
-    <meta name="twitter:description" content="Trade stock, bonds, variance, and options through a branching institutional narrative with stochastic pricing, regulations, lobbying, and six endings.">
+    <meta name="twitter:description" content="Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta name="author" content="a9lim">
     <link rel="icon" href="/favicon.ico">
     <meta name="theme-color" content="#E11107">
@@ -67,7 +67,7 @@
       "@type": ["WebApplication", "LearningResource", "Game"],
       "name": "Shoals",
       "url": "https://a9l.im/shoals",
-      "description": "Trade stock, bonds, variance, and options through a branching institutional narrative with stochastic pricing, regulations, lobbying, and six endings.",
+      "description": "Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.",
       "speakable": {
         "@type": "SpeakableSpecification",
         "cssSelector": ["meta[name='description']"]
@@ -81,21 +81,20 @@
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q187860", "name": "Option"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q176737", "name": "Stochastic process"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q208697", "name": "Financial market"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1338307", "name": "Black-Scholes model"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1338307", "name": "Black–Scholes model"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q596307", "name": "Stochastic volatility"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1138253", "name": "Binomial options pricing"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1138253", "name": "Binomial options pricing model"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q16167513", "name": "Portfolio management"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1660345", "name": "Implied volatility"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q3151497", "name": "Delta hedging"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1321169", "name": "Greeks (finance)"},
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q1321169", "name": "Greeks"},
         {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q189447", "name": "Risk management"},
-        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q66295", "name": "Financial derivative"}
+        {"@type": "Thing", "@id": "https://www.wikidata.org/wiki/Q66295", "name": "Derivative"}
       ],
       "keywords": "options trading simulator, binomial tree pricing, Heston model, stochastic volatility, Greeks, strategy builder, quantitative finance, educational",
       "operatingSystem": "Any (Web Browser)",
       "browserRequirements": "Modern browser with Canvas support",
-      "sameAs": "https://github.com/a9lim/a9lim.github.io",
-      "codeRepository": "https://github.com/a9lim/a9lim.github.io",
+      "sameAs": "https://github.com/a9lim/shoals",
+      "codeRepository": "https://github.com/a9lim/shoals",
       "license": "https://www.gnu.org/licenses/agpl-3.0.html",
       "interactivityType": "active",
       "teaches": [
@@ -111,7 +110,7 @@
         {"@type": "AlignmentObject", "alignmentType": "educationalSubject", "educationalFramework": "GARP Financial Risk Manager", "targetName": "FRM Part I: Valuation and Risk Models", "targetUrl": "https://www.garp.org/frm"}
       ],
       "datePublished": "2026-03-17",
-      "dateModified": "2026-07-16",
+      "dateModified": "2026-07-17",
       "author": {
         "@type": "Person",
         "name": "a9lim",
@@ -139,12 +138,12 @@
         "priceCurrency": "USD"
       },
       "timeRequired": "PT30M",
-      "accessibilityFeature": ["highContrastDisplay", "readingOrder", "structuralNavigation"],
-      "accessibilityHazard": ["flashing", "motionSimulation"],
+      "accessibilityFeature": ["readingOrder", "structuralNavigation"],
+      "accessibilityHazard": ["motionSimulation"],
       "relatedLink": ["https://a9l.im/geon", "https://a9l.im/cyano", "https://a9l.im/gerry"],
       "gameItem": [
-        {"@type":"Thing","name":"Character Traits","description":"12 personality traits that shape narrative branching"},
-        {"@type":"Thing","name":"Market Factions","description":"6 competing factions with parameterized trading behavior"},
+        {"@type":"Thing","name":"Character Traits","description":"12 permanent convictions and 6 dynamic reputation tags that shape narrative branching"},
+        {"@type":"Thing","name":"Institutional Standing","description":"6 standing dimensions covering the firm, regulators, parties, media, and Federal Reserve"},
         {"@type":"Thing","name":"Narrative Endings","description":"6 distinct ending types with adaptive 5-page epilogue"}
       ],
       "numberOfPlayers": {"@type":"QuantitativeValue","value":1},
@@ -185,7 +184,7 @@
           "name": "What market events does Shoals simulate?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "The narrative event engine includes over 400 curated scenarios: earnings surprises, Federal Reserve rate decisions, geopolitical events, sector rotations, and black swan events. Each event modifies the underlying price process parameters (drift, volatility, jump intensity) to produce realistic market dynamics and test portfolio resilience."
+            "text": "The offline registry currently contains more than 450 curated events across Federal Reserve, macro, market, firm, political, investigation, media, PNTH, tip, trait, and interjection domains. Events may change price-process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups."
           }
         },
         {
@@ -193,7 +192,7 @@
           "name": "How do I build a multi-leg options strategy in Shoals?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Click the options chain to add individual legs, then switch to the Strategy tab to see the combined payoff diagram, Greek overlays, max profit/loss, and break-even prices. Shoals supports any combination of calls and puts at different strikes and expirations."
+            "text": "Open the Strategy tab, select an expiry, and click stock, bond, VXPNT, call, or put cells to add long legs; use sell mode or right-click for short legs. The combined view updates payoff, Greek overlays, max profit or loss, and break-even estimates."
           }
         },
         {
@@ -201,7 +200,7 @@
           "name": "Does Shoals collect any personal data?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "No. Shoals runs entirely in your browser with no server-side processing, no cookies, and no analytics tracking. All simulation state stays on your device."
+            "text": "Offline modes keep simulation state in the browser. Dynamic (LLM) mode stores the supplied Anthropic key in browser local storage and sends generated market/world context directly to Anthropic's API; the portfolio site may also record aggregate page-view metadata separately."
           }
         },
         {
@@ -209,15 +208,15 @@
           "name": "Is Shoals free and open source?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Yes. Shoals is licensed under AGPL-3.0 and the source code is available on GitHub. It is free to use for educational and personal purposes."
+            "text": "Yes. Shoals' source is available on GitHub under the GNU Affero General Public License v3.0."
           }
         },
         {
           "@type": "Question",
-          "name": "What is implied volatility?",
+          "name": "How does Shoals build its pricing-volatility surface?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Implied volatility is the market's forecast of a likely movement in an asset's price, derived by reverse-engineering the Black-Scholes model from observed option prices. In Shoals, the vol surface adjusts implied volatility by moneyness and time to expiration, creating a realistic volatility smile. Options far from the money or near expiration trade at different implied vols than at-the-money options."
+            "text": "Shoals derives an effective term volatility from the Heston variance state, mean reversion, and volatility of volatility. It then applies first-order correlation skew plus a curvature term by log-moneyness before pricing each contract. This is a constructed pricing surface, not an inversion of observed market option prices."
           }
         }
       ]
@@ -232,11 +231,11 @@
       "@type": "HowTo",
       "name": "How to price options with Shoals",
       "step": [
-        {"@type": "HowToStep", "position": 1, "name": "Select underlying parameters", "text": "Set the initial stock price, volatility, risk-free rate, and dividend yield to define the underlying asset dynamics."},
-        {"@type": "HowToStep", "position": 2, "name": "Configure a pricing model", "text": "Choose between geometric Brownian motion, Heston stochastic volatility, or Merton jump diffusion to drive the price process."},
-        {"@type": "HowToStep", "position": 3, "name": "Build a strategy", "text": "Use the multi-leg strategy builder to construct spreads, straddles, condors, or custom option combinations with real-time payoff diagrams."},
-        {"@type": "HowToStep", "position": 4, "name": "Trigger a market event", "text": "Introduce earnings surprises, Fed rate decisions, or black swan events from the narrative event engine to see how positions respond."},
-        {"@type": "HowToStep", "position": 5, "name": "Analyze the Greeks", "text": "Study how delta, gamma, theta, vega, and rho change across the options chain as the underlying moves."}
+        {"@type": "HowToStep", "position": 1, "name": "Choose a market preset", "text": "Select one of five fixed regimes, Dynamic (Offline), or Dynamic (LLM), then adjust the exposed stock, volatility, jump, rate, and dividend parameters if desired."},
+        {"@type": "HowToStep", "position": 2, "name": "Open the live market", "text": "Run or single-step the 16-substep trading day while the Heston/Merton stock process, Vasicek rate process, VXPNT index, and rolling expiries update."},
+        {"@type": "HowToStep", "position": 3, "name": "Build and execute a strategy", "text": "Trade stock, bonds, VXPNT futures, or individual options, or use the multi-leg builder for a saved or custom strategy with payoff and Greek overlays."},
+        {"@type": "HowToStep", "position": 4, "name": "Manage orders and margin", "text": "Use market, limit, or stop orders; monitor cash, buying power, margin, borrow costs, price impact, and pending orders."},
+        {"@type": "HowToStep", "position": 5, "name": "Navigate the narrative", "text": "In a dynamic mode, respond to queued institutional decisions and observe how market parameters, world state, standing, traits, regulations, and endings change."}
       ]
     }
     </script>
@@ -742,20 +741,20 @@
         <h3>Strategy Builder</h3>
         <p>The multi-leg strategy builder supports spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy displays a payoff diagram, Greek overlays showing how sensitivity changes across strikes, maximum profit and loss, and break-even points. A margin system tracks portfolio-level exposure and buying power.</p>
         <h3>Market Events</h3>
-        <p>Over 400 narrative scenarios &mdash; earnings surprises, central bank decisions, geopolitical crises, and sector rotations &mdash; modify the price process in real time. Events change drift, volatility, and jump intensity, forcing traders to adapt strategies to evolving conditions rather than static assumptions.</p>
+        <p>More than 450 curated events span Federal Reserve, macro, market, firm, political, investigation, media, PNTH, tip, trait, and interjection domains. Depending on the event, they can change process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups.</p>
     <h3>Price Impact</h3>
-    <p>Shoals uses the Almgren-Chriss model to simulate price impact from large trades. Buying or selling significant quantities moves the stock price against the trader, with impact decaying over time. This creates realistic market microstructure effects and forces traders to consider execution strategy, not just option selection.</p>
+    <p>Shoals records decaying cumulative volume separately for stock, bonds, VXPNT futures, and each option contract. Square-root fill costs and valuation overlays model execution impact; option delta changes generate market-maker stock hedges, and very large gross exposure can add temporary capped parameter overlays.</p>
     <h3>Narrative Framework</h3>
-    <p>The simulation is set at Meridian Capital during the Barron administration. Over 400 narrative market events are not random: they follow storylines with followup chains, political consequences, and faction dynamics. The game tracks twelve character traits and six faction standings that shape which events occur and how they resolve, culminating in one of six ending types with a five-page adaptive epilogue.</p>
+    <p>The simulation is set at Meridian Capital during the Barron administration. The event registry combines Poisson arrivals, scheduled pulses, portfolio triggers, one-shot conditions, and followup chains. Twelve permanent convictions, six dynamic reputation tags, and six institutional-standing dimensions shape later eligibility and consequences, culminating in one of six ending types with a five-page adaptive epilogue.</p>
     <h3>Accessibility</h3>
-    <p>Shoals supports keyboard navigation for all controls and dialogs, high-contrast mode via the theme toggle, and ARIA labels on interactive elements. Chart data is accessible through the numerical sidebar displays. All popup dialogs are focus-trapped. No flashing content or motion simulation hazards.</p>
+    <p>Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market and portfolio readouts, and focus trapping for narrative popups and the epilogue. The live candlestick chart, sparklines, typewriter treatment, and other animated feedback create continuous motion.</p>
     <p><em>See also: <a href="/geon">Geon</a> for particle physics, <a href="/cyano">Cyano</a> for cellular metabolism, <a href="/gerry">Gerry</a> for electoral fairness.</em></p>
 <h3>Learning Outcomes</h3>
-<p>After using Shoals, students should be able to: derive the Black-Scholes price for a European call and put; explain why American options require numerical methods like the binomial tree; describe how stochastic volatility (Heston model) produces volatility smiles that geometric Brownian motion cannot; compute and interpret delta, gamma, theta, vega, and rho for single options and multi-leg strategies; and analyze how market events propagate through the Greeks to affect portfolio value.</p>
+<p>After using Shoals, students should be able to: explain why American exercise is handled with a binomial tree; interpret delta, gamma, theta, vega, and rho for single options and multi-leg positions; distinguish spot volatility, term volatility, skew, and VXPNT futures; connect margin and execution impact to position sizing; and trace how market events and institutional decisions propagate into portfolio value.</p>
 <h3>Prerequisites</h3>
 <p>Basic probability and statistics (expected value, standard deviation, normal distribution). Familiarity with compound interest and present value. No prior knowledge of options or derivatives is required.</p>
 <h3>Volatility Surface</h3>
-<p>The implied volatility surface in Shoals plots IV across strike prices and expirations. Under GBM, the surface is flat — IV equals realized volatility everywhere. Under Heston, the surface develops a characteristic skew (lower strikes have higher IV) and term structure (short-dated options show more curvature). The event engine creates temporary surface dislocations that mean-revert over time, mimicking real market behavior around earnings and macro announcements.</p>
+<p>Shoals computes a contract-specific pricing volatility rather than plotting or reverse-engineering a market-implied surface. The Heston variance state and mean reversion produce the term component; price/variance correlation and volatility of volatility add moneyness skew and curvature. Events can shift those underlying parameters, after which the configured decay and mean-reversion mechanisms act on them.</p>
 <h3>References</h3>
 <p>F. Black and M. Scholes, <a href="https://doi.org/10.1086/260062" target="_blank" rel="noopener">"The Pricing of Options and Corporate Liabilities"</a> (1973). S. L. Heston, <a href="https://doi.org/10.1093/rfs/6.2.327" target="_blank" rel="noopener">"A Closed-Form Solution for Options with Stochastic Volatility"</a> (1993). J. C. Cox, S. A. Ross, and M. Rubinstein, <a href="https://doi.org/10.1016/0304-405X(79)90015-1" target="_blank" rel="noopener">"Option pricing: A simplified approach"</a> (1979).</p>
       </article>

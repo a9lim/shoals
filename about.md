@@ -1,8 +1,8 @@
 ---
 name: Shoals
 title: Shoals — Options Trading and Politics Simulator
-description: Trade stock, bonds, variance, and options through a branching institutional narrative with stochastic pricing, regulations, lobbying, and six endings.
-updated: 2026-07-16
+description: Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.
+updated: 2026-07-17
 ---
 
 # Shoals — Interactive Options Trading Simulator
@@ -15,7 +15,7 @@ Stock prices follow geometric Brownian motion (GBM) with optional Merton jump di
 
 ## Options Chain
 
-The options chain spans 21 strikes and eight expiries, displaying calls and puts with real-time Greeks (delta, gamma, theta, vega, rho). Implied-volatility views show how the market prices risk across strikes and maturities.
+The options chain spans 21 strikes and eight expiries, displaying calls and puts with real-time Greeks (delta, gamma, theta, vega, rho). Each contract is priced with a term- and moneyness-adjusted volatility derived from the current Heston state.
 
 ## Strategy Builder
 
@@ -23,7 +23,7 @@ The multi-leg strategy builder lets users construct spreads, straddles, strangle
 
 ## Instruments and Portfolio
 
-The trading surface includes Lehman stock, bonds, VXPNT variance futures, and American options. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Large trades use an Almgren-Chriss-style temporary and permanent impact overlay without rewriting the underlying stochastic process.
+The trading surface includes PNTH stock, bonds, VXPNT volatility futures, and American options. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
 
 ## Institutional Narrative
 
@@ -39,8 +39,8 @@ The market layer makes option pricing, volatility, time decay, rates, portfolio 
 
 ## Accessibility
 
-Shoals supports keyboard navigation for all controls and dialogs, high-contrast mode via the theme toggle, and ARIA labels on interactive elements. Chart data is accessible through the numerical sidebar displays. All popup dialogs are focus-trapped. No flashing content or motion hazards.
+Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market/portfolio readouts, and focus trapping for narrative popups and the epilogue. The live candlestick chart, sparklines, typewriter treatment, and other animated feedback create continuous motion.
 
 ## Price Impact
 
-The Almgren-Chriss model simulates temporary and permanent price impact from large trades. Temporary impact decays exponentially; permanent impact shifts the equilibrium price based on order flow. Impact is computed as an overlay on the simulated price — it never mutates the underlying stochastic process, preserving model consistency.
+The impact model records decaying cumulative volume separately for stock, bonds, VXPNT futures, and each option contract. It applies square-root fill costs and valuation overlays without directly rewriting the simulated spot path. Delta changes in the player's option book generate market-maker hedge flow, and exposure thresholds add temporary, capped overlays to selected process parameters.

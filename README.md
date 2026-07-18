@@ -1,6 +1,6 @@
 # Shoals
 
-An interactive options trading simulator that runs entirely in the browser. You play as a derivatives trader during a four-year presidential term, trading stocks, bonds, and options in a fully dynamic simulated market.
+An interactive options trading simulator that runs in the browser. You play as a derivatives trader during a four-year presidential term, trading stock, bonds, VXPNT volatility futures, and American options in a dynamic simulated market.
 
 **[Try it](https://a9l.im/shoals)** | Part of the [a9l.im](https://a9l.im) portfolio
 
@@ -33,7 +33,7 @@ Then open `http://localhost:8000/shoals/`.
 
 ## Tech
 
-Vanilla HTML, CSS, and JavaScript with ES6 modules. There's no build step, bundler, or dependencies. Canvas 2D for charts. All the pricing, simulation, and portfolio logic is written from scratch. The lounge jazz soundtrack is synthesized at runtime via the Web Audio API, so there are no external audio files.
+Vanilla HTML, CSS, and JavaScript with ES6 modules. There is no build, bundler, or package-install step; the app consumes the portfolio's shared modules and loads KaTeX from the configured CDN for its reference panels. Canvas 2D renders the charts, pricing/simulation/portfolio logic lives in local modules, and the lounge jazz soundtrack is synthesized at runtime through the Web Audio API.
 
 ## License
 

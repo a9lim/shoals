@@ -15,10 +15,12 @@ cd path/to/a9lim.github.io && python -m http.server
 ```
 
 Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/shared-base.css`).
+There is no build, test runner, or linter. After changes, run `node --check`
+over `main.js`, `colors.js`, and `src/**/*.js`, then `git diff --check`.
 
 ## Overview
 
-Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), VXPNT equity volatility index + tradeable VXPNT futures, strategy builder, portfolio/margin system, Almgren-Chriss price impact, narrative event engine with popup decisions, political lore, lounge jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. Zero dependencies, vanilla ES6 modules, no build step.
+Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), VXPNT equity volatility index + tradeable VXPNT futures, strategy builder, portfolio/margin system, Almgren-Chriss-style price impact, narrative event engine with popup decisions, political lore, lounge jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. Vanilla ES6 modules with no build or package-install step; KaTeX is loaded from the root site's allowed CDN.
 
 ## Architecture
 
@@ -45,11 +47,11 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 ### Bootstrap
 
-`sim.prepopulate()` backfills 252-bar history (negates `mu` for correct reverse drift). Must call `syncMarket(sim)` after `prepopulate()` in both `init()` and `_resetCore()` or market params will be zero.
+`sim.prepopulate()` backfills 252-bar history (negates `mu` for correct reverse drift). Call `_syncAll()` after `prepopulate()` in both `init()` and `_resetCore()` so `market` receives the simulation parameters and the derived VXPNT spot value.
 
 ### Reset
 
-`_resetCore()` must call all narrative resets: `resetTraits()`, `resetRegulations()`, `resetFactions()`, `resetLobbying()`, `resetAudio()`, `resetImpactState()`, `eventEngine.resetTriggerCooldowns()`, `resetUsedTips()`. Also reset `dayInProgress`, `chart._lerp.day = -1`, `_lobbyCount = 0`. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
+`_resetCore()` clears player choices, popup queues, impact/review history, lobby count, event trigger cooldowns and model-release state, then calls `resetUsedTips()`, `resetFactions()`, `resetTraits()`, `resetRegulations()`, `resetLobbying()`, `resetAudio()`, and `resetImpactState()`. It resets the simulation and portfolio, prepopulates history, calls `_syncAll()`, rebuilds histories/chain state, and clears the chart lerp object. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
 
 ## Key Conventions
 
