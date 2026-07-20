@@ -14,7 +14,7 @@ Part of the **a9l.im** portfolio. See root `AGENTS.md` for the shared design sys
 cd path/to/a9lim.github.io && python -m http.server
 ```
 
-Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/shared-base.css`).
+Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/shared/base.css`).
 There is no build, test runner, or linter. After changes, run `node --check`
 over `main.js`, `colors.js`, and `src/**/*.js`, then `git diff --check`.
 
