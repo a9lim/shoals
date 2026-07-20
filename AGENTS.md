@@ -4,23 +4,22 @@ Part of the **a9l.im** portfolio. See root `AGENTS.md` for the shared design sys
 
 ## Rules
 
-- Always prefer shared modules (`shared-*.js`, `shared-base.css`) over project-specific reimplementations. Check the root repo before adding utility code.
+- Always prefer parent `shared/` modules over project-specific reimplementations. Check the root repo before adding utility code.
 - Never use the phrase "retarded potential(s)" in code, comments, or user-facing text. Use "signal delay" or "finite-speed force propagation" instead.
 - Do not manually test via browser automation. The user will test changes themselves.
 
 ## Running Locally
 
 ```bash
-cd path/to/a9lim.github.io && python -m http.server
+cd path/to/a9lim.github.io && npm run build && python -m http.server --directory dist
 ```
 
-Serve from the root — shared files load via absolute paths (`/shared-*.js`, `/shared/base.css`).
-There is no build, test runner, or linter. After changes, run `node --check`
+The project itself has no compile step, test runner, or linter; the parent build stages it with the shared assets. After changes, run `node --check`
 over `main.js`, `colors.js`, and `src/**/*.js`, then `git diff --check`.
 
 ## Overview
 
-Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), VXPNT equity volatility index + tradeable VXPNT futures, strategy builder, portfolio/margin system, Almgren-Chriss-style price impact, narrative event engine with popup decisions, political lore, lounge jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. Vanilla ES6 modules with no build or package-install step; KaTeX is loaded from the root site's allowed CDN.
+Interactive options trading simulator at **Meridian Capital**. Player is a senior derivatives trader during the Barron administration. GBM+Merton+Heston stock, Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), VXPNT equity volatility index + tradeable VXPNT futures, strategy builder, portfolio/margin system, Almgren-Chriss-style price impact, narrative event engine with popup decisions, political lore, lounge jazz soundtrack, and 5-page adaptive epilogue with 6 ending types. The project is vanilla ES6 modules; KaTeX is loaded from the root site's allowed CDN.
 
 ## Architecture
 
@@ -32,7 +31,7 @@ Interactive options trading simulator at **Meridian Capital**. Player is a senio
 
 **LLM event source**: `src/llm.js` (LLMEventSource) is an Anthropic API client for dynamic narrative event generation, activated via the "Dynamic (LLM)" mode (option 6 in the mode dropdown). Generates event batches with parameter deltas, faction shifts, and world state effects via structured tool use. API key and model are configured in the LLM Settings section of the sidebar (localStorage keys `shoals_llm_key`, `shoals_llm_model`; default model `claude-haiku-4-5-20251001`). `eventEngine = new EventEngine('llm', llmSource)` swaps in the LLM source at mode-select time; event schema and tool definitions reuse `PARAM_RANGES` from events.js.
 
-**Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) background jazz loop (72 BPM, 16-bar Am form: Rhodes piano (sine+bell partial) with hand-placed comp events and ghost voicings, spacious walking bass (triangle+sub-sine) with chromatic approaches, brush drums (swish circles + dab backbeats), sparse ride cymbal shimmer on swung upbeats, and muted trumpet melody fragments (60% chance per loop, two alternating pentatonic phrases). Convolution reverb (1.8s synthetic IR, 12ms predelay, darkened via LP return) on piano and trumpet. Form: A(Am9→Dm9→Hd→E7) A'(Am9→FM7→Hd→E7) B(FM7→Em7→Dm9→CM7) C(Hd→E7→E7→Am9). 4-note spread voicings (Bill Evans style). (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix. Volume slider is in the settings dropdown, triggered by the gear icon (`#settings-btn`) in the toolbar. The dropdown uses `_settings.create()` from `shared-settings.js`. `$.settingsBtn` is the DOM cache reference.
+**Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) background jazz loop (72 BPM, 16-bar Am form: Rhodes piano (sine+bell partial) with hand-placed comp events and ghost voicings, spacious walking bass (triangle+sub-sine) with chromatic approaches, brush drums (swish circles + dab backbeats), sparse ride cymbal shimmer on swung upbeats, and muted trumpet melody fragments (60% chance per loop, two alternating pentatonic phrases). Convolution reverb (1.8s synthetic IR, 12ms predelay, darkened via LP return) on piano and trumpet. Form: A(Am9→Dm9→Hd→E7) A'(Am9→FM7→Hd→E7) B(FM7→Em7→Dm9→CM7) C(Hd→E7→E7→Am9). 4-note spread voicings (Bill Evans style). (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix. Volume slider is in the settings dropdown, triggered by the gear icon (`#settings-btn`) in the toolbar. The dropdown uses `_settings.create()` from `shared/settings.js`. `$.settingsBtn` is the DOM cache reference.
 
 **Lore bible**: `lore.md` at project root — canonical creative reference for all named characters, nations, products, legislation, publications, and journalists. Not consumed by runtime code. Consult when writing new events or modifying narrative text.
 

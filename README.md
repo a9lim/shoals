@@ -22,11 +22,12 @@ An interactive options trading simulator that runs in the browser. You play as a
 
 ## Running Locally
 
-Serve from the parent directory (shared files load via absolute paths):
+Build from the parent repository root and serve `dist/` (shared files load via absolute paths):
 
 ```bash
 cd path/to/a9lim.github.io
-python -m http.server
+npm run build
+python -m http.server --directory dist
 ```
 
 Then open `http://localhost:8000/shoals/`.
