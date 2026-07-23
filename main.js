@@ -70,6 +70,7 @@ import {
 import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
+import { createRaceState, advanceRace, resetRaceState } from './src/race/race-state.js';
 
 
 // ---------------------------------------------------------------------------
@@ -98,6 +99,7 @@ let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: 
 let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry)
 let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
+let raceState = null;    // hidden AI-race state machine (null when not in Dynamic mode; nothing reads it yet)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
 let vxhcnHistory = null;    // sparkline ring buffer for VX
@@ -592,6 +594,8 @@ function init() {
         }
         // Faction state lives in faction-standing.js; attach by reference so events can read it
         eventEngine.world.factions = factions;
+        // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
+        raceState = createRaceState();
     }
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
@@ -1295,6 +1299,10 @@ function _onDayComplete() {
         if (trait) _toast(`${trait.permanent ? 'Conviction unlocked' : 'Reputation earned'}: ${trait.name}`, 4000);
     }
 
+    // Advance the hidden AI-race state machine one completed day (overhaul
+    // phase 1). Neutral inputs; nothing reads it yet, so this is invisible.
+    if (raceState) advanceRace(raceState);
+
     // Fire dynamic events
     if (eventEngine) {
         eventEngine.setPlayerContext(
@@ -1779,8 +1787,11 @@ function loadPreset(index) {
         }
         // Attach faction reference (faction-standing.js is the source of truth)
         eventEngine.world.factions = factions;
+        // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
+        raceState = createRaceState();
     } else {
         eventEngine = null;
+        raceState = null;
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
@@ -1798,6 +1809,10 @@ function resetSim() {
     _resetCore(index);
 
     if (eventEngine) eventEngine.reset();
+    // Reset the hidden AI-race state in place with a fresh per-run seed (a new
+    // world each reset). Same-preset reset only; mode changes create/null it in
+    // loadPreset -- so no discarded-seed draws. Null in Classic, untouched.
+    if (raceState) resetRaceState(raceState);
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);

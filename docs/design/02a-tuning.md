@@ -45,16 +45,38 @@ resources = 1.0, talent 1.0. Tianxia: compute 0.75 growing 1.3×/yr
 Calibration (Codex-verified at prior medians): R2 ~day 230, R3 ~644,
 R4 ~800, R5 ~911 — note the recursion sigmoid's tail contributes from
 day one (σ(−3) ≈ 0.047, ~25% of base at start); that is *in* the
-calibration, not a bug to re-fix. Low-elasticity worlds (q → 0)
+calibration, not a bug to re-fix. The official calibration statistic
+(settled 2026-07-23, phase-1 verification): **unconditional
+first-passage medians** — right-censored runs (no crossing by 1008)
+count, Kaplan–Meier style — never medians conditional on crossing,
+which bias early. The ±10% tolerance is a *design* band (how far the
+stance may drift), not a sampling band; MC sampling SD at N=1000 is
+~2–4 days. Low-elasticity worlds (q → 0)
 asymptote near C ≈ 3.2 — the plateau is a ceiling, not a slower slope.
 **Plateau confirmation** (resolution ladder step 4): trailing 120-day
-capability growth of the leader < 0.0002/day.
+capability growth of the leader < 0.0002/day, gated to runs where
+recursion never ignited (`q < 0.01` / `E ≤ 0.60`) and R5 was never
+crossed — see the note at the terminal mapping.
+
+**Polaris defaults** (ratified 2026-07-23; calibration-neutral —
+Halcyon leads regardless): compute grows 2×/yr like the frontier;
+starts SL2; `C_rel` = `C_int` − 0.2 at spawn; spawn day ~
+round(Normal(400, 25)) clamped [300, 500]; culture Normal(0.8, 0.1)
+clamped [0, 1] like every culture draw.
 
 **Releases:** release when `C_int − C_rel` > appetite; appetite 0.25
 (Halcyon), 0.15 (Tianxia), 0.45 (Polaris); +0.1 when heat > 0.55, −0.1
 when trailing by > 0.25 rung. Release pulls `C_rel` up 85% of the gap.
+Per-lab release cooldown **45 trading days** (tuned 2026-07-23 against
+the ratchet band — majors ship no oftener than ~9 weeks; 63d was
+rejected because it pins the release count at its ceiling and no floor
+increment lands mid-band).
 Certification lags: R2 Exp(25d); R3 Exp(60d) + 40% disputed (+20–40d);
-R4 Exp(20d).
+R4 Exp(20d). Certification is **nested** (ruled 2026-07-23): settling
+rung r settles all unresolved lower rungs the same day and cancels
+their pending timers — a certified R4 entails a certified R3. The
+ledger records implied-vs-direct settlement so Consensus can
+distinguish them.
 
 ## Safety margin, heat, theft
 
@@ -67,7 +89,12 @@ heat0 = { transient: 0.15, floor: 0 }
 
 Post-theft: `S` *accumulation* zeroes for 90d; racing burn continues.
 Heat impulses as [02](02-race-model.md) rev; theft adds +0.04 to the
-permanent floor. Heat floor also takes min(0.05·tianxiaReleases, 0.35).
+permanent floor. Heat floor also takes
+min(**0.016**·tianxiaReleases, **0.30**) — retuned 2026-07-23 with the
+45d cooldown so the proliferation cap binds in ~47% of runs (inside
+the 35–55% acceptance band — a strict minority, with sampling room;
+rev 2's
+0.05/0.35 saturated in ~95% of runs, a ratchet that always bound).
 
 **Theft:** attempt hazard/day = 0.0011 · clamp(0.10 + gap/0.75, 0, 1.5)
 · (1 + heat) — the 0.10 floor keeps parity-state espionage alive
@@ -178,6 +205,23 @@ Terminal mapping, exclusive, in order:
    **family 1 requires `lead ≥ 0.25` ∧ `margin > required`** (no
    knife-edge vindication), else family 2 gradient
 5. day 1008 → timeout
+
+(Plateau confirmation in step 3 must be gated to pre-R5 runs: the
+trailing-120d growth test false-positives on ceiling-saturated
+post-takeoff trajectories — C clamps at the asymptote and flatlines,
+reading ~26% "plateau" against the true 12% elasticity tail in the
+phase-1 MC. Confirm plateau only where recursion never ignited
+(`q < 0.01` / `E ≤ 0.60` are the clean signals); a run that crossed
+R5 and then flatlined is family 1–4 business, not family 6. Found by
+the phase-1 skeleton's calibration harness, 2026-07-23. Second
+finding, same day: the trailing-120d growth test is noise-dominated —
+the daily shock puts the growth-estimator SD at ~3.6e-4/day against
+the 2e-4/day threshold, so even a truly flat run confirms only ~71%
+of the time, and most low-E runs are still slowly climbing toward the
+3.2 asymptote at day 1008 anyway (they resolve by timeout
+extrapolation, correctly). When the resolution ladder is built, use a
+smoothed or shock-free capability estimate, or a wider window, for
+the confirmation test — the raw endpoint difference is not usable.)
 
 Treaty sub-gates (to make Deal ≈ 4% derivable from dealPossible 0.15):
 discovery of `dealPossible` 0.65/run · initiation 0.85 · farce-gauntlet
