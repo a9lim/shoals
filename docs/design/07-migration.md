@@ -40,8 +40,7 @@ the new ones; write fresh against the design docs and delete the old):
   becomes the final page.
 - `regulations.js` / `lobbying.js` → pipeline machinery survives; menus
   and bills are new ([03-market-mechanics.md](03-market-mechanics.md)).
-- `lore.md` → full rewrite (**next docs-phase artifact**, once naming is
-  acked). `about.md`, `art-prompts.md` follow.
+- `lore.md` → full rewrite. `about.md`, `art-prompts.md` follow.
 
 **New builds** (no prototype ancestor), proposed as a `src/race/` cluster:
 `sampler.js` (hidden-state per-run config), `capability.js` (per-lab `C`,
@@ -98,10 +97,7 @@ losing that competition *is* the satire.
    (riskiest, most interlocked — last)
 
 ## Docs-phase queue (before any code)
-
-1. a9 acks the ◇ queue in [06-naming.md](06-naming.md)
-2. `lore.md` v2 — the full world-bible rewrite against 01/06
-3. A mechanics-tuning appendix for 02 (priors, thresholds, coupling
+1. A mechanics-tuning appendix for 02 (priors, thresholds, coupling
    constants — the numbers the sampler actually needs)
-4. Then AGENTS.md gets one paragraph pointing at docs/design/ as the
+2.TThen AGENTS.md gets one paragraph pointing at docs/design/ as the
    overhaul's source of truth, and the code phase can open

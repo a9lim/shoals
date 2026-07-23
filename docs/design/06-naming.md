@@ -97,27 +97,9 @@ VXHCN).
 Settled ✓ (2026-07-23); characters specified in
 [01-world.md](01-world.md) and detailed in lore.md v2:
 
-- CEO (the sincere accelerationist): **Elias Voss**
+- CEO (the sincere accelerationist): **Andreas Dirks**
 - Chief scientist (the hedging conscience): **Dr. Anja Reinholt**
 - Head of alignment (the vital-sign resignation risk): **Dr. Yuki Sato**
-- CFO: **Raj Malhotra** ✓ keep — analyst-ese was never part of the
-  critique; he was always register-correct
+- CFO: **Raj Malhotra**
 - Board kingmaker (ports Zhen's function): **Edwin Osei**
-- Polaris founder: **Eugene Gottlieb** ✓ — ports from the prototype,
-  re-aimed: Halcyon co-founder who leads the walkout when the scaling
-  decision goes the wrong way. The founders' divorce is the schism
-  superevent.
-- Polaris CEO: **Andrea Dirks** ✓ — ports with her IC background intact
-  and her threat model updated: the defense hawk who read the evals and
-  concluded the national-security threat is the model, not the rival.
-  Runs Polaris with opsec seriousness — the safety lab that is not a
-  pious nonprofit.
-
-Mira Kassis's function (safety-focused, caught in the middle) is absorbed
-by Sato; Dr. Miriam Keel is cut. Tianxia's public face lands in lore.md
-v2.
-
-## Remaining ◇ queue
-
-Empty — slate fully settled 2026-07-23 (Cangjie ✓, Holt ✓, cast ✓,
-HCN-as-underlying adopted ✓). Next artifact: lore.md v2.
+- Polaris founder: **Eugene Gottlieb**
