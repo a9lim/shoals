@@ -1,7 +1,8 @@
 # 06 — Naming
 
-> Rev 2 (2026-07-23) — most of the slate is now **settled** (marked ✓).
-> Remaining proposals marked ◇ await a9's ack. Rationale unchanged: the
+> Rev 3 (2026-07-23) — most of the slate is now **settled** (marked ✓),
+> and the lore rule is revised: **real places, fictional people** — the
+> polity fictions are dead. Remaining proposals marked ◇ await a9's ack. Rationale unchanged: the
 > prototype's names encoded the shallow critique; the real subject is
 > existential. Political and geopolitical names largely survive (they
 > serve the satire register, which stays).
@@ -47,6 +48,8 @@ becomes a household word when it leaks.
 points; the transfinite ladder (ℵ₀, ℵ₁, …) is quietly the whole subject;
 versions cleanly ("Aleph 4.5"). History ports from Silmarillion's: 1.x
 research, 2.x first commercial, current line in production at game start.
+(Collision with the real-world Aleph Alpha noted, weighed, and accepted
+— ratified 2026-07-23.)
 
 **Tianxia** ✓ — Zhaowei Technologies' frontier program ("all under
 heaven"); the register was already right. Now the open-weights player
@@ -80,24 +83,34 @@ game's one chart underlying *is* HCN (see
 **Consensus Markets** ✓ — the prediction-market venue for milestone
 binaries. Bland-real. Absolutely not "Delphi."
 
-**Geography** ✓ — Meridia is cut; **Phoenicia** reserved if a Levantine
-polity is ever needed. Foreign policy outside Columbia–Serica demotes to
-one-liners (decided 2026-07-23; see [01-world.md](01-world.md)). Serica,
-Khasuria, Farsistan, Boliviara keep their names for whatever texture
-survives.
+**Geography** ✓ — revised 2026-07-23: **real places, fictional people.**
+The United States (Washington), China (Beijing; Zhaowei in Shenzhen),
+Taiwan (Hsinchu — Cambria's fabs, and the strait's standing tail),
+Russia, OPEC/the Gulf, Bolivia as texture. Meridian Capital in New York;
+Halcyon in San Francisco; Polaris in Boulder. Foreign policy outside the
+U.S.–China axis demotes to one-liners, Taiwan excepted (see
+[01-world.md](01-world.md)); the Phoenicia reservation dissolves —
+Israel is just Israel if ever needed.
+
+✓ **Parties stay fictional** (Federalist / Farmer-Labor) — the one
+deliberate exception to the real-places-real-institutions rule: real
+party names would read as partisan commentary rather than structural
+satire, and the F / F-L architecture (seats, filibuster, midterms) is
+load-bearing in the engine. Ratified 2026-07-23.
 
 **Dead names** — Palanthropic/PNTH, Silmarillion, Atlas
 Sentinel/Aegis/Companion/Crucible, Covenant, Aletheia, Ptonos, Hearth
 (the separate open-weights lab died when open-weights became Tianxia's
 identity), Pharos, Lodestar, VXPNT (ticker; the machinery lives on as
-VXHCN).
+VXHCN) — and, from the geography pass (2026-07-23): Federal States of
+Columbia, Serica, Khasuria, Farsistan, Boliviara, Meridia, Phoenicia.
 
 ## Cast (sketch — lab only; political cast survives)
 
 Settled ✓ (2026-07-23); characters specified in
 [01-world.md](01-world.md) and detailed in lore.md v2:
 
-- CEO (the sincere accelerationist): **Andreas Dirks**
+- CEO (the sincere accelerationist): **Andrea Dirks**
 - Chief scientist (the hedging conscience): **Dr. Anja Reinholt**
 - Head of alignment (the vital-sign resignation risk): **Dr. Yuki Sato**
 - CFO: **Raj Malhotra**

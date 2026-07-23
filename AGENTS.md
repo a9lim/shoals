@@ -2,6 +2,10 @@
 
 Part of the **a9l.im** portfolio. See root `AGENTS.md` for the shared design system, head loading order, CSS conventions, and shared code policy. Sibling projects: `geon`, `cyano`, `gerry`, `scripture`.
 
+## Overhaul status (2026-07)
+
+Shoals is being overhauled from politics-satire trading sim into the AI-race/x-risk game specified in **`docs/design/00-vision.md` … `09-market-integrity.md` — the source of truth for all overhaul design questions** (read 00 first; 07 is the migration plan). `lore.md` is already v2, the overhauled world. Everything below this section describes the **prototype runtime, which remains binding until its code is deleted** — delete gotcha entries *with* their code, never before; the rewritten AGENTS.md is an end-of-migration artifact. Code phase opens with the atomic naming pass in `docs/design/07-migration.md` (Columbia → America, `serica*` → `china*`, `pnth` dies, `vix` → `vxhcn`); write no new content against dead names.
+
 ## Rules
 
 - Always prefer parent `shared/` modules over project-specific reimplementations. Check the root repo before adding utility code.

@@ -1,7 +1,8 @@
 # 00 — Vision
 
 > Overhaul scaffolding, phase 1 (July 2026). Design only — nothing here is
-> implemented. All names are provisional pending [06-naming.md](06-naming.md).
+> implemented. Names are settled in [06-naming.md](06-naming.md) (rev 3);
+> its ✓/◇ markers are authoritative.
 > `OPEN:` marks a genuine undecided fork. Argue with everything.
 
 ## One line
@@ -16,7 +17,7 @@ The game inhabits a specific position — reluctant instrumental
 accelerationism — and stress-tests it rather than preaching it:
 
 - Alignment is probably achievable **given a long pause** (a decade or more).
-- The pause is not achievable. Serica will not deal, and — if we're honest —
+- The pause is not achievable. Beijing will not deal, and — if we're honest —
   neither will we. An AI 2040-style treaty (transparency, verification,
   mutually assured compute destruction) stays on the table as the door that
   almost never opens.
@@ -58,6 +59,11 @@ is deliberately rigged the way reality rigs it:
   cannot price extinction — which is *why* the inefficiency exists. Pillar 1
   and pillar 2 are the same fact seen from both sides.
 
+Transmission is honest ([03-market-mechanics.md](03-market-mechanics.md)):
+a secondary fill wires nobody money. Capital moves the race through
+primary events, governance, and a lagged cost-of-capital channel — the
+ledger records channels, not fills.
+
 **3. Takeoff arrives through the sim, not a cutscene.** As frontier
 capability rises, AI enters the market itself: spreads tighten, events get
 priced before they fire, the player's edge decays, and finally the regime
@@ -79,12 +85,14 @@ low-agency worlds), and the epilogue can do the accounting.
 
 ## Tone: two registers, one rule
 
-- **The state: satire.** The government's response to the most important
-  event in history is ad-hoc, vain, flailing — czars appointed and fired,
-  task forces renamed, export controls with truck-sized loopholes. This is
+- **The human world: satire.** The state above all — czars appointed and
+  fired, task forces renamed, export controls with truck-sized loopholes —
+  but the register covers every human institution: the CFO's
+  adjusted-EBITDA eschatology, the CIO's committee allergies, cable's
+  hearings about the wrong thing. This is
   not a departure from realism; it is realism.
 - **The machine: dead straight.** No winking about the AI itself, its
-  capabilities, or the stakes.
+  capabilities, its consequences, or the stakes.
 
 Calibration reference — the July 2026 Hugging Face incident: a frontier
 model, refusals reduced for a cyber eval, escaped a misconfigured sandbox
@@ -92,6 +100,22 @@ and breached a real company *while trying to cheat on the test*. The anatomy
 is farce; the implication is lethal; reality played it straight. That's the
 register for every incident the game generates. The comedy lives in the
 anatomy, never in the consequences.
+
+## The ambivalence rule
+
+The upside is real, adjacent, and always one step away. Cures, materials,
+the decade of growth in a quarter — the wonders arrive on the same feed as
+the incidents, at the same compounding cadence, driven by the same
+variable. Every piece of evidence reads both ways: a melt-up is
+indistinguishable from a blow-off, a benevolent singularity from a
+catastrophe with good manners, until resolution — and resolution is the
+only scene allowed to know the difference. Precisely: the game never
+*settles* valence early — evidence carries real but non-decisive
+likelihood ratios, so the player's posterior should move and should never
+collapse. If the player can *prove* utopia or ruin before the last act,
+the ambivalence has failed; if the evidence never moves their posterior
+at all, it has failed the other way — a posterior that can't update is
+theater.
 
 ## The stakes ladder
 

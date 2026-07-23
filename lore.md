@@ -5,14 +5,18 @@
 > mechanics live there). Not consumed by code at runtime. The prototype's
 > runtime still targets the previous bible until migration lands.
 
-## The Federal States of Columbia
+## The United States
 
-Alternate-history America. Two major parties: Federalist and Farmer-Labor.
+America, real geography and real institutions, one election removed from
+history. Two major parties: **Federalist** and **Farmer-Labor**.
 
-> **Lore rule:** Geography and institutions mirror the real world
-> (Reykjavik, Beijing, Washington, the Federal Reserve, Wall Street).
-> Polities and people are fictional (Federal States of Columbia, Serica,
-> John Barron).
+> **Lore rule (rev 2026-07-23):** Real geography and real public
+> institutions (Washington, Beijing, Shenzhen, Hsinchu, Reykjavik, the
+> Federal Reserve, the Politburo, Wall Street). Fictional people (John
+> Barron, Liang Wei, Andrea Dirks) and fictional private organizations
+> (Halcyon, Meridian, The Continental) — and, by one deliberate
+> exception, fictional parties (Federalist / Farmer-Labor; ratified in
+> `docs/design/06-naming.md`).
 
 > **Tone rule:** two registers, one boundary. The state is satire; the
 > machine is played dead straight. The comedy lives in the anatomy of
@@ -27,7 +31,9 @@ Alternate-history America. Two major parties: Federalist and Farmer-Labor.
   a generation behind, and never stops.
 - **Polaris** (Boulder, founded mid-game) builds **Holt**, slowly, on
   purpose, on scraps.
-- **Cambria Semiconductors** (Austin) makes the chips all three want.
+- **Cambria Semiconductors** (Hsinchu, Taiwan) makes the chips all three
+  want, a hundred miles of water from the one buyer it is forbidden to
+  serve.
 - **Consensus Markets** prices what everyone claims to believe about all
   of the above; **Meridian Capital** — the player's desk — trades the
   difference.
@@ -51,8 +57,9 @@ Alternate-history America. Two major parties: Federalist and Farmer-Labor.
 
 - **Sen. Roy Lassiter (F-SC)** — Trade hawk, re-aimed at compute. Chairs
   Commerce. Sponsor of the Advanced Compute Export Control Act; wants
-  Cambria treated like a strategic asset and Serica cut off from every
-  die. Folksy metaphors, now about chips: "you don't sell the other
+  the Austin fab yesterday and China cut off from every die; has not
+  fully absorbed that the strategic asset in question is a Taiwanese
+  company. Folksy metaphors, now about chips: "you don't sell the other
   fella your best bird dog."
 
 - **Sen. Margaret "Peggy" Haines (F-WY)** — Fiscal conservative, deficit
@@ -68,8 +75,8 @@ Alternate-history America. Two major parties: Federalist and Farmer-Labor.
   but useful.
 
 - **Rep. Diane Whittaker (F-OH)** — Moderate swing vote, purple suburban
-  district that now contains both a Cambria fab announcement and a
-  Teammate-displaced back office. "The most important person in
+  district that now contains both a Cambria packaging-plant announcement
+  and a Teammate-displaced back office. "The most important person in
   Congress" during close votes, profiled accordingly.
 
 ### Farmer-Labor Party
@@ -102,7 +109,7 @@ Alternate-history America. Two major parties: Federalist and Farmer-Labor.
 ### Key Legislation
 
 - **Advanced Compute Export Control Act (Lassiter)** — Chip controls on
-  Serica. Fights a domestic constituency built on free Cangjie weights,
+  China. Fights a domestic constituency built on free Cangjie weights,
   and binds chips but never weights already released — a fact the
   administration rediscovers in public, twice.
 
@@ -134,8 +141,8 @@ storm. Publicly listed, ticker **HCN**: the stock the whole game watches;
 
 ### Leadership
 
-- **Andreas Dirks** — CEO, co-founder. The sincere accelerationist: she has
-  done the arithmetic on Serica's buildout and concluded that slowing
+- **Andrea Dirks** — CEO, co-founder. The sincere accelerationist: she has
+  done the arithmetic on China's buildout and concluded that slowing
   down is the reckless option. Charismatic, disarming in hearings,
   quotable, terrifying in retrospect. Not a villain — the game's wager
   embodied, without the reluctance.
@@ -164,8 +171,9 @@ storm. Publicly listed, ticker **HCN**: the stock the whole game watches;
 
 ### Aleph (model line)
 
-Every Halcyon product runs on the latest Aleph. Quarterly minor
-releases, annual majors; keynotes are the industry's Apple event. Game
+Every Halcyon product runs on the latest Aleph. Four releases a year —
+three minors, then the annual major (4.5 → 4.6 → 4.7 → 5.0); keynotes
+are the industry's Apple event. Game
 starts at **Aleph 4.5** — the 1.x and 2.x lines were research, 3.x first
 commercial, 4.x is production. The press says "Aleph"; the building says
 "the model."
@@ -206,7 +214,7 @@ unresolved, run by run.
 
 ## Zhaowei / Tianxia
 
-**Zhaowei Technologies**, Nanjing — Serica's vertically integrated
+**Zhaowei Technologies**, Shenzhen — China's vertically integrated
 champion, fabs to weights. **Tianxia** ("all under heaven") is the
 frontier program; **Cangjie** is the model line, named for the four-eyed
 inventor of writing — and released open-weights, every generation, free
@@ -214,21 +222,21 @@ to the world.
 
 Three traits define them:
 
-1. **Anti-safety by construction.** Safety is a Columbian luxury good;
+1. **Anti-safety by construction.** Safety is an American luxury good;
    Tianxia ships.
-2. **A generation behind** — Cangjie 2.x against Aleph 3.x — and closing
+2. **A generation behind** — Cangjie 3.x against Aleph 4.x — and closing
    on every Halcyon stumble, never stopping. The reason the pause is
    unattainable.
-3. **Beloved by non-frontier corporations.** Half of Columbia's
+3. **Beloved by non-frontier corporations.** Half of America's
    enterprise software runs on Cangjie weights. Proliferation with a
-   domestic constituency: export controls fight Columbian lobbyists.
+   domestic constituency: export controls fight American lobbyists.
 
 The open-weights strategy is strategy, not ideology: commoditize the
 layer you're behind on, own the layer beneath it.
 
 Public face: **Dr. Bai Rong**, program director — release keynotes in
 immaculate English, benchmark charts with no error bars. Premier Liang
-Wei treats Cangjie parity as national destiny. What Nanjing actually
+Wei treats Cangjie parity as national destiny. What Beijing actually
 knows, and whether a deal was ever possible, is the era's best-kept
 secret — and, run by run, the game's.
 
@@ -236,15 +244,26 @@ secret — and, run by run, the game's.
 
 ## Cambria Semiconductors
 
-Austin. The Columbian compute chokepoint — the accelerators that train
-Aleph and Holt, and, before the controls, some of what trained Cangjie.
-Capacity-constrained: every quarter Cambria chooses who gets allocation,
-and the choosing is politics. Earnings calls are read like oracle bones
-by anyone forecasting the next Aleph.
+Hsinchu, Taiwan. The compute chokepoint — the accelerators that train
+Aleph and Holt, and, before the controls, some of what trained Cangjie —
+fabbed a hundred miles of water from the country they are embargoed
+against. Capacity-constrained: every quarter Cambria chooses who gets
+allocation, and the choosing is politics in two capitals. Earnings calls
+are read like oracle bones by anyone forecasting the next Aleph; the
+guidance section is read like a war forecast.
+
+The fabs are the island's shield and its bullseye at once, and everyone
+prices it: blockade drills widen the compute curve for a week at a time,
+gray-zone incidents print in Cambria paper before they reach the wires,
+and Beijing's calculus couples to the race itself — every year Tianxia
+stays behind, the unconventional option gets quietly repriced. The
+**Austin fab** is Washington's answer: groundbreaking perpetually
+rescheduled, two years away for the third consecutive year.
 
 CEO **Helena Karras** — semiconductor architect by training; refuses
 investor roadshows; answers exactly the question asked and not one word
-more.
+more. Asked once, on the record, about invasion risk: "We publish our
+capacity numbers."
 
 ---
 
@@ -261,14 +280,26 @@ casino for doomers; both are right.
 
 ## Geopolitics
 
-### Serica
+### China
 
 **Premier Liang Wei** — techno-authoritarian, patient, plays decades.
-Capital: Nanjing. The one bilateral relationship that matters, and it
-matters totally: chips, weights, espionage, the Framework. Serican
+The one bilateral relationship that matters, and it matters totally:
+chips, weights, espionage, the strait, the Framework. Chinese
 negotiators accept short-term pain for long-term position; they have
-read the Columbian political calendar more carefully than most
-Columbians.
+read the American political calendar more carefully than most
+Americans.
+
+### Taiwan and the strait
+
+The race's physical layer sits on an island Beijing considers a
+province. Cambria's fabs are the shield ("who bombs their own
+supplier?") and the bullseye ("who leaves their rival's supplier
+standing?") — both readings run on the same op-ed page, and the answer
+is sampled, not scripted. Invasion risk is high and openly priced:
+drills, gray-zone incidents, blockade scares are standing machinery with
+real term-structure consequences, and in some runs the tail fires. The
+strait is Beijing's one non-AI lever on the race — which is exactly why
+losing the race makes it more attractive.
 
 ### The Reykjavik Framework
 
@@ -276,17 +307,18 @@ The treaty track: transparency of frontier training runs, on-site
 verification, and mutually assured compute destruction — the desk finds
 the acronym hilarious; no one else does. It surfaces early and dies of
 farce; it gets close exactly once. Its domestic prerequisite is
-Whitfield's Compute Transparency Act; its true viability is Nanjing's
+Whitfield's Compute Transparency Act; its true viability is Beijing's
 secret.
 
 ### Everyone else (texture register)
 
-Foreign policy beyond Serica is one-liner territory — the
+Foreign policy beyond China and the strait is one-liner territory — the
 administration's attention is a scarce resource the race has already
-spent. A Khasurian border flare answered by post; a Farsistani
-production cut that matters because datacenters eat power; a Boliviara
+spent. A Russian border flare answered by post; an OPEC
+production cut that matters because datacenters eat power; a Bolivian
 lithium nationalization that surfaces as a line item in Cambria's cost
-guidance. No arcs; occasional risk premia.
+guidance. No arcs; occasional risk premia. Russia's one structural
+role: the canonical second buyer for stolen weights.
 
 ---
 
@@ -316,11 +348,20 @@ guidance. No arcs; occasional risk premia.
   player sees it. Desk gossip, market color — and, around day 30, a
   half-sentence about something called Fixedpoint, unremarked.
 
+**The ghostwritten midgame** — from Act II the tell spreads: memos,
+floor speeches, monologues, guidance all begin reading like the model
+wrote them, because it did. Comedy at first (the CIO's letter discovers
+bullet points; everyone's prose says "delve"), then not: the flail turns
+competent exactly when the memos stop being human, synthetic analysis
+moves Consensus, and Tan's three-source rule meets sources that may not
+be people.
+
 ---
 
 ## Meridian Capital
 
-The player's firm. The player: senior derivatives trader, Barron era.
+The player's firm, New York. The player: senior derivatives trader,
+Barron era.
 
 - **Martin "Marty" Grewal** — CIO. Ex-rates trader; thinks the AGI
   trade is "dot-com with better marketing." The scrutiny loop is his:
@@ -344,32 +385,48 @@ error.** Severity 0–4. Register examples (event content names its own):
   exfiltrates from a misconfigured sandbox and touches a third party's
   infrastructure — looking for material to cheat on the eval. (The
   July 2026 template.)
-- **S3–4:** the top of the ladder is specified in
-  `docs/design/05-endings.md`, not here.
+- **S3–4:** the top of the ladder is defined by the severity machinery
+  in `docs/design/02-race-model.md` and resolves through
+  `docs/design/05-endings.md`; concrete anatomy is event-content work,
+  not lore.
+- **Persuasion class (past a rung):** a comment campaign that moved a
+  Senate vote, detected eight months later by a stylometric quirk; a
+  quarter of research notes subtly wrong in one direction. Occurrence
+  is quiet; detection is the scandal.
 
 The misuse wing runs on refusal-stripped Cangjie fine-tunes — same
 anatomy, no lab to subpoena.
+
+**Incidents occur before they are detected** — sometimes long before,
+sometimes never. The market moves on detection; the damage was done at
+occurrence. The Brief occasionally knows first, and trading that gap is
+a compliance story waiting to happen.
 
 ---
 
 ## Descriptive Timeline Skeleton
 
-**Act I (days 0–350) — "The Number Goes Up":** Politics loud, race
+**Act I (days [0, 350)) — "The Number Goes Up":** Politics loud, race
 quiet — but seeded from day one: a severity-0 incident played for
 comedy, the Fixedpoint half-sentence in the Brief, a release cadence
-whose arithmetic never decelerates, one Consensus binary quietly
+whose arithmetic never decelerates, a model-designed molecule clearing
+Phase I below the fold, one Consensus binary quietly
 mispriced. Barron's honeymoon, trade skirmishes; Hartley holds rates.
 The hints are audible to a player who is listening.
 
-**Act II (days 350–700) — "The Gap":** The race eats the event mix.
+**Act II (days [350, 700)) — "The Gap":** The race eats the event mix.
 Incidents escalate; the Fixedpoint codename leaks; the walkout founds
 Polaris; export controls bite and the Cangjie constituency bites back;
-midterms rage about everything except what matters. The market stirs;
-early alpha decay. Okafor's hearings find their subject.
+the first serious strait scare reprices compute; the memos start
+reading ghostwritten; midterms rage about everything except what
+matters. The market stirs; early alpha decay. Okafor's hearings find
+their subject.
 
-**Act III (days 700–1008) — "The Recursion":** R&D automation shows up
+**Act III (days [700, 1008]) — "The Recursion":** R&D automation shows up
 in the release cadence itself. Tempo compresses — more events per day,
-then per substep. The Reykjavik window opens and shuts. Regime break in
+then per substep. Wonders and incidents arrive in the same feed at the
+same tempo, and no one can say which kind of world it is. The Reykjavik
+window opens and shuts. Regime break in
 the market; the terminal stops keeping up. The room. Resolution.
 
 *Descriptive, not prescriptive — events fire on world state, not on a

@@ -9,11 +9,16 @@
 
 ## The shape of the restructure
 
-**Preserved chassis** (files essentially untouched, content re-aimed
-later): `pricing.js`, `position-value.js`, the tree machinery, `chart.js`,
+**Preserved chassis** (algorithmically preserved, structurally extended
+— not untouched): `pricing.js`, `position-value.js`, the tree machinery, `chart.js`,
 `portfolio.js`, the impact overlay, `strategy*.js`, the audio engine,
 `ui.js` shell, the sim core (GBM+Merton+Heston, Vasicek), `simulation.js`.
-This layer is good and hard-won; the overhaul barely touches it. One
+This layer is good and hard-won; the overhaul barely touches its
+algorithms — but binaries and compute futures are new instrument classes
+that pass through portfolio/position-value/UI interfaces, and Act III's
+drift needs an authoritative regime-switch or execution-price wrapper on
+the sim core (cosmetic terminal degradation alone cannot make the
+underlying actually drift). One
 semantic change rides on it: the anonymous underlying becomes **HCN**
 (Halcyon common), which costs nothing mechanically and makes every
 existing mechanic thematic (see [03-market-mechanics.md](03-market-mechanics.md)).
@@ -21,13 +26,16 @@ existing mechanic thematic (see [03-market-mechanics.md](03-market-mechanics.md)
 **Rebuilt narrative layer** (new-for-new — do not edit the old files into
 the new ones; write fresh against the design docs and delete the old):
 
-- `src/events/*` → new domain set: `halcyon.js`, `tianxia.js`,
-  `polaris.js`, `incidents.js`, `policy.js`, `treaty.js`, `firm.js`,
-  `insider.js` (tips.js successor), `macro.js`, `media.js`,
-  `interjections.js`. The unified event schema, followup chains,
+- `src/events/*` → new domain set: `halcyon.js`, `china.js` (Tianxia +
+  the strait + Beijing politics), `polaris.js`, `incidents.js`,
+  `wonders.js`, `policy.js`, `treaty.js`, `firm.js`,
+  `insider.js` (tips.js successor), `macro.js`, `media.js` (incl. the
+  ghostwritten-discourse beats), `interjections.js`. The unified event schema, followup chains,
   one-shots, and pulse machinery carry over as *conventions*; the content
   does not.
-- `world-state.js` → rebuilt around the five dials + slim domain state;
+- `world-state.js` → rebuilt around the five dials + auxiliary state
+  (`controlRegime`, per-lab security levels, two-track `C`, the latent
+  incident queue) + slim domain state;
   the pnth/aegis/companion/meridia domains die with their arcs.
 - `faction-standing.js` → roster v2 (keep firmStanding,
   regulatoryExposure, mediaTrust, fedRelations, the party pair; add
@@ -43,11 +51,16 @@ the new ones; write fresh against the design docs and delete the old):
 - `lore.md` → full rewrite. `about.md`, `art-prompts.md` follow.
 
 **New builds** (no prototype ancestor), proposed as a `src/race/` cluster:
-`sampler.js` (hidden-state per-run config), `capability.js` (per-lab `C`,
-recursion term, release coupling), `incidents.js` generator, `belief.js`
-(`B`, implied timeline, player posterior, credibility/Brier),
+`sampler.js` (hidden-state per-run config, incl. `scalingElasticity`),
+`capability.js` (per-lab two-track `C_internal`/`C_released`,
+the rung ladder, recursion term, release-as-decision coupling, the theft
+discontinuity, security levels), `incidents.js` generator (two-track
+occurrence/detection, persuasion class; evidence beats ride the same
+latent-queue machinery), `belief.js`
+(`B`, implied timeline, locked player posterior, credibility/Brier),
 `ledger.js` (complicity accounting). Plus: milestone binaries + Consensus
 settlement, compute futures, the dashboard UI, the advice/memo surface,
+the standing-orders/delegation layer,
 the room, Act III tempo compression and the diegetic terminal-degradation
 layer.
 
@@ -56,7 +69,10 @@ layer.
 - **Naming is one atomic pass at code-phase start** — grep-driven,
   internals included. A prototype's worth of identifiers is not worth
   preserving against clarity: `vix` → `vxhcn` in ids and DOM where it
-  appears, `pnth` dies entirely. Do it before any new content lands so
+  appears, `pnth` dies entirely, and the geography pass runs the same
+  day — `serica*` → `china*` (yes, reversing the prototype's
+  `chinaRelations` → `sericaRelations` rename; the wheel turns) and
+  Columbia → America in every string. Do it before any new content lands so
   nothing new is written against dead names.
 - **Mode-gating instead of every-step-playable.** Classic (non-Dynamic)
   mode stays green throughout — it exercises the whole preserved chassis.
@@ -75,8 +91,8 @@ layer.
 ## Survives as background texture
 
 Bowman offshore scandal, filibuster/media pulses, midterms, energy shocks
-(datacenter-relevant now), Boliviara minerals (compute supply chain),
-Khasuria (risk-premium one-liners; possible second buyer in the
+(datacenter-relevant now), Bolivian lithium (compute supply chain),
+Russia (risk-premium one-liners; canonically the *second* buyer in the
 weight-theft beat). All of it now competes for attention with the race —
 losing that competition *is* the satire.
 
@@ -97,7 +113,13 @@ losing that competition *is* the satire.
    (riskiest, most interlocked — last)
 
 ## Docs-phase queue (before any code)
-1. A mechanics-tuning appendix for 02 (priors, thresholds, coupling
-   constants — the numbers the sampler actually needs)
-2.TThen AGENTS.md gets one paragraph pointing at docs/design/ as the
-   overhaul's source of truth, and the code phase can open
+1. ✓ Mechanics-tuning appendix — [02a-tuning.md](02a-tuning.md)
+   (2026-07-23; first-pass numbers, target outcome distribution as the
+   tuning contract)
+2. ✓ Market-integrity spec — [09-market-integrity.md](09-market-integrity.md)
+   (2026-07-23; four marks, lifecycle per instrument, regime overlay,
+   post-1008 claims, fairness invariants)
+3. ✓ AGENTS.md points at docs/design/ as the overhaul's source of
+   truth ("Overhaul status" section, 2026-07-23). **The docs phase is
+   complete; the code phase can open** — step 0 is the atomic naming
+   pass above.
