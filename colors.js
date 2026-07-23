@@ -16,7 +16,7 @@ _PALETTE.gamma = _PALETTE.extended.green;
 _PALETTE.theta = _PALETTE.extended.rose;
 _PALETTE.vega  = _PALETTE.extended.purple;
 _PALETTE.rho   = _PALETTE.extended.blue;
-_PALETTE.vix   = _PALETTE.extended.purple;
+_PALETTE.vxhcn   = _PALETTE.extended.purple;
 
 _freezeTokens();
 
@@ -35,7 +35,7 @@ _freezeTokens();
   --theta: ${P.theta};
   --vega: ${P.vega};
   --rho: ${P.rho};
-  --vix: ${P.vix};
+  --vxhcn: ${P.vxhcn};
   --chart-grid: ${_r(L.text, 0.06)};
   --chart-crosshair: ${_r(L.text, 0.25)};
   --chart-axis: ${L.textSecondary};

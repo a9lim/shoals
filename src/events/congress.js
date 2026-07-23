@@ -18,11 +18,11 @@ export const CONGRESS_EVENTS = [
         id: 'okafor_grills_dirks',
         category: 'political',
         likelihood: 0.8,
-        headline: 'Sen. Okafor grills Dirks for six hours in televised hearing; "Did you or did you not discuss Atlas targeting with VP Bowman?" Clip goes viral, 40M views',
+        headline: 'Sen. Okafor grills Dirks for six hours in televised hearing; "Did you or did you not discuss defense contracts with VP Bowman?" Clip goes viral, 40M views',
         params: { mu: -0.02, theta: 0.01, lambda: 0.3 },
         magnitude: 'moderate',
         minDay: 200,
-        when: (sim, world) => world.pnth.senateProbeLaunched,
+        when: (sim, world) => world.investigations.tanBowmanStory >= 1,
         effects: (world) => {
             world.investigations.okaforProbeStage = Math.max(1, world.investigations.okaforProbeStage);
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 2);
@@ -106,7 +106,7 @@ export const CONGRESS_EVENTS = [
         id: 'barron_approval_erosion',
         category: 'political',
         likelihood: 3,
-        headline: 'The Continental\'s latest tracking poll: Barron approval slides 4 points. Whitfield on the Senate floor: "The Columbian people are waking up." Tao dismisses it as "fake polling"',
+        headline: 'The Continental\'s latest tracking poll: Barron approval slides 4 points. Whitfield on the Senate floor: "The American people are waking up." Tao dismisses it as "fake polling"',
         params: { mu: -0.003 },
         magnitude: 'minor',
         when: (sim, world) => world.election.barronApproval > 52,
@@ -259,17 +259,16 @@ export const CONGRESS_EVENTS = [
         effects: (world) => { world.election.barronApproval = Math.max(0, world.election.barronApproval - 5); shiftFaction('federalistSupport', -3); shiftFaction('firmStanding', -3); },
     },
     {
-        id: 'compound_pnth_scandal_trade_war',
+        id: 'compound_scandal_trade_war',
         category: 'compound',
         likelihood: 1.0,
-        headline: 'Nanjing state media runs week-long exposé on Bowman-PNTH corruption; frames Columbian tech sector as "fundamentally compromised." Allied nations reconsider Atlas contracts',
+        headline: 'Beijing state media runs week-long exposé on Bowman corruption; frames American tech sector as "fundamentally compromised." Allied nations reconsider defense contracts',
         params: { mu: -0.05, theta: 0.025, lambda: 1.0 },
         magnitude: 'major',
         minDay: 400,
         when: (sim, world) => world.investigations.tanBowmanStory >= 2 && world.geopolitical.tradeWarStage >= 3,
         effects: (world) => {
-            world.pnth.commercialMomentum = Math.max(-2, world.pnth.commercialMomentum - 1);
-            world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1);
+            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
             shiftFaction('firmStanding', -3);
             shiftFaction('regulatoryExposure', 3);
         },
@@ -302,7 +301,7 @@ export const CONGRESS_EVENTS = [
         id: 'compound_impeachment_war',
         category: 'compound',
         likelihood: 1.0,
-        headline: 'Constitutional crisis deepens as Barron faces impeachment trial while troops remain deployed in Meridia; markets price in maximum political uncertainty. The Continental: "Two fronts, zero precedent."',
+        headline: 'Constitutional crisis deepens as Barron faces impeachment trial while troops remain deployed in Israel; markets price in maximum political uncertainty. The Continental: "Two fronts, zero precedent."',
         params: { mu: -0.05, theta: 0.03, lambda: 1.5, sigmaR: 0.008 },
         magnitude: 'major',
         minDay: 500,
@@ -310,34 +309,6 @@ export const CONGRESS_EVENTS = [
         effects: (world) => {
             world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
             shiftFaction('firmStanding', -3);
-        },
-    },
-    {
-        id: 'compound_pnth_hostile_bid_crisis',
-        category: 'compound',
-        likelihood: 1.0,
-        headline: 'A Serica-linked sovereign tech fund launches a hostile bid for scandal-plagued PNTH at 40% premium. Dirks calls it "a hostile act dressed as an investment." The Meridian Brief: "Palanthropic for sale — at a discount no one wanted."',
-        params: { mu: 0.08, theta: 0.04, lambda: 2.0 },
-        magnitude: 'major',
-        minDay: 500,
-        when: (sim, world) => (world.pnth.dojSuitFiled || world.pnth.whistleblowerFiled) && sim.theta > 0.12 && !world.pnth.acquired,
-        effects: (world) => {
-            world.pnth.acquired = true;
-        },
-    },
-    {
-        id: 'compound_war_crimes_pnth',
-        category: 'compound',
-        likelihood: 1.0,
-        headline: 'Leaked PNTH internal memo shows engineers flagged civilian targeting errors and were overruled by management; ICC opens preliminary investigation',
-        params: { mu: -0.07, theta: 0.03, lambda: 1.5 },
-        magnitude: 'major',
-        minDay: 400,
-        when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.pnth.militaryContractActive,
-        effects: (world) => {
-            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
-            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
-            world.election.barronApproval = Math.max(0, world.election.barronApproval - 5);
         },
     },
     {
@@ -624,7 +595,7 @@ export const CONGRESS_EVENTS = [
         followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
-        headline: 'Whittaker elected Speaker on the fourth ballot as compromise candidate; Tao concedes gracefully. The Continental: "The most powerful moderate in Columbia." Markets relieved',
+        headline: 'Whittaker elected Speaker on the fourth ballot as compromise candidate; Tao concedes gracefully. The Continental: "The most powerful moderate in America." Markets relieved',
         params: { mu: 0.02, theta: -0.008, lambda: -0.3 },
         magnitude: 'moderate',
     },
@@ -646,7 +617,7 @@ export const CONGRESS_EVENTS = [
         id: 'debt_ceiling_standoff',
         category: 'congressional',
         likelihood: 0.5,
-        headline: 'Treasury invokes extraordinary measures as debt ceiling deadline looms. Haines demands spending cuts; Whitfield vows to block any "hostage deal." Rating agencies put Columbia on negative watch',
+        headline: 'Treasury invokes extraordinary measures as debt ceiling deadline looms. Haines demands spending cuts; Whitfield vows to block any "hostage deal." Rating agencies put America on negative watch',
         magnitude: 'major',
         minDay: 250,
         when: (sim, world, congress) => !congress.trifecta,
@@ -667,7 +638,7 @@ export const CONGRESS_EVENTS = [
         followupOnly: true,
         category: 'congressional',
         likelihood: 1.0,
-        headline: 'Columbia briefly misses a Treasury coupon payment — first technical default in history. S&P strips the AAA rating. Okafor: "Barron held the full faith and credit of this nation hostage." Dollar tumbles as global shockwave hits',
+        headline: 'America briefly misses a Treasury coupon payment — first technical default in history. S&P strips the AAA rating. Okafor: "Barron held the full faith and credit of this nation hostage." Dollar tumbles as global shockwave hits',
         params: { mu: -0.08, theta: 0.05, lambda: 3.0, muJ: -0.06, sigmaR: 0.02, b: 0.015, borrowSpread: 1.0, q: -0.003 },
         magnitude: 'major',
         effects: (world) => {
@@ -702,7 +673,7 @@ export const CONGRESS_EVENTS = [
         id: 'congressional_insider_trading_scandal',
         category: 'congressional',
         likelihood: 0.5,
-        headline: 'DOJ charges four members of Congress with insider trading on PNTH defense contracts — two Federalists, one Farmer-Labor rep, and Sen. Hargrove (F-GA). Okafor: "I warned you all. I warned you"',
+        headline: 'DOJ charges four members of Congress with insider trading on HCN defense contracts — two Federalists, one Farmer-Labor rep, and Sen. Hargrove (F-GA). Okafor: "I warned you all. I warned you"',
         params: { mu: -0.02, theta: 0.01, lambda: 0.4, borrowSpread: 0.1 },
         magnitude: 'moderate',
         minDay: 200,
@@ -766,7 +737,7 @@ export const CONGRESS_EVENTS = [
         id: 'congress_overrides_veto',
         category: 'congressional',
         likelihood: 0.15,
-        headline: 'Congress overrides Barron\'s veto of the Serican sanctions bill 78-22. Lassiter and Whitfield vote together for the first time all session. Barron: "An unconstitutional coup by RINOs and radicals"',
+        headline: 'Congress overrides Barron\'s veto of the Chinese sanctions bill 78-22. Lassiter and Whitfield vote together for the first time all session. Barron: "An unconstitutional coup by RINOs and radicals"',
         params: { mu: -0.02, theta: 0.01, lambda: 0.3, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim, world, congress) => congress.superMajority || (!congress.fedControlsHouse && world.congress.senate.federalist <= 55),
@@ -858,12 +829,12 @@ export const CONGRESS_EVENTS = [
         effects: [ { path: 'election.barronApproval', op: 'add', value: -1 }, ],
     },
 
-    // -- Serican Reciprocal Tariff Act lifecycle ------------------------------
+    // -- Chinese Reciprocal Tariff Act lifecycle ------------------------------
     {
         id: 'tariff_act_introduced',
         category: 'congressional',
         likelihood: 2,
-        headline: 'Lassiter introduces the Serican Reciprocal Tariff Act in the Senate. "If Serica taxes our goods, we tax theirs — dollar for dollar." Bipartisan support from both hawks. Reyes abstains. MarketWire: "This one has legs."',
+        headline: 'Lassiter introduces the Chinese Reciprocal Tariff Act in the Senate. "If China taxes our goods, we tax theirs — dollar for dollar." Bipartisan support from both hawks. Reyes abstains. MarketWire: "This one has legs."',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && getPipelineStatus('trade_war_tariffs') === null,
         params: { mu: -0.01, theta: 0.005 },
@@ -878,7 +849,7 @@ export const CONGRESS_EVENTS = [
         followupOnly: true,
         category: 'congressional',
         likelihood: 2,
-        headline: 'Lassiter brings Serican factory workers to testify before the Foreign Relations Committee. "These are the jobs we lost." The footage dominates The Sentinel for three days. Cole: "His best performance yet."',
+        headline: 'Lassiter brings Chinese factory workers to testify before the Foreign Relations Committee. "These are the jobs we lost." The footage dominates The Sentinel for three days. Cole: "His best performance yet."',
         magnitude: 'minor',
         when: (sim, world) => getPipelineStatus('trade_war_tariffs') === 'introduced',
         params: {},
@@ -889,7 +860,7 @@ export const CONGRESS_EVENTS = [
         followupOnly: true,
         category: 'congressional',
         likelihood: 3,
-        headline: 'Senate Foreign Relations Committee advances the Serican Reciprocal Tariff Act 14-8 with bipartisan support. Haines votes yes. "This isn\'t about politics — it\'s about leverage," she tells MarketWire.',
+        headline: 'Senate Foreign Relations Committee advances the Chinese Reciprocal Tariff Act 14-8 with bipartisan support. Haines votes yes. "This isn\'t about politics — it\'s about leverage," she tells MarketWire.',
         magnitude: 'moderate',
         when: (sim, world) => getPipelineStatus('trade_war_tariffs') === 'introduced',
         params: { mu: -0.01, theta: 0.005 },
@@ -903,7 +874,7 @@ export const CONGRESS_EVENTS = [
         id: 'tariff_act_passes',
         followupOnly: true,
         category: 'congressional',
-        headline: 'The Serican Reciprocal Tariff Act passes 68-32 with bipartisan support. Lassiter and Whitfield both vote yes. Barron signs it in the Rose Garden. Liang Wei recalls Columbia\'s ambassador within the hour.',
+        headline: 'The Chinese Reciprocal Tariff Act passes 68-32 with bipartisan support. Lassiter and Whitfield both vote yes. Barron signs it in the Rose Garden. Liang Wei recalls America\'s ambassador within the hour.',
         likelihood: (sim, world) => {
             let w = world.geopolitical.tradeWarStage >= 2 ? 3 : 1;
             w *= (1 + (world.election.lobbyMomentum || 0) * 0.1);
@@ -914,7 +885,7 @@ export const CONGRESS_EVENTS = [
         params: { mu: -0.02, theta: 0.01, lambda: 0.5 },
         effects: (world) => {
             shiftFaction('federalistSupport', 3);
-            world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1);
+            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
             advanceBill('trade_war_tariffs', 'active');
         },
     },
@@ -922,7 +893,7 @@ export const CONGRESS_EVENTS = [
         id: 'tariff_act_fails',
         followupOnly: true,
         category: 'congressional',
-        headline: 'The Serican Reciprocal Tariff Act fails 45-55 as business-wing Federalists break ranks. Lassiter: "Corporate cowards." Barron threatens executive tariffs instead. Markets rally on the news.',
+        headline: 'The Chinese Reciprocal Tariff Act fails 45-55 as business-wing Federalists break ranks. Lassiter: "Corporate cowards." Barron threatens executive tariffs instead. Markets rally on the news.',
         likelihood: (sim, world) => {
             let w = world.geopolitical.tradeWarStage >= 2 ? 0.3 : 2;
             return Math.max(0.1, w);
@@ -1019,9 +990,9 @@ export const CONGRESS_EVENTS = [
         id: 'digital_markets_introduced',
         category: 'congressional',
         likelihood: 0.4,
-        headline: 'Reyes introduces the Digital Markets Accountability Act targeting AI monopolies. "Palanthropic controls the government\'s eyes, ears, and now its weapons." Whittaker co-sponsors after extracting a small-business exemption.',
+        headline: 'Reyes introduces the Digital Markets Accountability Act targeting AI monopolies. "A handful of labs control the models the whole economy now runs on." Whittaker co-sponsors after extracting a small-business exemption.',
         magnitude: 'moderate',
-        when: (sim, world) => (world.pnth.companionScandal >= 1 || world.pnth.aegisControversy >= 1 || world.pnth.dojSuitFiled) && getPipelineStatus('antitrust_scrutiny') === null,
+        when: (sim, world) => (world.investigations.tanBowmanStory >= 1 || world.media.lobbyingExposed) && getPipelineStatus('antitrust_scrutiny') === null,
         params: { mu: -0.015, theta: 0.008 },
         effects: () => { advanceBill('antitrust_scrutiny', 'introduced'); shiftFaction('regulatoryExposure', 3); },
         followups: [
@@ -1034,7 +1005,7 @@ export const CONGRESS_EVENTS = [
         followupOnly: true,
         category: 'congressional',
         likelihood: 2,
-        headline: 'Malhotra flies to Washington for closed-door meetings with the Commerce Committee. "Atlas Sentinel protects 200 million Columbians. Regulate us out of existence and see what happens." Three senators privately back off.',
+        headline: 'A senior industry lobbyist flies to Washington for closed-door meetings with the Commerce Committee. "Our systems protect 200 million Americans. Regulate us out of existence and see what happens." Three senators privately back off.',
         magnitude: 'minor',
         when: (sim, world) => getPipelineStatus('antitrust_scrutiny') === 'introduced',
         params: { mu: 0.005 },
@@ -1058,10 +1029,10 @@ export const CONGRESS_EVENTS = [
         id: 'digital_markets_passes',
         followupOnly: true,
         category: 'congressional',
-        headline: 'The Digital Markets Accountability Act passes 54-46 with five Federalist defections. AI companies face mandatory safety audits and licensing. Malhotra: "Compliance costs will be material." Gottlieb calls it "long overdue."',
+        headline: 'The Digital Markets Accountability Act passes 54-46 with five Federalist defections. AI companies face mandatory safety audits and licensing. Industry warns compliance costs will be material; safety advocates call it "long overdue."',
         likelihood: (sim, world) => {
-            let w = world.pnth.dojSuitFiled ? 2.5 : 1;
-            if (world.pnth.senateProbeLaunched) w *= 1.5;
+            let w = world.investigations.tanBowmanStory >= 2 ? 2.5 : 1;
+            if (world.investigations.okaforProbeStage >= 1) w *= 1.5;
             return w;
         },
         magnitude: 'major',
@@ -1077,7 +1048,7 @@ export const CONGRESS_EVENTS = [
         id: 'digital_markets_fails',
         followupOnly: true,
         category: 'congressional',
-        headline: 'The Digital Markets Accountability Act fails 44-56 as the tech lobby holds the line. Reyes: "Money won today." Whittaker votes no after Tao applies pressure. The Meridian Brief: "PNTH exhales."',
+        headline: 'The Digital Markets Accountability Act fails 44-56 as the tech lobby holds the line. Reyes: "Money won today." Whittaker votes no after Tao applies pressure. The Meridian Brief: "HCN exhales."',
         likelihood: (sim, world, congress) => {
             let w = congress.trifecta ? 2.5 : 1;
             return w;
@@ -1188,7 +1159,7 @@ export const CONGRESS_EVENTS = [
     {
         id: 'filibuster_whitfield_opens',
         category: 'filibuster',
-        headline: 'Sen. Whitfield takes the Senate floor at 9:14 PM with a stack of CBO scoring documents. "The Columbian people deserve to hear every number," he says. The galleries settle in.',
+        headline: 'Sen. Whitfield takes the Senate floor at 9:14 PM with a stack of CBO scoring documents. "The American people deserve to hear every number," he says. The galleries settle in.',
         likelihood: 3,
         params: { theta: 0.005 },
         magnitude: 'moderate',
@@ -1197,7 +1168,7 @@ export const CONGRESS_EVENTS = [
     {
         id: 'filibuster_whitfield_hour_nine',
         category: 'filibuster',
-        headline: 'Hour nine. Whitfield is reading soybean import statistics from the Serican Reciprocal Tariff Act\'s appendix. Tao is asleep in the cloakroom. The overnight MarketWire desk sends: "Still going."',
+        headline: 'Hour nine. Whitfield is reading soybean import statistics from the Chinese Reciprocal Tariff Act\'s appendix. Tao is asleep in the cloakroom. The overnight MarketWire desk sends: "Still going."',
         likelihood: 2,
         params: {},
         magnitude: 'minor',

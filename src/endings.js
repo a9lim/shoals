@@ -127,14 +127,14 @@ export function generateEnding(endingId, world, sim, portfolio, eventLog, player
 
     return [
         _pageElection(world, playerChoices, premature, endingId),
-        _pagePNTH(world, playerChoices, premature),
+        _pageIndustry(world, playerChoices, premature),
         _pageWorld(world, sim, impactHistory, premature),
         _pageMeridian(endingId, sim, portfolio, factionState, quarterlyReviews, playerChoices),
         _pageLegacy(endingId, sim, portfolio, eventLog, playerChoices, impactHistory, quarterlyReviews, traitIds, factionState),
     ];
 }
 
-// -- Page 1: The Election & Columbia's Direction ------------------------------
+// -- Page 1: The Election & America's Direction ------------------------------
 
 function _pageElection(world, playerChoices, premature, endingId) {
     let body = '';
@@ -144,7 +144,7 @@ function _pageElection(world, playerChoices, premature, endingId) {
         body += _p('Your story at Meridian ended before the presidential term did. The nation continued without you.');
 
         if (endingId === 'criminal_indictment') {
-            body += _p('By the time the election arrived, your name had become a footnote in a larger story about Columbian finance. Prosecutors cited your case in stump speeches. Reform candidates used your mugshot in campaign ads. You watched the returns from a place where the channels were chosen for you.');
+            body += _p('By the time the election arrived, your name had become a footnote in a larger story about American finance. Prosecutors cited your case in stump speeches. Reform candidates used your mugshot in campaign ads. You watched the returns from a place where the channels were chosen for you.');
         } else if (endingId === 'whistleblower') {
             body += _p('Your testimony reshaped the campaign. Both parties claimed your revelations as evidence for their platform. The Federalists pointed to your cooperation as proof the system worked. The Farmer-Labor caucus pointed to the crimes you described as proof it didn\'t.');
         }
@@ -199,7 +199,7 @@ function _pageElection(world, playerChoices, premature, endingId) {
 
     // Media framing
     if (world?.media?.sentinelRating >= 7 && world?.media?.tanCredibility <= 4) {
-        body += _p('Cole\'s Sentinel framed the election as a referendum on Columbian strength. Without The Continental\'s investigative counterweight, the narrative held.');
+        body += _p('Cole\'s Sentinel framed the election as a referendum on American strength. Without The Continental\'s investigative counterweight, the narrative held.');
     } else if (world?.media?.tanCredibility >= 7) {
         body += _p('Tan\'s Continental investigations defined the campaign\'s final weeks. Cole fought back on The Sentinel, but the documents spoke for themselves.');
     }
@@ -220,7 +220,7 @@ function _pageElection(world, playerChoices, premature, endingId) {
             body += _p('John Barron won re-election on the first Tuesday of November, and he won decisively. The networks called it before midnight Eastern.');
             body += _p('The victory was built on a foundation that his critics never understood. The economy, for all its turbulence, had delivered gains that working families could feel.');
             if (geo.tradeWarStage === 4) {
-                body += _p('The trade deal with Serica, announced three months before the election, gave Barron the closing argument he needed.');
+                body += _p('The trade deal with China, announced three months before the election, gave Barron the closing argument he needed.');
             }
             if (okafor) {
                 body += _p('Senator Okafor ran a disciplined campaign, but she could never escape the perception that her candidacy was built on investigation rather than vision.');
@@ -231,7 +231,7 @@ function _pageElection(world, playerChoices, premature, endingId) {
         case 'barron_wins_narrowly':
             body += _p('The election was not decided on election night. It took eleven days of counting, recounting, and legal challenges in three states before John Barron was declared the winner.');
             if (okafor) {
-                body += _p('Senator Patricia Okafor had come closer than anyone thought possible. Her campaign, launched on the back of the Palanthropic investigations, had turned the election into a referendum on accountability.');
+                body += _p('Senator Patricia Okafor had come closer than anyone thought possible. Her campaign, launched on the back of the corporate-accountability investigations, had turned the election into a referendum on accountability.');
             }
             if (imp >= 2) {
                 body += _p('The shadow of the impeachment proceedings hung over everything. Barron\'s legal team had successfully delayed the Senate trial past the election.');
@@ -241,14 +241,14 @@ function _pageElection(world, playerChoices, premature, endingId) {
 
         case 'okafor_wins':
             body += _p('Senator Patricia Okafor made history on election night, becoming the first woman and first Black woman elected President of the United States.');
-            body += _p('The turning point was not a single moment but an accumulation of them. The Palanthropic hearings had given Okafor a national profile. The midterms had given her a platform.');
+            body += _p('The turning point was not a single moment but an accumulation of them. The corporate-accountability hearings had given Okafor a national profile. The midterms had given her a platform.');
             if (geo.recessionDeclared) {
                 body += _p('The recession, declared six months before the election, sealed Barron\'s fate.');
             }
             if (fed.hartleyFired) {
                 body += _p('Barron\'s firing of Fed Chair Hartley came back to haunt him. Okafor\'s campaign ad\u2014just Hartley\'s face, the date she was fired, and the unemployment rate six months later\u2014ran in heavy rotation through October.');
             }
-            body += _p('In her victory speech, Okafor promised accountability for Palanthropic, restoration of Fed independence, and "a foreign policy that doesn\'t start wars to win news cycles."');
+            body += _p('In her victory speech, Okafor promised accountability for Wall Street and the AI giants, restoration of Fed independence, and "a foreign policy that doesn\'t start wars to win news cycles."');
             break;
 
         case 'okafor_wins_decisively':
@@ -293,108 +293,19 @@ function _pageElection(world, playerChoices, premature, endingId) {
     return { title: 'The Election', body };
 }
 
-// -- Page 2: PNTH & Corporate America ----------------------------------------
+// -- Page 2: The AI Industry -------------------------------------------------
+// NOTE: the prototype's corporate-narrative page was excised with the
+// discontinued arc. This is a minimal coherent placeholder keyed off surviving
+// investigation state; the adaptive industry epilogue is rebuilt in a later phase.
 
-function _pagePNTH(world, playerChoices, premature) {
-    const p = world?.pnth || {};
+function _pageIndustry(world, playerChoices, premature) {
     const inv = world?.investigations || {};
     let body = '';
 
-    if (premature) {
-        // Compressed summary
-        if (p.acquired) {
-            body += _p('Palanthropic was acquired before you could see how the story ended. The name survived. The mission didn\'t.');
-        } else if (p.dojSuitFiled && p.whistleblowerFiled) {
-            body += _p('Palanthropic was engulfed in scandal. The DOJ suit, the whistleblower, and Okafor\'s investigation converged into a perfect storm.');
-        } else if (p.gottliebStartedRival) {
-            body += _p('Gottlieb left to found Covenant AI. The schism split the industry along ethical lines.');
-        } else if (p.ceoIsGottlieb) {
-            body += _p('Gottlieb\'s commercial pivot was underway. Whether it would succeed was a question you wouldn\'t be around to answer.');
-        } else if (!p.ceoIsGottlieb && (p.boardDirks || 0) >= 7) {
-            body += _p('Dirks\'s defense-first Palanthropic was printing money. The engineers who cared about alignment had already left.');
-        } else {
-            body += _p('The Gottlieb-Dirks detente held, but insiders said it was only a matter of time.');
-        }
-
-        // Products
-        if (p.aegisDeployed && (p.aegisControversy || 0) >= 3) {
-            body += _p('Atlas Aegis was grounded after the Operation Dustwalker casualty reports.');
-        }
-        if (p.companionLaunched && (p.companionScandal || 0) >= 3) {
-            body += _p('Atlas Companion\'s privacy catastrophe was the biggest class-action in tech history.');
-        }
-
-        return { title: 'PNTH & Corporate America', body };
-    }
-
-    // Full version -- adapted from epilogue.js
-    if (p.acquired) {
-        body += _h3('Under New Management');
-        body += _p('In the end, Palanthropic did not die or triumph. It was absorbed. The acquisition, announced on a Sunday evening to minimize market reaction, was the largest in tech history.');
-        body += _p('The name Palanthropic still appeared on the building, but the lobby had been redecorated and the mission statement quietly updated. The Atlas AI platform now served clients on six continents with no particular regard for their form of government.');
-        if (p.gottliebStartedRival) {
-            body += _p('Eugene Gottlieb watched from across the bay. His new company, Covenant AI, had become a refuge for engineers who couldn\'t stomach the new Palanthropic.');
-        } else if (p.ceoIsGottlieb) {
-            body += _p('Gottlieb received his payout and retreated from public life. Friends said he was writing a book.');
-        } else {
-            body += _p('Gottlieb released a statement calling the deal "the final betrayal of everything Palanthropic was meant to be." It trended for six hours.');
-        }
-
-    } else if (p.dojSuitFiled && p.whistleblowerFiled && p.senateProbeLaunched) {
-        body += _h3('The Reckoning');
-        body += _p('What was once the most promising AI company in America was now a cautionary tale. The DOJ antitrust suit, the whistleblower complaint, and Senator Okafor\'s investigation had converged into a perfect storm. Palanthropic\'s stock had lost eighty percent of its value from peak to trough.');
-        body += _p('The consent decree was brutal. An independent monitor was installed. The military contracts were suspended pending review. Andrea Dirks was photographed leaving a federal courthouse in a navy suit and an expression that betrayed nothing.');
-        if (p.ceoIsGottlieb) {
-            body += _p('Gottlieb, remarkably, had survived. His early opposition to the military contracts now looked like prescience.');
-        } else {
-            body += _p('The board brought in an outside CEO. Gottlieb was offered an advisory role and declined.');
-        }
-
-    } else if (p.gottliebStartedRival) {
-        body += _h3('The Schism');
-        body += _p('The AI industry had split along ethical lines. On one side: Palanthropic under Dirks, its Atlas platform powering military operations. On the other: Covenant AI, Gottlieb\'s defiant response.');
-        body += _p('The rivalry had become personal. Dirks called Covenant "a vanity project." Gottlieb called Palanthropic "a weapons manufacturer that happened to use neural networks."');
-        body += _p('Covenant AI attracted a disproportionate share of top researchers. Their commercial product was gaining traction. Revenue was still a fraction of Palanthropic\'s. But the trajectory lines were converging.');
-
-    } else if (p.ceoIsGottlieb && (p.boardGottlieb || 0) >= 6) {
-        body += _h3('The Pivot');
-        body += _p('Gottlieb proved the skeptics wrong. It took two years of boardroom battles, but when the dust settled, Palanthropic was his.');
-        body += _p('The pivot to enterprise AI was not glamorous. Instead of drone strikes, there were hospital systems running Atlas for diagnostic support. Financial institutions using it for risk modeling. The revenue grew slowly at first, then with compound acceleration.');
-        body += _p('Dirks departed with a severance package and a non-compete. She was last seen consulting for defense contractors.');
-
-    } else if (!p.ceoIsGottlieb && (p.boardDirks || 0) >= 7) {
-        body += _h3('The Contractor');
-        body += _p('Dirks had won, but the company Gottlieb built was unrecognizable. The visitor badges now required security clearance. The cafeteria conversations were conducted in careful whispers.');
-        body += _p('The defense contracts had made Palanthropic enormously profitable. Atlas powered surveillance networks, predictive policing systems, and autonomous weapons platforms. Wall Street loved it.');
-        body += _p('Gottlieb\'s farewell email, leaked within hours, ended with: "Build something you can explain to your children."');
-
+    if ((inv.tanBowmanStory || 0) >= 2 || (inv.okaforProbeStage || 0) >= 2) {
+        body += _p('The corporate scandals that shadowed the administration \u2014 the Bowman trades, the Okafor hearings \u2014 outlived your time on the desk. The frontier AI companies at the center of them kept shipping regardless.');
     } else {
-        body += _h3('The Detente');
-        body += _p('The Gottlieb-Dirks detente held, but insiders said it was only a matter of time. The board remained split, neither faction commanding the votes for a decisive move.');
-        body += _p('The company ran in two directions at once: commercial division building enterprise tools, defense division fulfilling government contracts. Industry analysts called it "the most dysfunctional company in tech that still makes money."');
-    }
-
-    // Atlas products
-    if (p.aegisDeployed) {
-        if ((p.aegisControversy || 0) >= 3) {
-            body += _p('Atlas Aegis was grounded by executive order after the Operation Dustwalker casualty reports. Kassis\'s leaked decision logs made continued deployment politically impossible.');
-        } else if ((p.aegisControversy || 0) >= 1) {
-            body += _p('Atlas Aegis remained operational in the Farsistan theater, a quiet engine of Pentagon funding and boardroom power for Dirks\'s faction.');
-        }
-    }
-    if (p.companionLaunched) {
-        if ((p.companionScandal || 0) >= 3) {
-            body += _p('Atlas Companion\'s 200 million users learned their conversations had been accessible to Farsistani intelligence. The class-action lawsuit was the largest in tech history.');
-        } else if ((p.companionScandal || 0) >= 1) {
-            body += _p('Atlas Companion reshaped daily life for hundreds of millions. The "AI boyfriend" headlines faded. The revenue didn\'t.');
-        }
-    }
-
-    // Board fight
-    if ((p.boardDirks || 0) > (p.boardGottlieb || 0)) {
-        body += _p('Zhen cast the deciding vote for Dirks. Malhotra switched sides after seeing the quarterly numbers.');
-    } else if ((p.boardGottlieb || 0) > (p.boardDirks || 0)) {
-        body += _p('Zhen sided with Gottlieb in the end. "The company needs a conscience," he told the board.');
+        body += _p('The AI industry ground forward through the term, indifferent to the politics swirling around it. The companies that mattered kept shipping; the ones that didn\'t were forgotten.');
     }
 
     // Player involvement
@@ -404,7 +315,7 @@ function _pagePNTH(world, playerChoices, premature) {
         body += _p('When subpoenas flew, one trader at Meridian kept their head down and their records clean.');
     }
 
-    return { title: 'PNTH & Corporate America', body };
+    return { title: 'The AI Industry', body };
 }
 
 // -- Page 3: The World --------------------------------------------------------
@@ -423,7 +334,7 @@ function _pageWorld(world, sim, impactHistory, premature) {
             body += _p('The Strait of Hormuz remained closed. Al-Farhan reshaped Middle Eastern power dynamics for a generation.');
         }
         if ((geo.tradeWarStage || 0) >= 3) {
-            body += _p('The tech decoupling with Serica was complete and permanent.');
+            body += _p('The tech decoupling with China was complete and permanent.');
         }
         if (fed.hartleyFired) {
             body += _p('Hartley\'s firing was the constitutional crisis that wasn\'t. The Fed\'s independence was the real casualty.');
@@ -435,16 +346,16 @@ function _pageWorld(world, sim, impactHistory, premature) {
 
     // Full version -- adapted from epilogue.js
 
-    // Trade / Serica
+    // Trade / China
     if ((geo.tradeWarStage || 0) > 0) {
-        body += _h3('Trade &amp; Serica');
+        body += _h3('Trade &amp; China');
         if (geo.tradeWarStage >= 4) {
             body += _p('The framework deal was, depending on who you asked, either Barron\'s crowning achievement or the most expensive photo opportunity in American economic history. The tariffs came down. The retaliatory measures were unwound. The cost of the detour was a number both sides preferred not to calculate.');
-            if ((geo.sericaRelations || 0) > 0) {
-                body += _p('Relations between Washington and Serica settled into something approaching warmth, or at least the absence of active hostility.');
+            if ((geo.chinaRelations || 0) > 0) {
+                body += _p('Relations between Washington and China settled into something approaching warmth, or at least the absence of active hostility.');
             }
         } else if (geo.tradeWarStage >= 3) {
-            body += _p('The tech decoupling was complete and permanent. American and Serican technology ecosystems now operated in parallel universes. Liang Wei\'s Zhaowei Technologies thrived in the bifurcated landscape.');
+            body += _p('The tech decoupling was complete and permanent. American and Chinese technology ecosystems now operated in parallel universes. Liang Wei\'s Zhaowei Technologies thrived in the bifurcated landscape.');
         } else if (geo.tradeWarStage >= 2) {
             body += _p('The trade war had settled into a grinding stalemate. Tariffs remained in place on both sides. Neither could claim victory. Both could claim enormous costs.');
         } else {
@@ -464,31 +375,31 @@ function _pageWorld(world, sim, impactHistory, premature) {
         }
     }
 
-    // Khasuria
-    const khasuria = geo.khasurianCrisis || 0;
-    if (khasuria >= 3) {
-        body += _h3('Khasuria');
-        body += _p('Volkov\'s forces never withdrew from the border territories. The Khasurian Border Accord was dead. The new status quo \u2014 armed occupation dressed in diplomatic language \u2014 would outlast the Barron presidency.');
-    } else if (khasuria >= 2) {
-        body += _h3('Khasuria');
-        body += _p('The Khasurian border crisis subsided without resolution. Volkov withdrew his armored divisions but left intelligence assets in place.');
-    } else if (khasuria >= 1) {
-        body += _h3('Khasuria');
+    // Russia
+    const russia = geo.russianCrisis || 0;
+    if (russia >= 3) {
+        body += _h3('Russia');
+        body += _p('Volkov\'s forces never withdrew from the border territories. The Russian Border Accord was dead. The new status quo \u2014 armed occupation dressed in diplomatic language \u2014 would outlast the Barron presidency.');
+    } else if (russia >= 2) {
+        body += _h3('Russia');
+        body += _p('The Russian border crisis subsided without resolution. Volkov withdrew his armored divisions but left intelligence assets in place.');
+    } else if (russia >= 1) {
+        body += _h3('Russia');
         body += _p('Volkov tested the border and found Barron\'s red line credible \u2014 or at least unpredictable enough to respect.');
     }
 
     // Strait
     if (geo.straitClosed) {
         body += _p('The Strait of Hormuz remained closed. Al-Farhan extracted concessions that reshaped Middle Eastern power dynamics for a generation.');
-    } else if ((geo.farsistanEscalation || 0) >= 2) {
+    } else if ((geo.gulfEscalation || 0) >= 2) {
         body += _p('Al-Farhan\'s Strait of Hormuz brinkmanship ended in a back-channel deal. Bowman\'s one genuine diplomatic achievement.');
     }
 
-    // Serica relations
-    if ((geo.sericaRelations || 0) >= 1) {
+    // China relations
+    if ((geo.chinaRelations || 0) >= 1) {
         body += _p('The Transpacific Commerce Framework held. Liang Wei and Barron traded insults publicly and concessions privately.');
-    } else if ((geo.sericaRelations || 0) <= -2) {
-        body += _p('Decoupling from Serica became permanent. Zhaowei chips vanished from Columbian supply chains. The semiconductor cold war had begun.');
+    } else if ((geo.chinaRelations || 0) <= -2) {
+        body += _p('Decoupling from China became permanent. Zhaowei chips vanished from American supply chains. The semiconductor cold war had begun.');
     }
 
     // The Fed
@@ -715,7 +626,7 @@ function _pageLegacy(endingId, sim, portfolio, eventLog, playerChoices, impactHi
         }
 
         // Information edge
-        if (playerChoices.pursued_insider_tip || playerChoices.pursued_pnth_tip) {
+        if (playerChoices.pursued_insider_tip || playerChoices.pursued_hcn_tip) {
             body += _p('There were conversations that, in retrospect, you probably shouldn\u2019t have had. Tips received, tips acted upon. The compliance logs told one story; the P&L told another.');
         } else if (playerChoices.declined_analyst_color) {
             body += _p('When the sellside called with color, you hung up. When the tips came, you deleted them. Your edge was in the math, not the whisper network.');
@@ -881,7 +792,7 @@ function _synthesizeReputation(playerChoices, impactHistory, quarterlyReviews, p
     if (flags.includes('stonewalled_sec')) scores.insider += 2;
     if (flags.includes('invoked_fifth')) scores.insider += 1;
     if (flags.includes('pursued_insider_tip'))  scores.insider += 2;
-    if (flags.includes('pursued_pnth_tip'))     scores.insider += 2;
+    if (flags.includes('pursued_hcn_tip'))     scores.insider += 2;
     if (flags.includes('lawyered_up'))          scores.insider += 1;
     if (flags.includes('lawyered_up_unusual'))  scores.insider += 1;
 

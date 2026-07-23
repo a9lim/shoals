@@ -1,7 +1,7 @@
 ---
 name: Shoals
 title: Shoals — Options Trading and Politics Simulator
-description: Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.
+description: Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.
 updated: 2026-07-17
 ---
 
@@ -23,7 +23,7 @@ The multi-leg strategy builder lets users construct spreads, straddles, strangle
 
 ## Instruments and Portfolio
 
-The trading surface includes PNTH stock, bonds, VXPNT volatility futures, and American options. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
+The trading surface includes HCN stock, bonds, VXHCN volatility futures, and American options. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
 
 ## Institutional Narrative
 
@@ -43,4 +43,4 @@ Shoals provides keyboard shortcuts, light and dark themes, labeled controls, num
 
 ## Price Impact
 
-The impact model records decaying cumulative volume separately for stock, bonds, VXPNT futures, and each option contract. It applies square-root fill costs and valuation overlays without directly rewriting the simulated spot path. Delta changes in the player's option book generate market-maker hedge flow, and exposure thresholds add temporary, capped overlays to selected process parameters.
+The impact model records decaying cumulative volume separately for stock, bonds, VXHCN futures, and each option contract. It applies square-root fill costs and valuation overlays without directly rewriting the simulated spot path. Delta changes in the player's option book generate market-maker hedge flow, and exposure thresholds add temporary, capped overlays to selected process parameters.

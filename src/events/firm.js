@@ -35,7 +35,7 @@ export const FIRM_EVENTS = [
         id: 'barron_cryptic_tweet_2',
         category: 'neutral',
         likelihood: 4,
-        headline: 'Barron tweets "The Fake News won\'t tell you, but PNTH is doing TREMENDOUS things for this country." Sharma: "Presidential stock tips. We live in interesting times." Stock ticks up briefly.',
+        headline: 'Barron tweets "The Fake News won\'t tell you, but HCN is doing TREMENDOUS things for this country." Sharma: "Presidential stock tips. We live in interesting times." Stock ticks up briefly.',
         params: { mu: 0.003 },
         magnitude: 'minor',
     },
@@ -46,24 +46,6 @@ export const FIRM_EVENTS = [
         headline: 'President Barron delivers 90-minute speech at rally; The Sentinel runs it live. The Meridian Brief: "90 minutes, zero policy substance. Markets unmoved."',
         params: { mu: -0.001 },
         magnitude: 'minor',
-    },
-    {
-        id: 'gottlieb_ted_talk',
-        category: 'neutral',
-        likelihood: 3,
-        headline: 'Gottlieb delivers TED talk on "Ethical AI in an Age of Acceleration"; standing ovation. Sharma tweets: "Eloquent as always. Markets don\'t care."',
-        params: { mu: 0.004 },
-        magnitude: 'minor',
-        when: (sim, world) => world.pnth.ceoIsGottlieb,
-    },
-    {
-        id: 'kassis_hackathon',
-        category: 'neutral',
-        likelihood: 3,
-        headline: 'PNTH CTO Mira Kassis demos Atlas Sentinel capabilities at company hackathon; viral clip boosts employer brand. MarketWire picks it up.',
-        params: { mu: 0.003 },
-        magnitude: 'minor',
-        when: (sim, world) => world.pnth.ctoIsMira,
     },
     {
         id: 'hartley_jackson_hole',
@@ -104,10 +86,9 @@ export const FIRM_EVENTS = [
         id: 'zhaowei_conference',
         category: 'neutral',
         likelihood: 3,
-        headline: 'Zhaowei CEO Liang Wei showcases new chip architecture at Nanjing AI Forum; Sharma: "The Zhaowei gap is narrowing. Kassis knows it."',
+        headline: 'Zhaowei CEO Liang Wei showcases new chip architecture at Beijing AI Forum; Sharma: "The Zhaowei gap is narrowing, and everyone knows it."',
         params: { mu: -0.002 },
         magnitude: 'minor',
-        effects: (world) => { world.geopolitical.crucibleCompetitionPressure = true; },
     },
     {
         id: 'markets_drift_sideways_1',
@@ -121,7 +102,7 @@ export const FIRM_EVENTS = [
         id: 'markets_drift_sideways_2',
         category: 'neutral',
         likelihood: 6,
-        headline: 'Another quiet session as major indices trade in a tight range; VIX slips below 14. The Meridian Brief: "Vol sellers are getting paid. Enjoy it while it lasts."',
+        headline: 'Another quiet session as major indices trade in a tight range; VXHCN slips below 14. The Meridian Brief: "Vol sellers are getting paid. Enjoy it while it lasts."',
         params: { theta: -0.002 },
         magnitude: 'minor',
     },
@@ -129,7 +110,7 @@ export const FIRM_EVENTS = [
         id: 'markets_drift_sideways_3',
         category: 'neutral',
         likelihood: 5,
-        headline: 'Low-conviction session: breadth flat, volume below 30-day average. The Meridian Brief: "No leadership, no conviction. Market is waiting for Malhotra\'s earnings call."',
+        headline: 'Low-conviction session: breadth flat, volume below 30-day average. The Meridian Brief: "No leadership, no conviction. Market is waiting for the next big earnings call."',
         params: { mu: 0.002 },
         magnitude: 'minor',
     },
@@ -153,7 +134,7 @@ export const FIRM_EVENTS = [
         id: 'opex_positioning',
         category: 'neutral',
         likelihood: 3,
-        headline: 'Options expiration approaching; dealers adjust hedges as gamma exposure shifts near key strikes. The Meridian Brief flags unusual activity ahead of Malhotra\'s next earnings call.',
+        headline: 'Options expiration approaching; dealers adjust hedges as gamma exposure shifts near key strikes. The Meridian Brief flags unusual activity ahead of the next major earnings call.',
         params: { theta: 0.003 },
         magnitude: 'minor',
     },
@@ -169,7 +150,7 @@ export const FIRM_EVENTS = [
         id: 'buyback_season',
         category: 'neutral',
         likelihood: 3,
-        headline: 'Corporate buyback window reopens post-earnings; S&P constituents authorized $180B in repurchases this quarter. Malhotra\'s buyback program is among the largest.',
+        headline: 'Corporate buyback window reopens post-earnings; S&P constituents authorized $180B in repurchases this quarter. The largest tech names are among the biggest buyers.',
         params: { mu: 0.005, theta: -0.002 },
         magnitude: 'minor',
     },
@@ -188,15 +169,6 @@ export const FIRM_EVENTS = [
         headline: 'Retail sales come in exactly at consensus (+0.3% m/m); no revision to prior month. The Meridian Brief: "In-line data, in-line market. Next."',
         params: { mu: 0.002 },
         magnitude: 'minor',
-    },
-    {
-        id: 'pnth_investor_conference',
-        category: 'neutral',
-        likelihood: 3,
-        headline: 'PNTH holds annual investor conference; Gottlieb reiterates long-term Atlas Sentinel vision, no guidance change. Malhotra handles the Q&A. Dirks skips the event.',
-        params: { mu: 0.004, theta: -0.001 },
-        magnitude: 'minor',
-        when: (sim, world) => world.pnth.ceoIsGottlieb,
     },
     {
         id: 'meme_stock_day',
@@ -392,7 +364,7 @@ export const FIRM_EVENTS = [
                 : '';
             const macro = world.geopolitical.recessionDeclared
                 ? 'Priya Sharma\'s MarketWire column called it "the worst macro backdrop in a decade."'
-                : 'The trade war with Serica is deepening and Priya Sharma\'s MarketWire coverage is unrelentingly bearish.';
+                : 'The trade war with China is deepening and Priya Sharma\'s MarketWire coverage is unrelentingly bearish.';
             return prefix + `You're carrying ${netDelta.toFixed(0)} delta — massively long — into what everyone else sees as a worsening macro picture. ${macro} Two PMs on the Meridian floor pulled you aside at lunch. The CRO wants to know your thesis. Either you're brilliant or reckless, and right now nobody can tell which.`;
         },
         choices: [
@@ -661,23 +633,23 @@ export const FIRM_EVENTS = [
     },
 
     {
-        id: 'desk_pnth_earnings',
+        id: 'desk_hcn_earnings',
         trigger: (sim) => {
             const eq = equity();
             if (eq <= 0) return false;
-            const pnthNotional = portfolio.positions.filter(p => p.type === 'stock')
+            const hcnNotional = portfolio.positions.filter(p => p.type === 'stock')
                 .reduce((s, p) => s + Math.abs(p.qty) * posPrice(p), 0);
             const daysToEarnings = QUARTERLY_CYCLE - (sim.day % QUARTERLY_CYCLE);
-            return pnthNotional / eq > 0.15 * firmThresholdMult() && daysToEarnings <= 10;
+            return hcnNotional / eq > 0.15 * firmThresholdMult() && daysToEarnings <= 10;
         },
         cooldown: 150,
         tone: 'negative',
         popup: true,
-        headline: 'Sellside salesman mentions "interesting flow" ahead of Malhotra\'s earnings call',
+        headline: 'Sellside salesman mentions "interesting flow" ahead of the earnings call',
         context: (sim, world) => {
-            let text = 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been unusual activity in the PNTH options chain ahead of Malhotra\'s earnings call. Smart money is positioning before the print — someone on the sellside thinks Raj is going to guide higher. I think you\'d want to know." He trails off, waiting for you to bite.';
-            if (world?.geopolitical?.khasurianCrisis >= 2) {
-                text += ' The Khasurian border crisis has made Aegis a national security priority overnight.';
+            let text = 'A salesman from a bulge bracket calls your line. "Listen, I can\'t say much, but there\'s been unusual activity in the HCN options chain ahead of the earnings call. Smart money is positioning before the print — someone on the sellside thinks the number is going to beat. I think you\'d want to know." He trails off, waiting for you to bite.';
+            if (world?.geopolitical?.russianCrisis >= 2) {
+                text += ' The Russian border crisis has the whole tape on edge.';
             }
             return text;
         },
@@ -692,7 +664,7 @@ export const FIRM_EVENTS = [
                 label: 'Ask what he\'s hearing',
                 desc: 'The curiosity is killing you.',
                 factionShifts: [{ faction: 'regulatoryExposure', value: 13 }],
-                playerFlag: 'pursued_pnth_tip',
+                playerFlag: 'pursued_hcn_tip',
                 _tipAction: true,
             },
         ],
@@ -711,9 +683,9 @@ export const FIRM_EVENTS = [
         headline: 'The Meridian Brief: "One trader swimming against the tide"',
         context: (sim, world) => {
             const netDelta = computeNetDelta();
-            let text = `PNTH is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you on the Meridian floor just booked his best quarter ever going long. Your MarketWire chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
-            if (world?.geopolitical?.crucibleCompetitionPressure) {
-                text += ' Zhaowei\'s sovereign-backed compute buildout looms over every Crucible projection.';
+            let text = `HCN is at $${sim.S.toFixed(0)} — well above where you started shorting — and your delta is ${netDelta.toFixed(0)}. Every tick higher costs you. The PM next to you on the Meridian floor just booked his best quarter ever going long. Your MarketWire chat is full of unsolicited advice. The desk head walks past without making eye contact. You're either early or wrong, and right now the P&L doesn't distinguish between the two.`;
+            if (world?.geopolitical?.chinaRelations <= -1) {
+                text += ' Zhaowei\'s sovereign-backed compute buildout looms over every U.S. AI projection.';
             }
             return text;
         },

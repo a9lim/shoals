@@ -21,7 +21,7 @@ import { StrategyRenderer } from './src/strategy.js';
 import {
     cacheDOMElements, bindEvents, updateChainDisplay,
     rebuildTradeDropdown, rebuildStrategyDropdown,
-    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateVixDisplay, updateStockBondPrices,
+    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateVxhcnDisplay, updateStockBondPrices,
     syncSettingsUI, toggleStrategyView,
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
@@ -37,7 +37,7 @@ import { checkEndings, generateEnding } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
-import { computeVIXSpot } from './src/pricing.js';
+import { computeVXHCNSpot } from './src/pricing.js';
 import { syncMarket, market } from './src/market.js';
 import {
     resetImpactState, decayImpactVolumes,
@@ -100,7 +100,7 @@ let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
-let vixHistory = null;    // sparkline ring buffer for VX
+let vxhcnHistory = null;    // sparkline ring buffer for VX
 let portfolioHistory = null; // sparkline ring buffer for portfolio value
 let _savedOverlays = {};
 
@@ -132,7 +132,7 @@ function _haptic(pattern) {
 }
 function _syncAll() {
     syncMarket(sim);
-    market.vix = computeVIXSpot(sim.v, sim.kappa, sim.theta, sim.xi);
+    market.vxhcn = computeVXHCNSpot(sim.v, sim.kappa, sim.theta, sim.xi);
 }
 function _clampRate() {
     const ceil = getRegulationEffect('rateCeiling', null);
@@ -183,12 +183,12 @@ function _initRateHistory() {
     }
 }
 
-function _initVixHistory() {
-    vixHistory = createSparkHistory(HISTORY_CAPACITY);
+function _initVxhcnHistory() {
+    vxhcnHistory = createSparkHistory(HISTORY_CAPACITY);
     const h = sim.history;
     for (let d = h.minDay; d <= h.maxDay; d++) {
         const bar = h.get(d);
-        if (bar) pushSparkSample(vixHistory, computeVIXSpot(bar.v, sim.kappa, sim.theta, sim.xi));
+        if (bar) pushSparkSample(vxhcnHistory, computeVXHCNSpot(bar.v, sim.kappa, sim.theta, sim.xi));
     }
 }
 
@@ -359,7 +359,7 @@ function init() {
         initAboutPanel({
             title: 'Shoals',
             lastUpdated: '2026-07-17',
-            description: 'Trade stock, bonds, VXPNT volatility futures, and American options in a stochastic market simulator. Build multi-leg strategies, manage a margin portfolio, and navigate branching institutional events during a volatile political term.',
+            description: 'Trade stock, bonds, VXHCN volatility futures, and American options in a stochastic market simulator. Build multi-leg strategies, manage a margin portfolio, and navigate branching institutional events during a volatile political term.',
             controls: [
                 { label: 'Buy / sell stock', value: 'Click Buy button or press B' },
                 { label: 'Buy / sell bond', value: 'Click Bond button or press N' },
@@ -391,8 +391,8 @@ function init() {
         onShortStock:     () => handleShortStock(),
         onBuyBond:        () => handleBuyBond(),
         onShortBond:      () => handleShortBond(),
-        onBuyVix:         () => handleBuyVix(),
-        onShortVix:       () => handleShortVix(),
+        onBuyVxhcn:         () => handleBuyVxhcn(),
+        onShortVxhcn:       () => handleShortVxhcn(),
         onChainCellClick: (info) => handleChainCellClick(info),
         onExpiryChange:   (idx) => {
             const pe = _priceExpiry(idx);
@@ -567,7 +567,7 @@ function init() {
     sim.prepopulate();
     _syncAll();
     _initRateHistory();
-    _initVixHistory();
+    _initVxhcnHistory();
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
 
@@ -1208,9 +1208,9 @@ function _recordImpact(day, direction, magnitude, context) {
 function _onDayComplete() {
     const vol = market.sigma;
 
-    // Record rate + VIX for sparklines
+    // Record rate + VXHCN for sparklines
     if (rateHistory) pushSparkSample(rateHistory, sim.r);
-    if (vixHistory) pushSparkSample(vixHistory, market.vix);
+    if (vxhcnHistory) pushSparkSample(vxhcnHistory, market.vxhcn);
 
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
 
@@ -1271,7 +1271,7 @@ function _onDayComplete() {
             const _w = eventEngine.world;
             if (_w.geopolitical.recessionDeclared) playerChoices.profited_recession = true;
             if (_w.geopolitical.oilCrisis) playerChoices.profited_oil_crisis = true;
-            if (_w.geopolitical.farsistanEscalation >= 2) playerChoices.profited_war_escalation = true;
+            if (_w.geopolitical.gulfEscalation >= 2) playerChoices.profited_war_escalation = true;
             if (_w.investigations.impeachmentStage >= 2) playerChoices.profited_impeachment = true;
         }
     }
@@ -1548,7 +1548,7 @@ function updateUI(precomputedMargin) {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, portfolioHistory);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
-    updateVixDisplay($, market.vix, vixHistory);
+    updateVxhcnDisplay($, market.vxhcn, vxhcnHistory);
     refreshTooltip();
     if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
         _updateTradeCreditDebit();
@@ -1582,7 +1582,7 @@ function updateSubstepUI(marginInfo) {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
     updateRateDisplay($, sim.r, rateHistory);
-    updateVixDisplay($, market.vix, vixHistory);
+    updateVxhcnDisplay($, market.vxhcn, vxhcnHistory);
 
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
@@ -1728,17 +1728,6 @@ function _resetCore(index) {
     impactHistory.length = 0;
     quarterlyReviews.length = 0;
     if (eventEngine) eventEngine.resetTriggerCooldowns();
-    if (eventEngine) {
-        // Reset Silmarillion release state on game reset (preset re-load includes this path)
-        eventEngine._releasesThisYear = 0;
-        eventEngine.world.pnth.silmarillionVersion = '3.5';
-        eventEngine.world.pnth.lastReleaseTier = null;
-        eventEngine.world.pnth.frontierLead = 0;
-        // Reset the modelRelease pulse so initial offset reapplies
-        for (const pulse of eventEngine._pulses) {
-            if (pulse.type === 'modelRelease') pulse.nextDay = -1;
-        }
-    }
     resetUsedTips();
     resetFactions();
     // Re-attach faction reference after reset (faction-standing.js is the source of truth)
@@ -1753,7 +1742,7 @@ function _resetCore(index) {
     sim.prepopulate();
     _syncAll();
     _initRateHistory();
-    _initVixHistory();
+    _initVxhcnHistory();
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
@@ -1889,16 +1878,16 @@ function handleShortBond() {
     _executeOrPlace('bond', 'short', _getTradeQty(), null, _getTradeExpiryDay());
 }
 
-function handleBuyVix() {
-    _executeOrPlace('vixfuture', 'long', _getTradeQty(), null, _getTradeExpiryDay());
+function handleBuyVxhcn() {
+    _executeOrPlace('vxhcnfuture', 'long', _getTradeQty(), null, _getTradeExpiryDay());
 }
 
-function handleShortVix() {
-    _executeOrPlace('vixfuture', 'short', _getTradeQty(), null, _getTradeExpiryDay());
+function handleShortVxhcn() {
+    _executeOrPlace('vxhcnfuture', 'short', _getTradeQty(), null, _getTradeExpiryDay());
 }
 
 function handleChainCellClick(info) {
-    const expiryDay = info.expiryDay ?? ((info.type === 'bond' || info.type === 'vixfuture') ? _getTradeExpiryDay() : undefined);
+    const expiryDay = info.expiryDay ?? ((info.type === 'bond' || info.type === 'vxhcnfuture') ? _getTradeExpiryDay() : undefined);
     _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike ?? undefined, expiryDay);
 }
 
@@ -1942,7 +1931,7 @@ function handleAddLeg(type, side, strike, expiryDay) {
     if (strike == null && (type === 'call' || type === 'put')) {
         strike = Math.round(sim.S / 5) * 5;
     }
-    if (expiryDay == null && (type === 'call' || type === 'put' || type === 'bond' || type === 'vixfuture')) {
+    if (expiryDay == null && (type === 'call' || type === 'put' || type === 'bond' || type === 'vxhcnfuture')) {
         const idx = parseInt($.strategyExpiry?.value, 10);
         const expiry = chainSkeleton.length > 0 ? chainSkeleton[isNaN(idx) ? chainSkeleton.length - 1 : Math.min(idx, chainSkeleton.length - 1)] : null;
         expiryDay = expiry ? expiry.day : sim.day + 21;

@@ -11,11 +11,11 @@ export const MACRO_EVENTS = [
         id: 'tariffs_announced',
         category: 'macro',
         likelihood: 0.5,
-        headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "Columbia will no longer be ripped off," he declares at signing ceremony',
+        headline: 'Barron signs executive order imposing 25% tariffs on $200B of imports; "America will no longer be ripped off," he declares at signing ceremony',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 0,
         params: { mu: -0.03, theta: 0.015, lambda: 0.6, muJ: -0.01 },
-        effects: (world) => { world.geopolitical.tradeWarStage = 1; world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1); world.election.barronApproval = Math.max(0, world.election.barronApproval - 2); shiftFaction('federalistSupport', -2); },
+        effects: (world) => { world.geopolitical.tradeWarStage = 1; world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1); world.election.barronApproval = Math.max(0, world.election.barronApproval - 2); shiftFaction('federalistSupport', -2); },
         followups: [ { id: 'trade_retaliation', mtth: 18, weight: 0.7 }, { id: 'tariff_selloff', mtth: 3, weight: 0.5 }, ],
     },
     {
@@ -32,11 +32,11 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Liang Wei announces matching tariffs on Columbian agriculture and energy exports. Zhaowei unveils a "strategic decoupling plan." Lassiter on The Sentinel: "I warned you — pass the Serican Reciprocal Tariff Act now."',
+        headline: 'Liang Wei announces matching tariffs on American agriculture and energy exports. Zhaowei unveils a "strategic decoupling plan." Lassiter on The Sentinel: "I warned you — pass the Chinese Reciprocal Tariff Act now."',
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage === 1,
         params: { mu: -0.03, theta: 0.015, lambda: 0.5, muJ: -0.01 },
-        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 }, { path: 'geopolitical.sericaRelations', op: 'add', value: -1 }, ],
+        effects: [ { path: 'geopolitical.tradeWarStage', op: 'set', value: 2 }, { path: 'geopolitical.chinaRelations', op: 'add', value: -1 }, ],
         followups: [ { id: 'tariff_exemptions', mtth: 18, weight: 0.6 }, ],
     },
     {
@@ -50,7 +50,7 @@ export const MACRO_EVENTS = [
         when: (sim, world) => world.geopolitical.tradeWarStage === 2,
         effects: (world) => {
             world.geopolitical.tradeWarStage = 3;
-            world.geopolitical.sericaRelations = -3;
+            world.geopolitical.chinaRelations = -3;
             shiftFaction('federalistSupport', -2);
         },
         followups: [
@@ -62,10 +62,10 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Liang Wei restricts rare earth exports to Columbia in retaliation for the Zhaowei ban. Atlas Crucible warns of a six-month semiconductor supply shortage. Malhotra: "We are exploring alternative sourcing." Defense stocks crater',
+        headline: 'Liang Wei restricts rare earth exports to America in retaliation for the Zhaowei ban. Analysts warn of a six-month semiconductor supply shortage. Defense stocks crater',
         params: { mu: -0.08, theta: 0.04, lambda: 2.0, muJ: -0.05, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
-        when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.sericaRelations <= -2,
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 3 && world.geopolitical.chinaRelations <= -2,
         portfolioFlavor: (portfolio) => {
             const putQty = portfolio.positions.filter(p => p.type === 'put').reduce((s, p) => s + p.qty, 0);
             const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
@@ -84,7 +84,7 @@ export const MACRO_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && world.geopolitical.tradeWarStage <= 3,
         effects: (world) => {
-            world.geopolitical.sericaRelations = Math.min(3, world.geopolitical.sericaRelations + 1);
+            world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 1);
         },
     },
     {
@@ -96,22 +96,22 @@ export const MACRO_EVENTS = [
             if (sim.day > 750) base += 0.3;
             return base;
         },
-        headline: 'Barron and Liang Wei announce a "Phase One" trade framework at the Meridia Summit. Tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever." Lassiter walks out of the briefing.',
+        headline: 'Barron and Liang Wei announce a "Phase One" trade framework at the Israel Summit. Tariffs to be rolled back over 18 months. Barron: "The biggest deal in history, maybe ever." Lassiter walks out of the briefing.',
         magnitude: 'major',
         minDay: 400,
         when: (sim, world) => world.geopolitical.tradeWarStage >= 2 && world.geopolitical.tradeWarStage < 4,
         params: { mu: 0.04, theta: -0.015, lambda: -0.6, muJ: 0.008, q: 0.002 },
-        effects: (world) => { world.geopolitical.tradeWarStage = 4; world.geopolitical.sericaRelations = Math.min(3, world.geopolitical.sericaRelations + 2); world.election.barronApproval = Math.min(100, world.election.barronApproval + 3); shiftFaction('federalistSupport', 3); },
+        effects: (world) => { world.geopolitical.tradeWarStage = 4; world.geopolitical.chinaRelations = Math.min(3, world.geopolitical.chinaRelations + 2); world.election.barronApproval = Math.min(100, world.election.barronApproval + 3); shiftFaction('federalistSupport', 3); },
     },
 
     // =====================================================================
-    //  ARC 4: OPERATION DUSTWALKER (FARSISTAN / MERIDIA)
+    //  ARC 4: OPERATION DUSTWALKER (GULF / ISRAEL)
     // =====================================================================
     {
         id: 'mideast_strikes',
         category: 'macro',
         likelihood: 0.6,
-        headline: 'Operation Dustwalker begins: U.S. and Meridia launch precision strikes on Farsistani military targets using PNTH Atlas Aegis targeting. DoW: "Surgical, zero collateral." Navon: "We stand with our allies." Barron: "Mission accomplished."',
+        headline: 'Operation Dustwalker begins: U.S. and Israel launch precision strikes on Gulf military targets. DoW: "Surgical, zero collateral." Navon: "We stand with our allies." Barron: "Mission accomplished."',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation === 0,
@@ -130,7 +130,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Leaked drone footage contradicts DoW "zero collateral" claims from Operation Dustwalker. 47 Farsistani civilians confirmed dead. Gottlieb: "This is a betrayal of everything Atlas was built for." Al-Farhan demands an emergency UN session.',
+        headline: 'Leaked drone footage contradicts DoW "zero collateral" claims from Operation Dustwalker. 47 Gulf civilians confirmed dead. Al-Farhan demands an emergency UN session.',
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 1,
@@ -154,7 +154,7 @@ export const MACRO_EVENTS = [
             const stockQty = portfolio.positions.filter(p => p.type === 'stock').reduce((s, p) => s + p.qty, 0);
             const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
             if (stockQty > 10) return 'Your long equity book is taking heat as energy costs crush margins across the board.';
-            if (hasOptions) return 'Your options book is getting re-marked as implied vol spikes on the Farsistan oil shock.';
+            if (hasOptions) return 'Your options book is getting re-marked as implied vol spikes on the Gulf oil shock.';
             return null;
         },
     },
@@ -163,7 +163,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Barron deploys 15,000 troops to Meridia for "stability operations" along the Farsistani border. Largest ground deployment in 20 years. Navon: "We welcome our allies." Okafor: "This is mission creep." Defense stocks surge, consumer confidence plummets.',
+        headline: 'Barron deploys 15,000 troops to Israel for "stability operations" along the Gulf border. Largest ground deployment in 20 years. Navon: "We welcome our allies." Okafor: "This is mission creep." Defense stocks surge, consumer confidence plummets.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.2, muJ: -0.03, sigmaR: 0.005 },
         magnitude: 'major',
         minDay: 150,
@@ -183,7 +183,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Pentagon briefing leaked: 200+ Dustwalker casualties, $2B/month burn rate, no exit strategy. Farsistani militias control the border highlands. Okafor: "This is Vietnam with drones." Barron approval craters.',
+        headline: 'Pentagon briefing leaked: 200+ Dustwalker casualties, $2B/month burn rate, no exit strategy. Gulf militias control the border highlands. Okafor: "This is Vietnam with drones." Barron approval craters.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
         magnitude: 'major',
         minDay: 300,
@@ -218,7 +218,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Under bipartisan pressure, Barron announces phased withdrawal from Meridia. Operation Dustwalker "concluded successfully." Polls show 68% support pulling out. Navon is visibly furious at the joint press conference.',
+        headline: 'Under bipartisan pressure, Barron announces phased withdrawal from Israel. Operation Dustwalker "concluded successfully." Polls show 68% support pulling out. Navon is visibly furious at the joint press conference.',
         params: { mu: 0.03, theta: -0.015, lambda: -0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.mideastEscalation >= 2 && world.election.barronApproval < 35,
@@ -229,13 +229,13 @@ export const MACRO_EVENTS = [
     },
 
     // =====================================================================
-    //  ARC 8: SOUTHERN HEMISPHERE INITIATIVE (BOLIVIARA)
+    //  ARC 8: SOUTHERN HEMISPHERE INITIATIVE (BOLIVIA)
     // =====================================================================
     {
         id: 'south_america_covert_exposed',
         category: 'macro',
         likelihood: 0.5,
-        headline: 'The Continental reveals the Southern Hemisphere Initiative: CIA and Palanthropic covert operations in Boliviara. Leaked memos show Atlas Sentinel used for surveillance of Madero\'s political opposition. Madero: "Columbia treats our nation as a laboratory."',
+        headline: 'The Continental reveals the Southern Hemisphere Initiative: CIA covert operations in Bolivia. Leaked memos show AI surveillance tools deployed against Madero\'s political opposition. Madero: "America treats our nation as a laboratory."',
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps === 0,
@@ -253,7 +253,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Barron deploys 500 "military advisors" to Boliviara to "assist with counter-narcotics." DoW insists they are non-combat trainers. Madero expels the Columbian ambassador. Okafor: "This is the Southern Hemisphere Initiative with a new coat of paint."',
+        headline: 'Barron deploys 500 "military advisors" to Bolivia to "assist with counter-narcotics." DoW insists they are non-combat trainers. Madero expels the American ambassador. Okafor: "This is the Southern Hemisphere Initiative with a new coat of paint."',
         params: { mu: -0.02, theta: 0.015, lambda: 0.5, sigmaR: 0.003 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps === 1,
@@ -270,7 +270,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Madero\'s government collapses after a military coup. Transitional council installed under Columbian military protection. Protests erupt across Boliviara: "Yankee puppets out!" Lithium mines resume operations within 48 hours.',
+        headline: 'Madero\'s government collapses after a military coup. Transitional council installed under American military protection. Protests erupt across Bolivia: "Yankee puppets out!" Lithium mines resume operations within 48 hours.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02 },
         magnitude: 'major',
         minDay: 250,
@@ -289,7 +289,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'Boliviaran insurgency intensifies. Columbian advisors come under fire in the lithium belt — three killed. Madero broadcasts from exile: "The resistance will prevail." Barron doubles down: "We will not be driven out by thugs."',
+        headline: 'Bolivian insurgency intensifies. American advisors come under fire in the lithium belt — three killed. Madero broadcasts from exile: "The resistance will prevail." Barron doubles down: "We will not be driven out by thugs."',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, muJ: -0.02 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps === 3,
@@ -302,7 +302,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'White House announces withdrawal of all advisors from Boliviara. The Southern Hemisphere Initiative is quietly deemed "complete" despite no stated objectives being met. Madero supporters celebrate in the streets.',
+        headline: 'White House announces withdrawal of all advisors from Bolivia. The Southern Hemisphere Initiative is quietly deemed "complete" despite no stated objectives being met. Madero supporters celebrate in the streets.',
         params: { mu: 0.02, theta: -0.01, lambda: -0.3 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps >= 2,
@@ -316,7 +316,7 @@ export const MACRO_EVENTS = [
         followupOnly: true,
         category: 'macro',
         likelihood: 1.0,
-        headline: 'UN General Assembly passes non-binding resolution condemning Columbian operations in Boliviara, 124-8. Liang Wei co-sponsors the resolution. Barron calls it "meaningless theater from meaningless countries."',
+        headline: 'UN General Assembly passes non-binding resolution condemning American operations in Bolivia, 124-8. Liang Wei co-sponsors the resolution. Barron calls it "meaningless theater from meaningless countries."',
         params: { mu: -0.01, theta: 0.005 },
         magnitude: 'minor',
         when: (sim, world) => world.geopolitical.southAmericaOps >= 1,
@@ -329,7 +329,7 @@ export const MACRO_EVENTS = [
         id: 'oil_shock_opec',
         category: 'macro',
         likelihood: 0.35,
-        headline: 'Al-Farhan brokers a surprise 2M barrel/day OPEC+ production cut. Oil surges 18% in a single session. Priya Sharma: "Farsistan just reminded everyone who controls the spigot." Energy costs ripple through supply chains.',
+        headline: 'Al-Farhan brokers a surprise 2M barrel/day OPEC+ production cut. Oil surges 18% in a single session. Priya Sharma: "Gulf just reminded everyone who controls the spigot." Energy costs ripple through supply chains.',
         magnitude: 'major',
         when: (sim, world) => !world.geopolitical.oilCrisis,
         params: { mu: -0.04, theta: 0.025, lambda: 1.0, muJ: -0.02, b: 0.008, sigmaR: 0.006, q: -0.001 },
@@ -339,7 +339,7 @@ export const MACRO_EVENTS = [
         id: 'energy_sanctions',
         category: 'macro',
         likelihood: 0.3,
-        headline: 'Barron imposes energy sanctions on Farsistan after al-Farhan refuses to reverse the production cut. "They will feel the full force of Columbian economic power." Crude jumps 8%. Navon publicly endorses the sanctions.',
+        headline: 'Barron imposes energy sanctions on Gulf after al-Farhan refuses to reverse the production cut. "They will feel the full force of American economic power." Crude jumps 8%. Navon publicly endorses the sanctions.',
         params: { mu: -0.03, theta: 0.02, lambda: 0.8, b: 0.005, sigmaR: 0.005, q: -0.001 },
         magnitude: 'moderate',
         when: (sim, world) => !world.geopolitical.sanctionsActive,
@@ -404,7 +404,7 @@ export const MACRO_EVENTS = [
         id: 'sovereign_debt_scare',
         category: 'macro',
         likelihood: 0.25,
-        headline: 'Khasurian sovereign debt downgraded two notches as Volkov\'s military spending spirals. Contagion fears spike across Eastern European CDS markets. Flight to quality drives Columbian Treasury yields down.',
+        headline: 'Russian sovereign debt downgraded two notches as Volkov\'s military spending spirals. Contagion fears spike across Eastern European CDS markets. Flight to quality drives American Treasury yields down.',
         params: { mu: -0.04, theta: 0.025, lambda: 1.5, muJ: -0.03, b: -0.005, sigmaR: 0.008, q: -0.002 },
         magnitude: 'major',
     },
@@ -436,7 +436,7 @@ export const MACRO_EVENTS = [
         id: 'tech_capex_boom',
         category: 'macro',
         likelihood: 1.2,
-        headline: 'Corporate capex on AI infrastructure surges 45% YoY; Malhotra calls it "the biggest investment cycle since the internet." Atlas Crucible bookings are up accordingly. Semiconductor and cloud names rally broadly.',
+        headline: 'Corporate capex on AI infrastructure surges 45% YoY — the biggest investment cycle since the internet. Datacenter and compute bookings are up accordingly. Semiconductor and cloud names rally broadly.',
         params: { mu: 0.03, theta: -0.008, lambda: -0.2 },
         magnitude: 'moderate',
     },
@@ -462,106 +462,103 @@ export const MACRO_EVENTS = [
     },
 
     // =====================================================================
-    //  ARC 9: KHASURIAN BORDER ESCALATION
+    //  ARC 9: RUSSIAN BORDER ESCALATION
     // =====================================================================
     {
-        id: 'khasuria_border_probe',
+        id: 'russia_border_probe',
         category: 'macro',
-        headline: 'Khasurian reconnaissance drones cross the border accord line for the third time this month. Volkov\'s spokesman: "Equipment malfunction." The Meridian Brief: "Equipment doesn\'t malfunction this precisely."',
+        headline: 'Russian reconnaissance drones cross the border accord line for the third time this month. Volkov\'s spokesman: "Equipment malfunction." The Meridian Brief: "Equipment doesn\'t malfunction this precisely."',
         likelihood: 2,
         params: { theta: 0.005, b: 0.005 },
         magnitude: 'minor',
-        when: (sim, world) => world.geopolitical.khasurianCrisis === 0,
-        effects: (world) => { world.geopolitical.khasurianCrisis = 1; },
+        when: (sim, world) => world.geopolitical.russianCrisis === 0,
+        effects: (world) => { world.geopolitical.russianCrisis = 1; },
         era: 'early',
         followups: [
-            { id: 'khasuria_troop_buildup', mtth: 60, weight: 1 },
+            { id: 'russia_troop_buildup', mtth: 60, weight: 1 },
         ],
     },
     {
-        id: 'khasuria_troop_buildup',
+        id: 'russia_troop_buildup',
         followupOnly: true,
         category: 'macro',
-        headline: 'Satellite imagery shows Khasurian armored divisions massing 40km from the border. Volkov claims "defensive repositioning." Barron dispatches the Secretary of State. Bond markets price in risk.',
+        headline: 'Satellite imagery shows Russian armored divisions massing 40km from the border. Volkov claims "defensive repositioning." Barron dispatches the Secretary of State. Bond markets price in risk.',
         likelihood: 0,
         params: { mu: -0.02, theta: 0.01, b: 0.008, sigmaR: 0.003 },
         magnitude: 'moderate',
-        when: (sim, world) => world.geopolitical.khasurianCrisis === 1,
-        effects: (world) => { world.geopolitical.khasurianCrisis = 2; },
+        when: (sim, world) => world.geopolitical.russianCrisis === 1,
+        effects: (world) => { world.geopolitical.russianCrisis = 2; },
         followups: [
-            { id: 'khasuria_incursion', mtth: 45, weight: 0.67 },
-            { id: 'khasuria_backs_down', mtth: 45, weight: 0.33 },
+            { id: 'russia_incursion', mtth: 45, weight: 0.67 },
+            { id: 'russia_backs_down', mtth: 45, weight: 0.33 },
         ],
     },
     {
-        id: 'khasuria_incursion',
+        id: 'russia_incursion',
         followupOnly: true,
         category: 'macro',
-        headline: 'Khasurian forces cross the border in a "limited security operation." Three border towns occupied. The Khasurian Border Accord is officially dead. Barron faces his first real foreign policy crisis.',
+        headline: 'Russian forces cross the border in a "limited security operation." Three border towns occupied. The Russian Border Accord is officially dead. Barron faces his first real foreign policy crisis.',
         likelihood: 0,
         params: { mu: -0.04, theta: 0.03, lambda: 2.0, b: 0.015 },
         magnitude: 'major',
-        when: (sim, world) => world.geopolitical.khasurianCrisis === 2,
-        effects: (world) => { world.geopolitical.khasurianCrisis = 3; world.geopolitical.aegisDemandSurge = true; shiftFaction('fedRelations', -2); },
-        followups: [
-            { id: 'pnth_international_expansion', mtth: 15, weight: 0.5 },
-        ],
+        when: (sim, world) => world.geopolitical.russianCrisis === 2,
+        effects: (world) => { world.geopolitical.russianCrisis = 3; shiftFaction('fedRelations', -2); },
     },
     {
-        id: 'khasuria_backs_down',
+        id: 'russia_backs_down',
         followupOnly: true,
         category: 'macro',
-        headline: 'Volkov recalls troops from the Khasurian border after Barron\'s back-channel threat of energy sanctions. "Exercises concluded successfully," his spokesman says. Markets exhale.',
+        headline: 'Volkov recalls troops from the Russian border after Barron\'s back-channel threat of energy sanctions. "Exercises concluded successfully," his spokesman says. Markets exhale.',
         likelihood: 0,
         params: { mu: 0.02, theta: -0.01, b: -0.005 },
         magnitude: 'moderate',
-        when: (sim, world) => world.geopolitical.khasurianCrisis === 2,
-        effects: (world) => { world.geopolitical.khasurianCrisis = 1; },
+        when: (sim, world) => world.geopolitical.russianCrisis === 2,
+        effects: (world) => { world.geopolitical.russianCrisis = 1; },
     },
 
     // =====================================================================
-    //  ARC 10: FARSISTAN / STRAIT OF FARSIS ESCALATION
+    //  ARC 10: GULF / STRAIT OF FARSIS ESCALATION
     // =====================================================================
     {
-        id: 'farsistan_tanker_inspections',
+        id: 'gulf_tanker_inspections',
         category: 'macro',
         headline: 'Al-Farhan orders "security inspections" of all tankers transiting the Strait of Hormuz. Transit times double. Oil creeps up $8/barrel. Priya Sharma: "This is the warning shot."',
         likelihood: 2,
         params: { b: 0.008, mu: -0.01 },
         magnitude: 'moderate',
-        when: (sim, world) => world.geopolitical.farsistanEscalation === 0,
-        effects: (world) => { world.geopolitical.farsistanEscalation = 1; },
+        when: (sim, world) => world.geopolitical.gulfEscalation === 0,
+        effects: (world) => { world.geopolitical.gulfEscalation = 1; },
         era: 'mid',
         followups: [
-            { id: 'farsistan_partial_closure', mtth: 50, weight: 1 },
+            { id: 'gulf_partial_closure', mtth: 50, weight: 1 },
         ],
     },
     {
-        id: 'farsistan_partial_closure',
+        id: 'gulf_partial_closure',
         followupOnly: true,
         category: 'macro',
-        headline: 'Farsistan closes the Strait of Hormuz to non-allied shipping. Meridia-flagged tankers turned back. Oil surges past $120. Barron: "We will ensure free navigation." Navon: "We\'re ready."',
+        headline: 'Gulf closes the Strait of Hormuz to non-allied shipping. Israel-flagged tankers turned back. Oil surges past $120. Barron: "We will ensure free navigation." Navon: "We\'re ready."',
         likelihood: 0,
         params: { mu: -0.03, b: 0.015, theta: 0.015, sigmaR: 0.004 },
         magnitude: 'major',
-        when: (sim, world) => world.geopolitical.farsistanEscalation === 1,
-        effects: (world) => { world.geopolitical.farsistanEscalation = 2; shiftFaction('fedRelations', -2); },
+        when: (sim, world) => world.geopolitical.gulfEscalation === 1,
+        effects: (world) => { world.geopolitical.gulfEscalation = 2; shiftFaction('fedRelations', -2); },
         followups: [
-            { id: 'farsistan_full_closure', mtth: 40, weight: 1 },
-            { id: 'farsistan_negotiation', mtth: 40, weight: 1 },
+            { id: 'gulf_full_closure', mtth: 40, weight: 1 },
+            { id: 'gulf_negotiation', mtth: 40, weight: 1 },
         ],
     },
     {
-        id: 'farsistan_full_closure',
+        id: 'gulf_full_closure',
         followupOnly: true,
         category: 'macro',
-        headline: 'Al-Farhan seals the Strait completely. "No ship passes without Farsistani consent." Oil gaps to $145. Emergency SPR release announced. The Sentinel runs a war countdown clock.',
+        headline: 'Al-Farhan seals the Strait completely. "No ship passes without Gulf consent." Oil gaps to $145. Emergency SPR release announced. The Sentinel runs a war countdown clock.',
         likelihood: 0,
         params: { mu: -0.06, b: 0.025, theta: 0.03, lambda: 2.0, sigmaR: 0.006 },
         magnitude: 'major',
-        when: (sim, world) => world.geopolitical.farsistanEscalation === 2,
+        when: (sim, world) => world.geopolitical.gulfEscalation === 2,
         effects: (world) => {
-            world.geopolitical.farsistanEscalation = 3;
+            world.geopolitical.gulfEscalation = 3;
             world.geopolitical.straitClosed = true;
             world.geopolitical.oilCrisis = true;
             world.geopolitical.energyCrisis = true;
@@ -573,70 +570,53 @@ export const MACRO_EVENTS = [
         ],
     },
     {
-        id: 'farsistan_negotiation',
+        id: 'gulf_negotiation',
         followupOnly: true,
         category: 'macro',
-        headline: 'Back-channel talks between Bowman and al-Farhan\'s envoy produce a framework: Farsistan reopens the Strait in exchange for sanctions relief and a PNTH sovereign wealth fund stake. Markets rally cautiously.',
+        headline: 'Back-channel talks between Bowman and al-Farhan\'s envoy produce a framework: Gulf reopens the Strait in exchange for sanctions relief. Markets rally cautiously.',
         likelihood: 0,
         params: { mu: 0.03, b: -0.01, theta: -0.01 },
         magnitude: 'moderate',
-        when: (sim, world) => world.geopolitical.farsistanEscalation === 2,
-        effects: (world) => { world.geopolitical.farsistanEscalation = 1; },
+        when: (sim, world) => world.geopolitical.gulfEscalation === 2,
+        effects: (world) => { world.geopolitical.gulfEscalation = 1; },
     },
 
     // =====================================================================
-    //  SERICA TRADE EVENTS
+    //  CHINA TRADE EVENTS
     // =====================================================================
     {
-        id: 'serica_retaliatory_tariffs',
+        id: 'china_retaliatory_tariffs',
         category: 'macro',
-        headline: 'Liang Wei announces 25% tariffs on Columbian agricultural exports. Iowa soybean futures limit down. Lassiter goes on The Sentinel: "This proves we need to hit them harder." Oduya calls for auto worker protections.',
+        headline: 'Liang Wei announces 25% tariffs on American agricultural exports. Iowa soybean futures limit down. Lassiter goes on The Sentinel: "This proves we need to hit them harder." Oduya calls for auto worker protections.',
         likelihood: 2,
         params: { mu: -0.02, theta: 0.01 },
         magnitude: 'moderate',
-        when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && world.geopolitical.sericaRelations < 0,
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 1 && world.geopolitical.chinaRelations < 0,
     },
     {
         id: 'zhaowei_chip_ban',
         category: 'macro',
-        headline: 'Serica bans Zhaowei from exporting semiconductors to Columbia. The Zhaowei Semiconductor Accord is dead. Atlas Crucible faces a hardware supply crisis. Malhotra: "We have six months of inventory."',
+        headline: 'China bans Zhaowei from exporting semiconductors to America. The Zhaowei Semiconductor Accord is dead. Chip supply tightens across the sector as buyers scramble for inventory.',
         likelihood: 2,
         params: { mu: -0.03, theta: 0.02, lambda: 1.0 },
         magnitude: 'major',
         when: (sim, world) => world.geopolitical.tradeWarStage >= 3,
-        effects: (world) => { world.geopolitical.sericaRelations = Math.max(-3, world.geopolitical.sericaRelations - 1); },
+        effects: (world) => { world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1); },
         era: 'mid',
     },
 
     // =====================================================================
-    //  BOLIVIARA EVENTS
+    //  BOLIVIA EVENTS
     // =====================================================================
     {
-        id: 'boliviara_nationalization',
+        id: 'bolivia_nationalization',
         category: 'macro',
-        headline: 'Madero nationalizes Boliviara\'s lithium reserves on live television. "These minerals belong to the Boliviaran people, not to Columbian corporations." Three mining stocks halt. Rare earth futures spike.',
+        headline: 'Madero nationalizes Bolivia\'s lithium reserves on live television. "These minerals belong to the Bolivian people, not to American corporations." Three mining stocks halt. Rare earth futures spike.',
         likelihood: 2,
         params: { mu: -0.02, theta: 0.01 },
         magnitude: 'moderate',
         when: (sim, world) => world.geopolitical.southAmericaOps >= 1,
         era: 'mid',
-        followups: [
-            { id: 'boliviara_sentinel_leak', mtth: 60, weight: 1 },
-        ],
-    },
-    {
-        id: 'boliviara_sentinel_leak',
-        followupOnly: true,
-        category: 'macro',
-        headline: 'Rachel Tan publishes Atlas Sentinel deployment logs from the Southern Hemisphere Initiative. "Palanthropic\'s AI Helped the CIA Target Boliviaran Dissidents." Madero holds a press conference demanding extradition.',
-        likelihood: 0,
-        params: { mu: -0.03, theta: 0.02, lambda: 1.5 },
-        magnitude: 'major',
-        when: (sim, world) => world.geopolitical.southAmericaOps >= 2 && world.pnth.sentinelLaunched,
-        effects: (world) => {
-            world.media.tanCredibility = Math.min(10, world.media.tanCredibility + 1);
-            shiftFaction('mediaTrust', 2);
-        },
     },
 
     // ── One-shot compound events (macro domain) ──
@@ -665,7 +645,7 @@ export const MACRO_EVENTS = [
         oneShot: true,
         when: (sim, world, congress, ctx) =>
             world.geopolitical.oilCrisis && world.geopolitical.mideastEscalation >= 3,
-        headline: 'Al-Farhan closes the Strait of Hormuz as Meridia border tensions peak. Oil gaps above $140. Barron tweets: "The Emir will learn what Columbia does when you cut our energy supply." Bond vigilantes are already moving.',
+        headline: 'Al-Farhan closes the Strait of Hormuz as Israel border tensions peak. Oil gaps above $140. Barron tweets: "The Emir will learn what America does when you cut our energy supply." Bond vigilantes are already moving.',
         magnitude: 'major',
         superevent: true,
         params: { mu: -0.06, theta: 0.03, lambda: 2.5, b: 0.02, sigmaR: 0.005 },
@@ -677,21 +657,20 @@ export const MACRO_EVENTS = [
         oneShot: true,
         when: (sim, world, congress, ctx) =>
             world.geopolitical.straitClosed &&
-            world.geopolitical.farsistanEscalation >= 3,
-        headline: 'Al-Farhan seals the Strait of Hormuz completely. Navon puts Meridia on war footing. Barron authorizes naval escort operations. Oil hits $160. The Sentinel runs a countdown clock: "Days Since the Strait Closed."',
+            world.geopolitical.gulfEscalation >= 3,
+        headline: 'Al-Farhan seals the Strait of Hormuz completely. Navon puts Israel on war footing. Barron authorizes naval escort operations. Oil hits $160. The Sentinel runs a countdown clock: "Days Since the Strait Closed."',
         magnitude: 'major',
         superevent: true,
         params: { mu: -0.08, b: 0.03, sigmaR: 0.008, theta: 0.04, lambda: 3.0 },
     },
     {
-        id: 'compound_khasuria_invasion',
+        id: 'compound_russia_invasion',
         category: 'macro',
         likelihood: 0,
         oneShot: true,
         when: (sim, world, congress, ctx) =>
-            world.geopolitical.khasurianCrisis >= 3 &&
-            world.pnth.aegisDeployed,
-        headline: 'Volkov sends armored columns across the Khasurian border at dawn. Barron holds an emergency NSC meeting. Hartley — or his replacement — signals emergency rate action. Atlas Aegis redeployment from Farsistan to Eastern Europe is on the table.',
+            world.geopolitical.russianCrisis >= 3,
+        headline: 'Volkov sends armored columns across the Russian border at dawn. Barron holds an emergency NSC meeting. Hartley — or his replacement — signals emergency rate action. Markets brace for a wider war.',
         magnitude: 'major',
         superevent: true,
         params: { mu: -0.06, theta: 0.04, lambda: 3.0, b: 0.02, sigmaR: 0.006 },

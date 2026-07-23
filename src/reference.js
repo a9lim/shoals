@@ -1524,12 +1524,12 @@ $\\sigma_R$. A hawkish Fed raises $b$ (pulling rates up); a dovish Fed lowers it
 `,
     },
 
-    vix: {
+    vxhcn: {
         title: 'VX (Equity Volatility Index)',
         body: `
-<p><strong>VX</strong> is the 30-day equity volatility index for PNTH, analogous to
-the CBOE VIX but computed for this single stock. It measures the market&rsquo;s
-expectation of PNTH&rsquo;s volatility over the next 30 trading days.</p>
+<p><strong>VX</strong> is the 30-day equity volatility index for HCN, analogous to
+the CBOE&rsquo;s broad-market volatility index but computed for this single stock. It measures the market&rsquo;s
+expectation of HCN&rsquo;s volatility over the next 30 trading days.</p>
 
 <h3>How It&rsquo;s Computed</h3>
 <p>In the Heston stochastic volatility model, the expected integrated variance
@@ -1573,7 +1573,6 @@ parameters in real time, creating evolving market conditions and storylines.</p>
 <tr><th style="text-align:left;padding:4px 8px">Event type</th><th style="text-align:left;padding:4px 8px">Frequency</th><th style="text-align:left;padding:4px 8px">Notes</th></tr>
 <tr><td style="padding:4px 8px">Fed meetings</td><td style="padding:4px 8px">~1 per 32 days</td><td style="padding:4px 8px">With jitter; ~8/year like real FOMC</td></tr>
 <tr><td style="padding:4px 8px">Non-Fed events</td><td style="padding:4px 8px">Poisson ~1/30 days</td><td style="padding:4px 8px">8&ndash;15 day cooldown; effective ~1/41.5</td></tr>
-<tr><td style="padding:4px 8px">PNTH earnings</td><td style="padding:4px 8px">~1 per 63 days</td><td style="padding:4px 8px">Quarterly with jitter</td></tr>
 <tr><td style="padding:4px 8px">Midterm elections</td><td style="padding:4px 8px">Day 504</td><td style="padding:4px 8px">Campaign from day 440</td></tr>
 </table>
 
@@ -1582,7 +1581,6 @@ parameters in real time, creating evolving market conditions and storylines.</p>
 <li><strong>Fed/monetary</strong>: rate decisions, QE/QT, forward guidance</li>
 <li><strong>Macro/geopolitical</strong>: GDP, trade wars, conflicts</li>
 <li><strong>Sector/tech</strong>: AI breakthroughs, regulation, tech crashes</li>
-<li><strong>PNTH (Palanthropic)</strong>: company-specific events with multi-step narratives</li>
 <li><strong>Market structure</strong>: short squeezes, flash crashes, liquidity events</li>
 <li><strong>Neutral/flavour</strong>: colour events that don&rsquo;t significantly move parameters</li>
 </ul>
@@ -1620,7 +1618,6 @@ The system prompt contains the full universe lore:</p>
 <ul>
 <li>President John Barron (Federalist) vs. Robin Clay (Farmer-Labor)</li>
 <li>Fed Chair Hayden Hartley&rsquo;s independence and credibility</li>
-<li>Palanthropic (PNTH): Chairwoman Andrea Dirks vs. CEO Eugene Gottlieb</li>
 <li>Geopolitical landscape, congressional composition, ongoing investigations</li>
 </ul>
 <p>Events are pre-fetched in batches of 3&ndash;5 to minimise API calls and latency.</p>

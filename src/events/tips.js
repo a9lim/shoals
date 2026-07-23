@@ -11,7 +11,7 @@ import { QUARTERLY_CYCLE, INITIAL_CAPITAL } from '../config.js';
 
 export const INSIDER_TIPS = [
     {
-        hint: 'Malhotra is going to raise the PNTH dividend at the next earnings call',
+        hint: 'the company is going to raise the HCN dividend at the next earnings call',
         realEvent: 'tip_dividend_hike',
         fakeEvent: 'tip_dividend_flat',
     },
@@ -21,7 +21,7 @@ export const INSIDER_TIPS = [
         fakeEvent: 'tip_fed_hike',
     },
     {
-        hint: 'Dirks is about to announce a major Atlas Aegis defense contract within two weeks',
+        hint: 'the company is about to announce a major government contract within two weeks',
         realEvent: 'tip_contract_win',
         fakeEvent: 'tip_contract_loss',
     },
@@ -31,7 +31,7 @@ export const INSIDER_TIPS = [
         fakeEvent: 'tip_squeeze_fizzle',
     },
     {
-        hint: 'Malhotra\'s earnings are going to blow out expectations by double digits',
+        hint: 'the company\'s earnings are going to blow out expectations by double digits',
         realEvent: 'tip_earnings_beat',
         fakeEvent: 'tip_earnings_miss',
     },
@@ -64,9 +64,9 @@ export const TIP_EVENTS = [
     // -- Insider tip outcome events (real) --
     {
         id: 'tip_dividend_hike',
-        category: 'pnth_earnings',
+        category: 'sector',
         likelihood: 0,
-        headline: 'PNTH announces surprise dividend hike — payout doubles',
+        headline: 'HCN announces surprise dividend hike — payout doubles',
         params: { mu: 0.03, theta: -0.01 },
         magnitude: 'moderate',
     },
@@ -82,7 +82,7 @@ export const TIP_EVENTS = [
         id: 'tip_contract_win',
         category: 'sector',
         likelihood: 0,
-        headline: 'PNTH wins $2.8B defense contract — shares surge',
+        headline: 'HCN wins $2.8B defense contract — shares surge',
         params: { mu: 0.04, theta: -0.015 },
         magnitude: 'moderate',
     },
@@ -96,9 +96,9 @@ export const TIP_EVENTS = [
     },
     {
         id: 'tip_earnings_beat',
-        category: 'pnth_earnings',
+        category: 'sector',
         likelihood: 0,
-        headline: 'PNTH crushes earnings — revenue up 25%, guidance raised',
+        headline: 'HCN crushes earnings — revenue up 25%, guidance raised',
         params: { mu: 0.04, theta: -0.01, q: 0.002 },
         magnitude: 'moderate',
     },
@@ -106,7 +106,7 @@ export const TIP_EVENTS = [
         id: 'tip_acquisition_bid',
         category: 'sector',
         likelihood: 0,
-        headline: 'Foreign consortium launches $55B bid for PNTH — 30% premium',
+        headline: 'Foreign consortium launches $55B bid for HCN — 30% premium',
         params: { mu: 0.06, theta: -0.02, xi: 0.03 },
         magnitude: 'major',
     },
@@ -114,9 +114,9 @@ export const TIP_EVENTS = [
     // -- Insider tip outcome events (fake — "despite rumors") --
     {
         id: 'tip_dividend_flat',
-        category: 'pnth_earnings',
+        category: 'sector',
         likelihood: 0,
-        headline: 'PNTH maintains dividend despite rumors of increase — board prioritizes buybacks',
+        headline: 'HCN maintains dividend despite rumors of increase — board prioritizes buybacks',
         params: { mu: -0.01, theta: 0.005 },
         magnitude: 'minor',
     },
@@ -132,7 +132,7 @@ export const TIP_EVENTS = [
         id: 'tip_contract_loss',
         category: 'sector',
         likelihood: 0,
-        headline: 'PNTH loses defense bid to rival despite rumors of a win — shares slide',
+        headline: 'HCN loses defense bid to rival despite rumors of a win — shares slide',
         params: { mu: -0.03, theta: 0.01 },
         magnitude: 'moderate',
     },
@@ -146,9 +146,9 @@ export const TIP_EVENTS = [
     },
     {
         id: 'tip_earnings_miss',
-        category: 'pnth_earnings',
+        category: 'sector',
         likelihood: 0,
-        headline: 'Despite whisper-number optimism, PNTH misses estimates — guidance lowered',
+        headline: 'Despite whisper-number optimism, HCN misses estimates — guidance lowered',
         params: { mu: -0.03, theta: 0.015, q: -0.001 },
         magnitude: 'moderate',
     },
@@ -156,7 +156,7 @@ export const TIP_EVENTS = [
         id: 'tip_acquisition_denied',
         category: 'sector',
         likelihood: 0,
-        headline: 'PNTH denies acquisition rumors — "not in discussions with any party"',
+        headline: 'HCN denies acquisition rumors — "not in discussions with any party"',
         params: { mu: -0.02, theta: 0.01, xi: -0.01 },
         magnitude: 'minor',
     },
@@ -180,7 +180,7 @@ export const TIP_EVENTS = [
                 ? ' With Okafor\'s investigation active, any connection to government sources is dynamite.'
                 : '';
             if (hasTrait('quiet_money')) {
-                return `Your phone buzzes at 9pm. A college friend who works in the Barron White House sends a detailed text — more detailed than he should. "I know you keep things quiet. There's something moving through the West Wing that's going to hit PNTH. I trust you to be discreet."${investigationLine} He's never been this forthcoming before.`;
+                return `Your phone buzzes at 9pm. A college friend who works in the Barron White House sends a detailed text — more detailed than he should. "I know you keep things quiet. There's something moving through the West Wing that's going to hit HCN. I trust you to be discreet."${investigationLine} He's never been this forthcoming before.`;
             }
             return `Your phone buzzes at 9pm. A college friend who works in the Barron White House sends a vague text: "Hey — can we talk? I've come across something that might interest you. Can't say more here." You haven't spoken in months.${investigationLine} This is either nothing, or it's the kind of call that changes everything.`;
         },
@@ -213,9 +213,9 @@ export const TIP_EVENTS = [
         },
         cooldown: 200,
         popup: true,
-        headline: 'A sellside analyst wants to meet before Malhotra\'s earnings call',
+        headline: 'A sellside analyst wants to meet before the HCN earnings call',
         context: () => {
-            return 'A well-known PNTH analyst sends a cryptic message: "I have some data you\'ll want to see before Malhotra\'s print. Not on MarketWire, not in any filing. Coffee tomorrow? Just us." The invitation is casual. The implication is not.';
+            return 'A well-known HCN analyst sends a cryptic message: "I have some data you\'ll want to see before the print. Not on MarketWire, not in any filing. Coffee tomorrow? Just us." The invitation is casual. The implication is not.';
         },
         choices: [
             {

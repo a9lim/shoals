@@ -1,7 +1,7 @@
 /* ===================================================
    world-state.js -- Mutable world state machine for
    the Shoals event system. Tracks congressional
-   control, PNTH corporate narrative, geopolitical
+   control, geopolitical
    escalation, Fed credibility, ongoing investigations,
    and election state. Provides LLM effect validation
    and application via structured path mutations.
@@ -17,30 +17,6 @@ export function createWorldState() {
             filibusterActive: false,
             bigBillStatus:    0,
         },
-        pnth: {
-            boardDirks:              7,
-            boardGottlieb:           3,
-            ceoIsGottlieb:           true,
-            ctoIsMira:               true,
-            militaryContractActive:  false,
-            commercialMomentum:      0,
-            ethicsBoardIntact:       true,
-            activistStakeRevealed:   false,
-            dojSuitFiled:            false,
-            senateProbeLaunched:     false,
-            whistleblowerFiled:      false,
-            acquired:                false,
-            gottliebStartedRival:    false,
-            sentinelLaunched:        true,
-            aegisDeployed:           false,
-            companionLaunched:       false,
-            crucibleLaunched:         false,
-            companionScandal:        0,
-            aegisControversy:        0,
-            silmarillionVersion:     '3.5', // not-yet-released sentinel; engine-bumped on quarterly pulse
-            lastReleaseTier:         null,  // null = not-yet-released; LLM cannot reset to null
-            frontierLead:            0,
-        },
         geopolitical: {
             tradeWarStage:       0,
             mideastEscalation:   0,
@@ -48,12 +24,10 @@ export function createWorldState() {
             sanctionsActive:     false,
             oilCrisis:           false,
             recessionDeclared:   false,
-            sericaRelations:     0,
-            farsistanEscalation: 0,
-            khasurianCrisis:     0,
+            chinaRelations:     0,
+            gulfEscalation: 0,
+            russianCrisis:     0,
             straitClosed:              false,
-            aegisDemandSurge:          false,
-            crucibleCompetitionPressure: false,
             energyCrisis:               false,
         },
         fed: {
@@ -113,29 +87,12 @@ export function validateCongress(world) {
     house.farmerLabor = 435 - house.federalist;
 }
 
-/** Clamp PNTH board seats so total does not exceed 12. */
-export function validatePnthBoard(world) {
-    world.pnth.boardDirks = Math.max(0, Math.min(12, Math.round(world.pnth.boardDirks)));
-    world.pnth.boardGottlieb = Math.max(0, Math.min(12, Math.round(world.pnth.boardGottlieb)));
-    const total = world.pnth.boardDirks + world.pnth.boardGottlieb;
-    if (total > 12) {
-        const excess = total - 12;
-        if (world.pnth.boardDirks >= world.pnth.boardGottlieb) {
-            world.pnth.boardDirks -= excess;
-        } else {
-            world.pnth.boardGottlieb -= excess;
-        }
-    }
-}
-
 // -- LLM effect validation ranges (whitelist) ----------------------------
 // Numeric: { min, max, type: 'number' }
 // Boolean: { type: 'boolean' }
 // Enum:    { type: 'enum', values: [...] } — set-only, value must be in list
 // Null/string fields (midtermResult, presidentialResult) are omitted —
-// the LLM cannot set them via structured effects. silmarillionVersion is
-// also omitted — the engine bumps it on a quarterly schedule, the LLM is
-// not permitted to mutate it.
+// the LLM cannot set them via structured effects.
 
 const WORLD_STATE_RANGES = {
     // congress.senate
@@ -147,28 +104,6 @@ const WORLD_STATE_RANGES = {
     // congress
     'congress.filibusterActive':        { type: 'boolean' },
     'congress.bigBillStatus':           { min: 0,   max: 4,   type: 'number' },
-    // pnth
-    'pnth.boardDirks':                  { min: 0,   max: 12,  type: 'number' },
-    'pnth.boardGottlieb':               { min: 0,   max: 12,  type: 'number' },
-    'pnth.ceoIsGottlieb':               { type: 'boolean' },
-    'pnth.ctoIsMira':                   { type: 'boolean' },
-    'pnth.militaryContractActive':      { type: 'boolean' },
-    'pnth.commercialMomentum':          { min: -2,  max: 2,   type: 'number' },
-    'pnth.ethicsBoardIntact':           { type: 'boolean' },
-    'pnth.activistStakeRevealed':       { type: 'boolean' },
-    'pnth.dojSuitFiled':                { type: 'boolean' },
-    'pnth.senateProbeLaunched':         { type: 'boolean' },
-    'pnth.whistleblowerFiled':          { type: 'boolean' },
-    'pnth.acquired':                    { type: 'boolean' },
-    'pnth.gottliebStartedRival':        { type: 'boolean' },
-    'pnth.sentinelLaunched':            { type: 'boolean' },
-    'pnth.aegisDeployed':               { type: 'boolean' },
-    'pnth.companionLaunched':           { type: 'boolean' },
-    'pnth.crucibleLaunched':             { type: 'boolean' },
-    'pnth.companionScandal':            { min: 0,   max: 3,   type: 'number' },
-    'pnth.aegisControversy':            { min: 0,   max: 3,   type: 'number' },
-    'pnth.lastReleaseTier':             { type: 'enum', values: ['breakthrough', 'strong', 'mediocre', 'disappointing', 'failure'] },
-    'pnth.frontierLead':                { min: -3,  max: 3,   type: 'number' },
     // geopolitical
     'geopolitical.tradeWarStage':       { min: 0,   max: 4,   type: 'number' },
     'geopolitical.mideastEscalation':   { min: 0,   max: 3,   type: 'number' },
@@ -176,9 +111,9 @@ const WORLD_STATE_RANGES = {
     'geopolitical.sanctionsActive':     { type: 'boolean' },
     'geopolitical.oilCrisis':           { type: 'boolean' },
     'geopolitical.recessionDeclared':   { type: 'boolean' },
-    'geopolitical.sericaRelations':      { min: -3,  max: 3,   type: 'number' },
-    'geopolitical.farsistanEscalation': { min: 0,   max: 3,   type: 'number' },
-    'geopolitical.khasurianCrisis':     { min: 0,   max: 3,   type: 'number' },
+    'geopolitical.chinaRelations':      { min: -3,  max: 3,   type: 'number' },
+    'geopolitical.gulfEscalation': { min: 0,   max: 3,   type: 'number' },
+    'geopolitical.russianCrisis':     { min: 0,   max: 3,   type: 'number' },
     'geopolitical.straitClosed':        { type: 'boolean' },
     // fed
     'fed.hikeCycle':                    { type: 'boolean' },

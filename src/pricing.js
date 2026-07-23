@@ -96,10 +96,10 @@ export function computeEffectiveSigma(v, T, kappa, theta, xi) {
 }
 
 /**
- * VX spot: 30-day equity volatility index for PNTH.
+ * VX spot: 30-day equity volatility index for HCN.
  * In the Heston model this is the expected integrated vol over 30 trading days.
  */
-export function computeVIXSpot(v, kappa, theta, xi) {
+export function computeVXHCNSpot(v, kappa, theta, xi) {
     return computeEffectiveSigma(v, 30 / 252, kappa, theta, xi) * 100;
 }
 
@@ -110,7 +110,7 @@ export function computeVIXSpot(v, kappa, theta, xi) {
  * Natural contango when v < θ, backwardation when v > θ.
  *
  * Jensen's inequality: E[√X] < √(E[X]), so the futures price
- * (which is E[VIX_T] = E[√(fwdIntVar)]) is below √(E[fwdIntVar]).
+ * (which is E[VXHCN_T] = E[√(fwdIntVar)]) is below √(E[fwdIntVar]).
  * The ξ² correction approximates this concavity discount.
  *
  * @param {number} v     - Current instantaneous variance
@@ -118,9 +118,9 @@ export function computeVIXSpot(v, kappa, theta, xi) {
  * @param {number} theta - Long-run variance
  * @param {number} xi    - Vol-of-vol
  * @param {number} T     - Time to futures expiry in years
- * @returns {number} Fair VIX futures level (percentage, e.g. 24.5)
+ * @returns {number} Fair VXHCN futures level (percentage, e.g. 24.5)
  */
-export function computeVIXFuturePrice(v, kappa, theta, xi, T) {
+export function computeVXHCNFuturePrice(v, kappa, theta, xi, T) {
     const expNkT = Math.exp(-kappa * T);
     const fwdVar = theta + (v - theta) * expNkT;
     const Delta = 30 / 252;

@@ -6,10 +6,10 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shoals — Options Trading and Politics Simulator | a9l.im</title>
     <meta name="description"
-        content="Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
+        content="Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta name="robots" content="index, follow, max-image-preview:large, max-snippet:-1">
     <meta property="og:title" content="Shoals — Options Trading and Politics Simulator">
-    <meta property="og:description" content="Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
+    <meta property="og:description" content="Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta property="og:type" content="website">
     <meta property="og:url" content="https://a9l.im/shoals">
     <meta property="og:site_name" content="a9l.im">
@@ -24,7 +24,7 @@
     <meta name="twitter:creator" content="@_a9lim">
     <meta property="og:locale" content="en_US">
     <meta name="twitter:title" content="Shoals — Options Trading and Politics Simulator">
-    <meta name="twitter:description" content="Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
+    <meta name="twitter:description" content="Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta name="author" content="a9lim">
     <link rel="icon" href="/favicon.ico">
     <meta name="theme-color" content="#E11107">
@@ -67,7 +67,7 @@
       "@type": ["WebApplication", "LearningResource", "Game"],
       "name": "Shoals",
       "url": "https://a9l.im/shoals",
-      "description": "Trade stock, bonds, VXPNT volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.",
+      "description": "Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.",
       "speakable": {
         "@type": "SpeakableSpecification",
         "cssSelector": ["meta[name='description']"]
@@ -184,7 +184,7 @@
           "name": "What market events does Shoals simulate?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "The offline registry currently contains more than 450 curated events across Federal Reserve, macro, market, firm, political, investigation, media, PNTH, tip, trait, and interjection domains. Events may change price-process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups."
+            "text": "The offline registry currently contains roughly 350 curated events across Federal Reserve, macro, market, firm, political, investigation, media, HCN, tip, trait, and interjection domains. Events may change price-process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups."
           }
         },
         {
@@ -192,7 +192,7 @@
           "name": "How do I build a multi-leg options strategy in Shoals?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Open the Strategy tab, select an expiry, and click stock, bond, VXPNT, call, or put cells to add long legs; use sell mode or right-click for short legs. The combined view updates payoff, Greek overlays, max profit or loss, and break-even estimates."
+            "text": "Open the Strategy tab, select an expiry, and click stock, bond, VXHCN, call, or put cells to add long legs; use sell mode or right-click for short legs. The combined view updates payoff, Greek overlays, max profit or loss, and break-even estimates."
           }
         },
         {
@@ -232,8 +232,8 @@
       "name": "How to price options with Shoals",
       "step": [
         {"@type": "HowToStep", "position": 1, "name": "Choose a market preset", "text": "Select one of five fixed regimes, Dynamic (Offline), or Dynamic (LLM), then adjust the exposed stock, volatility, jump, rate, and dividend parameters if desired."},
-        {"@type": "HowToStep", "position": 2, "name": "Open the live market", "text": "Run or single-step the 16-substep trading day while the Heston/Merton stock process, Vasicek rate process, VXPNT index, and rolling expiries update."},
-        {"@type": "HowToStep", "position": 3, "name": "Build and execute a strategy", "text": "Trade stock, bonds, VXPNT futures, or individual options, or use the multi-leg builder for a saved or custom strategy with payoff and Greek overlays."},
+        {"@type": "HowToStep", "position": 2, "name": "Open the live market", "text": "Run or single-step the 16-substep trading day while the Heston/Merton stock process, Vasicek rate process, VXHCN index, and rolling expiries update."},
+        {"@type": "HowToStep", "position": 3, "name": "Build and execute a strategy", "text": "Trade stock, bonds, VXHCN futures, or individual options, or use the multi-leg builder for a saved or custom strategy with payoff and Greek overlays."},
         {"@type": "HowToStep", "position": 4, "name": "Manage orders and margin", "text": "Use market, limit, or stop orders; monitor cash, buying power, margin, borrow costs, price impact, and pending orders."},
         {"@type": "HowToStep", "position": 5, "name": "Navigate the narrative", "text": "In a dynamic mode, respond to queued institutional decisions and observe how market parameters, world state, standing, traits, regulations, and endings change."}
       ]
@@ -347,7 +347,7 @@
                             <tbody><tr>
                                 <td class="chain-cell" id="stock-price-cell" role="button" tabindex="0">—</td>
                                 <td class="chain-cell" id="bond-price-cell" role="button" tabindex="0">—</td>
-                                <td class="chain-cell" id="vix-price-cell" role="button" tabindex="0">—</td>
+                                <td class="chain-cell" id="vxhcn-price-cell" role="button" tabindex="0">—</td>
                             </tr></tbody>
                         </table>
                         <div id="chain-table" class="chain-table">
@@ -462,7 +462,7 @@
                             <tbody><tr>
                                 <td class="chain-cell" id="strategy-stock-cell" role="button" tabindex="0">&mdash;</td>
                                 <td class="chain-cell" id="strategy-bond-cell" role="button" tabindex="0">&mdash;</td>
-                                <td class="chain-cell" id="strategy-vix-cell" role="button" tabindex="0">&mdash;</td>
+                                <td class="chain-cell" id="strategy-vxhcn-cell" role="button" tabindex="0">&mdash;</td>
                             </tr></tbody>
                         </table>
                         <div id="strategy-chain-table" class="chain-table">
@@ -526,11 +526,11 @@
                         <div class="stat-row">
                             <span class="stat-label-wrap">
                                 <span class="stat-label">VX</span>
-                                <button class="info-trigger" type="button" data-info="vix" aria-label="Info: VX">?</button>
+                                <button class="info-trigger" type="button" data-info="vxhcn" aria-label="Info: VX">?</button>
                             </span>
-                            <span class="stat-value" id="vix-display">0.00</span>
+                            <span class="stat-value" id="vxhcn-display">0.00</span>
                         </div>
-                        <canvas class="sparkline rate-sparkline" id="vix-sparkline" width="280" height="40"></canvas>
+                        <canvas class="sparkline rate-sparkline" id="vxhcn-sparkline" width="280" height="40"></canvas>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
                         <div class="group-label">LLM Settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM Integration">?</button></div>
@@ -741,16 +741,16 @@
         <h3>Strategy Builder</h3>
         <p>The multi-leg strategy builder supports spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy displays a payoff diagram, Greek overlays showing how sensitivity changes across strikes, maximum profit and loss, and break-even points. A margin system tracks portfolio-level exposure and buying power.</p>
         <h3>Market Events</h3>
-        <p>More than 450 curated events span Federal Reserve, macro, market, firm, political, investigation, media, PNTH, tip, trait, and interjection domains. Depending on the event, they can change process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups.</p>
+        <p>Roughly 350 curated events span Federal Reserve, macro, market, firm, political, investigation, media, HCN, tip, trait, and interjection domains. Depending on the event, they can change process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups.</p>
     <h3>Price Impact</h3>
-    <p>Shoals records decaying cumulative volume separately for stock, bonds, VXPNT futures, and each option contract. Square-root fill costs and valuation overlays model execution impact; option delta changes generate market-maker stock hedges, and very large gross exposure can add temporary capped parameter overlays.</p>
+    <p>Shoals records decaying cumulative volume separately for stock, bonds, VXHCN futures, and each option contract. Square-root fill costs and valuation overlays model execution impact; option delta changes generate market-maker stock hedges, and very large gross exposure can add temporary capped parameter overlays.</p>
     <h3>Narrative Framework</h3>
     <p>The simulation is set at Meridian Capital during the Barron administration. The event registry combines Poisson arrivals, scheduled pulses, portfolio triggers, one-shot conditions, and followup chains. Twelve permanent convictions, six dynamic reputation tags, and six institutional-standing dimensions shape later eligibility and consequences, culminating in one of six ending types with a five-page adaptive epilogue.</p>
     <h3>Accessibility</h3>
     <p>Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market and portfolio readouts, and focus trapping for narrative popups and the epilogue. The live candlestick chart, sparklines, typewriter treatment, and other animated feedback create continuous motion.</p>
     <p><em>See also: <a href="/geon">Geon</a> for particle physics, <a href="/cyano">Cyano</a> for cellular metabolism, <a href="/gerry">Gerry</a> for electoral fairness.</em></p>
 <h3>Learning Outcomes</h3>
-<p>After using Shoals, students should be able to: explain why American exercise is handled with a binomial tree; interpret delta, gamma, theta, vega, and rho for single options and multi-leg positions; distinguish spot volatility, term volatility, skew, and VXPNT futures; connect margin and execution impact to position sizing; and trace how market events and institutional decisions propagate into portfolio value.</p>
+<p>After using Shoals, students should be able to: explain why American exercise is handled with a binomial tree; interpret delta, gamma, theta, vega, and rho for single options and multi-leg positions; distinguish spot volatility, term volatility, skew, and VXHCN futures; connect margin and execution impact to position sizing; and trace how market events and institutional decisions propagate into portfolio value.</p>
 <h3>Prerequisites</h3>
 <p>Basic probability and statistics (expected value, standard deviation, normal distribution). Familiarity with compound interest and present value. No prior knowledge of options or derivatives is required.</p>
 <h3>Volatility Surface</h3>

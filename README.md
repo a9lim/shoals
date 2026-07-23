@@ -1,6 +1,6 @@
 # Shoals
 
-An interactive options trading simulator that runs in the browser. You play as a derivatives trader during a four-year presidential term, trading stock, bonds, VXPNT volatility futures, and American options in a dynamic simulated market.
+An interactive options trading simulator that runs in the browser. You play as a derivatives trader during a four-year presidential term, trading stock, bonds, VXHCN volatility futures, and American options in a dynamic simulated market.
 
 **[Try it](https://a9l.im/shoals)** | Part of the [a9l.im](https://a9l.im) portfolio
 

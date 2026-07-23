@@ -23,7 +23,7 @@ const TRAITS = [
             const f = ctx.playerChoices;
             let score = 0;
             if (f.pursued_insider_tip) score++;
-            if (f.pursued_pnth_tip) score++;
+            if (f.pursued_hcn_tip) score++;
             if (f.pursued_analyst_tip) score++;
             return score >= 2;
         },

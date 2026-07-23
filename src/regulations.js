@@ -31,7 +31,7 @@ const REGULATIONS = [
     {
         id: 'short_sale_ban',
         name: 'Emergency Short-Sale Ban',
-        description: 'The SEC invokes emergency powers as recession grips Columbia — short stock positions temporarily prohibited.',
+        description: 'The SEC invokes emergency powers as recession grips America — short stock positions temporarily prohibited.',
         color: 'var(--ext-red)',
         type: 'executive',
         duration: 90,
@@ -57,7 +57,7 @@ const REGULATIONS = [
     },
     {
         id: 'sanctions_compliance',
-        name: 'Serican Sanctions Compliance',
+        name: 'Chinese Sanctions Compliance',
         description: 'Lassiter\'s sanctions regime requires full counterparty screening on every trade — compliance overhead increases borrowing costs.',
         color: 'var(--ext-indigo)',
         type: 'executive',
@@ -67,7 +67,7 @@ const REGULATIONS = [
     {
         id: 'antitrust_scrutiny',
         name: 'Digital Markets Accountability Act',
-        description: 'The DOJ suit and Okafor\'s Senate probe create a cloud of regulatory uncertainty around Palanthropic — spreads widen on every headline.',
+        description: 'The DOJ suit and Okafor\'s Senate probe create a cloud of regulatory uncertainty around the AI majors — spreads widen on every headline.',
         color: 'var(--ext-purple)',
         type: 'legislative',
         effects: { spreadMult: 1.2 },
@@ -83,8 +83,8 @@ const REGULATIONS = [
     },
     {
         id: 'trade_war_tariffs',
-        name: 'Serican Reciprocal Tariff Act',
-        description: 'Lassiter\'s Serican Reciprocal Tariff Act is in effect — import costs rise, supply chains reroute, spreads and borrowing costs climb.',
+        name: 'Chinese Reciprocal Tariff Act',
+        description: 'Lassiter\'s Chinese Reciprocal Tariff Act is in effect — import costs rise, supply chains reroute, spreads and borrowing costs climb.',
         color: 'var(--ext-yellow)',
         type: 'legislative',
         effects: { spreadMult: 1.15, borrowSpreadAdd: 0.15 },
@@ -109,7 +109,7 @@ const REGULATIONS = [
     {
         id: 'algorithmic_capability_disclosure_act',
         name: 'Algorithmic Capability Disclosure Act',
-        description: 'Reyes\'s response to the Silmarillion capability surge — mandatory pre-release disclosure of foundation-model evaluations to the FTC. Compliance overhead increases borrowing costs across AI-exposed names.',
+        description: 'Reyes\'s response to the latest frontier-model capability surge — mandatory pre-release disclosure of foundation-model evaluations to the FTC. Compliance overhead increases borrowing costs across AI-exposed names.',
         color: 'var(--ext-purple)',
         type: 'legislative',
         effects: { borrowSpreadAdd: 0.2 },

@@ -253,9 +253,9 @@ main {
     color: var(--bond);
 }
 
-#vix-price-cell,
-#strategy-vix-cell {
-    color: var(--vix);
+#vxhcn-price-cell,
+#strategy-vxhcn-cell {
+    color: var(--vxhcn);
 }
 
 /* --- Position indicators on chain cells --- */

@@ -5,7 +5,6 @@ export { PARAM_RANGES } from './param-ranges.js';
 
 import { FED_EVENTS } from './fed.js';
 import { MACRO_EVENTS } from './macro.js';
-import { PNTH_EVENTS } from './pnth.js';
 import { CONGRESS_EVENTS } from './congress.js';
 import { INVESTIGATION_EVENTS } from './investigation.js';
 import { MEDIA_EVENTS } from './media.js';
@@ -14,12 +13,10 @@ import { FIRM_EVENTS } from './firm.js';
 import { TIP_EVENTS } from './tips.js';
 import { INTERJECTION_EVENTS } from './interjections.js';
 import { TRAIT_EVENTS } from './traits.js';
-import { SILMARILLION_EVENTS } from './silmarillion.js';
 
 export const ALL_EVENTS = [
     ...FED_EVENTS,
     ...MACRO_EVENTS,
-    ...PNTH_EVENTS,
     ...CONGRESS_EVENTS,
     ...INVESTIGATION_EVENTS,
     ...MEDIA_EVENTS,
@@ -28,7 +25,6 @@ export const ALL_EVENTS = [
     ...TIP_EVENTS,
     ...INTERJECTION_EVENTS,
     ...TRAIT_EVENTS,
-    ...SILMARILLION_EVENTS,
 ];
 
 // -- Event-by-id lookup --

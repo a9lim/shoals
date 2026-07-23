@@ -15,7 +15,7 @@ import { fmtDte } from './format-helpers.js';
 export function posKey(type, strike, expiryDay) {
     if (type === 'stock') return 'stock';
     if (type === 'bond') return 'bond:' + expiryDay;
-    if (type === 'vixfuture') return 'vixfuture:' + expiryDay;
+    if (type === 'vxhcnfuture') return 'vxhcnfuture:' + expiryDay;
     return type + ':' + strike + ':' + expiryDay;
 }
 

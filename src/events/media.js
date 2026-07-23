@@ -9,7 +9,7 @@ export const MEDIA_EVENTS = [
     {
         id: 'tan_bowman_offshore',
         category: 'media',
-        headline: 'Rachel Tan publishes Part 1 of her Bowman investigation: offshore accounts in the Farsistani banking system. The Continental\'s servers crash from traffic. Cole calls it "a hit piece."',
+        headline: 'Rachel Tan publishes Part 1 of her Bowman investigation: offshore accounts in the Gulf banking system. The Continental\'s servers crash from traffic. Cole calls it "a hit piece."',
         likelihood: (sim, world) => {
             let base = 3;
             if (world.media.lobbyingExposed) base *= 1.5;
@@ -98,27 +98,9 @@ export const MEDIA_EVENTS = [
         magnitude: 'minor',
     },
     {
-        id: 'tan_pnth_military',
-        category: 'media',
-        headline: 'Tan\'s Continental series on PNTH military contracts wins the Harriman Prize for investigative journalism. Dirks releases a statement calling it "irresponsible." Subscriptions spike. PNTH dips 2%.',
-        likelihood: (sim, world) => {
-            let base = 2;
-            if (world.media.lobbyingExposed) base *= 1.5;
-            return base;
-        },
-        params: { mu: -0.01, theta: 0.005 },
-        magnitude: 'minor',
-        when: (sim, world) => world.media.tanCredibility >= 7 && world.pnth.aegisDeployed,
-        era: 'mid',
-        effects: (world) => {
-            world.media.tanCredibility = Math.min(10, world.media.tanCredibility + 1);
-            shiftFaction('mediaTrust', 2);
-        },
-    },
-    {
         id: 'sharma_debt_warning',
         category: 'media',
-        headline: 'Sharma publishes a MarketWire special report: "Columbian Debt Trajectory: The Numbers Nobody Wants to See." Ten-year yields jump 15bps. Haines tweets the link without comment.',
+        headline: 'Sharma publishes a MarketWire special report: "American Debt Trajectory: The Numbers Nobody Wants to See." Ten-year yields jump 15bps. Haines tweets the link without comment.',
         likelihood: 2,
         params: { b: 0.005, sigmaR: 0.002 },
         magnitude: 'moderate',
@@ -147,18 +129,6 @@ export const MEDIA_EVENTS = [
         magnitude: 'minor',
         when: (sim, world) => world.investigations.tanBowmanStory >= 2 && world.media.tanCredibility >= 6,
         era: 'mid',
-    },
-    {
-        id: 'cole_reyes_viral_clash',
-        category: 'media',
-        headline: 'Reyes and Cole\'s Sentinel debate goes viral when Reyes holds up Atlas Companion\'s terms of service: "Read paragraph 47. I dare you." Cole cuts to commercial. 40 million views by morning.',
-        likelihood: 2,
-        params: {},
-        magnitude: 'minor',
-        when: (sim, world) => world.pnth.companionLaunched && world.media.sentinelRating >= 5,
-        effects: (world) => {
-            world.media.sentinelRating = Math.min(10, world.media.sentinelRating + 1);
-        },
     },
 
     // ── High-mediaTrust gated events ──
@@ -288,7 +258,7 @@ export const MEDIA_EVENTS = [
         popup: true,
         headline: 'The Continental investigates "Meridian\'s crisis profits"',
         context: (sim, world) => {
-            const crisis = world.geopolitical.oilCrisis ? 'Farsistan oil crisis' : 'Farsistan escalation';
+            const crisis = world.geopolitical.oilCrisis ? 'Gulf oil crisis' : 'Gulf escalation';
             const tone = firmTone();
             const prefix = tone === 'warm' ? 'Routine review — '
                 : tone === 'pointed' ? 'We need to talk again — '

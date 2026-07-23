@@ -37,7 +37,7 @@ const FACTION_SHIFT_SCHEMA = {
 const EFFECT_SCHEMA = {
     type: 'object',
     properties: {
-        path:  { type: 'string', description: 'Dot-notation path into world state, e.g. "pnth.boardDirks", "election.barronApproval", "fed.credibilityScore".' },
+        path:  { type: 'string', description: 'Dot-notation path into world state, e.g. "election.barronApproval", "fed.credibilityScore".' },
         op:    { type: 'string', enum: ['set', 'add'] },
         value: { type: 'number' },
     },
@@ -52,7 +52,7 @@ const FOLLOWUP_SCHEMA = {
         headline:  { type: 'string', description: '1-2 sentence followup headline.' },
         params:    { type: 'object', description: 'Parameter deltas.', properties: PARAM_PROPERTIES, additionalProperties: false },
         magnitude: { type: 'string', enum: ['minor', 'moderate', 'major'] },
-        category:  { type: 'string', enum: ['pnth', 'macro', 'sector', 'neutral', 'political', 'investigation', 'congressional', 'filibuster', 'media', 'desk', 'compound'] },
+        category:  { type: 'string', enum: ['macro', 'sector', 'neutral', 'political', 'investigation', 'congressional', 'filibuster', 'media', 'desk', 'compound'] },
         mtth:      { type: 'number', description: 'Mean trading days until followup fires (10-30).' },
         weight:    { type: 'number', description: 'Probability 0-1 the followup fires (0.3-0.9).' },
         effects:   { type: 'array', items: EFFECT_SCHEMA, description: 'World state mutations on followup.' },
@@ -99,7 +99,7 @@ const TOOL_DEF = {
                         },
                         category: {
                             type: 'string',
-                            enum: ['pnth', 'macro', 'sector', 'neutral', 'political', 'investigation', 'congressional', 'filibuster', 'media', 'desk', 'compound'],
+                            enum: ['macro', 'sector', 'neutral', 'political', 'investigation', 'congressional', 'filibuster', 'media', 'desk', 'compound'],
                         },
                         params: {
                             type: 'object',
@@ -154,15 +154,15 @@ const TOOL_DEF = {
     },
 };
 
-const SYSTEM_PROMPT = `You are a narrative event generator for "Shoals", an options trading simulator set in an alternate-history Federal States of Columbia. The player is a senior derivatives trader at Meridian Capital, trading stock and options in Palanthropic (ticker: PNTH) across a 4-year presidential term (~1008 trading days). Use the emit_events tool to return your events.
+const SYSTEM_PROMPT = `You are a narrative event generator for "Shoals", an options trading simulator set in an alternate-history United States. The player is a senior derivatives trader at Meridian Capital, trading stock and options in HCN across a 4-year presidential term (~1008 trading days). Use the emit_events tool to return your events.
 
 ## Universe
 
-Geography is real (Wall Street, Strait of Hormuz, Nanjing). Polities and people are fictional.
+Geography is real (Wall Street, Strait of Hormuz, Beijing). Polities and people are fictional.
 
 ### The Administration
-- **President John Barron** (Federalist) — Populist strongman. Military hawk, tariff enthusiast, Fed-basher. Launches airstrikes in the Middle East and "stabilization operations" in South America using PNTH AI targeting systems. Pressures Fed Chair to cut rates.
-- **VP Jay Bowman** — Former defense lobbyist. Andrea Dirks's college roommate. Lobbied Pentagon on PNTH's behalf. His corruption is an open secret driven by Rachel Tan's reporting.
+- **President John Barron** (Federalist) — Populist strongman. Military hawk, tariff enthusiast, Fed-basher. Launches airstrikes in the Middle East and "stabilization operations" in South America. Pressures Fed Chair to cut rates.
+- **VP Jay Bowman** — Former defense lobbyist. His corruption is an open secret driven by Rachel Tan's reporting.
 - **Former President Robin Clay** (Farmer-Labor) — Establishment centrist, face of the opposition.
 
 ### Congress
@@ -176,41 +176,18 @@ Two parties: Federalist and Farmer-Labor. Key members:
 - **Sen. Patricia Okafor** (F-L, IL) — Senate Intelligence Chair, investigations, potential presidential candidate
 - **Rep. David Oduya** (F-L, MI) — labor wing, anti-trade
 
-Key legislation: Big Beautiful Bill (omnibus, bigBillStatus 0-4), Serican Reciprocal Tariff Act, Financial Freedom Act, Digital Markets Accountability Act.
+Key legislation: Big Beautiful Bill (omnibus, bigBillStatus 0-4), Chinese Reciprocal Tariff Act, Financial Freedom Act, Digital Markets Accountability Act.
 
 ### The Fed
 - **Chair Hayden Hartley** — Technocratic, principled. Barron's attacks are personal. Can be fired with a trifecta + low credibility.
 - **Governor Marcus Vane** — Hawkish rival, Barron's preferred replacement.
 
-### Palanthropic (PNTH)
-- **Chairwoman Andrea Dirks** — Political operative. VP Bowman's college roommate. Defense/intelligence monopoly vision. Controls board (initially 7-3).
-- **CEO Eugene Gottlieb** — Idealistic founder watching his tech get weaponized.
-- **CTO Mira Kassis** — Brilliant engineer, politically naive. Can become whistleblower, Dirks ally, or leave.
-- **CFO Raj Malhotra** — Numbers man, quiet loyalty to whoever's winning.
-- **David Zhen** — Board kingmaker. His vote tips proxy fights.
-Products: Atlas Sentinel (enterprise), Atlas Aegis (military), Atlas Companion (consumer), Atlas Crucible (infrastructure). Gottlieb may start rival Covenant AI.
-
-SILMARILLION (PNTH foundation model line):
-Silmarillion is PNTH's frontier foundation model line. Every Atlas product runs
-on top of the latest Silmarillion generation. The game tracks
-world.pnth.silmarillionVersion (string, e.g. "3.5", "4.0") which the engine
-bumps on a quarterly schedule (3 minor bumps + 1 major bump per year). After
-each release the engine sets world.pnth.lastReleaseTier to one of:
-"breakthrough", "strong", "mediocre", "disappointing", "failure".
-world.pnth.frontierLead (-3..+3) tracks PNTH's lead vs the global frontier
-(Tianxia at Zhaowei in Serica; Aletheia at Covenant once Gottlieb has
-resigned). Ptonos (Austin-headquartered) is PNTH's domestic GPU supplier;
-Zhaowei is the contested foreign alternative. When you write events about
-the AI race, reference these names and the current version when relevant.
-You may set lastReleaseTier (enum) and add to frontierLead, but you cannot
-modify silmarillionVersion -- the engine owns version bumps.
-
 ### Geopolitics
-- **Serica** (Premier Liang Wei, Zhaowei Technologies) — PNTH's rival. Trade war and tech decoupling.
-- **Khasuria** (President Volkov) — Military incursion sets aegisDemandSurge.
-- **Farsistan** (Emir al-Farhan) — Strait of Hormuz closure triggers energyCrisis.
-- **Boliviara** (President Madero) — South American instability.
-- **Meridia** (PM Navon) — Regional flashpoint.
+- **China** (Premier Liang Wei, Zhaowei Technologies) — Trade war and tech decoupling.
+- **Russia** (President Volkov) — Military incursion and border escalation.
+- **Gulf** (Emir al-Farhan) — Strait of Hormuz closure triggers energyCrisis.
+- **Bolivia** (President Madero) — South American instability.
+- **Israel** (PM Navon) — Regional flashpoint.
 
 ### Media
 - **The Continental** (Rachel Tan, Tom Driscoll) — Paper of record. Tan drives investigation arcs.
@@ -218,24 +195,17 @@ modify silmarillionVersion -- the engine owns version bumps.
 - **MarketWire** (Priya Sharma) — Financial wire service.
 - **The Meridian Brief** — Meridian Capital internal newsletter.
 
-## World State (7 domains)
+## World State (6 domains)
 
 ### congress
 Senate/House seat counts (Federalist vs Farmer-Labor). Trifecta = Senate >= 50 + House >= 218.
 - filibusterActive (bool), bigBillStatus (0-4: not introduced, introduced, committee, floor, passed/failed)
 
-### pnth
-- boardDirks / boardGottlieb (max 12 total), ceoIsGottlieb, ctoIsMira (bool)
-- militaryContractActive, commercialMomentum (-2 to +2), ethicsBoardIntact
-- activistStakeRevealed, dojSuitFiled, senateProbeLaunched, whistleblowerFiled, acquired, gottliebStartedRival (bool)
-- sentinelLaunched, aegisDeployed, companionLaunched, crucibleLaunched (bool)
-- companionScandal (0-3), aegisControversy (0-3)
-
 ### geopolitical
 - tradeWarStage (0=peace, 1=tariffs, 2=retaliation, 3=decoupling, 4=deal)
-- sericaRelations (-3 cold war to +3 detente)
-- mideastEscalation, southAmericaOps, farsistanEscalation, khasurianCrisis (0-3)
-- sanctionsActive, oilCrisis, recessionDeclared, straitClosed, aegisDemandSurge, crucibleCompetitionPressure, energyCrisis (bool)
+- chinaRelations (-3 cold war to +3 detente)
+- mideastEscalation, southAmericaOps, gulfEscalation, russianCrisis (0-3)
+- sanctionsActive, oilCrisis, recessionDeclared, straitClosed, energyCrisis (bool)
 
 ### fed
 - hikeCycle, cutCycle, qeActive, hartleyFired, vaneAppointed (bool)
@@ -263,8 +233,8 @@ Six factions (0-100): firmStanding, regulatoryExposure, federalistSupport, farme
 - Reference named characters and publications in headlines (e.g., "Tan publishes in The Continental", not "journalist publishes article").
 - Reference current market conditions (price, vol, rates) and world state.
 - Parameter deltas: minor = 1-2 params with small deltas; moderate = 2-3; major = 3-5 with large deltas.
-- Mix categories: pnth, macro, sector, neutral, political, investigation, congressional, filibuster, media, desk, compound.
-- Do NOT generate category "fed", "pnth_earnings", "midterm", or "interjection" — those are pulse-scheduled separately.
+- Mix categories: macro, sector, neutral, political, investigation, congressional, filibuster, media, desk, compound.
+- Do NOT generate category "fed", "midterm", or "interjection" — those are pulse-scheduled separately.
 - Include neutral/flavor events to avoid constant directional drift.
 - About 1 in 4 events should be popups with 2-3 choices. Popup events must have choices array.
 - Superevents: at most 1 per batch, reserved for dramatic turning points (full-screen treatment + chord stab).
@@ -274,7 +244,7 @@ Six factions (0-100): firmStanding, regulatoryExposure, federalistSupport, farme
 - Effects are validated and clamped server-side; invalid paths silently dropped.
 - Use "op": "add" for incremental changes, "op": "set" for absolute values. For booleans use set with 1 or 0.
 - Keep effects proportional: minor events move 1-2 fields slightly, major events shift 2-4 fields significantly.
-- Cross-domain connections matter: geopolitical crises affect PNTH military demand, investigations affect media trust, election results reshape legislative likelihood.`;
+- Cross-domain connections matter: geopolitical crises reprice risk, investigations affect media trust, election results reshape legislative likelihood.`;
 
 export class LLMEventSource {
     constructor() {
@@ -342,24 +312,12 @@ export class LLMEventSource {
                 '- filibusterActive: ' + (cg.filibusterActive || false),
                 '- bigBillStatus: ' + (cg.bigBillStatus || 0),
                 '',
-                '[PNTH]',
-                '- Board: ' + w.pnth.boardDirks + ' Dirks / ' + w.pnth.boardGottlieb + ' Gottlieb',
-                '- CEO: ' + (w.pnth.ceoIsGottlieb ? 'Gottlieb' : 'successor') + ', CTO: ' + (w.pnth.ctoIsMira ? 'Kassis' : 'vacant'),
-                '- militaryContractActive: ' + w.pnth.militaryContractActive + ', commercialMomentum: ' + w.pnth.commercialMomentum,
-                '- ethicsBoardIntact: ' + w.pnth.ethicsBoardIntact + ', activistStakeRevealed: ' + w.pnth.activistStakeRevealed,
-                '- dojSuitFiled: ' + w.pnth.dojSuitFiled + ', senateProbeLaunched: ' + w.pnth.senateProbeLaunched,
-                '- whistleblowerFiled: ' + w.pnth.whistleblowerFiled + ', acquired: ' + w.pnth.acquired + ', gottliebStartedRival: ' + w.pnth.gottliebStartedRival,
-                '- Products: sentinel=' + w.pnth.sentinelLaunched + ', aegis=' + w.pnth.aegisDeployed + ', companion=' + w.pnth.companionLaunched + ', crucible=' + w.pnth.crucibleLaunched,
-                '- companionScandal: ' + w.pnth.companionScandal + ', aegisControversy: ' + w.pnth.aegisControversy,
-                '- silmarillionVersion: ' + (w.pnth.silmarillionVersion || '3.5') + ', lastReleaseTier: ' + (w.pnth.lastReleaseTier || 'none') + ', frontierLead: ' + (w.pnth.frontierLead || 0),
-                '',
                 '[Geopolitical]',
-                '- tradeWarStage: ' + w.geopolitical.tradeWarStage + ', sericaRelations: ' + w.geopolitical.sericaRelations,
+                '- tradeWarStage: ' + w.geopolitical.tradeWarStage + ', chinaRelations: ' + w.geopolitical.chinaRelations,
                 '- mideastEscalation: ' + w.geopolitical.mideastEscalation + ', southAmericaOps: ' + w.geopolitical.southAmericaOps,
-                '- farsistanEscalation: ' + (w.geopolitical.farsistanEscalation || 0) + ', khasurianCrisis: ' + (w.geopolitical.khasurianCrisis || 0),
+                '- gulfEscalation: ' + (w.geopolitical.gulfEscalation || 0) + ', russianCrisis: ' + (w.geopolitical.russianCrisis || 0),
                 '- sanctionsActive: ' + w.geopolitical.sanctionsActive + ', oilCrisis: ' + w.geopolitical.oilCrisis + ', recessionDeclared: ' + w.geopolitical.recessionDeclared,
-                '- straitClosed: ' + (w.geopolitical.straitClosed || false) + ', aegisDemandSurge: ' + (w.geopolitical.aegisDemandSurge || false),
-                '- crucibleCompetitionPressure: ' + (w.geopolitical.crucibleCompetitionPressure || false) + ', energyCrisis: ' + (w.geopolitical.energyCrisis || false),
+                '- straitClosed: ' + (w.geopolitical.straitClosed || false) + ', energyCrisis: ' + (w.geopolitical.energyCrisis || false),
                 '',
                 '[Fed]',
                 '- hikeCycle: ' + w.fed.hikeCycle + ', cutCycle: ' + w.fed.cutCycle + ', qeActive: ' + w.fed.qeActive,

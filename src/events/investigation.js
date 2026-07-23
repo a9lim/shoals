@@ -16,7 +16,7 @@ export const INVESTIGATION_EVENTS = [
             if (world.election.midtermResult === 'fed_gain') base *= 0.5;
             return base;
         },
-        headline: 'EXCLUSIVE (The Continental): Rachel Tan reveals VP Bowman held $4M in PNTH stock while personally lobbying Pentagon for Atlas contract. White House: "old news"',
+        headline: 'EXCLUSIVE (The Continental): Rachel Tan reveals VP Bowman held $4M in HCN stock while personally lobbying Pentagon for a defense contract. White House: "old news"',
         magnitude: 'moderate',
         maxDay: 600,
         when: (sim, world) => world.investigations.tanBowmanStory === 0,
@@ -44,7 +44,7 @@ export const INVESTIGATION_EVENTS = [
         followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
-        headline: 'Tan follow-up: Bowman\'s "blind trust" traded PNTH options 48 hours before contract announcements. Trust manager: Dirks\'s former assistant. The blind trust wasn\'t blind',
+        headline: 'Tan follow-up: Bowman\'s "blind trust" traded HCN options 48 hours before contract announcements. Trust manager: Dirks\'s former assistant. The blind trust wasn\'t blind',
         magnitude: 'moderate',
         when: (sim, world) => world.investigations.tanBowmanStory === 1,
         params: { mu: -0.04, theta: 0.02, lambda: 0.6, muJ: -0.02 },
@@ -61,14 +61,14 @@ export const INVESTIGATION_EVENTS = [
         minDay: 300,
         when: (sim, world) => world.investigations.tanBowmanStory >= 2,
         params: { mu: -0.06, theta: 0.03, lambda: 1.5, muJ: -0.04 },
-        effects: (world) => { world.investigations.tanBowmanStory = 3; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1); world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 8); },
+        effects: (world) => { world.investigations.tanBowmanStory = 3; world.election.barronApproval = Math.max(0, world.election.barronApproval - 8); shiftFaction('mediaTrust', 3); shiftFaction('regulatoryExposure', 8); },
         followups: [{ id: 'bowman_resigns', mtth: 20, weight: 0.5 }, { id: 'meridian_exposed', mtth: 25, weight: 0.5 }],
     },
     {
         id: 'tan_nsa_initial',
         category: 'investigation',
         likelihood: 0.5,
-        headline: 'Tan pivots to new story: PNTH provided NSA with backdoor access to Atlas commercial clients\' data. Three Fortune 500 companies threaten to sue',
+        headline: 'Tan pivots to new story: HCN provided NSA with backdoor access to commercial clients\' data. Three Fortune 500 companies threaten to sue',
         params: { mu: -0.04, theta: 0.02, lambda: 0.8 },
         magnitude: 'moderate',
         minDay: 200,
@@ -87,14 +87,12 @@ export const INVESTIGATION_EVENTS = [
         followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
-        headline: 'Tan\'s second NSA piece: backdoor was approved personally by Dirks without board knowledge. EU threatens to ban Atlas from European markets entirely',
+        headline: 'Tan\'s second NSA piece: backdoor was approved personally by Dirks without board knowledge. EU threatens to ban the company from European markets entirely',
         params: { mu: -0.05, theta: 0.025, lambda: 1.0, muJ: -0.03 },
         magnitude: 'major',
         when: (sim, world) => world.investigations.tanNsaStory === 1,
         effects: (world) => {
             world.investigations.tanNsaStory = 2;
-            world.pnth.boardDirks = Math.max(0, world.pnth.boardDirks - 1);
-            world.pnth.boardGottlieb = Math.min(10, world.pnth.boardGottlieb + 1);
             shiftFaction('mediaTrust', 3);
             shiftFaction('regulatoryExposure', 5);
         },
@@ -113,9 +111,9 @@ export const INVESTIGATION_EVENTS = [
                 world.election.midtermResult === 'fed_loss_house') base *= 1.5;
             return base;
         },
-        headline: 'Sen. Okafor formally opens Intelligence Committee hearings into PNTH-White House ties; witness list includes current and former PNTH executives',
+        headline: 'Sen. Okafor formally opens Intelligence Committee hearings into HCN-White House ties; witness list includes current and former HCN executives',
         magnitude: 'moderate',
-        when: (sim, world) => world.investigations.okaforProbeStage === 0 && world.pnth.senateProbeLaunched,
+        when: (sim, world) => world.investigations.okaforProbeStage === 0 && world.investigations.tanBowmanStory >= 1,
         params: { mu: -0.02, theta: 0.01, lambda: 0.4 },
         effects: [ { path: 'investigations.okaforProbeStage', op: 'set', value: 1 }, ],
     },
@@ -158,7 +156,7 @@ export const INVESTIGATION_EVENTS = [
         followupOnly: true,
         category: 'investigation',
         likelihood: 1.0,
-        headline: 'DOJ opens formal investigation into VP Bowman\'s PNTH stock trades; FBI agents visit Bowman\'s financial advisor. White House: "Full cooperation"',
+        headline: 'DOJ opens formal investigation into VP Bowman\'s HCN stock trades; FBI agents visit Bowman\'s financial advisor. White House: "Full cooperation"',
         params: { mu: -0.03, theta: 0.015, lambda: 0.5 },
         magnitude: 'moderate',
         when: (sim, world, congress) => !congress.trifecta && world.investigations.tanBowmanStory >= 2,
@@ -254,7 +252,7 @@ export const INVESTIGATION_EVENTS = [
         likelihood: 0,
         oneShot: true,
         when: (sim, world, congress, ctx) =>
-            (ctx.playerChoices.pursued_insider_tip || ctx.playerChoices.pursued_pnth_tip) &&
+            (ctx.playerChoices.pursued_insider_tip || ctx.playerChoices.pursued_hcn_tip) &&
             world.investigations.tanBowmanStory >= 2,
         headline: 'Rachel Tan\'s Continental investigation connects the insider tip you pursued to a pattern of suspicious trading flagged by the SEC. Her three-part series drops Sunday. Your name isn\'t in it — yet.',
         magnitude: 'major',
@@ -442,7 +440,7 @@ export const INVESTIGATION_EVENTS = [
         params: { theta: 0.005 },
         when: (sim, world, congress, ctx) =>
             !world.investigations.meridianExposed && (
-                (ctx.playerChoices.pursued_insider_tip || ctx.playerChoices.pursued_pnth_tip || ctx.playerChoices.hosted_fundraiser) ||
+                (ctx.playerChoices.pursued_insider_tip || ctx.playerChoices.pursued_hcn_tip || ctx.playerChoices.hosted_fundraiser) ||
                 (ctx.factions && ctx.factions.regulatoryExposure > 50) ||
                 world.media.lobbyingExposed
             ),

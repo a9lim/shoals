@@ -11,12 +11,10 @@ import {
     MIDTERM_DAY, CAMPAIGN_START_DAY, NON_FED_POISSON_RATE,
     NON_FED_COOLDOWN_MIN, NON_FED_COOLDOWN_MAX, FED_MEETING_JITTER,
     BOREDOM_THRESHOLD, TERM_END_DAY,
-    PNTH_EARNINGS_INTERVAL, PNTH_EARNINGS_JITTER,
-    MODEL_RELEASE_INTERVAL, MODEL_RELEASE_JITTER, MODEL_RELEASE_OFFSET,
     ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY,
 } from './config.js';
 
-import { createWorldState, congressHelpers, applyStructuredEffects, validateCongress, validatePnthBoard } from './world-state.js';
+import { createWorldState, congressHelpers, applyStructuredEffects, validateCongress } from './world-state.js';
 import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
 import { firmCooldownMult, shiftFaction } from './faction-standing.js';
@@ -29,7 +27,7 @@ const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
-const _PULSE_CATEGORIES = new Set(['fed', 'pnth_earnings', 'midterm', 'interjection', 'model_release']);
+const _PULSE_CATEGORIES = new Set(['fed', 'midterm', 'interjection']);
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
@@ -53,11 +51,6 @@ export class EventEngine {
         // Epilogue
         this._epilogueFired = false;
 
-        // Silmarillion release counter -- 0..3 within each "year" of releases.
-        // Counter logic is purely modular (4 releases per year, 4th is major bump);
-        // does not depend on sim.day so it stays in sync if releases are missed.
-        this._releasesThisYear = 0;
-
         // Player context for enriched guard signatures
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot = new Set();
@@ -65,8 +58,6 @@ export class EventEngine {
         // Pre-filter pools from ALL_EVENTS (exclude followupOnly events)
         this._pools = {
             fed:            ALL_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
-            pnth_earnings:  ALL_EVENTS.filter(e => e.category === 'pnth_earnings' && !e.followupOnly),
-            model_release:  ALL_EVENTS.filter(e => e.category === 'model_release' && !e.followupOnly),
             random:         ALL_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
             filibuster:     ALL_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
             media:          ALL_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
@@ -80,8 +71,6 @@ export class EventEngine {
         // Pulse schedule
         this._pulses = [
             { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, poolKey: 'fed' },
-            { type: 'recurring', id: 'pnth_earnings',  interval: PNTH_EARNINGS_INTERVAL,  jitter: PNTH_EARNINGS_JITTER,  nextDay: -1, poolKey: 'pnth_earnings' },
-            { type: 'modelRelease', id: 'model_release', interval: MODEL_RELEASE_INTERVAL, jitter: MODEL_RELEASE_JITTER, offset: MODEL_RELEASE_OFFSET, nextDay: -1 },
             { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, poolKey: 'filibuster' },
             { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, poolKey: 'media' },
             { type: 'recurring', id: 'interjection',     interval: 50, jitter: 15, nextDay: -1, poolKey: 'interjection' },
@@ -144,16 +133,6 @@ export class EventEngine {
                 if (day >= pulse.day && !pulse.fired) {
                     pulse.fired = true;
                     return _partition(this[pulse.handler](sim, day, netDelta));
-                }
-            } else if (pulse.type === 'modelRelease') {
-                // Initialize nextDay on first call -- use offset, not interval, for first fire
-                if (pulse.nextDay < 0) {
-                    pulse.nextDay = day + pulse.offset + this._jitterRoll(pulse.jitter);
-                }
-                if (day >= pulse.nextDay) {
-                    pulse.nextDay = day + pulse.interval + this._jitterRoll(pulse.jitter);
-                    const result = this._fireSilmarillionRelease(sim, day, netDelta);
-                    if (result) return _partition([result]);
                 }
             }
         }
@@ -218,7 +197,7 @@ export class EventEngine {
         if (w.geopolitical.oilCrisis)              score -= 5;
 
         // New geopolitical/media scoring factors
-        if (w.geopolitical.khasurianCrisis >= 3) score -= 6;
+        if (w.geopolitical.russianCrisis >= 3) score -= 6;
         if (w.geopolitical.straitClosed) score -= 8;
         if (w.congress.bigBillStatus === 3) score += 5;
         if (w.congress.bigBillStatus === 4) score -= 4;
@@ -268,13 +247,12 @@ export class EventEngine {
 
         // Reset all pulse states
         for (const pulse of this._pulses) {
-            if (pulse.type === 'recurring' || pulse.type === 'modelRelease') {
+            if (pulse.type === 'recurring') {
                 pulse.nextDay = -1;
             } else if (pulse.type === 'fixed') {
                 pulse.fired = false;
             }
         }
-        this._releasesThisYear = 0;
     }
 
     /** Update player context passed to event guards. */
@@ -332,158 +310,6 @@ export class EventEngine {
         return entry;
     }
 
-    /**
-     * Roll a Silmarillion release tier using world-state-modulated distribution.
-     * Returns one of: 'breakthrough', 'strong', 'mediocre', 'disappointing', 'failure'.
-     *
-     * Algorithm:
-     *   1. Roll base tier from distribution {F:10, D:25, M:30, S:25, B:10} as index 0..4.
-     *   2. Compute net shift in [-2, +2] from world state (see modulation table).
-     *   3. Add shift to tier index, clamp to [0, 4], return label.
-     */
-    _rollSilmarillionTier(world) {
-        // 1. Base roll: cumulative distribution F=0.10, D=0.35, M=0.65, S=0.90, B=1.00
-        const r = Math.random();
-        let tierIdx;
-        if      (r < 0.10) tierIdx = 0; // failure
-        else if (r < 0.35) tierIdx = 1; // disappointing
-        else if (r < 0.65) tierIdx = 2; // mediocre
-        else if (r < 0.90) tierIdx = 3; // strong
-        else                tierIdx = 4; // breakthrough
-
-        // 2. World-state modulation (sum of conditions, clamped to [-2, +2])
-        let shift = 0;
-        if (world.geopolitical.tradeWarStage >= 2)        shift -= 1;
-        if (world.geopolitical.straitClosed)              shift -= 1;
-        if (world.pnth.aegisControversy >= 2)             shift -= 1;
-        if (world.pnth.commercialMomentum >= 1)           shift += 1;
-        if (world.pnth.commercialMomentum <= -1)          shift -= 1;
-        if (world.pnth.gottliebStartedRival &&
-            (world.pnth.lastReleaseTier === 'disappointing' ||
-             world.pnth.lastReleaseTier === 'failure'))   shift -= 1;
-        if (world.pnth.frontierLead >= 2)                 shift += 1;
-        shift = Math.max(-2, Math.min(2, shift));
-
-        // 3. Apply shift, clamp, map to label
-        tierIdx = Math.max(0, Math.min(4, tierIdx + shift));
-        return ['failure', 'disappointing', 'mediocre', 'strong', 'breakthrough'][tierIdx];
-    }
-
-    /**
-     * Bump world.pnth.silmarillionVersion in place.
-     * 3 minor bumps (patch += 1) followed by 1 major bump (major += 1, patch = 0).
-     * Counter logic is modular on _releasesThisYear, not sim.day.
-     *
-     * Examples (counter -> resulting version starting from 3.5):
-     *   counter=0 -> 3.6 (minor), counter becomes 1
-     *   counter=1 -> 3.7 (minor), counter becomes 2
-     *   counter=2 -> 3.8 (minor), counter becomes 3
-     *   counter=3 -> 4.0 (major), counter becomes 0
-     */
-    _bumpSilmarillionVersion(world) {
-        const [majorStr, patchStr] = world.pnth.silmarillionVersion.split('.');
-        let major = parseInt(majorStr, 10);
-        let patch = parseInt(patchStr, 10);
-        const isMajorBump = (this._releasesThisYear === 3);
-
-        if (isMajorBump) {
-            major += 1;
-            patch = 0;
-            this._releasesThisYear = 0;
-        } else {
-            patch += 1;
-            this._releasesThisYear += 1;
-        }
-
-        world.pnth.silmarillionVersion = `${major}.${patch}`;
-        return { isMajorBump, prevVersion: `${majorStr}.${patchStr}`, newVersion: world.pnth.silmarillionVersion };
-    }
-
-    /**
-     * Fire a Silmarillion release event.
-     * Sequence: bump version -> roll tier -> select tier-keyed headline
-     * from pool -> substitute {version}/{prevVersion}/{tierLabel}/{tier} placeholders
-     * -> apply major-release multiplier if applicable -> fire through _fireEvent.
-     *
-     * Returns one of:
-     *   - mediocre-minor branch: a log entry from _logEvent (no event fired through _fireEvent)
-     *   - normal branch: a log entry from _fireEvent, or { queued: true, event } for popups
-     *   - missing-event branch: null (with console.warn)
-     * Caller can pass the result to _partition unchanged — log entries go to fired,
-     * { queued: true, event } objects go to popups, null is filtered.
-     */
-    _fireSilmarillionRelease(sim, day, netDelta) {
-        const { isMajorBump, prevVersion, newVersion } =
-            this._bumpSilmarillionVersion(this.world);
-
-        const tier = this._rollSilmarillionTier(this.world);
-        this.world.pnth.lastReleaseTier = tier;
-
-        // Mediocre-minor releases produce no chain headline event -- just log a
-        // toast directly and skip _fireEvent entirely.
-        if (tier === 'mediocre' && !isMajorBump) {
-            const headline = `Silmarillion ${newVersion} ships. Reviewers: incremental. Aggregate benchmarks roughly flat vs. ${prevVersion}.`;
-            return this._logEvent(day, { headline, category: 'model_release' }, {}, 'minor');
-        }
-
-        // Select the matching tier-keyed headline event from the pool.
-        // For major releases on Mediocre, use the dedicated major-meh event.
-        let eventId;
-        if (tier === 'mediocre' && isMajorBump) {
-            eventId = 'silmarillion_major_meh';
-        } else {
-            eventId = `silmarillion_${tier}`;
-        }
-        const baseEvent = getEventById(eventId);
-        if (!baseEvent) {
-            console.warn(`[events] _fireSilmarillionRelease: missing event '${eventId}'`);
-            return null;
-        }
-
-        // Clone and substitute placeholders in the headline.
-        const tierLabel = {
-            breakthrough: 'breakthrough',
-            strong: 'strong showing',
-            mediocre: 'middling result',
-            disappointing: 'underwhelming launch',
-            failure: 'fiasco',
-        }[tier];
-        const resolvedHeadline = baseEvent.headline
-            .replaceAll('{version}',     newVersion)
-            .replaceAll('{prevVersion}', prevVersion)
-            .replaceAll('{tierLabel}',   tierLabel)
-            .replaceAll('{tier}',        tier);
-
-        // Major release: multiply per-tier deltas (params and frontierLead-bearing
-        // effects). _fireEvent applies clamping after delta addition, so the
-        // multiplier is safe to apply here on the cloned params.
-        let resolvedParams = baseEvent.params;
-        let resolvedEffects = baseEvent.effects;
-        if (isMajorBump && resolvedParams) {
-            resolvedParams = {};
-            for (const [k, v] of Object.entries(baseEvent.params)) {
-                resolvedParams[k] = v * 1.5;
-            }
-        }
-        if (isMajorBump && Array.isArray(baseEvent.effects)) {
-            resolvedEffects = baseEvent.effects.map(eff => {
-                if (eff.path === 'pnth.frontierLead' && eff.op === 'add') {
-                    return { ...eff, value: eff.value * 2 };
-                }
-                return eff;
-            });
-        }
-
-        const cloned = {
-            ...baseEvent,
-            headline: resolvedHeadline,
-            params:   resolvedParams,
-            effects:  resolvedEffects,
-        };
-
-        return this._fireEvent(cloned, sim, day, 0, netDelta);
-    }
-
     _scheduleFollowups(event, day, depth, chainIdSuffix) {
         if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
         const chainId = event.id || ('chain_' + day + (chainIdSuffix || ''));
@@ -506,7 +332,6 @@ export class EventEngine {
             if (typeof event.effects === 'function') event.effects(this.world);
             else if (Array.isArray(event.effects)) applyStructuredEffects(this.world, event.effects);
             validateCongress(this.world);
-            validatePnthBoard(this.world);
 
             this._logEvent(day, event, event.params || {}, event.magnitude || 'major');
             this._scheduleFollowups(event, day, depth);
@@ -540,7 +365,6 @@ export class EventEngine {
             applyStructuredEffects(this.world, event.effects);
         }
         validateCongress(this.world);
-        validatePnthBoard(this.world);
 
         // Apply top-level faction shifts
         if (Array.isArray(event.factionShifts)) {
@@ -615,9 +439,6 @@ export class EventEngine {
         if (convIds.length > 0) {
             if (convIds.includes('political_operator') && (ev.category === 'congressional' || ev.category === 'filibuster' || ev.category === 'political')) {
                 w *= 1.5;
-            }
-            if (convIds.includes('volatility_addict') && (ev.category === 'pnth' || ev.category === 'pnth_earnings')) {
-                w *= 1.3;
             }
             if (convIds.includes('information_edge') && (ev.category === 'investigation' || ev.category === 'media')) {
                 w *= 1.4;
@@ -736,7 +557,6 @@ export class EventEngine {
         // Cross-domain signals
         if (w.investigations.okaforProbeStage >= 2) score -= 5;
         if (w.fed.hartleyFired) score -= 3;
-        if ((w.pnth.aegisControversy || 0) >= 2) score -= 3;
         const factions = w.factions || {};
         score += ((factions.federalistSupport || 30) - (factions.farmerLaborSupport || 30)) * 0.15;
 

@@ -301,7 +301,7 @@ export function resolveLegs(legs, S, day, expiries, overrideExpiryDay) {
         if (leg.type === 'stock') {
             return { type: leg.type, qty: leg.qty, strike: null, expiryDay: null };
         }
-        if (leg.type === 'bond' || leg.type === 'vixfuture') {
+        if (leg.type === 'bond' || leg.type === 'vxhcnfuture') {
             return { type: leg.type, qty: leg.qty, strike: null,
                 expiryDay: _resolveExpiry(leg.dteOffset, day, expiries, overrideExpiryDay) };
         }
@@ -321,7 +321,7 @@ export function computeNetCost(legs, S, vol, r, day, q, expiries, overrideExpiry
         const absQty = Math.abs(leg.qty);
         const isLong = leg.qty > 0;
         const mid = unitPrice(leg.type, S, vol, r, day, leg.strike, leg.expiryDay, q);
-        const spreadVol = leg.type === 'bond' ? market.sigmaR : leg.type === 'vixfuture' ? market.xi : vol;
+        const spreadVol = leg.type === 'bond' ? market.sigmaR : leg.type === 'vxhcnfuture' ? market.xi : vol;
         const ba = (leg.type === 'call' || leg.type === 'put')
             ? computeOptionBidAsk(mid, S, leg.strike, spreadVol)
             : computeBidAsk(mid, spreadVol);
@@ -335,7 +335,7 @@ export function computeNetCost(legs, S, vol, r, day, q, expiries, overrideExpiry
 
 export function legsToRelative(absLegs, S, day, selectableExpiry) {
     return absLegs.map(leg => {
-        if (leg.type === 'stock' || leg.type === 'bond' || leg.type === 'vixfuture') {
+        if (leg.type === 'stock' || leg.type === 'bond' || leg.type === 'vxhcnfuture') {
             return { type: leg.type, qty: leg.qty, strikeOffset: null, dteOffset: null };
         }
         const strikeOffset = (leg.strike != null ? leg.strike : Math.round(S / 5) * 5) - Math.round(S / 5) * 5;

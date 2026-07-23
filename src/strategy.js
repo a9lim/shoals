@@ -170,8 +170,8 @@ function _precomputeLegs(legs, entryS, vol, rate, evalDay, entryDay, fallbackDte
                 info.bondCurVal = unitPrice('bond', entryS, vol, rate, evalDay ?? 0, null,
                     entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null, q);
                 break;
-            case 'vixfuture':
-                info.vixCurVal = unitPrice('vixfuture', entryS, vol, rate, evalDay ?? 0, null,
+            case 'vxhcnfuture':
+                info.vxhcnCurVal = unitPrice('vxhcnfuture', entryS, vol, rate, evalDay ?? 0, null,
                     entryDay != null ? entryDay + Math.round(T * TRADING_DAYS_PER_YEAR) : null, q);
                 break;
         }
@@ -189,8 +189,8 @@ function _legPnlFast(info, S) {
             return (S - info.entryS) * info.mult;
         case 'bond':
             return (info.bondCurVal - info.entryVal) * info.mult;
-        case 'vixfuture':
-            return (info.vixCurVal - info.entryVal) * info.mult;
+        case 'vxhcnfuture':
+            return (info.vxhcnCurVal - info.entryVal) * info.mult;
         default:
             return 0;
     }
@@ -232,18 +232,18 @@ function _legGreeksFast(info, S) {
             }
             return { delta: 0, gamma: 0, theta: bTheta, vega: 0, rho: bRho };
         }
-        case 'vixfuture': {
+        case 'vxhcnfuture': {
             const kappa = market.kappa;
             const Delta = 30 / 252;
             const kD = kappa * Delta;
             const MR = kD < 1e-6 ? 1 : (1 - Math.exp(-kD)) / kD;
             const expKT = Math.exp(-kappa * info.T);
             const sigma = Math.sqrt(Math.max(market.v, 1e-8));
-            const vixFut = info.vixCurVal > 0.01 ? info.vixCurVal : 1;
-            // Vega: ∂VIXfut/∂σ = 10000 × MR × e^{-κT} × σ / VIXfut
-            const vegaPerUnit = MR * expKT * 10000 * sigma / vixFut;
+            const vxhcnFut = info.vxhcnCurVal > 0.01 ? info.vxhcnCurVal : 1;
+            // Vega: ∂VXHCNfut/∂σ = 10000 × MR × e^{-κT} × σ / VXHCNfut
+            const vegaPerUnit = MR * expKT * 10000 * sigma / vxhcnFut;
             // Theta: contango/backwardation decay per trading day
-            const thetaPerUnit = 5000 * kappa * (market.v - market.theta) * expKT * MR / (vixFut * TRADING_DAYS_PER_YEAR);
+            const thetaPerUnit = 5000 * kappa * (market.v - market.theta) * expKT * MR / (vxhcnFut * TRADING_DAYS_PER_YEAR);
             return { delta: 0, gamma: 0, theta: thetaPerUnit * info.mult, vega: vegaPerUnit * info.mult, rho: 0 };
         }
         default:
