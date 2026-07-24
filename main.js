@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD } from './src/config.js';
+import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD, BOND_FACE_VALUE } from './src/config.js';
 import { fmtDollar } from './src/format-helpers.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
@@ -15,7 +15,7 @@ import {
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder, cancelAllOrders,
     computeNetDelta, computeGrossNotional, portfolioValue,
-    executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows,
+    executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows, applyCloseoutRows,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -35,7 +35,7 @@ import {
 import { initTheme, toggleTheme } from './src/theme.js';
 import { EventEngine, eventBaseRateScale } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
-import { checkEndings, generateEnding } from './src/endings.js';
+import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
@@ -77,16 +77,18 @@ import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
 import { applyReportingRegime } from './src/race/incidents.js';
 import { straitTension } from './src/race/strait.js';
 import { stepTreaty } from './src/race/treaty-track.js';
-import { checkResolution } from './src/race/resolution.js';
+import { checkResolution, resolveNow } from './src/race/resolution.js';
 import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
-    buildPublicView, openDispute, ruleDispute,
+    buildPublicView, openDispute, ruleDispute, finalizeConsensusTerminal,
 } from './src/race/consensus.js';
 import {
     computeMarket, initComputeMarket, resetComputeMarket, deactivateComputeMarket,
     refreshComputeQuotes, computeFutureSettlements, stepNationalizationRef, setComputePriceSource,
+    finalizeComputeTerminal,
 } from './src/race/compute-market.js';
+import { closeoutBook } from './src/race/closeout.js';
 import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief,
     binaryQuoteFromBelief, computeCurveFromBelief, impliedTimeline,
@@ -99,7 +101,7 @@ import {
     applyEventImpulseOverlay, removeEventImpulseOverlay, resetEventImpulses,
 } from './src/race/impulse.js';
 import { stepCoupling, resetCoupling, deactivateCoupling } from './src/race/coupling.js';
-import { resetLedger, deactivateLedger, applyRaceEffects, appendLedger } from './src/race/ledger.js';
+import { resetLedger, deactivateLedger, applyRaceEffects, appendLedger, ledgerTotals } from './src/race/ledger.js';
 
 
 // ---------------------------------------------------------------------------
@@ -129,6 +131,8 @@ let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry
 let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let raceState = null;    // hidden AI-race state machine (null when not in Dynamic mode; nothing reads it yet)
+let _gameOver = false;   // P6-3 DURABLE terminal latch: desk locked, book closed out, epilogue shown. Never auto-releases (unlike portfolio.restricted); cleared only by _resetCore.
+let _pendingEpilogue = null;   // P6-3: epilogue pages built at game-over, rendered only AFTER the resolution-day beat drains from the popup queue (the treaty superevent reaches the player first).
 let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
 let vxhcnHistory = null;    // sparkline ring buffer for VX
@@ -237,7 +241,7 @@ function _exoSignals() {
  *  identically by the daily settlement pass, the outbox drain, and the dispute
  *  ruling hook -- so no milestone settles without scoring, and none double-pays. */
 function _applyBinaryRows(rows) {
-    if (!rows || rows.length === 0) return;
+    if (!rows || rows.length === 0) return [];
     const { fresh, cashResults } = applyBinarySettlementRows(rows);   // cash + settleClaims credibility, exactly-once
     for (const r of cashResults) {
         _toast('Consensus: ' + r.label + ' settled ' + r.outcome + ' — P&L ' + fmtDollar(r.pnl), 4500);
@@ -250,6 +254,7 @@ function _applyBinaryRows(rows) {
             _toast('Consensus: ' + r.label + ' reached — held for terminal closeout.', 4500);
         }
     }
+    return cashResults;   // per-position binary P&L (for the terminal scorecard)
 }
 /** Fire a race/policy shell event by id as a toast (phase 5a: dispute lifecycle
  *  narrative). Non-popup shells toast their headline; popup shells queue. */
@@ -1118,10 +1123,20 @@ function _updateLobbyPills() {
 
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
 function _processPopupQueue() {
-    if (_popupQueue.length === 0) return;
-    // Don't show if another overlay is open
+    // Don't show if another overlay is open (trade dialog / a popup already up).
     if (!$.tradeDialog.classList.contains('hidden')) return;
     if (!$.popupOverlay.classList.contains('hidden')) return;
+    if (_popupQueue.length === 0) {
+        // P6-3: the terminal epilogue renders ONLY after the resolution-day beat has
+        // drained (the treaty superevent showed as an event; now the desk closes over
+        // the player). Any _processPopupQueue call with an empty queue triggers it.
+        if (_pendingEpilogue) {
+            const pages = _pendingEpilogue;
+            _pendingEpilogue = null;
+            _showEpilogue(pages, true);   // terminal: no "keep playing"
+        }
+        return;
+    }
 
     const event = _popupQueue.shift();
     playing = false;
@@ -1297,7 +1312,8 @@ function _processPopupQueue() {
                 if (stuck.length === 0 && _portfolioEquity() < 0) {
                     _showGameOver('Forced liquidation left your account in deficit by '
                         + fmtDollar(Math.abs(_portfolioEquity()))
-                        + '. Regulators have flagged the account for review.');
+                        + '. Regulators have flagged the account for review.',
+                        'margin_call_liquidation', 'Account Liquidation');
                 }
             } else if (choice.playerFlag === 'margin_partial') {
                 // Close stock positions only
@@ -1317,16 +1333,19 @@ function _processPopupQueue() {
                     chainDirty = true;
                     updateUI();
                     if (stuck.length === 0 && _portfolioEquity() < 0) {
-                        _showGameOver('Forced liquidation left your account in deficit.');
+                        _showGameOver('Forced liquidation left your account in deficit.',
+                            'margin_call_liquidation', 'Account Liquidation');
                     }
                 }
             }
             _haptic('heavy');
         }
-        // Rogue trading / game over actions
+        // Rogue trading / margin-deficit game over: the announcement popup is the
+        // BEAT; what follows is the SHARED terminal machinery (02a P6-3 ruling 2),
+        // NOT a preset reset -- latch -> extrapolate -> closeout -> epilogue, with the
+        // involvement split deciding the overlay like any other resignation.
         if (event._gameOverAction) {
-            _resetCore(DEFAULT_PRESET);
-            loadPreset(DEFAULT_PRESET);
+            _triggerGameOver(event._gameOverEnding || 'forced_resignation');
         }
         // Forecast-lock (phase 4): commit the player's posterior claim vector at
         // the scheduled lock day. Immutable, on-grid, current-day only -- check the
@@ -1362,14 +1381,19 @@ function _processPopupQueue() {
             if (row) { _applyBinaryRows([row]); refreshBinaryQuotes(raceState); }
         }
         dirty = true;
+        // Drain the next queued popup (the overlay was hidden before this callback ran).
+        // This chains the resolution-day beats and, when the queue empties, renders any
+        // pending terminal epilogue (P6-3: the beat shows, THEN the desk closes over the
+        // player). A game-over choice already triggered its own drain; this is a no-op then.
+        _processPopupQueue();
     }, popupCat, event.magnitude, isSuperevent);
 }
 
-function _showGameOver(contextText) {
+function _showGameOver(contextText, endingId = 'forced_resignation', headline = 'Rogue Trading Investigation') {
     _popupQueue.unshift({
         category: 'gameover',
         magnitude: 'major',
-        headline: 'Rogue Trading Investigation',
+        headline,
         context: contextText,
         choices: [
             {
@@ -1380,17 +1404,110 @@ function _showGameOver(contextText) {
             },
         ],
         _gameOverAction: true,
+        _gameOverEnding: endingId,   // routed through _triggerGameOver (the shared latch)
     });
     _processPopupQueue();
 }
 
 function _showComplianceTermination() {
+    playerChoices['compliance_terminated'] = sim.day;
+    _triggerGameOver('forced_resignation');
+}
+
+// ---------------------------------------------------------------------------
+// P6-3: terminal game-over -- desk locks, world resolves, book closes out,
+// epilogue renders against the resolved world.
+// ---------------------------------------------------------------------------
+
+/**
+ * Fire the DURABLE terminal game-over for a player-terminal state (P6-1 ruling):
+ * the desk ends, the world extrapolates to a resolution (if it had not resolved
+ * already), the book closes out against that resolution through the 09 matrix, and
+ * the endings engine renders the epilogue. Idempotent (the _gameOver latch guards
+ * re-entry). Ledger-freeze-before-marking is guaranteed: the freeze fires inside
+ * checkResolution (mid-run / timeout) or resolveNow (early ejection) BEFORE any
+ * closeout cash moves.
+ */
+function _triggerGameOver(endingId) {
+    if (_gameOver) return;
+    _gameOver = true;
     playing = false;
     updatePlayBtn($, playing);
-    playerChoices['compliance_terminated'] = sim.day;
-    const pages = generateEnding('forced_resignation', eventEngine?.world ?? {}, sim, portfolio,
-        eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews);
-    _showEpilogue(pages);
+    // 1. Lock the desk: cancel pending orders, restrict (the durable lock is _gameOver).
+    cancelAllOrders();
+    portfolio.restricted = true;
+
+    // TERMINAL QUEUE DISCIPLINE (02a P6-3): the world's resolution supersedes the day's
+    // ordinary news. FILTER the popup queue -- BEFORE closeout / epilogue generation --
+    // to terminal-safe beats only: today exactly category 'summit' (treaty_holds /
+    // treaty_resolution, effect-free acknowledgments by construction). DISCARD every
+    // ordinary queued popup, so no queued choice (cashPenalty, factionShift, trade) can
+    // mutate the settled book or stale the epilogue. The retained beats are known-
+    // effect-free, so the epilogue generated below stays exact by construction; later
+    // terminal beats (P7's room) opt in by category, never by exemption. The predicate
+    // is extracted to endings.js (isTerminalSafeBeat) so the harness gates the rule.
+    for (let i = _popupQueue.length - 1; i >= 0; i--) {
+        if (!isTerminalSafeBeat(_popupQueue[i])) _popupQueue.splice(i, 1);
+    }
+
+    // 2/3. Dynamic mode only: resolve the world (extrapolate if the desk ended first)
+    //      and close the book out against it. Classic mode has no race -> no closeout.
+    let resolution = null, closeout = null, overlay = 'bystander';
+    if (raceState) {
+        const geo = eventEngine ? eventEngine.world.geopolitical : null;
+        resolution = resolveNow(raceState, geo);          // existing record, or extrapolate + latch (freezeLedger first)
+        closeout = _runTerminalCloseout(resolution, geo);
+        // Agency/movability (05 OPEN): compute + STORE on the resolution, surface nothing.
+        const _dP = resolution && resolution.axes ? Math.abs(resolution.axes.dP || 0) : 0;
+        if (resolution && resolution.axes) {
+            const dW = Math.abs(resolution.axes.dW || 0);
+            resolution.movability = { dP: _dP, dW, realizedShare: (_dP + dW) > 0 ? _dP / (_dP + dW) : 0 };
+        }
+        // Personal overlay (surface the mapping; the epilogue picks slots, not tone).
+        overlay = determineOverlay(endingId, ledgerTotals(), _dP, _firmVerdictFired);
+    }
+
+    // 4. Epilogue (structure + numbers here; sentences are coordinator slots). DEFERRED
+    //    behind the popup queue (02a P6-3 ruling 2): any resolution-day beat already
+    //    queued -- the treaty superevent above all -- shows as an EVENT first; the
+    //    epilogue renders only once the queue has drained (see _processPopupQueue).
+    _pendingEpilogue = generateEnding(endingId, {
+        resolution, overlay, totals: raceState ? ledgerTotals() : {},
+        closeout, sim, portfolio, playerChoices,
+        eventLog: eventEngine ? eventEngine.eventLog : [],
+        impactHistory, quarterlyReviews,
+    });
+    _processPopupQueue();   // drain the resolution-day beat first, THEN render the epilogue
+}
+
+/**
+ * Run the 09 terminal closeout for the whole book against the resolved world.
+ * Consensus + compute settle through their STATEFUL idempotent finalizers (cash +
+ * credibility, exactly-once); HCN stock / options / VXHCN futures / bonds settle
+ * through the pure closeout matrix at IMPACT-FREE authoritative marks. Returns the
+ * matrix result for the epilogue's desk page.
+ */
+function _runTerminalCloseout(resolution, geo) {
+    // Consensus binaries: durable rows through the ONE shared consequence helper.
+    // Capture the player's per-position binary P&L for the scorecard (P6-3 finding 4).
+    const binary = _applyBinaryRows(finalizeConsensusTerminal(raceState));
+    // Compute futures: the P3b cash path, driven by the terminal finalizer.
+    const cSettle = finalizeComputeTerminal(raceState, geo);
+    const compute = cSettle.length ? settleComputeFutures(cSettle, raceState) : [];
+    // HCN stock / options / VXHCN / bonds: impact-free authoritative marks (09 -- the
+    // impact overlay and the CRR tree never touch settlement). sim.S is the
+    // authoritative process price; market.vxhcn is the last-valid VXHCN spot (Heston,
+    // impact-free -- the formal validity-history/realized-var-fallback observation
+    // record is a market-integrity seam, FLAGGED); bonds carry their last live MTM via
+    // the impact-free Vasicek price (02a P6-3 ruling -- non-doom families mark at MTM,
+    // doom recovers on face inside closeout.js).
+    const book = closeoutBook(portfolio.positions, resolution, raceState, {
+        spot: sim.S, varianceIndex: market.vxhcn,
+        bond: { rate: sim.r, a: market.a, b: market.b, sigmaR: market.sigmaR, day: sim.day, face: BOND_FACE_VALUE },
+    });
+    applyCloseoutRows(book.rows);   // credit cash + remove positions by id (preserves borrow accrual)
+    // All nine cells reach the scorecard: the matrix book + the two finalizer P&L sets.
+    return { rows: book.rows, ctx: book.ctx, totalCash: book.totalCash, totalPnl: book.totalPnl, binary, compute };
 }
 
 /**
@@ -1603,8 +1720,15 @@ function _hasStuckLegs() {
     return false;
 }
 
-/** Order-entry guard: toast + block when the account is restricted. */
+/** Order-entry guard: toast + block when the account is restricted OR the game is
+ *  terminally over (P6-3: the desk is closed; the durable _gameOver latch never
+ *  auto-releases, so no trade can print after the closeout). */
 function _blockedByRestriction() {
+    if (_gameOver) {
+        _toast('The desk is closed. What remains is the accounting.', 3500);
+        _haptic('error');
+        return true;
+    }
     if (!portfolio.restricted) return false;
     _toast('Account restricted — trading disabled until frozen positions clear.', 3500);
     _haptic('error');
@@ -1630,6 +1754,8 @@ function _recordImpact(day, direction, magnitude, context) {
 }
 
 function _onDayComplete() {
+    if (_gameOver) return;   // P6-3: the desk is closed; no further day processing after the terminal closeout
+
     const vol = market.sigma;
 
     // Record rate + VXHCN for sparklines
@@ -1826,20 +1952,20 @@ function _onDayComplete() {
             _promptForecastLock();
         }
 
-        // Terminal resolution (P6, endings round 1 + fix): the precedence ladder,
-        // checked LAST -- after this tick's settlement/belief have applied -- so the
-        // resolving tick completes normally, then checkResolution clears
-        // race.lastTransitions (killing stale-ledger replay through runRaceBridge
-        // below). The race is NOT frozen: it keeps advancing to term-end so
-        // race-instrument contracts settle at their own deadlines. On the first fire,
-        // bar new race-instrument trades (freeze the books -> executeBinaryTrade /
-        // isComputeTradeable return null); frozen quotes are display residue. This is
-        // the 02a phase-6 interim; P6-3 replaces it with the closeout + game-over
-        // surface. checkResolution is idempotent post-latch (a no-op every tick after).
+        // Terminal resolution (P6): the precedence ladder, checked LAST -- after this
+        // tick's settlement/belief have applied. On the resolving tick, checkResolution
+        // latches (freezeLedger -> mark -> clear lastTransitions, preserving the treaty
+        // -outcome stamp for the bridge pass below) and bars new race-instrument trades.
+        // The 02a phase-6 interim (freeze + keep playing to term) is SUPERSEDED (P6-3
+        // gate): letting the sim run past resolution mutated settlements the closeout
+        // should have fixed at resolution time. Instead this tick completes its bridge
+        // pass + popup drain (the treaty superevent reaches the player), then the
+        // endings block below enters the atomic game-over -- SAME tick, resolution-time
+        // regime. The freeze bars survive INSIDE that atomic sequence.
         const _resolution = checkResolution(raceState, eventEngine.world.geopolitical);
         if (_resolution) {
-            consensus.frozen = true;        // bar new binary orders (interim; not a regime freeze)
-            computeMarket.frozen = true;    // bar new compute-future orders (interim)
+            consensus.frozen = true;        // bar new binary orders (survives into the atomic closeout)
+            computeMarket.frozen = true;    // bar new compute-future orders (survives into the atomic closeout)
             console.log('[race resolution] day', _resolution.day, 'family', _resolution.family,
                 _resolution.terminalCause, _resolution.extrapolated ? `(extrapolated +${_resolution.extrapolationDays}d)` : '',
                 '| leader', _resolution.leader, '| d', _resolution.d.toFixed(3),
@@ -1949,16 +2075,26 @@ function _onDayComplete() {
         }
     }
 
-    // Endings check (after events and faction shifts)
-    if (eventEngine) {
+    // Endings check (after events and faction shifts). A player-terminal state
+    // (P6-1 ruling) locks the desk, resolves the world, closes the book out, and
+    // renders the epilogue -- all inside _triggerGameOver.
+    if (eventEngine && !_gameOver) {
         const endingId = checkEndings(sim, portfolio, eventEngine.world, playerChoices);
         if (endingId) {
-            playing = false;
-            updatePlayBtn($, playing);
             if (endingId === 'term_ends') eventEngine.computeElectionOutcome(sim);
-            const pages = generateEnding(endingId, eventEngine.world, sim, portfolio,
-                eventEngine.eventLog, playerChoices, impactHistory, quarterlyReviews);
-            _showEpilogue(pages);
+            _triggerGameOver(endingId);
+            return;
+        }
+        // NATURAL world resolution ends the desk's story too (02a P6-3: the
+        // post-resolution interim is SUPERSEDED -- letting the sim run past
+        // resolution mutated settlements the closeout should have fixed at
+        // resolution time). The resolving tick already completed the race pipeline
+        // and the bridge pass above (so the treaty-outcome superevent is queued
+        // and reaches the player as an event); NOW the desk closes over them. The
+        // finalizers read the regime AS OF this resolution tick (unchanged since
+        // this tick's stepControlRegime), never a later one.
+        if (raceState && raceState.resolution) {
+            _triggerGameOver('term_ends');
             return;
         }
     }
@@ -2292,6 +2428,8 @@ function _resetCore(index) {
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     document.getElementById('fraud-overlay')?.classList.add('hidden');
     document.getElementById('popup-event-overlay')?.classList.add('hidden');
+    _gameOver = false;   // P6-3: clear the durable terminal latch on reset
+    _pendingEpilogue = null;
     _popupQueue.length = 0;
     for (const k in playerChoices) delete playerChoices[k];
     _lobbyCount = 0;
@@ -2830,7 +2968,7 @@ function updateStrategyBuilder() {
 // Epilogue overlay controller
 // ---------------------------------------------------------------------------
 
-function _showEpilogue(pages) {
+function _showEpilogue(pages, terminal = false) {
     let currentPage = 0;
 
     const overlay = document.getElementById('epilogue-overlay');
@@ -2864,7 +3002,9 @@ function _showEpilogue(pages) {
             backBtn.classList.toggle('hidden', currentPage === 0);
             nextBtn.classList.toggle('hidden', currentPage === pages.length - 1);
             restartBtn.classList.toggle('hidden', currentPage !== pages.length - 1);
-            keepBtn.classList.toggle('hidden', currentPage !== pages.length - 1);
+            // P6-3: a TERMINAL game-over never offers "keep playing" -- the desk is
+            // closed and the book settled; only Restart is coherent.
+            keepBtn.classList.toggle('hidden', terminal || currentPage !== pages.length - 1);
         }, 200);
     }
 

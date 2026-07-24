@@ -1489,6 +1489,27 @@ export function applyBinarySettlementRows(rows) {
  * holder, never dependent on cost basis (09 invariant 4). Settled positions are
  * removed. Returns per-position result rows { key, kind, qty, settlePrice, pnl }.
  */
+/**
+ * Apply terminal-closeout rows (from closeout.js closeoutBook) to the book: credit
+ * each row's cashChange, preserve any accrued borrow cost (closedBorrowCost, like
+ * closePosition), and REMOVE the settled position by id (so strategy-separated legs
+ * are removed unambiguously). Mirrors settleComputeFutures' apply half for the
+ * HCN stock/option/VXHCN/bond legs the pure matrix values. Returns applied rows.
+ */
+export function applyCloseoutRows(rows) {
+    const applied = [];
+    for (const r of (rows || [])) {
+        const i = portfolio.positions.findIndex(p => p.id === r.id);
+        if (i < 0) continue;
+        const pos = portfolio.positions[i];
+        if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;   // preserve accrued borrow (09 carry-through)
+        portfolio.cash += r.cashChange;
+        portfolio.positions.splice(i, 1);
+        applied.push(r);
+    }
+    return applied;
+}
+
 export function settleComputeFutures(settlements, race) {
     const results = [];
     for (const s of settlements) {

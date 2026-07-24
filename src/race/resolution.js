@@ -337,7 +337,15 @@ function evaluateLadder(race, extrapolated) {
 function extrapolate(race, geo) {
     const startDay = race.day;
     const tension = straitTension(geo);   // frozen public tension; 0 headless
-    for (let i = 0; i < EXTRAP_CAP; i++) {
+    // ABSOLUTE cap (02a P6-3 ruling 2): the world continues to a FIXED endpoint
+    // (HORIZON + EXTRAP_CAP), never a decade past whenever the DESK happened to leave.
+    // For the timeout path startDay == HORIZON, so this is byte-identical to the old
+    // `startDay + EXTRAP_CAP` loop (the no-player calibration is unchanged); for an
+    // early player-terminal ejection it extrapolates to the same endpoint a later
+    // ejection would, so the binary book settles against ONE world -- desk presence
+    // never changes the oracle.
+    const capDay = HORIZON + EXTRAP_CAP;
+    while (race.day < capDay) {
         advanceRace(race, { straitTension: tension });
         // Neutral-signal control-regime stepping (02a phase-6 ruling): the
         // political-control axis reads the EXTRAPOLATED world, not the day the
@@ -378,26 +386,50 @@ export function checkResolution(race, geo = null) {
     let rec = evaluateLadder(race, false);
     // Step 5: day-1008 timeout -> forward extrapolation into one of the six.
     if (!rec && race.day >= HORIZON) rec = extrapolate(race, geo);
-    if (rec) {
-        // Seal the complicity ledger at the latch (09), BEFORE terminal marking --
-        // the record is final at the moment the world resolves; the P6-3 closeout
-        // cannot rewrite it.
-        freezeLedger();
-        race.resolution = rec;
-        // Post-resolution interim (02a phase-6 ruling): clear the ledger so the
-        // race->narrative bridge cannot replay this terminal tick's transitions on
-        // subsequent frames. Trade-barring (freeze the instrument books) is the
-        // orchestrator's half of the interim -- P6-3 replaces both atomically.
-        // CARRY the treaty-outcome stamp across the clear: a Deal (family 5) is
-        // implemented and resolved on the SAME tick, and the bridge (which runs
-        // after this) must still fire treaty_holds once -- so preserve that one
-        // stamp while dropping the rest of the terminal ledger.
-        const outcome = race.lastTransitions ? race.lastTransitions.treatyOutcome : undefined;
-        race.lastTransitions = freshTransitions();
-        if (outcome) race.lastTransitions.treatyOutcome = outcome;
-        return rec;
-    }
+    if (rec) return _latch(race, rec);
     return null;
+}
+
+/**
+ * The terminal latch (09): seal the complicity ledger BEFORE any terminal marking --
+ * the record is final at the moment the world resolves; the P6-3 closeout may change
+ * the wealth score but can never create/erase/launder a channel. Then mark
+ * race.resolution and clear the per-tick ledger (no stale-ledger bridge replay),
+ * PRESERVING the treaty-outcome stamp (a Deal resolves on the same tick it implements,
+ * and the bridge still fires treaty_holds once). Shared by checkResolution (timeout /
+ * mid-run) and resolveNow (player-terminal ejection) so the freeze-before-marking
+ * ordering is identical on both paths.
+ */
+function _latch(race, rec) {
+    freezeLedger();
+    race.resolution = rec;
+    const outcome = race.lastTransitions ? race.lastTransitions.treatyOutcome : undefined;
+    race.lastTransitions = freshTransitions();
+    if (outcome) race.lastTransitions.treatyOutcome = outcome;
+    return rec;
+}
+
+/**
+ * Force terminal resolution NOW for a PLAYER-TERMINAL ejection (P6-3): the desk's
+ * story can end before the world's (margin call, indictment, forced-out, firm
+ * collapse, whistleblower). The world is extrapolated forward from the CURRENT day
+ * through the EXISTING extrapolate() path (advanceRace + treaty + neutral regime +
+ * ladder; draws only from existing substreams, so same-seed deterministic), then
+ * latched exactly as checkResolution does (freezeLedger before marking). Idempotent:
+ * returns the already-latched record if the world resolved first (mid-run, or the
+ * day-1008 timeout). By the time this runs the current tick's checkResolution has
+ * already fired in the race pipeline, so a null resolution means the world is still
+ * racing -> extrapolate.
+ *
+ * @param {object} race     race state
+ * @param {object|null} geo public geopolitics (frozen during extrapolation); null headless
+ * @returns {object}        the (new or existing) resolution record
+ */
+export function resolveNow(race, geo = null) {
+    if (!race) return null;
+    if (race.resolution) return race.resolution;
+    const rec = extrapolate(race, geo);
+    return _latch(race, rec);
 }
 
 /** Read-only accessor for the latched record (round 3 / epilogue consume it). */

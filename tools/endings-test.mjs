@@ -28,16 +28,35 @@
      K. Ledger reconstruction audit + applyRaceEffects (synthetic)
      L. Bounded-influence clip: d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|)
      M. Constraint 2: max reachable |d_P| catches >= 40% of |d_W|
+     -- P6-3 closeout + endings sections --
+     N. Closeout matrix conservation (every family x regime x instrument cell)
+     O. Consensus terminal finalizer (outcomes + idempotent exactly-once)
+     P. Compute terminal finalizer (held-past-resolution settles once)
+     Q. Player-terminal -> extrapolation -> closeout e2e (3 seeds)
+     R. Nationalization reference (multiple range, frozen once, conversion vs decree)
 
    PROMOTE_DISTRIBUTION flips A/B/D from diagnostic to hard gates.
    Set true once the outcome-table retune (02a "Outcome-table
    levers") lands and the family table is inside the 02a bands.
    =================================================== */
 
-import { createRaceState, advanceRace, stepControlRegime, heatValue, RETUNE } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, stepControlRegime, heatValue, RETUNE, setControlRegime } from '../src/race/race-state.js';
 import { stepTreaty } from '../src/race/treaty-track.js';
-import { checkResolution, HORIZON } from '../src/race/resolution.js';
-import { buildPublicView } from '../src/race/consensus.js';
+import { checkResolution, resolveNow, HORIZON } from '../src/race/resolution.js';
+import {
+    buildPublicView, initConsensus, resetConsensus, finalizeConsensusTerminal,
+    frontierCertifiedDay,
+} from '../src/race/consensus.js';
+import {
+    initComputeMarket, finalizeComputeTerminal, getNationalizationReference,
+    freezeNationalizationReference, stepNationalizationRef, COMPUTE_MULTIPLIER,
+} from '../src/race/compute-market.js';
+import {
+    hcnTerminalMark, closeoutUnitValue, closeoutPosition, closeoutBook, CLOSEOUT_TUNING,
+} from '../src/race/closeout.js';
+import { applyBinarySettlementRows } from '../src/portfolio.js';
+import { determineOverlay, isTerminalSafeBeat } from '../src/endings.js';
+import { getEventById } from '../src/events/index.js';
 import {
     ledger, resetLedger, deactivateLedger, freezeLedger,
     appendLedger, ledgerTotals, ledgerEntries, applyRaceEffects,
@@ -591,6 +610,392 @@ check('M: constraint 2 -- max reachable |d_P| catches >= 40% of |d_W|', coverage
     `cap ${CAP}  max|dP| p90 ${f3(maxReachableDP)}  coverage ${pct(coverage)}`);
 
 // =========================================================================
+// P6-3 closeout + endings sections
+// =========================================================================
+
+// ---- N: closeout matrix conservation (every family x regime x instrument) --
+// The conserving invariant (Codex): a position converts to cash at its terminal
+// unit value u -- cashChange = signedQty*u + reservedReturned -- so terminal
+// pre-closeout equity (signed MTM at the mark + reserved escrow) EQUALS post-closeout
+// cash, basis-free. Drive every cell; also check mark-leg zero-sum, entryPrice cash-
+// invariance, bond impact-independence, fizzle determinism, and conversion reference.
+let closeoutOK = true, coDetail = '', coCells = 0;
+{
+    const race = createRaceState(BASE_SEED >>> 0);
+    // Synthesize a frozen nationalization reference for the conversion cells.
+    race.nationalizationRef = { multiple: 0.9, window: [], frozen: { day: 500, median: 120, multiple: 0.9, reference: 108, sessions: 20 } };
+    const regimes = ['private', 'supervised', 'mobilized', 'nationalized', 'classified'];
+    const families = [1, 2, 3, 4, 5, 6];
+    const specs = [
+        { type: 'stock', qty: 10, strike: undefined, entryPrice: 90 },
+        { type: 'call', qty: 5, strike: 95, entryPrice: 8 },
+        { type: 'put', qty: 5, strike: 110, entryPrice: 7 },
+        { type: 'vxhcnfuture', qty: 3, strike: undefined, entryPrice: 20 },
+        { type: 'bond', qty: 4, strike: undefined, expiryDay: 900, entryPrice: 97 },
+    ];
+    const spot = 100, varianceIndex = 22;
+    // Rate-MOVED bond params -> the Vasicek MTM is NOT par (99.2), so non-doom bonds
+    // must carry the MTM (02a P6-3 ruling), not redeem at face.
+    const bond = { rate: 0.055, a: 0.15, b: 0.03, sigmaR: 0.01, day: 400, face: 100 };
+    const fail = (m) => { if (closeoutOK) { closeoutOK = false; coDetail = m; } };
+    for (const family of families) {
+        for (const regime of regimes) {
+            const hcn = hcnTerminalMark(family, regime, race, spot);
+            const ctx = { family, regime, hcnMark: hcn.mark, varianceIndex, bond };
+            for (const s of specs) {
+                coCells++;
+                const long = closeoutPosition({ id: 1, ...s }, ctx);
+                const short = closeoutPosition({ id: 2, ...s, qty: -s.qty }, ctx);
+                const u = long.unitValue;
+                if (!Number.isFinite(u) || u < 0) { fail(`nonfinite/neg u ${family}/${regime}/${s.type}`); continue; }
+                // pre/post equity equality: cashChange == signedQty*u + reserved (reserved 0 here).
+                if (Math.abs(long.cashChange - long.qty * u) > 1e-9) fail(`equity long ${s.type}`);
+                if (Math.abs(short.cashChange - short.qty * u) > 1e-9) fail(`equity short ${s.type}`);
+                // mark-leg zero-sum across offsetting sides (no reserved).
+                if (Math.abs(long.cashChange + short.cashChange) > 1e-9) fail(`mark-leg ${s.type}`);
+                // entryPrice cash-invariance (P&L may differ).
+                const long2 = closeoutPosition({ id: 3, ...s, entryPrice: s.entryPrice + 25 }, ctx);
+                if (Math.abs(long2.cashChange - long.cashChange) > 1e-9) fail(`entryPrice cash-variance ${s.type}`);
+                if (Math.abs(long2.pnl - long.pnl) < 1e-9 && s.entryPrice + 25 !== s.entryPrice) fail(`pnl basis-invariant ${s.type}`);
+            }
+        }
+    }
+    // reserved escrow release: short at u with collateral returns reserved - |qty|*u.
+    const sr = closeoutPosition({ id: 4, type: 'stock', qty: -10, entryPrice: 90, _reservedMargin: 700 },
+        { family: 1, regime: 'private', hcnMark: 160, varianceIndex, bond });
+    if (Math.abs(sr.cashChange - (700 - 10 * 160)) > 1e-9) fail('reserved escrow');
+    // bond: non-doom carries the impact-free Vasicek MTM (NOT par); doom recovers on FACE.
+    const bondPos = { type: 'bond', qty: 1, expiryDay: 900 };
+    const bondSafe = closeoutUnitValue(bondPos, { family: 5, bond });   // MTM at rate 0.055, dte (900-400)/252
+    const bondDoom = closeoutUnitValue(bondPos, { family: 3, bond });
+    if (!(bondSafe > 0) || Math.abs(bondSafe - bond.face) < 1e-6) fail(`bond non-doom not MTM (par-like ${f3(bondSafe)})`);
+    if (Math.abs(bondDoom - bond.face * CLOSEOUT_TUNING.bondDoomRecovery) > 1e-9) fail('bond doom recovery on face');
+    // bond MTM is impact-free/tree-free: unchanged when only unrelated market state moves.
+    const bondSafe2 = closeoutUnitValue(bondPos, { family: 5, bond });
+    if (bondSafe2 !== bondSafe) fail('bond MTM not deterministic/pure');
+    // fizzle determinism + no race-stream mutation.
+    const streamsBefore = JSON.stringify(createRaceState(77).streams);
+    const rf = createRaceState(77);
+    const m1 = hcnTerminalMark(6, 'private', rf, 100).mark;
+    const m2 = hcnTerminalMark(6, 'private', createRaceState(77), 100).mark;
+    if (m1 !== m2) fail('fizzle non-deterministic');
+    if (JSON.stringify(rf.streams) !== streamsBefore) fail('fizzle mutated race streams');
+    // conversion with NO frozen reference -> converted, NOT a family mark.
+    const noRef = createRaceState(9);   // nationalizationRef undefined (initComputeMarket not called)
+    const cNo = hcnTerminalMark(3, 'nationalized', noRef, 100);
+    if (!cNo.converted || cNo.cell !== 'hcn:conversion-unavailable') fail('no-ref not flagged converted');
+    if (Math.abs(cNo.mark - 100 * CLOSEOUT_TUNING.doomRecovery) < 1e-9) fail('no-ref silently used doom family mark');
+    // conversion WITH reference uses reference, never the compute multiplier.
+    const cYes = hcnTerminalMark(1, 'nationalized', race, 100);
+    if (!cYes.converted || Math.abs(cYes.mark - 108) > 1e-9) fail('conversion not at reference');
+}
+check(`N: closeout matrix conservation (${coCells} cells: equity==cash, mark zero-sum, basis-invariant, conversion)`, closeoutOK, coDetail);
+
+// ---- O: consensus terminal finalizer (outcomes + idempotent exactly-once) ---
+let consFinOK = true, cfDetail = '';
+{
+    const fail = (m) => { if (consFinOK) { consFinOK = false; cfDetail = m; } };
+    const setup = (mut) => {
+        const race = createRaceState(BASE_SEED >>> 0);
+        initConsensus(race);
+        mut(race);
+        return race;
+    };
+    const byKey = (rows) => Object.fromEntries(rows.map(r => [r.contract.predicate.rung + (r.contract.terminal ? 'T' : 'C'), r.outcome]));
+    // R5 crossed by its deadline -> YES; a cert rung certified by deadline -> YES.
+    let race = setup(r => {
+        r.capability.labs.halcyon.rungInternal[5] = 900;   // R5 internal cross before deadline (1000)
+        r.capability.labs.halcyon.rungCertified[2] = 100;  // R2 certified before its deadline (420)
+    });
+    let rows = finalizeConsensusTerminal(race);
+    let o = byKey(rows);
+    if (o['5T'] !== 'YES') fail('R5 crossed-by-deadline not YES');
+    if (o['2C'] !== 'YES') fail('R2 certified not YES');
+    if (o['3C'] !== 'NO') fail('R3 uncertified not NO');
+    // idempotent: second call settles nothing.
+    if (finalizeConsensusTerminal(race).length !== 0) fail('finalizer not idempotent');
+    // R5 crossing AFTER the deadline -> NO (judged on deadline, not race.day).
+    race = setup(r => { r.capability.labs.halcyon.rungInternal[5] = 1200; r.day = 1300; });
+    o = byKey(finalizeConsensusTerminal(race));
+    if (o['5T'] !== 'NO') fail('R5 post-deadline crossing paid YES');
+    // fallback regime (nationalized) settles EVERYTHING at FALLBACK.
+    race = setup(r => { r.controlRegime = 'nationalized'; r.capability.labs.halcyon.rungInternal[5] = 900; });
+    const allFb = finalizeConsensusTerminal(race).every(r => r.outcome === 'FALLBACK');
+    if (!allFb) fail('fallback regime not all FALLBACK');
+}
+check('O: consensus terminal finalizer (deadline-judged outcomes + fallback + idempotent)', consFinOK, cfDetail);
+
+// ---- P: compute terminal finalizer (held-past-resolution settles once) ------
+let compFinOK = true, pDetail = '';
+{
+    const fail = (m) => { if (compFinOK) { compFinOK = false; pDetail = m; } };
+    const race = createRaceState(BASE_SEED >>> 0);
+    initComputeMarket(race, null);
+    // Held contracts exist from listing; a private-regime terminal settles them all.
+    const s1 = finalizeComputeTerminal(race, null);
+    if (s1.length === 0) fail('no compute contracts settled at terminal');
+    if (!s1.every(s => s.kind === 'TERMINAL' && Number.isFinite(s.settlePrice))) fail('non-TERMINAL / nonfinite settle');
+    // idempotent.
+    if (finalizeComputeTerminal(race, null).length !== 0) fail('compute finalizer not idempotent');
+    // decree regime settles at DECREE.
+    const race2 = createRaceState((BASE_SEED + 1) >>> 0);
+    initComputeMarket(race2, null);
+    race2.controlRegime = 'nationalized';
+    const s2 = finalizeComputeTerminal(race2, null);
+    if (!s2.every(s => s.kind === 'DECREE')) fail('nationalized not DECREE');
+}
+check('P: compute terminal finalizer (held settles TERMINAL / DECREE, idempotent)', compFinOK, pDetail);
+
+// ---- Q: player-terminal -> extrapolation -> closeout e2e (3 seeds) ----------
+let e2eOK = true, qDetail = '';
+{
+    const fail = (m) => { if (e2eOK) { e2eOK = false; qDetail = m; } };
+    for (const seed of [1, 90210, 424242]) {
+        const race = createRaceState(seed >>> 0);
+        initConsensus(race);
+        initComputeMarket(race, null);
+        resetLedger();   // active, so resolveNow's freeze is observable
+        // Run to an EARLY day (desk ejects mid-race), stopping if the world resolves first.
+        for (let d = 0; d < 300 && !race.resolution; d++) {
+            advanceRace(race, { straitTension: 0 });
+            stepControlRegime(race);
+            stepTreaty(race, {});
+            checkResolution(race, null);
+        }
+        // Eject: force resolution NOW (extrapolate if still racing) -> must resolve + freeze ledger.
+        const res = resolveNow(race, null);
+        if (!res || !race.resolution) fail(`seed ${seed}: no resolution`);
+        else if (!ledger.frozen) fail(`seed ${seed}: ledger not frozen at resolve`);
+        // Close the books: finalizers idempotent + a synthetic HCN/option/vxhcn/bond book conserves.
+        finalizeConsensusTerminal(race);
+        finalizeComputeTerminal(race, null);
+        const positions = [
+            { id: 1, type: 'stock', qty: 8, entryPrice: 95 },
+            { id: 2, type: 'call', qty: 4, strike: 100, entryPrice: 6 },
+            { id: 3, type: 'vxhcnfuture', qty: -2, entryPrice: 21, _reservedMargin: 120 },
+            { id: 4, type: 'bond', qty: 5, expiryDay: 950, entryPrice: 98 },
+        ];
+        // Rate-moved bond params -> the bond leg carries a Vasicek MTM != par; conservation
+        // (equity == cash) must still hold with the MTM leg (02a P6-3 ruling test (a)).
+        const bond = { rate: 0.055, a: 0.15, b: 0.03, sigmaR: 0.01, day: 400, face: 100 };
+        const book = closeoutBook(positions, res, race, { spot: 100, varianceIndex: 22, bond });
+        const bondRow = book.rows.find(r => r.type === 'bond');
+        if (bondRow && Math.abs(bondRow.unitValue - bond.face) < 1e-6) fail(`seed ${seed}: bond leg redeemed at par, not MTM`);
+        // pre-closeout equity contribution (signed MTM at mark + reserved) == post cash.
+        let pre = 0;
+        for (const r of book.rows) {
+            const pos = positions.find(p => p.id === r.id);
+            pre += r.qty * r.unitValue + (pos._reservedMargin || 0);
+        }
+        if (Math.abs(pre - book.totalCash) > 1e-6) fail(`seed ${seed}: closeout equity!=cash (${pre} vs ${book.totalCash})`);
+        if (book.rows.length !== 4) fail(`seed ${seed}: not all legs valued`);
+    }
+}
+check('Q: player-terminal -> extrapolation -> closeout e2e (resolves, freezes, conserves; 3 seeds)', e2eOK, qDetail);
+
+// ---- R: nationalization reference (range, frozen once, conversion vs decree) -
+let natRefOK = true, rDetail = '';
+{
+    const fail = (m) => { if (natRefOK) { natRefOK = false; rDetail = m; } };
+    for (const seed of [1, 90210, 424242, 7, 55]) {
+        const race = createRaceState(seed >>> 0);
+        initComputeMarket(race, null);
+        const mult = race.nationalizationRef.multiple;
+        if (!(mult >= 0.60 && mult <= 1.15)) fail(`seed ${seed}: multiple ${mult} out of [0.60,1.15]`);
+    }
+    const race = createRaceState(BASE_SEED >>> 0);
+    initComputeMarket(race, null);
+    for (let d = 0; d < 30; d++) { race.day = d; stepNationalizationRef(race, 100 + d); }
+    const frozen1 = freezeNationalizationReference(race, 30);
+    const frozen2 = freezeNationalizationReference(race, 40);   // second freeze: first wins
+    if (frozen1 !== frozen2) fail('reference re-froze');
+    if (frozen1.reference == null || Math.abs(frozen1.reference - frozen1.median * frozen1.multiple) > 1e-9) fail('reference != median*multiple');
+    // Conversion mark uses the reference; the compute multiplier is a SEPARATE constant (1).
+    const conv = hcnTerminalMark(3, 'nationalized', race, 100);
+    if (Math.abs(conv.mark - frozen1.reference) > 1e-9) fail('conversion not at frozen reference');
+    if (COMPUTE_MULTIPLIER === race.nationalizationRef.multiple) fail('compute multiplier collided with nat multiple');
+}
+check('R: nationalization reference (multiple in range, frozen once, conversion vs decree separate)', natRefOK, rDetail);
+
+// ---- S: ejection-invariance -- the desk's presence never changes the oracle -
+// 02a P6-3 ruling 2: an early ejection extrapolates the world forward; a certification
+// that lands INSIDE the extrapolated trajectory before a contract's deadline settles
+// that contract YES, exactly as if the desk had stayed. So the SAME seed settles
+// IDENTICALLY whether the desk ejects early (finalize against the extrapolated world)
+// or plays to the natural resolution. Non-vacuous: at least one seed must have a
+// contract certified AFTER the ejection day, and its YES must survive.
+let ejInvOK = true, sDetail = '', nonVacuous = 0, seedsChecked = 0;
+{
+    const fail = (m) => { if (ejInvOK) { ejInvOK = false; sDetail = m; } };
+    const EJECT_DAY = 200;
+    // Settle the same race with a FRESH consensus book (finalizeConsensusTerminal reads
+    // the persistent capability state, not the daily pass -- so the ONLY input is the
+    // final world). key -> outcome.
+    const settleOutcomes = (race) => {
+        initConsensus(race);   // fresh contract set on this race's public view
+        const rows = finalizeConsensusTerminal(race);
+        return Object.fromEntries(rows.map(r => [r.key, r.outcome]));
+    };
+    for (let i = 0; i < Math.min(N, 200); i++) {
+        const seed = (BASE_SEED + i) >>> 0;
+        // Path A: run to EJECT_DAY, then resolveNow (extrapolate forward).
+        const rA = createRaceState(seed);
+        for (let d = 0; d < EJECT_DAY && !rA.resolution; d++) {
+            advanceRace(rA, { straitTension: 0 }); stepControlRegime(rA); stepTreaty(rA, {}); checkResolution(rA, null);
+        }
+        const certAtEject = { ...rA.capability.labs.halcyon.rungCertified };   // cert snapshot at ejection
+        resolveNow(rA, null);
+        const outA = settleOutcomes(rA);
+        // Path B: same seed, run to natural resolution (no ejection).
+        const rB = createRaceState(seed);
+        for (let d = 0; d < HORIZON && !rB.resolution; d++) {
+            advanceRace(rB, { straitTension: 0 }); stepControlRegime(rB); stepTreaty(rB, {}); checkResolution(rB, null);
+        }
+        if (!rB.resolution) checkResolution(rB, null);
+        const outB = settleOutcomes(rB);
+        seedsChecked++;
+        // Identical settlement, contract by contract.
+        const keys = new Set([...Object.keys(outA), ...Object.keys(outB)]);
+        for (const k of keys) if (outA[k] !== outB[k]) { fail(`seed ${seed}: contract ${k} A=${outA[k]} B=${outB[k]}`); break; }
+        // Non-vacuous: a rung certified strictly AFTER the ejection day whose contract settled YES.
+        for (const r of [2, 3, 4]) {
+            const cd = rB.capability.labs.halcyon.rungCertified[r] ?? rB.capability.labs.tianxia.rungCertified[r];
+            if (cd != null && cd > EJECT_DAY && certAtEject[r] == null && Object.values(outA).includes('YES')) { nonVacuous++; break; }
+        }
+    }
+    // At least one seed exercised the post-ejection-certification -> YES path.
+    if (nonVacuous === 0) fail('vacuous: no post-ejection certification settled YES in any seed');
+    // Credibility scoring routes through applyBinarySettlementRows: every matured YES/NO
+    // is scored exactly once (the shape the shared consequence helper consumes).
+    const rc = createRaceState(BASE_SEED >>> 0);
+    initConsensus(rc); initBelief(rc);
+    for (let d = 0; d < HORIZON && !rc.resolution; d++) {
+        advanceRace(rc, { straitTension: 0 }); stepControlRegime(rc); stepTreaty(rc, {}); checkResolution(rc, null);
+    }
+    if (!rc.resolution) checkResolution(rc, null);
+    const finRows = finalizeConsensusTerminal(rc);
+    const yesNo = finRows.filter(r => r.outcome === 'YES' || r.outcome === 'NO').length;
+    const { matured } = applyBinarySettlementRows(finRows);
+    if (matured.length !== yesNo) fail(`matured ${matured.length} != YES/NO ${yesNo} (scoring not routed exactly-once)`);
+    // second application scores nothing (exactly-once).
+    if (applyBinarySettlementRows(finRows).matured.length !== 0) fail('re-apply re-scored (not exactly-once)');
+}
+check(`S: ejection-invariance (desk presence never changes the oracle; ${seedsChecked} seeds, ${nonVacuous} non-vacuous)`, ejInvOK, sDetail);
+
+// ---- T: natural-resolution atomic closeout (02a P6-3: interim SUPERSEDED) ---
+// A world that resolves BEFORE term now enters the SAME atomic path as ejection --
+// latch (freeze ledger before marking) -> closeout AT the resolution-time regime ->
+// epilogue -- instead of running on with a drifting regime the delayed finalizers
+// would misread. Gated: natural-resolution conservation; ledger frozen at resolution;
+// the Deal treaty-outcome stamp carried across the latch (the bridge fires treaty_holds
+// before the epilogue); and the finalizer's REGIME-SENSITIVITY (finalizing against a
+// later drifted fallback regime differs -> reading the resolution-time regime is
+// load-bearing).
+let natResOK = true, tDetail = '', natChecked = 0, dealChecked = 0, dealCarry = 0, regimeSensitive = 0;
+{
+    const fail = (m) => { if (natResOK) { natResOK = false; tDetail = m; } };
+    const bond = { rate: 0.05, a: 0.15, b: 0.03, sigmaR: 0.01, day: 400, face: 100 };
+    const runToResolution = (seed, withConsensus) => {
+        const race = createRaceState(seed >>> 0);
+        if (withConsensus) initConsensus(race);
+        initComputeMarket(race, null);
+        for (let d = 0; d < HORIZON && !race.resolution; d++) {
+            advanceRace(race, { straitTension: 0 }); stepControlRegime(race); stepTreaty(race, {}); checkResolution(race, null);
+        }
+        if (!race.resolution) checkResolution(race, null);
+        return race;
+    };
+    const outcomes = (race) => Object.fromEntries(finalizeConsensusTerminal(race).map(r => [r.key, r.outcome]));
+    for (let i = 0; i < Math.min(N, 200); i++) {
+        const seed = (BASE_SEED + i) >>> 0;
+        resetLedger();
+        const race = runToResolution(seed, true);
+        natChecked++;
+        if (!ledger.frozen) fail(`seed ${seed}: ledger not frozen at resolution (freeze-before-marking)`);
+        if (race.resolution.family === 5) {
+            dealChecked++;
+            if (race.lastTransitions && race.lastTransitions.treatyOutcome) dealCarry++;
+            else fail(`seed ${seed}: Deal dropped treatyOutcome (treaty_holds beat lost)`);
+        }
+        const regimeR = race.controlRegime;
+        const outR = outcomes(race);   // finalize AT the resolution-time regime
+        finalizeComputeTerminal(race, null);
+        // conservation on a synthetic HCN/VXHCN/bond book.
+        const positions = [
+            { id: 1, type: 'stock', qty: 6, entryPrice: 95 },
+            { id: 2, type: 'vxhcnfuture', qty: -2, entryPrice: 20, _reservedMargin: 120 },
+            { id: 3, type: 'bond', qty: 4, expiryDay: 950, entryPrice: 98 },
+        ];
+        const book = closeoutBook(positions, race.resolution, race, { spot: 100, varianceIndex: 22, bond });
+        let pre = 0;
+        for (const r of book.rows) { const p = positions.find(x => x.id === r.id); pre += r.qty * r.unitValue + (p._reservedMargin || 0); }
+        if (Math.abs(pre - book.totalCash) > 1e-6) fail(`seed ${seed}: natural closeout equity!=cash`);
+        // REGIME-SENSITIVITY: a NON-fallback resolution with some YES/NO settles
+        // DIFFERENTLY if the regime later drifts to a fallback regime (all FALLBACK).
+        // The atomic fix pins the regime at resolution; the interim would have drifted it.
+        if (regimeR !== 'nationalized' && regimeR !== 'classified' && Object.values(outR).some(o => o !== 'FALLBACK')) {
+            const drift = runToResolution(seed, true);
+            drift.controlRegime = 'classified';   // simulate the interim's post-terminal drift
+            const outDrift = outcomes(drift);
+            if (Object.values(outDrift).every(o => o === 'FALLBACK') &&
+                Object.keys(outR).some(k => outR[k] !== outDrift[k])) regimeSensitive++;
+        }
+    }
+    if (regimeSensitive === 0) fail('vacuous: could not demonstrate finalizer regime-sensitivity (the atomic-timing fix)');
+}
+check(`T: natural-resolution atomic closeout (${natChecked} seeds conserve + frozen; ${dealCarry}/${dealChecked} Deal beats carried; ${regimeSensitive} regime-sensitive -> resolution-time regime load-bearing)`, natResOK, tDetail);
+
+// ---- U: rogue / resignation game-over overlay (shared latch) ----------------
+// Rogue trading routes as forced_resignation through the shared terminal latch (02a
+// P6-3 ruling 2); the involvement split then decides the overlay like any resignation.
+{
+    const lo = determineOverlay('forced_resignation', {}, 0, false);         // walked out, uninvolved
+    const hi = determineOverlay('forced_resignation', { C: 0.05 }, 0, false); // walked out, but in the room
+    const marginOverlay = determineOverlay('margin_call_liquidation', {}, 0, false);
+    check('U: forced_resignation splits by involvement (bystander / gray_eminence); margin->margin_called',
+        lo === 'bystander' && hi === 'gray_eminence' && marginOverlay === 'margin_called', `${lo}/${hi}/${marginOverlay}`);
+}
+
+// ---- V: terminal queue discipline (only effect-free 'summit' beats survive) --
+// 02a P6-3: once terminal closeout starts, the world's resolution supersedes the day's
+// ordinary news. A queued effect-carrying popup (the REAL scrutiny_enforcement, which
+// deterministically queues on 58/5000 forecast-lock resolutions and carries a
+// cashPenalty 2000) MUST be discarded at game-over -- BEFORE closeout/epilogue -- so
+// its choice can never mutate the settled book or stale the epilogue. Only category
+// 'summit' beats (treaty_holds / treaty_resolution, effect-free acknowledgments)
+// survive. The filter predicate is extracted to endings.js (isTerminalSafeBeat)
+// because main.js is DOM-coupled and unreachable headlessly; this probes the REAL
+// events + the REAL predicate main.js applies.
+let tqOK = true, tqDetail = '';
+{
+    const fail = (m) => { if (tqOK) { tqOK = false; tqDetail = m; } };
+    const scrutiny = getEventById('scrutiny_enforcement');   // cashPenalty 2000 (investigation.js)
+    const holds = getEventById('treaty_holds');              // category 'summit', acknowledge-only
+    const resolution = getEventById('treaty_resolution');    // category 'summit'
+    const effectful = (ev) => !!ev && (ev.choices || []).some(c => c.cashPenalty || c.factionShifts || c.deltas || c.effects || c.regulatoryAction);
+    // The probe is non-vacuous: scrutiny_enforcement really carries a book effect.
+    if (!effectful(scrutiny)) fail('probe vacuous: scrutiny_enforcement carries no book effect');
+    // Effect-carrying ordinary popup -> NOT terminal-safe -> discarded before closeout.
+    if (isTerminalSafeBeat({ ...scrutiny })) fail('effect-carrying scrutiny_enforcement survived the terminal filter');
+    // Summit beats -> terminal-safe -> retained (the treaty superevent reaches the player).
+    if (!isTerminalSafeBeat({ ...holds })) fail('treaty_holds not terminal-safe (beat lost)');
+    if (!isTerminalSafeBeat({ ...resolution })) fail('treaty_resolution not terminal-safe');
+    // Retained summit beats are EFFECT-FREE by construction -> draining them after the
+    // epilogue cannot mutate the settled book (cash / factions stay at closeout values).
+    if (effectful(holds)) fail('treaty_holds carries a book effect (not an acknowledgment)');
+    if (effectful(resolution)) fail('treaty_resolution carries a book effect');
+    // The filter main.js runs (retain only isTerminalSafeBeat) on a mixed queue keeps
+    // ONLY the summit beat; the cashPenalty + factionShift popups are dropped.
+    const factionPopup = { category: 'macro', choices: [{ factionShifts: [{ faction: 'firmStanding', value: 5 }] }] };
+    const q = [{ ...scrutiny }, { ...holds }, factionPopup];
+    const kept = q.filter(isTerminalSafeBeat);
+    if (kept.length !== 1 || kept[0].id !== 'treaty_holds') fail(`filter kept ${kept.length} (expected 1 summit beat)`);
+    // ...and the kept queue carries no residual effect at all.
+    if (kept.some(effectful)) fail('a retained beat still carries a book effect');
+}
+check('V: terminal queue discipline (effect popups discarded pre-closeout; only effect-free summit beats survive)', tqOK, tqDetail);
+
+// =========================================================================
 // Report
 // =========================================================================
 line(`endings-test: N=${N}, base seed=${BASE_SEED}, horizon=${HORIZON}d, ${elapsed}s  `
@@ -621,6 +1026,14 @@ line(`\n  P6-2 player channels (cap ${CAP}, halflife ${COUPLING_TUNING.halflife}
 line(`    no-player identity (J): ${playerInertOK ? 'inert (d_P == 0 all runs)' : 'VIOLATED'}`);
 line(`    constraint 2 (M): world |d_W| median ${f3(medDW)}  |  max reachable |d_P| p90 ${f3(maxReachableDP)}  |  coverage ${pct(coverage)} (>= 40%)`);
 line(`    clip (L): binds on ${clipBindCount}/${clipN} of the max-injection batch (verbatim d_eff identity ${clipIdentityOK ? 'holds' : 'VIOLATED'})`);
+line(`\n  P6-3 closeout + endings:`);
+line(`    matrix (N): ${coCells} family x regime x instrument cells, equity==cash + mark zero-sum ${closeoutOK ? 'conserve' : 'VIOLATED'}`);
+line(`    finalizers (O/P): consensus deadline-judged + idempotent ${consFinOK ? 'ok' : 'VIOLATED'}; compute held-settles ${compFinOK ? 'ok' : 'VIOLATED'}`);
+line(`    e2e (Q): eject -> extrapolate -> freeze -> closeout conserves ${e2eOK ? 'ok' : 'VIOLATED'} (3 seeds; bond leg carries MTM)`);
+line(`    nationalization (R): multiple in [0.60,1.15], frozen once, conversion!=decree ${natRefOK ? 'ok' : 'VIOLATED'}`);
+line(`    ejection-invariance (S): ${seedsChecked} seeds settle identically eject-vs-term, ${nonVacuous} non-vacuous (cert-in-extrapolation -> YES) ${ejInvOK ? 'ok' : 'VIOLATED'}`);
+line(`    natural-resolution atomic (T): ${natChecked} conserve+frozen, ${dealCarry}/${dealChecked} Deal beats carried, ${regimeSensitive} regime-sensitive ${natResOK ? 'ok' : 'VIOLATED'} (interim superseded)`);
+line(`    terminal queue discipline (V): effect popups (scrutiny_enforcement cashPenalty 2000) discarded pre-closeout, only effect-free summit beats survive ${tqOK ? 'ok' : 'VIOLATED'}`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

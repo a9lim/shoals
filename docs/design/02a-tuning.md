@@ -602,6 +602,83 @@ transcribed them; the phase-5a set is the first concrete one).
 Standing-orders unlocks stay as rev 1, deferred to P7 with the rest
 of the delegation layer.
 
+**Terminal closeout rulings (P6-3, 2026-07-24).** The nine 09 cells
+flagged as interpretation, arbitrated:
+
+1. *Family-mark magnitudes* (`CLOSEOUT_TUNING`): melt-up **1.60**
+   (won with margin) / **1.25** (ambiguous dawn), boring-world
+   **1.00** (the Deal — flat is the point), doom equity recovery
+   **0.35**, fizzle **0.55 ± 0.15** (seeded), doom bond recovery
+   **0.40** (the classic convention, knowingly). PROVISIONAL —
+   ratified as structure-sound; magnitudes get a feel pass at the
+   prose round. 09 fixes the shape, not the numbers.
+2. *HCN options settle intrinsic-vs-family-mark in ALL terminal
+   families*, not only nationalization — at the world's end there is
+   no remaining time value to price; declared accelerated
+   termination generalizes. Corporate-action hook stays (identity
+   today). Ratified.
+3. *Shares redeem to cash* at reference × multiple rather than
+   carrying claim instruments — the epilogue values everything
+   immediately, so claims-as-positions have no gap to live in. The
+   *claims language* survives in prose. Ratified.
+4. *VXHCN terminal mark* = last live `market.vxhcn` as
+   last-valid-before-cutoff. The exchange-variance-index
+   observation-record + realized-variance fallback machinery is a
+   DECLARED SEAM deferred to P7 (it matters when Heston is abandoned
+   mid-run — Act III terminal degradation — not at a clean terminal
+   marking). Ratified with the seam recorded.
+5. *Bonds*: **OVERRULED as flagged** — par redemption erases rate
+   P&L in families where 09's own language is "bonds are bonds."
+   Ruling: non-doom families mark bonds at the last live MTM (the
+   sim's own bond price; `unitPrice` already computes it); doom
+   families apply the 0.40 recovery on face. Par-at-the-world's-end
+   is only true when the world actually ends.
+6. *Fizzle* = single seeded draw (0.55 ± 0.15 from the `'closeout'`
+   substream), the 18-month path compressed to its endpoint.
+   Ratified; if the gate finds date-differentiated claims materially
+   mispriced by pathlessness, the refinement is maturity-linear
+   interpolation from last-valid to the draw — not a full path.
+7. *No usable frozen conversion reference* → redeem at last spot +
+   console.warn, never a family mark. Ratified (defensive; should
+   be unreachable).
+8. *Compute held past resolution* (private/supervised) → last-valid
+   index mark, `kind: 'TERMINAL'`. Ratified — frozen marks are
+   terminal and never repriced (phase-3b convention extended).
+9. *Early-ejection binaries*: **OVERRULED as flagged** — "world
+   stopped ⇒ can't certify further ⇒ NO" contradicts
+   desk-ends-before-world. The extrapolation IS the world
+   continuing without you: certifications that occur inside the
+   extrapolated trajectory before a contract's deadline settle that
+   contract YES, exactly as if you'd been there to watch. A binary
+   book settles against the world that actually happened, not the
+   world as of your firing. (The extrapolation already advances
+   race days past the ejection; the contract judge reads the
+   extrapolated state as of each deadline day.)
+
+*Overlay mapping* (endings engine): direct — indictment→convicted,
+margin call→margin_called, whistleblower→whistleblower_exile;
+term_ends/forced_resignation/firm_collapse split by INVOLVEMENT
+into gray_eminence vs bystander, judged on frozen-LEDGER actions
+(**|C| ≥ 0.02**, S ≥ 0.03, |F| ≥ 0.05, treaty ≥ 1, |d_P| ≥ 0.03,
+or firm-converted). Ratified, incl. the Codex-argued exclusion of
+traits/credibility/raw-F as primary signals — a belief is not an
+act, and raw F carries the autonomous wake. Thresholds code-local
+through the prose rounds (traits-v2 convention). The C gate is
+UNSIGNED — arbitrated to the code's semantics over this block's
+original one-sided transcription (P6-3 gate, 2026-07-24):
+involvement is magnitude, not direction — a player whose sustained
+short measurably slowed the race was in the room, not in the
+audience. (S and treaty stay one-sided because restraint-bought
+and windows-advanced are inherently positive quantities.) The
+rogue-trading loss popup (prototype `_showGameOver`) routes as
+**forced_resignation** through the shared terminal latch — walked
+out for cause, the firm survives you; the involvement split then
+decides the overlay like any other resignation.
+
+*Closeout substream*: `'closeout'` via `deriveSeed`, deliberately
+outside `race.streams` (nationalization-reference precedent) —
+race trajectories bit-identical with closeout on or off.
+
 ## Resolution arithmetic and the exclusive mapping
 
 ```
@@ -705,12 +782,30 @@ the fix/retune rounds:
   measurement under the retuned kinematics: 33.15% of extrapolated
   runs change regime post-1008 and every stored political axis equals
   the final extrapolated regime; family rates unaffected).
-- **Post-resolution interim** (until P6-3's real closeout): the
-  resolution latch clears `race.lastTransitions` (no stale-ledger
-  replay through the bridge) and bars new race-instrument trades
-  (binaries, compute futures); the frozen quotes are display residue,
-  not a market. P6-3 replaces this with the closeout matrix + game-over
-  surface atomically.
+- **Post-resolution interim — SUPERSEDED by P6-3** (gate finding,
+  2026-07-24): the interim (freeze + keep playing to term-end) was
+  P6-1 scaffolding only. With the closeout matrix landed, letting
+  the sim run past resolution is actively wrong — measured: 359/500
+  worlds resolved early and stayed live a median 128 days; 132/5000
+  changed regime *after* the world was terminal and mutated
+  settlements closeout should have fixed at resolution time. Ruled:
+  natural resolution enters the SAME atomic path as `resolveNow` —
+  latch (freezeLedger → mark → clear) → the resolution-day beat
+  fires (the carried treaty-outcome superevent must still reach the
+  player) → terminal closeout → epilogue; day processing stops.
+  What survives from the interim: the latch clearing
+  `lastTransitions` and the trade bars, now inside the atomic
+  sequence. *Terminal queue discipline* (re-gate ruling): once
+  terminal closeout starts, the popup queue is FILTERED to
+  terminal-safe beats — today, category `'summit'` (effect-free
+  acknowledgments by construction) — and every ordinary queued
+  popup is discarded: the world's resolution supersedes the day's
+  ordinary news, and no popup decision may mutate the settled book
+  or stale the epilogue (measured realizable: 58/5000 natural
+  resolutions land on forecast-lock days with an actionable popup
+  already queued; `scrutiny_enforcement` carries a cash penalty).
+  Later phases adding terminal beats (P7's room) mark them by
+  category, never by exemption.
 - **Constraint-4 "forced shutdown" reading**: the ratchet set for the
   knife-edge constraint is {nationalized, classified, permanent
   max-heat} — forced shutdown is not a distinct model state. Heat

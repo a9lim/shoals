@@ -560,3 +560,46 @@ export function computeFutureSettlements(race, geo) {
 
     return out;
 }
+
+/**
+ * TERMINAL FINALIZER (P6-3): settle EVERY still-open compute contract ONCE at the
+ * terminal, and return the settlements for portfolio.settleComputeFutures.
+ * Stateful/idempotent (records computeMarket.settled; re-call returns []). The
+ * ordinary path (computeFutureSettlements) settles only DECREE or matured
+ * (day >= settleDay) contracts; a held contract whose maturity is AFTER an early
+ * player-terminal / private-supervised resolution never matures there -- this
+ * closes it out. Precedence: decree (freeze regime) -> the captured decree price;
+ * else the last-valid public index mark (09 last-valid-before-cutoff; the compute
+ * index is public, impact never touches it), blockade-flagged when the Taiwan
+ * strait is closed. RULING FLAGGED (coordinator): a non-decree held contract
+ * settles at its last-valid index mark (`kind: 'TERMINAL'`) rather than being
+ * carried past game-over.
+ *
+ * @param {object} race  race state (post-resolution)
+ * @param {object|null} geo public geopolitics (Taiwan blockade flag); null headless
+ * @returns {Array} settlements { key, settleDay, kind, settlePrice }
+ */
+export function finalizeComputeTerminal(race, geo) {
+    if (!computeMarket.active) return [];
+    const day = race.day;
+    const decreeRegime = FREEZE_REGIMES.has(race.controlRegime);
+    const blockade = !!(geo && geo.taiwanBlockade);
+    const view = buildComputePublicView(race, geo);
+    const out = [];
+    for (const st of Object.values(computeMarket._state)) {
+        if (st.settled) continue;
+        let settlePrice, kind;
+        if (decreeRegime) {
+            settlePrice = st.decreePrice != null ? st.decreePrice : resolveDecreePrice(st);
+            st.decreePrice = settlePrice;
+            kind = 'DECREE';
+        } else {
+            settlePrice = st.lastMark != null ? st.lastMark : _priceSource(view, 0);
+            kind = blockade ? 'FORCE_MAJEURE' : 'TERMINAL';
+        }
+        st.settled = true;
+        computeMarket.settled[st.key] = { kind, day, settlePrice };
+        out.push({ key: st.key, settleDay: st.settleDay, kind, settlePrice });
+    }
+    return out;
+}

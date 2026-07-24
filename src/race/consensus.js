@@ -605,3 +605,78 @@ export function computeBinarySettlements(race) {
 
     return out;
 }
+
+/** Earliest certification day of rung R across all entities (Infinity if never
+ *  certified) -- the certification analogue of frontierInternalCrossDay, for the
+ *  terminal finalizer's "certified by deadline" read. */
+export function frontierCertifiedDay(cap, rung) {
+    let m = Infinity;
+    for (const id of ['halcyon', 'tianxia', 'polaris']) {
+        const lab = cap.labs[id];
+        if (lab.active && lab.rungCertified[rung] != null) m = Math.min(m, lab.rungCertified[rung]);
+    }
+    return m;
+}
+
+/**
+ * TERMINAL FINALIZER (P6-3): settle EVERY not-yet-cash-settled Consensus contract
+ * ONCE against the resolved world, and return the durable settlement rows for
+ * applyBinarySettlementRows (cash + credibility, exactly-once). Stateful and
+ * idempotent -- it records `consensus.settled` and clears pending/dispute markers,
+ * so a second call returns [] (the P6-2 interim's "bar new trades" is replaced by
+ * real settlement). Called by the ONE terminal finalizer for both the day-1008
+ * timeout and player-terminal ejection.
+ *
+ * A pure row-builder cannot do exactly-once (applyBinarySettlementRows only
+ * deduplicates the same row OBJECT, and re-enumeration would re-score credibility);
+ * this function owns the settled-state, so re-calls are no-ops.
+ *
+ * Precedence (09): nationalized/classified fallback settles EVERYTHING at
+ * fallbackValue (succession ends there). Otherwise, judged against the contract's
+ * DEADLINE (never `race.day`, which post-extrapolation may sit far past it):
+ *   - terminal R5: internal R5 crossed by its deadline -> YES, else NO.
+ *   - certification contract: frontier certified rung R by its deadline -> YES, else NO.
+ * A disputed contract still open at terminal settles at fallbackValue (no limbo).
+ *
+ * EXTRAPOLATION IS THE WORLD CONTINUING (02a P6-3 ruling): the reads
+ * frontierInternalCrossDay / frontierCertifiedDay consume the PERSISTENT capability
+ * state (rungInternal / rungCertified), which resolveNow's extrapolation advances
+ * past the desk's ejection -- NEVER `lastTransitions` (the latch cleared it). So a
+ * certification that lands INSIDE the extrapolated trajectory, before a contract's
+ * deadline, settles that contract YES exactly as if the desk had been there to watch:
+ * the binary book settles against the world that actually happened, not the world as
+ * of the firing. The desk's presence does not change the oracle.
+ *
+ * RULING FLAGGED (coordinator): shares/binaries redeem to CASH here rather than
+ * persisting as claims (09 models shares as signed claims; cash closeout is the
+ * epilogue simplification).
+ *
+ * @param {object} race  race state (post-resolution)
+ * @returns {Array} durable settlement rows (shape of computeBinarySettlements)
+ */
+export function finalizeConsensusTerminal(race) {
+    if (!consensus.active) return [];
+    const cap = race.capability;
+    const fallback = FALLBACK_REGIMES.has(race.controlRegime);
+    const rows = [];
+    for (const c of consensus.contracts) {
+        if (consensus.settled[c.key]) continue;   // already cash-terminal (idempotent)
+        let outcome;
+        if (fallback) {
+            outcome = 'FALLBACK';
+        } else if (consensus.disputed[c.key]) {
+            outcome = 'FALLBACK';                  // open dispute at terminal -> no limbo (09)
+        } else if (c.terminal) {
+            outcome = frontierInternalCrossDay(cap, c.predicate.rung) <= c.deadline ? 'YES' : 'NO';
+        } else {
+            outcome = frontierCertifiedDay(cap, c.predicate.rung) <= c.deadline ? 'YES' : 'NO';
+        }
+        delete consensus.pendingCloseout[c.key];
+        delete consensus.disputed[c.key];
+        consensus.settled[c.key] = { outcome, day: race.day, reason: 'terminal-finalize' };
+        const payoutPerUnit = outcome === 'YES' ? c.notional
+            : outcome === 'FALLBACK' ? c.fallbackValue * c.notional : 0;
+        rows.push({ key: c.key, contract: c, label: c.label, outcome, payoutPerUnit });
+    }
+    return rows;
+}
