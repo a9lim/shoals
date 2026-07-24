@@ -14,6 +14,18 @@ import { TIP_EVENTS } from './tips.js';
 import { INTERJECTION_EVENTS } from './interjections.js';
 import { TRAIT_EVENTS } from './traits.js';
 import { RACE_EVENTS } from './race-events.js';
+// Overhaul phase-5a domain skeletons + machinery shells. The machinery shells
+// (china strait, policy regime/dispute/reporting) fire via the race bridge /
+// main.js hooks; the arc seeds are DORMANT (Poisson-excluded categories) until
+// the content rounds. Merged here so getEventById + followup-chain validation
+// see them all.
+import { HALCYON_EVENTS } from './halcyon.js';
+import { CHINA_EVENTS } from './china.js';
+import { POLARIS_EVENTS } from './polaris.js';
+import { WONDER_EVENTS } from './wonders.js';
+import { POLICY_EVENTS } from './policy.js';
+import { TREATY_EVENTS } from './treaty.js';
+import { INSIDER_EVENTS } from './insider.js';
 
 export const ALL_EVENTS = [
     ...FED_EVENTS,
@@ -27,6 +39,13 @@ export const ALL_EVENTS = [
     ...INTERJECTION_EVENTS,
     ...TRAIT_EVENTS,
     ...RACE_EVENTS,
+    ...HALCYON_EVENTS,
+    ...CHINA_EVENTS,
+    ...POLARIS_EVENTS,
+    ...WONDER_EVENTS,
+    ...POLICY_EVENTS,
+    ...TREATY_EVENTS,
+    ...INSIDER_EVENTS,
 ];
 
 // -- Event-by-id lookup --
@@ -41,10 +60,21 @@ export function getEventById(id) {
 }
 
 // -- Startup validation: followup chain integrity --
+// Collect referenced followup ids from BOTH top-level `ev.followups` (scheduled in
+// _fireEvent) AND choice-level `choice.followups` (scheduled via scheduleFollowup
+// when the player picks that choice) -- both are real references, so a target
+// reached only through a choice must not be flagged "never referenced".
 const _referencedFollowupIds = new Set();
 for (const ev of ALL_EVENTS) {
     if (ev.followups) {
         for (const fu of ev.followups) _referencedFollowupIds.add(fu.id);
+    }
+    if (Array.isArray(ev.choices)) {
+        for (const c of ev.choices) {
+            if (c && Array.isArray(c.followups)) {
+                for (const fu of c.followups) _referencedFollowupIds.add(fu.id);
+            }
+        }
     }
 }
 for (const id of _referencedFollowupIds) {

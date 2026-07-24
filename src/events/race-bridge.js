@@ -241,6 +241,39 @@ function bridgeIncidents(tr, emit) {
     }
 }
 
+// ---- Strait (phase 5a: gray-zone scares, blockade start/end) -------------
+// The strait beats are public by nature (a scare is observed, a blockade
+// announces itself), so they fire straight off the ledger like detected
+// incidents. Prose is token-free -> finalize just picks/capitalizes.
+
+function bridgeStrait(tr, emit) {
+    const s = tr.strait;
+    if (!s) return;
+    for (const gz of s.grayZone) emit(shell('strait_grayzone', {}, { day: gz.day }));
+    if (s.blockadeStart) emit(shell('strait_blockade', {}, { day: s.blockadeStart.day, duration: s.blockadeStart.duration }));
+    if (s.blockadeEnd) emit(shell('strait_blockade_lifted', {}, { day: s.blockadeEnd.day }));
+}
+
+// ---- Control-regime ratchet (phase 5a: fire the transition narrative) ----
+// tr.regimeChange (set by stepControlRegime, run in main.js before the bridge)
+// carries { from, to }; fire the matching regime_* shell. The real consequences
+// (Consensus/compute freeze, decree, fallback) already happened via
+// setControlRegime -- this is the narrative around them.
+
+const _REGIME_SHELL = {
+    supervised: 'regime_supervised',
+    mobilized: 'regime_mobilized',
+    nationalized: 'regime_nationalized',
+    classified: 'regime_classified',
+};
+
+function bridgeRegime(tr, emit) {
+    const rc = tr.regimeChange;
+    if (!rc) return;
+    const id = _REGIME_SHELL[rc.to];
+    if (id) emit(shell(id, {}, { from: rc.from, to: rc.to }));
+}
+
 // ---- Thefts (stub: records intent, fires nothing) ------------------------
 
 function bridgeThefts(tr) {
@@ -292,6 +325,8 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     bridgeReleases(tr, emit);
     bridgeCertifications(tr, emit);
     bridgeIncidents(tr, emit);
+    bridgeStrait(tr, emit);
+    bridgeRegime(tr, emit);
     bridgeThefts(tr);
 
     return { fired, popups };

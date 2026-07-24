@@ -10,6 +10,14 @@ const FACTION_DEFAULTS = {
     farmerLaborSupport: 30,
     mediaTrust: 40,
     fedRelations: 40,
+    // Roster v2 (07-migration, phase 5a). safetyNetworkTrust: standing with the
+    // safety-researcher source network -- the insider channel's moral core (04),
+    // grown through discreet handling; starts low (unearned). labRelations: the
+    // player's/firm's relationship with the frontier labs (Halcyon board access,
+    // Polaris backing, invitations to the room) -- SCALAR for now (per-lab is a
+    // later refinement; UNRATIFIED). Both feed "the room" endgame access (04).
+    safetyNetworkTrust: 20,
+    labRelations: 30,
 };
 
 const factions = {
@@ -183,6 +191,20 @@ const DESCRIPTORS = {
         [30, 'Known quantity'],
         [15, 'No access'],
         [0, 'Shut out'],
+    ],
+    safetyNetworkTrust: [
+        [75, 'They call you first'],
+        [50, 'A trusted channel'],
+        [30, 'On the list'],
+        [15, 'Wary of you'],
+        [0, 'No one talks'],
+    ],
+    labRelations: [
+        [75, 'A seat at the table'],
+        [50, 'Board access'],
+        [30, 'Known to the labs'],
+        [15, 'Outside the loop'],
+        [0, 'Persona non grata'],
     ],
 };
 

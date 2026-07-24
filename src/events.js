@@ -30,8 +30,40 @@ const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
 // The race categories (overhaul phase 2) fire ONLY via the race->narrative
 // bridge (src/events/race-bridge.js), never by Poisson draw -- excluding them
-// here keeps them out of both the random pool and the one-shot pre-pass.
-const _PULSE_CATEGORIES = new Set(['fed', 'midterm', 'interjection', 'release', 'incident', 'certification']);
+// here keeps them out of both the random pool and the one-shot pre-pass. The
+// phase-5a machinery + skeleton categories ('strait', 'regime', 'dispute',
+// 'policy', 'treaty', 'wonder', 'halcyon', 'china', 'polaris', 'insider',
+// 'ghostwritten') are ALSO excluded: the machinery shells fire via the bridge /
+// followups, and the content skeletons stay dormant (placeholder prose) until the
+// content rounds -- they must never Poisson-fire into the live game.
+const _PULSE_CATEGORIES = new Set([
+    'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
+    'strait', 'regime', 'dispute', 'policy', 'treaty', 'wonder',
+    'halcyon', 'china', 'polaris', 'insider', 'ghostwritten', 'conversion',
+]);
+
+// -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------
+// The event engine's Poisson base rate scales with PUBLIC world state -- the
+// RELEASED frontier rung, the SAME public quantity `eta` reads (02a; latent C is
+// never touched). Early game (R1) the multiplier is EXACTLY 1, so Act I is
+// bit-identical to the current constant-rate cadence (no regression); late game
+// it rises toward BASE_RATE_MAX_MULT as capability compounds, compressing the
+// discretionary event cadence per 04's tempo principle (ratified, 02a phase-5a).
+//
+// P7 SEAM: substep-resolution events (04 engine note 2) are NOT built here -- the
+// day stays the atomic narrative unit. When P7 lands, the same released-rung
+// driver gates an intraday firing pass; this day-level scale is its precursor.
+// RATIFIED (02a phase-5a block): the ceiling and the linear-in-released-rung shape.
+export const BASE_RATE_MAX_MULT = 2.5;   // late-game (R5) event-cadence ceiling
+
+/** Day-level base-rate multiplier from the public released frontier rung (1..5).
+ *  1.0 at R1 (Act-I match), rising linearly to BASE_RATE_MAX_MULT at R5 -- the
+ *  same [0,1] released-rung driver `marketEfficiency`/`eta` uses. Pure. */
+export function eventBaseRateScale(releasedFrontierRung) {
+    const rr = releasedFrontierRung || 1;
+    const t = Math.max(0, Math.min(1, (rr - 1) / 4));
+    return 1 + (BASE_RATE_MAX_MULT - 1) * t;
+}
 
 // -- Stable, RNG-free string hash (FNV-1a) for headline-variant selection ----
 // Used to collapse `headlines: [...]` pools to one variant deterministically,
@@ -63,6 +95,10 @@ export class EventEngine {
 
         // Random event cooldown
         this._randomCooldown = 0;
+
+        // Day-level base-rate multiplier (phase 5a). 1 = current constant rate
+        // (Act I / Classic); main.js raises it with the released frontier rung.
+        this._baseRateScale = 1;
 
         // Epilogue
         this._epilogueFired = false;
@@ -157,13 +193,18 @@ export class EventEngine {
         const firedFollowups = this._checkFollowups(sim, day, netDelta);
         if (firedFollowups.length > 0) return _partition(firedFollowups);
 
-        // 3. Random draw with cooldown
+        // 3. Random draw with cooldown. The base rate + cooldown both scale with
+        //    the released frontier (phase 5a): higher accept probability and
+        //    shorter cooldown late-game compress the discretionary cadence. At
+        //    scale 1 (Act I / Classic) this is bit-identical to the old constant
+        //    rate. The accept probability is capped so it can never certainty-fire.
         if (this._randomCooldown > 0) {
             this._randomCooldown--;
             return empty;
         }
 
-        if (Math.random() >= NON_FED_POISSON_RATE) return empty;
+        const scale = this._baseRateScale || 1;
+        if (Math.random() >= Math.min(0.95, NON_FED_POISSON_RATE * scale)) return empty;
 
         // 4. Draw from appropriate source
         const event = this.source === 'llm'
@@ -172,9 +213,10 @@ export class EventEngine {
 
         if (!event) return empty;
 
-        // Set cooldown after successful random draw
-        this._randomCooldown = NON_FED_COOLDOWN_MIN +
+        // Set cooldown after successful random draw (compressed by the base-rate scale)
+        const cd = NON_FED_COOLDOWN_MIN +
             Math.floor(Math.random() * (NON_FED_COOLDOWN_MAX - NON_FED_COOLDOWN_MIN + 1));
+        this._randomCooldown = Math.max(1, Math.round(cd / scale));
 
         return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
     }
@@ -260,6 +302,7 @@ export class EventEngine {
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot.clear();
         this._triggerCooldowns = {};
+        this._baseRateScale = 1;
 
         // Reset all pulse states
         for (const pulse of this._pulses) {
@@ -274,6 +317,13 @@ export class EventEngine {
     /** Update player context passed to event guards. */
     setPlayerContext(playerChoices, factions, activeRegIds, traitIds = [], portfolioMetrics = {}, lobbyCount = 0, lastLobbyDay = 0) {
         this._playerCtx = { playerChoices, factions, activeRegIds, traitIds, portfolio: portfolioMetrics, lobbyCount, lastLobbyDay };
+    }
+
+    /** Set the day-level base-rate multiplier (phase 5a). main.js derives it from
+     *  the released frontier rung via eventBaseRateScale each completed day; 1 in
+     *  Classic (no race) keeps the prototype cadence exactly. */
+    setBaseRateScale(scale) {
+        this._baseRateScale = (typeof scale === 'number' && scale > 0) ? scale : 1;
     }
 
     /** Clear fired one-shot tracking (call on reset). */

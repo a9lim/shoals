@@ -289,4 +289,33 @@ export const MEDIA_EVENTS = [
             },
         ],
     },
+
+    // ===================================================================
+    //  GHOSTWRITTEN-DISCOURSE ADDITIONS (overhaul phase 5a SKELETON)
+    //  "The ghostwritten world" (04): AI in the discourse, not just the
+    //  market. Played for comedy until it isn't -- op-eds nobody can
+    //  source move `B`; the government flail turns abruptly competent
+    //  when the memos stop being human. Category 'ghostwritten' is
+    //  Poisson-EXCLUDED, so these stay DORMANT until the content rounds.
+    //  Past a rung these become persuasion-class campaigns (incident
+    //  ladder, incidents.js) -- occurrence quiet, detection the scandal.
+    //  PROSE: coordinator (all "[P] ..." placeholders).
+    // ===================================================================
+    {
+        id: 'ghostwritten_memo',
+        category: 'ghostwritten',
+        magnitude: 'minor',
+        // PROSE: coordinator. Comedy register: the CIO's letter grows a fondness for "delve".
+        headline: '[P] The CIO’s quarterly letter arrives with bullet points and a suspicious fondness for "delve." Cole’s monologues have tightened; he drafts in Halcyon Chat and denies it.',
+        params: {},
+    },
+    {
+        id: 'ghostwritten_competent',
+        category: 'ghostwritten',
+        magnitude: 'moderate',
+        // PROSE: coordinator. The satire's last joke and the straight register's first warning.
+        headline: '[P] The government flail turns abruptly competent — loopholes close, the czar’s testimony parses — precisely when the memos stop being human. Synthetic analysis is moving Consensus now.',
+        params: {},
+        impulse: { xi: 0.006 },   // decaying (P4): the tape reads a mind it cannot source
+    },
 ];

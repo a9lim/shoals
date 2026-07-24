@@ -65,6 +65,7 @@
 
 import { CERT_RUNGS, RUNGS } from './capability.js';
 import { createRng, deriveSeed } from './rng.js';
+import { straitTension } from './strait.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const median = (arr) => {
@@ -168,19 +169,10 @@ const COMPUTE_HALF_SPREAD_PCT = 0.004;   // 0.4% each side (0.8% round-trip)
 
 // ---- The public view (integrity boundary) --------------------------------
 
-/**
- * Public tension scalar in [0,1] from PUBLIC geopolitical facts (world-state).
- * The Taiwan/compute chokepoint reads off China relations + the trade-war stage
- * -- both public narrative state, never hidden race truth, and both genuinely
- * China-side (02a). The weights are a P4-swappable placeholder (phase-3b block).
- * A null `geo` (headless / Classic) reads as calm (tension 0).
- */
-function tensionFromGeo(geo) {
-    if (!geo) return 0;
-    const china = clamp(-(geo.chinaRelations || 0) / 3, 0, 1);   // worse relations -> higher tension
-    const trade = clamp((geo.tradeWarStage || 0) / 4, 0, 1);
-    return clamp(0.6 * china + 0.4 * trade, 0, 1);
-}
+// Public tension scalar in [0,1] from the China proxies is FACTORED into
+// strait.js as the single shared source (02a: "factor that helper to one shared
+// source"), so the compute curve and the blockade hazard read tension
+// identically. Imported as `straitTension` (was the local `tensionFromGeo`).
 
 /**
  * Project the race + world state onto the ONLY fields a compute quote may see:
@@ -213,7 +205,7 @@ export function buildComputePublicView(race, geo) {
         releaseCount,
         certifiedFrontierRung,
         blockade: !!(geo && geo.taiwanBlockade),   // Taiwan strait ONLY (never Hormuz's straitClosed)
-        straitTension: tensionFromGeo(geo),
+        straitTension: straitTension(geo),
         controlRegime: race.controlRegime,
     };
 }

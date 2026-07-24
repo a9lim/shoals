@@ -109,6 +109,25 @@ SL3 cuts it to ~0.27, which is what the upgrade buys.
 cumulative per-run ≈ 3% baseline → 12–15% hot/desperate. Blockade: far
 compute curve +40–80%, heat +0.20, mobilization gate opens.
 
+Blockade hazard (ratified 2026-07-23, phase 5a — calibrated against
+the incidence band above; measured 2.9% / 14.2% at N=2000):
+
+```
+h_block/day = 0.0000355 · (1 + heat) · (0.5 + 2.05·tension)
+                        · (0.4 + 1.4·desperation)
+desperation = clamp((C_int[frontier] − C_int[tianxia]) / 1.2, 0, 1)
+```
+
+The desperation term reads the *latent* lead gap — a physical-world
+read, the same class as theft's gap term, never a market/quote read.
+Duration ~ Exp(45d) clamped [20, 120]: blockades **end** — flag, heat
+overlay, and compute force-majeure all lift together. The mobilization
+gate, once opened, stays open for the run (the political option space
+doesn't re-shrink). Strait tension is one shared source:
+`0.6·clamp(−chinaRelations/3) + 0.4·clamp(tradeWarStage/4)`, public
+facts only. No gray-zone escalation or new blockade rolls while a
+blockade is active.
+
 ## Incidents (two-track) and evidence
 
 World occurrence process (cadence-calibrated; per-lab hazards compose
@@ -318,6 +337,89 @@ lock, never a manufactured market-prior forecast. The forecast-lock
 UI is the minimal 3-preset popup; the timeline-vs-posterior
 dashboard belongs to a later phase.
 
+## Content plumbing (phase-5a ratifications, 2026-07-23)
+
+**controlRegime transition gates** — the ratchet runs on a *decaying*
+grip pressure (per-day decay 0.97, half-life ≈ 23 trading days), so it
+responds to recent severity clusters, not the ever-accumulating S0/S1
+farce stream — that decay is what keeps mobilized+ a strict minority
+despite ~80–160 detected incidents per run, and it is a design load-
+bearing choice, not an implementation detail. Per-detection pressure
+increments by severity: S0 0.10 / S1 0.20 / S2 0.80 / S3 4.0 / S4
+15.0; persuasion-class 2.5; successful theft 2.0; blockade start 4.0.
+Gates, transcribed as the full disjunctions (corrected at the
+phase-5a gate — the first transcription compressed the OR-structure
+into conjunctive gates, and Codex's replay showed the strict
+conjunctions produce 0.08% / 0.00% terminals, killing the
+nationalization trade; the event-triggered paths ARE the design):
+
+- **supervised**: pressure ≥ 7 ∨ heat ≥ 0.45 ∨ exo
+  supervision/evals push.
+- **mobilized** (may jump straight from private on a severe shock):
+  pressure ≥ 12 ∨ any S4 ∨ (mobilization gate open ∧ (heat ≥ 0.60 ∨
+  pressure ≥ 7)) ∨ (theft ∧ heat ≥ 0.60) ∨ exo push. The open gate
+  lowering the pressure bar to the *supervised* threshold is
+  deliberate: after a blockade the memo is already drafted.
+- **terminal** (**requires already-mobilized** — current rank, not
+  the in-call target; the panic button follows mobilization, never
+  leapfrogs it): *event-triggered first* — (S4 ∧ theft) →
+  nationalized; (≥ 2 detected persuasion campaigns ∧ heat ≥ 0.55) →
+  classified; exo pushes; *pressure-gated second* — pressure ≥ 22 ∧
+  heat ≥ 0.55, splitting theft-flavored → nationalized, else
+  classified. A qualitative catastrophe nationalizes regardless of
+  the accumulated-pressure metric — that is the story, not a
+  shortcut.
+
+Measured reachability (endogenous only, N=2500, full predicates):
+private 15.6 / supervised 68.0 / mobilized 13.9 / nationalized 1.8 /
+classified 0.7 — ≥ mobilized 16.4%, a strict minority per the
+knife-edge principle; all five reachable; zero monotonicity
+violations. Terminal peers never swap: nationalized ↔ classified is
+rejected by the sole writer, both directions. Exogenous pushes (lobbying, elections) are
+the content layer's lever and arrive as `exo` signals, never as
+direct `setControlRegime` calls.
+
+**Regime evaluation is orchestrated, not baked in** — ratified: the
+target-regime evaluator (`stepControlRegime`) is a separate step the
+orchestrator runs after `advanceRace`, not part of it. `advanceRace`
+stays the physical race (capability, incidents, strait — the strait
+*is* race dynamics and lives inside); the political overlay is a
+consumer of its ledger. This keeps the instrument harnesses'
+regime-static runs meaningful and `advanceRace`'s ledger role pure.
+
+**Event cadence scaling** — day-level discretionary base rate scales
+linearly in the *released* frontier rung (the same public driver as
+η): ×1.0 at R1 → ×2.5 at R5, applied to accept-rate and cooldowns
+alike. Measured: early cadence ≈ 41d (prototype match), late ≈ 17d.
+This is the day-resolution precursor of 04's tempo compression; the
+substep firing pass is P7's, gated by the same driver.
+
+**Field contract** (ratified): new world domain `world.ai` —
+`exportControlStage` 0–3, `treatyStage` 0–4, `wonderCount`,
+`controlRegime` + `reportingRegime` as **race-owned read-only
+mirrors** (main.js mirrors race → world each day; event `when`
+guards read the mirror, never the race object). Existing prototype
+domains are *not* slimmed yet — every candidate-dead geopolitical
+field is still read by surviving prototype `when` guards, so
+slimming rides the content-excision rounds, field by field with its
+last reader (the AGENTS.md deletion rule, applied to state).
+Factions v2 adds `safetyNetworkTrust` (init 20) and `labRelations`
+(init 30) to the six; `labRelations` is a **scalar** — per-lab
+nuance lives in playerFlags and the insider-channel state, not the
+faction table. Traits v2 (agi-pilled, doomer, accelerationist,
+deal-believer, insider, whistleblower) gate on **observable play
+only** — locked posteriors, credibility, tip verbs, leak choices;
+never hidden truth. Their thresholds are narrative gating, not
+market math: they stay code-local and tunable through the prose
+rounds, and their `effects` land with the content that uses them.
+
+**Impulse magnitudes on the new shells** (strait, regime, dispute):
+signs are binding as written (blockade risk-off with jump premium,
+relief rally with tail memory, regime hardening scaling with rank),
+magnitudes rev-1-tunable — the same clause as the phase-4 table.
+Blockade duration, gray-zone silence during an active blockade, and
+the latched mobilization gate are ratified above in the Strait block.
+
 ## Bounded influence (margin units, not log-odds)
 
 Track world and player deltas to each terminal quantity separately.
@@ -332,7 +434,11 @@ by construction, with no attenuation of the world when the player sat
 out. (Rev 1's `0.7·world + 0.3·player` blend attenuated the world
 unconditionally and capped nothing.)
 
-`controlRegime` transition gates and standing-orders unlocks as rev 1.
+`controlRegime` transition gates: ratified numbers in the "Content
+plumbing (phase-5a ratifications)" block above (rev 1 never
+transcribed them; the phase-5a set is the first concrete one).
+Standing-orders unlocks stay as rev 1, deferred to P7 with the rest
+of the delegation layer.
 
 ## Resolution arithmetic and the exclusive mapping
 

@@ -84,6 +84,21 @@ export function isFreezeRegime(regime) {
     return FREEZE_REGIMES.has(regime);
 }
 
+/**
+ * Named dispute adjudicator per controlRegime (09 "Oracle discipline",
+ * adjudicator succession): exchange certification panel (private/supervised) ->
+ * the federal evals office (mobilized) -> fallbackValue (nationalized/classified).
+ * The satire register owns the staffing (the evals office is the one Congress
+ * defunded); the math plays straight. Returns 'fallback' when the succession has
+ * ended -- a disputed contract in a fallback regime pays fallbackValue for all
+ * holders identically.
+ */
+export function disputeAdjudicator(regime) {
+    if (FALLBACK_REGIMES.has(regime)) return 'fallback';
+    if (regime === 'mobilized') return 'federal-evals-office';
+    return 'exchange-cert-panel';
+}
+
 // ---- Contract definitions (09 oracle tuples) -----------------------------
 //
 // RATIFIED (02a "Consensus binaries", phase-3a): deadlines R2 420 / R3 756 /
@@ -156,6 +171,17 @@ export const consensus = {
     quotes: {},
     settled: {},
     pendingCloseout: {},
+    // Phase-5a dispute lifecycle (09 adjudicator succession). key -> { openedDay,
+    // disputeDeadline, openedUnder, mark }. A disputed contract is non-tradeable
+    // (held at its last valid mark, like a pending one) until the adjudicator rules
+    // (ruleDispute) or the disputeDeadline expires (auto-fallback).
+    disputed: {},
+    // Durable settlement OUTBOX (R3). A synchronous ruling (ruleDispute) marks the
+    // contract terminal and stashes its settlement row here as well as returning it,
+    // so a caller that drops the return does not strand portfolio cash: the daily
+    // settlement pass drains any UNCONSUMED stashed rows through the shared
+    // consequence helper, exactly-once by each row's `_consumed` flag.
+    pendingRows: [],
 };
 
 /** Build the listed contracts and clear the book. Dynamic-mode init/reset.
@@ -168,6 +194,8 @@ export function initConsensus(race) {
     consensus.quotes = {};
     consensus.settled = {};
     consensus.pendingCloseout = {};
+    consensus.disputed = {};
+    consensus.pendingRows = [];
     _quoteSource = placeholderQuote;
     if (race) refreshBinaryQuotes(race);
 }
@@ -185,6 +213,8 @@ export function deactivateConsensus() {
     consensus.quotes = {};
     consensus.settled = {};
     consensus.pendingCloseout = {};
+    consensus.disputed = {};
+    consensus.pendingRows = [];
 }
 
 /**
@@ -328,6 +358,15 @@ export function refreshBinaryQuotes(race) {
             consensus.quotes[c.key] = { bid: mid, ask: mid, mid, pending: true };
             continue;
         }
+        if (consensus.disputed[c.key]) {
+            // Under adjudication (09): non-tradeable, held at the FROZEN last-valid
+            // executable mark captured when the dispute opened (halted-leg risk-mark
+            // protocol) -- never a live reprice, never a 0.50 overwrite.
+            const dm = consensus.disputed[c.key];
+            const mid = (dm.mark != null) ? dm.mark : c.fallbackValue;
+            consensus.quotes[c.key] = { bid: mid, ask: mid, mid, disputed: true };
+            continue;
+        }
         const mid = clamp(_quoteSource(view, c), QUOTE_FLOOR, QUOTE_CEIL);
         const half = BINARY_SPREAD / 2;
         consensus.quotes[c.key] = {
@@ -366,6 +405,81 @@ export function pendingTerminalCloseout() {
         const key = Number(k);
         return { key, contract: contractByKey(key), ...consensus.pendingCloseout[k] };
     });
+}
+
+// ---- Dispute lifecycle (09 adjudicator succession; phase 5a) --------------
+
+/**
+ * Open a dispute on a live contract (the "dispute event class", 09) -- a policy /
+ * dispute narrative event calls this. The contract stops trading and is held at
+ * its last valid executable mark (halted-leg risk-mark protocol) until the
+ * adjudicator rules (ruleDispute) or the disputeDeadline expires (auto-fallback in
+ * computeBinarySettlements). No-op on an unknown, already-settled, pending, or
+ * already-disputed contract, or on the terminal R5 (which resolves via terminal
+ * closeout, not disputes). `regime` is stored as `openedUnder` for the ledger /
+ * narrative ONLY -- it is NOT the settlement authority (the adjudicator is resolved
+ * from the CURRENT regime at ruling time, F3). Returns the dispute record, or null.
+ */
+export function openDispute(key, day, regime = 'private') {
+    if (!consensus.active) return null;
+    const c = contractByKey(key);
+    if (!c || c.terminal) return null;
+    if (consensus.settled[key] || consensus.pendingCloseout[key] || consensus.disputed[key]) return null;
+    const lastQ = consensus.quotes[key];
+    const mark = (lastQ && !lastQ.settled && lastQ.mid != null) ? lastQ.mid : c.fallbackValue;
+    const rec = {
+        openedDay: day,
+        disputeDeadline: c.disputeDeadline,
+        openedUnder: regime,     // informational (ledger/narrative) -- NOT the authority
+        mark,
+    };
+    consensus.disputed[key] = rec;
+    return rec;
+}
+
+/**
+ * The adjudicator rules on an open dispute (a dispute-ruling narrative event
+ * calls this). Dispute finality (09, ruled 2026-07-23):
+ *   - F2a: a ruling AFTER `disputeDeadline` is VOID -- rejected; the deadline
+ *     fallback stands (no late ruling can overturn the automatic fallback).
+ *   - F3: the adjudicator is resolved from the CURRENT `regime` at ruling time
+ *     (adjudicator succession reaches open disputes), not the open-time snapshot.
+ *     Under a fallback regime (nationalized/classified) the succession has ended,
+ *     so a ruling is not possible -- rejected; fallback governs.
+ *   - F2b: a timely ruling is TERMINAL and settles the contract SYNCHRONOUSLY
+ *     here (same consequence-bundle philosophy as setControlRegime) -- marked
+ *     consensus.settled now, so no later fallback path (regime or deadline) can
+ *     override it. The row is stashed in the `pendingRows` outbox AND returned;
+ *     the caller applies it via portfolio.applyBinarySettlementRows (cash +
+ *     credibility, exactly-once), and the daily pass drains any unconsumed
+ *     stashed row -- a dropped return still pays exactly once (R3).
+ * `outcome` is 'YES' or 'NO'. Returns the settlement row (settleBinaries-shaped),
+ * or null if rejected.
+ */
+export function ruleDispute(key, outcome, day, regime = 'private') {
+    const d = consensus.disputed[key];
+    if (!d) return null;
+    if (outcome !== 'YES' && outcome !== 'NO') return null;
+    if (day > d.disputeDeadline) return null;                    // F2a: post-deadline -> void
+    const adjudicator = disputeAdjudicator(regime);              // F3: current regime, not the snapshot
+    if (adjudicator === 'fallback') return null;                 // succession ended -> fallback governs
+    const c = contractByKey(key);
+    delete consensus.disputed[key];
+    // F2b: synchronous terminal settlement -- senior to every later fallback.
+    consensus.settled[key] = { outcome, day, reason: 'dispute-ruled:' + adjudicator, openedUnder: d.openedUnder };
+    // R3: stash the settlement row in the durable outbox (also returned). `_consumed`
+    // is the exactly-once flag the shared consequence helper marks when it applies
+    // the row -- so a dropped return is drained by the daily pass, and a hook that
+    // applies it is not re-paid by the drain.
+    const row = { key, contract: c, label: c.label, outcome,
+        payoutPerUnit: outcome === 'YES' ? c.notional : 0, dispute: 'ruled', adjudicator, _consumed: false };
+    consensus.pendingRows.push(row);
+    return row;
+}
+
+/** The dispute record for a contract key, or null. Read-only. */
+export function getDispute(key) {
+    return consensus.disputed[key] || null;
 }
 
 // ---- Settlement (consumes the certification ledger, never state-diffing) --
@@ -410,6 +524,7 @@ export function computeBinarySettlements(race) {
         //    the position's cash/collateral is freed.
         if (fallbackRegime) {
             if (consensus.pendingCloseout[c.key]) delete consensus.pendingCloseout[c.key];
+            if (consensus.disputed[c.key]) delete consensus.disputed[c.key];   // succession ends at fallback
             consensus.settled[c.key] = { outcome: 'FALLBACK', day, reason: 'controlRegime:' + regime };
             out.push({ key: c.key, contract: c, label: c.label, outcome: 'FALLBACK', payoutPerUnit: c.fallbackValue * c.notional });
             continue;
@@ -417,6 +532,29 @@ export function computeBinarySettlements(race) {
 
         // Non-fallback regimes: a parked pending contract stays parked.
         if (consensus.pendingCloseout[c.key]) continue;
+
+        // 1b. Dispute resolution (09 adjudicator succession). A timely ruling
+        //     already settled SYNCHRONOUSLY in ruleDispute (removing the marker and
+        //     marking consensus.settled -- senior to every fallback), so a marker
+        //     still present here means NO timely ruling: an expired disputeDeadline
+        //     auto-settles at fallbackValue (09: "No indefinite limbo"); otherwise
+        //     the dispute is still under adjudication and suspends the normal cert/
+        //     terminal path (the contract is not trading).
+        const disp = consensus.disputed[c.key];
+        if (disp) {
+            // R1: the deadline boundary is SINGULAR. The deadline day itself is the
+            // LAST day a ruling can land (ruleDispute rejects only day > deadline), so
+            // the auto-fallback fires only STRICTLY AFTER it -- otherwise the daily
+            // pass (which runs before queued popup rulings) would beat a deadline-day
+            // ruling to fallback by call order.
+            if (day > disp.disputeDeadline) {
+                delete consensus.disputed[c.key];
+                consensus.settled[c.key] = { outcome: 'FALLBACK', day, reason: 'dispute-expired' };
+                out.push({ key: c.key, contract: c, label: c.label, outcome: 'FALLBACK',
+                    payoutPerUnit: c.fallbackValue * c.notional, dispute: 'expired' });
+            }
+            continue;   // disputed contracts never run the normal cert/terminal path
+        }
 
         // 2. Terminal-resolution contract (R5): never NO against a crossed world.
         if (c.terminal) {

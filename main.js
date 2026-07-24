@@ -15,7 +15,7 @@ import {
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder, cancelAllOrders,
     computeNetDelta, computeGrossNotional, portfolioValue,
-    executeBinaryTrade, settleBinaries, settleComputeFutures,
+    executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -33,7 +33,7 @@ import {
     showPopupEvent,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
-import { EventEngine } from './src/events.js';
+import { EventEngine, eventBaseRateScale } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
 import { checkEndings, generateEnding } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
@@ -72,11 +72,14 @@ import {
 import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
-import { createRaceState, advanceRace, resetRaceState } from './src/race/race-state.js';
+import { createRaceState, advanceRace, resetRaceState, stepControlRegime } from './src/race/race-state.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
+import { applyReportingRegime } from './src/race/incidents.js';
+import { straitTension } from './src/race/strait.js';
 import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
+    buildPublicView, openDispute, ruleDispute,
 } from './src/race/consensus.js';
 import {
     computeMarket, initComputeMarket, resetComputeMarket, deactivateComputeMarket,
@@ -85,8 +88,8 @@ import {
 import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief,
     binaryQuoteFromBelief, computeCurveFromBelief, impliedTimeline,
-    isLockDay, lockForecast, settleClaims,
-    playerPilled, stepFirmBelief, scrutinyGap, marketPilled, hasEverLocked,
+    isLockDay, lockForecast,
+    playerPilled, stepFirmBelief, scrutinyGap, marketPilled, hasEverLocked, credibility,
 } from './src/race/belief.js';
 import {
     decayEventImpulses,
@@ -169,6 +172,65 @@ function _wireBeliefQuoters() {
 function _unwireBeliefQuoters() {
     setBinaryQuoteSource(null);    // restore the placeholder quoter
     setComputePriceSource(null);
+}
+/** Mirror the race-owned strait + controlRegime state into world-state (phase 5a)
+ *  so the compute market sees the Taiwan blockade and event `when` guards can read
+ *  the regime / reporting regime. race-state.js stays the sole AUTHORITY; this is a
+ *  one-way read-only mirror. No-op outside Dynamic mode. */
+function _syncRaceToWorld() {
+    if (!raceState || !eventEngine) return;
+    const w = eventEngine.world;
+    w.geopolitical.taiwanBlockade = raceState.taiwanBlockade;   // Taiwan strait (compute market reads this)
+    w.ai.controlRegime = raceState.controlRegime;
+    w.ai.reportingRegime = raceState.incidentReporting;
+}
+/** Public strait tension in [0,1] from world-state China proxies (phase 5a),
+ *  fed to the strait generator so gray-zone / blockade hazard reads the same
+ *  public tension the compute curve does. 0 outside Dynamic mode. */
+function _straitTension() {
+    return eventEngine ? straitTension(eventEngine.world.geopolitical) : 0;
+}
+/** Exogenous controlRegime-ratchet signals (lobbying / election) for
+ *  stepControlRegime. Built from player lobbying flags the content rounds set;
+ *  absent flags are simply falsy, so the endogenous ratchet carries phase 5a. */
+function _exoSignals() {
+    return {
+        evalsPush: !!playerChoices.lobbied_evals_regime,
+        supervisionPush: !!playerChoices.lobbied_supervision,
+        mobilizationPush: !!playerChoices.lobbied_mobilization,
+        nationalizationPush: !!playerChoices.lobbied_nationalization,
+        classificationPush: !!playerChoices.lobbied_classification,
+    };
+}
+/** Apply a batch of Consensus settlement rows through the ONE shared consequence
+ *  helper (cash + credibility, exactly-once) and layer the narrative on top
+ *  (settled toasts, dispute-resolution shells, R5 pending-closeout notices). Used
+ *  identically by the daily settlement pass, the outbox drain, and the dispute
+ *  ruling hook -- so no milestone settles without scoring, and none double-pays. */
+function _applyBinaryRows(rows) {
+    if (!rows || rows.length === 0) return;
+    const { fresh, cashResults } = applyBinarySettlementRows(rows);   // cash + settleClaims credibility, exactly-once
+    for (const r of cashResults) {
+        _toast('Consensus: ' + r.label + ' settled ' + r.outcome + ' — P&L ' + fmtDollar(r.pnl), 4500);
+    }
+    for (const r of fresh) {
+        if (r.dispute === 'ruled') _fireRaceShell('dispute_ruled');
+        else if (r.dispute === 'expired') _fireRaceShell('dispute_fallback');
+        if (r.outcome === 'PENDING_CLOSEOUT'
+            && portfolio.positions.some(p => p.type === 'binary' && p.strike === r.key)) {
+            _toast('Consensus: ' + r.label + ' reached — held for terminal closeout.', 4500);
+        }
+    }
+}
+/** Fire a race/policy shell event by id as a toast (phase 5a: dispute lifecycle
+ *  narrative). Non-popup shells toast their headline; popup shells queue. */
+function _fireRaceShell(id) {
+    if (!eventEngine) return;
+    const base = getEventById(id);
+    if (!base) return;
+    const r = eventEngine._fireEvent({ ...base }, sim, sim.day, 0, 0);
+    if (r && r.queued) _popupQueue.push(r.event);
+    else if (r && r.headline) _toast(r.headline, 5000);
 }
 function _clampRate() {
     const ceil = getRegulationEffect('rateCeiling', null);
@@ -1224,6 +1286,30 @@ function _processPopupQueue() {
                 ? 'Forecast locked. Credibility now scores it against every matured milestone.'
                 : 'The lock window has passed — no forecast recorded this quarter.', 4000);
         }
+        // Reporting-regime lever (phase 5a): a policy choice enacts the mandatory
+        // incident-reporting regime (retroactive-once). Mirror the flag into
+        // world-state so guards see it, and report the disclosure wave.
+        if (choice._applyReportingRegime && raceState) {
+            const res = applyReportingRegime(raceState);
+            _syncRaceToWorld();
+            _toast('Mandatory incident reporting enacted — disclosure wave: '
+                + res.rescued + ' surfaced, ' + res.shortened + ' lags shortened.', 5000);
+        }
+        // Consensus dispute lifecycle (phase 5a): open a dispute on a contract, or
+        // record an adjudicator ruling. Content-driven; the machinery + narrative
+        // exist so the arcs can drive them.
+        if (choice._openDispute != null && raceState) {
+            const rec = openDispute(choice._openDispute, raceState.day, raceState.controlRegime);
+            if (rec) { refreshBinaryQuotes(raceState); _fireRaceShell('dispute_opened'); }
+        }
+        if (choice._ruleDispute && raceState) {
+            // A timely ruling settles SYNCHRONOUSLY (F2b) and returns the settlement
+            // row (also stashed in the outbox, R3); route it through the ONE shared
+            // consequence helper -- cash + credibility scoring + narrative -- exactly
+            // like the daily pass, so a ruled milestone is never paid without scoring.
+            const row = ruleDispute(choice._ruleDispute.key, choice._ruleDispute.outcome, raceState.day, raceState.controlRegime);
+            if (row) { _applyBinaryRows([row]); refreshBinaryQuotes(raceState); }
+        }
         dirty = true;
     }, popupCat, event.magnitude, isSuperevent);
 }
@@ -1550,6 +1636,13 @@ function _onDayComplete() {
             largeImpactTrades: impactHistory.length,
             continentalMentions: playerChoices._continentalMentions || 0,
         },
+        // Belief-derived OBSERVABLE signals for the v2 convictions (phase 5a).
+        // The player's OWN locked posterior / credibility / lock participation --
+        // never latent race state. Safe defaults in Classic (belief inactive):
+        // everLocked false, so agi_pilled/doomer stay dormant.
+        beliefPilled: raceState ? playerPilled() : 0,
+        credibility: raceState ? credibility() : 0,
+        everLocked: raceState ? hasEverLocked() : false,
     };
     const newTraits = evaluateTraits(_traitCtx);
     for (const id of newTraits) {
@@ -1561,7 +1654,20 @@ function _onDayComplete() {
     // phase 1). Neutral inputs; the bridge (phase 2) + Consensus binaries
     // (phase 3a) read the ledger it produces.
     if (raceState) {
-        advanceRace(raceState);
+        advanceRace(raceState, { straitTension: _straitTension() });
+        // controlRegime ratchet (overhaul phase 5a): evaluate + advance the regime
+        // through the canonical setControlRegime writer BEFORE any settlement reads
+        // it (a mobilized/nationalized regime freezes / fallback-settles below). A
+        // strait blockade may have opened the mobilization gate this tick. Then
+        // MIRROR the race-owned strait + regime state into world-state so the
+        // compute market sees the Taiwan blockade and event guards can read the
+        // regime. Order: advanceRace (sets taiwanBlockade) -> ratchet -> mirror.
+        stepControlRegime(raceState, _exoSignals());
+        _syncRaceToWorld();
+        // Event base-rate scaling (overhaul phase 5a; 04 engine note 1): the
+        // discretionary Poisson cadence scales with the PUBLIC released frontier
+        // rung (1.0 at R1 = Act-I match, rising late-game). Set before maybeFire.
+        eventEngine.setBaseRateScale(eventBaseRateScale(buildPublicView(raceState).releasedFrontierRung));
         // Market belief B (overhaul phase 4): fold this completed day's LEGIBLE
         // ledger (releases, certifications, detected incidents, published/leaked
         // evidence) into B before anything reads a quote. Consumes ONLY
@@ -1572,28 +1678,15 @@ function _onDayComplete() {
         // -- the ledger, never state-diffing), then refresh quotes off the public
         // (released/certified) view. Runs before the event bridge so a settled
         // milestone's toast reads after the race headline.
-        const settlements = computeBinarySettlements(raceState);
-        if (settlements.length) {
-            const settled = settleBinaries(settlements);
-            for (const r of settled) {
-                _toast('Consensus: ' + r.label + ' settled ' + r.outcome
-                    + ' — P&L ' + fmtDollar(r.pnl), 4500);
-            }
-            // Credibility (phase 4): score the player's locked forecast against
-            // every milestone that just matured YES/NO (traded or not). R5 PENDING
-            // and FALLBACK do not settle a claim.
-            const matured = settlements
-                .filter(s => s.outcome === 'YES' || s.outcome === 'NO')
-                .map(s => ({ rung: s.contract.predicate.rung, outcome: s.outcome === 'YES' ? 1 : 0 }));
-            if (matured.length) settleClaims(matured);
-            // Terminal (R5) crossings held for closeout: notify if the player holds one.
-            for (const s of settlements) {
-                if (s.outcome === 'PENDING_CLOSEOUT'
-                    && portfolio.positions.some(p => p.type === 'binary' && p.strike === s.key)) {
-                    _toast('Consensus: ' + s.label + ' reached — held for terminal closeout.', 4500);
-                }
-            }
-        }
+        // All settlement rows -- the day's certifications/deadlines/fallbacks AND
+        // any UNCONSUMED rows a synchronous dispute ruling stashed in the outbox --
+        // route through the ONE shared consequence helper (cash + credibility +
+        // exactly-once). Draining the outbox here is the safety net for a dropped
+        // ruling return (R3): the stashed row is paid + scored exactly once, whether
+        // the hook already applied it (consumed -> skipped) or dropped it.
+        _applyBinaryRows(computeBinarySettlements(raceState));
+        _applyBinaryRows(consensus.pendingRows);
+        consensus.pendingRows = consensus.pendingRows.filter(r => !r._consumed);
         refreshBinaryQuotes(raceState);
 
         // Compute futures (overhaul phase 3b): feed the nationalization reference

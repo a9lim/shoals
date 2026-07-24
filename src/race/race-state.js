@@ -32,6 +32,10 @@
 import { createRng, randomSeed, deriveSeed } from './rng.js';
 import { sampleHiddenState } from './sampler.js';
 import { stepIncidents, stepEvidence } from './incidents.js';
+import { stepStrait, freshStraitState } from './strait.js';
+import {
+    CONTROL_REGIMES, REGIME_RANK, desiredRegime, stepControlSignals, freshControlSignals,
+} from './control-regime.js';
 import {
     createCapabilityState, stepCapability, rollTheftDecision,
     scheduleCertification, stepCertification, frontierInternal,
@@ -40,6 +44,11 @@ import {
 } from './capability.js';
 import { freezeConsensus, isFreezeRegime } from './consensus.js';
 import { freezeComputeMarket } from './compute-market.js';
+
+// Re-export the control-regime enum so existing importers of race-state.js
+// (main.js, harnesses) keep working after the definition moved to
+// control-regime.js (one-way import, no cycle).
+export { CONTROL_REGIMES, REGIME_RANK };
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
@@ -79,9 +88,11 @@ export const RACE_TUNING = {
     prolifCap: 0.30,       // proliferation floor cap (binds in ~47% of runs)
 };
 
-/** Total heat = clamp(transient + floor, 0, 1); the floor is a ratchet. */
+/** Total heat = clamp(transient + floor + strait, 0, 1). The floor is a ratchet;
+ *  `strait` is a REVERSIBLE blockade overlay (strait.js sets it to BLOCKADE_HEAT
+ *  while a Taiwan blockade is active, back to 0 when it lifts). */
 export function heatValue(heat) {
-    return clamp(heat.transient + heat.floor, 0, 1);
+    return clamp(heat.transient + heat.floor + (heat.strait || 0), 0, 1);
 }
 
 /** Recompute the irreversible heat floor from proliferation + theft counts. */
@@ -99,6 +110,10 @@ function freshTransitions() {
         // track the race->narrative bridge fires on.
         incidents: { occurred: [], detected: [] },
         evidence: { occurred: [], published: [] },
+        // Phase-5a: strait beats (gray-zone scares, blockade start/end) and a
+        // controlRegime transition, consumed by the bridge / main.js narrative.
+        strait: { grayZone: [], blockadeStart: null, blockadeEnd: null },
+        regimeChange: null,   // { from, to } on a forward controlRegime move this tick
     };
 }
 
@@ -137,6 +152,7 @@ export function resetRaceState(race, seed) {
         theft: createRng(deriveSeed(seed, 'theft')),
         certification: createRng(deriveSeed(seed, 'certification')),
         incidents: createRng(deriveSeed(seed, 'incidents')),
+        strait: createRng(deriveSeed(seed, 'strait')),
         treaty: createRng(deriveSeed(seed, 'treaty')),
     };
 
@@ -150,11 +166,17 @@ export function resetRaceState(race, seed) {
         open: S0.open,
     };
 
-    race.heat = { transient: HEAT_TRANSIENT0, floor: HEAT_FLOOR0 };
+    race.heat = { transient: HEAT_TRANSIENT0, floor: HEAT_FLOOR0, strait: 0 };
     race.sAccumFreezeUntil = -1;      // day until which S accumulation is frozen
     race.theftCount = 0;
     race.F = F0;                      // firm belief (belief-adjacent; B built beside it phase 4)
     race.lastTransitions = freshTransitions();   // per-tick ledger (phase 2 consumes)
+
+    // ---- Phase-5a strait + controlRegime ratchet state -------------------
+    race.taiwanBlockade = false;      // Taiwan-strait blockade flag (mirrored to geo.taiwanBlockade)
+    race.straitBlockade = freshStraitState();   // { active, startDay, endDay }
+    race.mobilizationGateOpen = false;          // latched by a blockade; a mobilization precondition
+    race.controlSignals = freshControlSignals(); // decaying grip pressure + qualitative flags
 
     // ---- Phase-2 incident / evidence generator state ---------------------
     race.latentIncidents = [];        // two-track incident queue (occur -> detect | never)
@@ -166,8 +188,12 @@ export function resetRaceState(race, seed) {
 
     // ---- Later-phase stubs (null/empty; extend, don't reshape) -----------
     race.B = null;                    // phase-4 market belief (hazard-over-dates curve)
-    race.controlRegime = 'private';   // private -> supervised -> mobilized -> nationalized (transitions later-phase)
-    race.treaty = null;               // treaty discovery/initiation/summit state (later-phase)
+    race.controlRegime = 'private';   // ratchet driven by control-regime.js (phase 5a)
+    // Treaty arc (phase 5a skeleton): the latent gate lives in the sampler
+    // (hidden.chinaTrue.dealPossible); this is the DISCOVERED/public-facing arc
+    // state the treaty.js content advances. `discovered` gates the live window
+    // (02a treaty sub-gates); dormant until the treaty content lands.
+    race.treaty = { stage: 0, discovered: false, initiated: false, summitDay: null };
 
     return race;
 }
@@ -268,12 +294,9 @@ function baselineReleasePolicy(race, endDay, heat) {
 }
 
 // ---- Control-regime transition (canonical op) ----------------------------
-
-/** Valid controlRegime values (09): the state's grip tightening in order. */
-export const CONTROL_REGIMES = ['private', 'supervised', 'mobilized', 'nationalized', 'classified'];
-// Monotone rank (nationalized/classified are terminal peers). The regime only
-// ever tightens -- a freeze, once public, never unwinds mid-run.
-const REGIME_RANK = { private: 0, supervised: 1, mobilized: 2, nationalized: 3, classified: 3 };
+// CONTROL_REGIMES / REGIME_RANK are defined in control-regime.js (imported +
+// re-exported above) so the ratchet evaluator and this writer share them with no
+// import cycle. Monotone: nationalized/classified are terminal peers.
 
 /**
  * Set the control regime -- the ONE canonical mutation path for
@@ -292,6 +315,10 @@ export function setControlRegime(race, regime) {
     if (!CONTROL_REGIMES.includes(regime)) return false;
     const cur = REGIME_RANK[race.controlRegime] ?? 0;
     if (REGIME_RANK[regime] < cur) return false;   // backward -> ignore, never unfreeze
+    // F6: terminal peers (nationalized/classified, both rank 3) cannot swap. An
+    // equal-rank move to a DIFFERENT regime is rejected in BOTH directions; an
+    // equal-rank move to the SAME regime is an idempotent no-op-ish re-apply.
+    if (REGIME_RANK[regime] === cur && regime !== race.controlRegime) return false;
     race.controlRegime = regime;
     if (isFreezeRegime(regime)) {
         freezeConsensus();
@@ -391,6 +418,16 @@ export function advanceRace(race, inputs = {}) {
         tr.evidence = stepEvidence(race, day, endDay);
     }
 
+    // 5c. Strait generator (phase 5a). Draws ONLY from streams.strait; reads
+    //     pre-tick heat + public tension (from inputs, 0 headless). A blockade
+    //     sets race.taiwanBlockade, applies the reversible heat.strait overlay
+    //     (effective NEXT tick, post-snapshot), and opens the mobilization gate.
+    //     NOT gated by incidentsEnabled -- it is its own substream and must run
+    //     identically in both isolation arms (its heat effect perturbs theft
+    //     identically ON/OFF, so the bit-identical capability+theft check holds).
+    const straitTension = clamp(inputs.straitTension ?? 0, 0, 1);
+    tr.strait = stepStrait(race, day, endDay, heatPre, straitTension);
+
     // 6. Safety margin per active lab. dS/dt burns with racing pace always;
     //    accumulation is culture-driven, heat-suppressed (pre-tick heat), and
     //    frozen post-theft (both snapshotted before any same-tick mutation).
@@ -407,4 +444,38 @@ export function advanceRace(race, inputs = {}) {
     race.day = endDay;
     race.lastTransitions = tr;
     return tr;
+}
+
+/**
+ * The controlRegime ratchet, evaluated for one completed day (phase 5a). Kept a
+ * SEPARATE orchestrated step (like stepBelief / the settlement passes), NOT baked
+ * into advanceRace, so the instrument harnesses that call advanceRace alone keep
+ * a `private` world -- the ratchet fires only where it is explicitly stepped
+ * (main.js and the reachability harness). Consumes `race.lastTransitions` (the
+ * ledger the just-completed advanceRace produced): accrues the decaying grip
+ * pressure, evaluates the target regime, and advances through the CANONICAL
+ * setControlRegime writer on a FORWARD move only (never bypass it, never move
+ * backward). Pure of RNG. Returns the { from, to } change, or null.
+ *
+ * @param {object} race   race state (post-advanceRace)
+ * @param {object} [exo]  exogenous push signals (lobbying / election); none headless
+ */
+export function stepControlRegime(race, exo = undefined) {
+    const tr = race.lastTransitions;
+    if (!tr) return null;
+    // F5: consume each completed race day's ledger AT MOST ONCE -- a same-day
+    // replay is a no-op, so re-running one S4+theft tick cannot double-walk the
+    // ratchet past the same-tick terminal guard.
+    if (race.controlSignals.lastConsumedDay === race.day) return null;
+    race.controlSignals.lastConsumedDay = race.day;
+    stepControlSignals(race, tr);
+    const heatNow = heatValue(race.heat);
+    const target = desiredRegime(race, heatNow, exo || {});
+    if ((REGIME_RANK[target] ?? 0) > (REGIME_RANK[race.controlRegime] ?? 0)) {
+        const from = race.controlRegime;
+        setControlRegime(race, target);
+        tr.regimeChange = { from, to: race.controlRegime };
+        return tr.regimeChange;
+    }
+    return null;
 }

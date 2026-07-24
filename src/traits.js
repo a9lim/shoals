@@ -184,6 +184,76 @@ const TRAITS = [
         effects: { regExposureMult: 1.5, boredomImmune: true },
     },
 
+    // ── Conviction set v2 (overhaul phase 5a; 07-migration) ────
+    // Driven ONLY by observable play -- the player's OWN locked posterior
+    // (ctx.beliefPilled), credibility (ctx.credibility), lock participation
+    // (ctx.everLocked), tip verbs, and lobbying flags -- NEVER latent race state
+    // (tau / C / S / heat). Effects are deliberately `{}` for now (UNRATIFIED --
+    // the content rounds wire their gameplay hooks); they surface as convictions
+    // and gate the new arcs' narrative. Dormant in Classic (no belief -> everLocked
+    // false, beliefPilled defaults), so Classic behavior is untouched.
+    {
+        id: 'agi_pilled',
+        name: 'AGI-Pilled',
+        permanent: true,
+        description: 'You called the short timeline early and put the book on it.',
+        // Own locked posterior on the recursion rungs is consistently high.
+        condition: (ctx) => !!ctx.everLocked && (ctx.beliefPilled ?? 0) >= 62,
+        effects: {},   // UNRATIFIED: content-round hooks TBD
+    },
+    {
+        id: 'doomer',
+        name: 'Doomer',
+        permanent: true,
+        description: 'Pilled on the timeline, and positioned like you mean it — long the tail, not the trend.',
+        // Pilled AND expressing it defensively (long-vol / tail / sit-out-short).
+        condition: (ctx) => !!ctx.everLocked && (ctx.beliefPilled ?? 0) >= 55
+            && (ctx.playerChoices.bought_takeoff_binary || ctx.playerChoices.long_vol_hedge || ctx.playerChoices.doom_short),
+        effects: {},   // UNRATIFIED
+    },
+    {
+        id: 'accelerationist',
+        name: 'Accelerationist',
+        permanent: true,
+        description: 'Long the frontier and lobbying to take the brakes off.',
+        condition: (ctx) => ctx.playerChoices.lobbied_deregulation
+            || (((ctx.beliefPilled ?? 0) >= 50) && ctx.playerChoices.long_frontier && ctx.playerChoices.lobbied_export_controls),
+        effects: {},   // UNRATIFIED
+    },
+    {
+        id: 'deal_believer',
+        name: 'Deal-Believer',
+        permanent: true,
+        description: 'You spent capital on the one lever that makes the treaty thinkable: compute reporting.',
+        condition: (ctx) => ctx.playerChoices.lobbied_compute_reporting || ctx.playerChoices.lobbied_verification,
+        effects: {},   // UNRATIFIED
+    },
+    {
+        id: 'insider',
+        name: 'Insider',
+        permanent: true,
+        description: 'The channel is open. You trade what publication withholds.',
+        // The insider channel: pursued tips AND acted on the channel (traded/leaked/sat).
+        condition: (ctx) => {
+            const f = ctx.playerChoices;
+            let score = 0;
+            if (f.pursued_insider_tip) score++;
+            if (f.pursued_hcn_tip) score++;
+            if (f.pursued_analyst_tip) score++;
+            if (f.traded_insider_tip) score++;
+            return score >= 3 || (score >= 1 && (f.traded_insider_tip || f.leaked_insider_tip || f.sat_on_insider_tip));
+        },
+        effects: {},   // UNRATIFIED
+    },
+    {
+        id: 'whistleblower',
+        name: 'Whistleblower',
+        permanent: true,
+        description: 'You gave Rachel Tan the thing that mattered, with everything that costs.',
+        condition: (ctx) => !!(ctx.playerChoices.leaked_to_tan || ctx.playerChoices.sent_incident_to_tan),
+        effects: {},   // UNRATIFIED
+    },
+
     // ── Reputation tags (dynamic, narrative gating) ────────────
     {
         id: 'market_mover',

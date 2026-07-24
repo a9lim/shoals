@@ -1080,7 +1080,7 @@ export function updateComputePanel($, computeMarket, portfolio, day) {
 // Standings panel
 // ---------------------------------------------------------------------------
 
-const _FACTION_IDS = ['firmStanding', 'regulatoryExposure', 'federalistSupport', 'farmerLaborSupport', 'mediaTrust', 'fedRelations'];
+const _FACTION_IDS = ['firmStanding', 'regulatoryExposure', 'federalistSupport', 'farmerLaborSupport', 'mediaTrust', 'fedRelations', 'safetyNetworkTrust', 'labRelations'];
 
 export function updateStandings($, world, factions, getFactionDescriptor) {
     if (!$.standingsWorld || !$.standingsFactions) return;
@@ -1117,6 +1117,8 @@ const _FACTION_LABELS = {
     farmerLaborSupport: 'Farmer-Labor',
     mediaTrust: 'Media',
     fedRelations: 'Fed Relations',
+    safetyNetworkTrust: 'Safety Network',
+    labRelations: 'Lab Relations',
 };
 
 function _renderFactionScores(container, factions, getFactionDescriptor) {

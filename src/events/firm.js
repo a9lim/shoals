@@ -1074,4 +1074,46 @@ export const FIRM_EVENTS = [
             },
         ],
     },
+
+    // ===================================================================
+    //  FIRM-CONVERSION RE-AIM (overhaul phase 5a SKELETON)
+    //  "The firm conversion" (04): the CIO arc. Act I the skeptic + the
+    //  scrutiny loop (existing quarterly-review machinery); Act II the
+    //  grudging memo ("walk me through the thesis"); Act III conversion or
+    //  ejection. The game's most persistent human throughline -- the
+    //  person who thought you were crazy deciding out loud how much crazy
+    //  the evidence now licenses. Runs on firm belief `F` (race.F) +
+    //  credibility. Category 'conversion' is Poisson-EXCLUDED, so these
+    //  stay DORMANT; the content rounds fire them off the scrutiny loop.
+    //  PROSE: coordinator (all "[P] ..." placeholders).
+    // ===================================================================
+    {
+        id: 'firm_conversion_memo',
+        category: 'conversion',
+        popup: true,
+        magnitude: 'moderate',
+        // PROSE: coordinator. Act II: the grudging memo, gated on F waking + credibility.
+        headline: '[P] The CIO’s memo: "Walk me through the thesis." The person who laughed at you in Act I is deciding out loud how much crazy the evidence now licenses.',
+        // PROSE: coordinator
+        context: '[P] Being right early converts the firm. Your track record is the currency here, not this quarter’s P&L. What do you tell them?',
+        choices: [
+            // PROSE: coordinator
+            { label: '[P] Make the case', desc: '[P] Convert the CIO; high F turns the fund’s book into a race-relevant flow.', playerFlag: 'made_the_case' },
+            // PROSE: coordinator
+            { label: '[P] Hedge the answer', desc: '[P] Keep your head down; the divergence stays your problem.' },
+        ],
+    },
+    {
+        id: 'firm_conversion_verdict',
+        category: 'conversion',
+        popup: true,
+        magnitude: 'major',
+        // PROSE: coordinator. Act III: conversion (amplifier) or ejection.
+        headline: '[P] The verdict: conversion or ejection. If converted, the CIO becomes your amplifier and the book becomes a lever on the race itself.',
+        params: {},
+        choices: [
+            // PROSE: coordinator
+            { label: '[P] Acknowledge', desc: '[P] The relationship resolves. The desk’s reach just changed.' },
+        ],
+    },
 ];

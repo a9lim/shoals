@@ -62,6 +62,20 @@ export function createWorldState() {
             leakCount:         0,
             lobbyingExposed:   false,
         },
+        // AI-policy domain (overhaul phase 5a; 07-migration). The slim narrative-
+        // facing state the new arcs read via event `when` guards. Export-control
+        // politics + the treaty track + the wonders track live here; controlRegime
+        // and reportingRegime are READ-ONLY MIRRORS of race-state (main.js writes
+        // them each day from raceState -- race-state.js stays the sole authority,
+        // this exists so event guards can read the regime without a race handle).
+        // The five race dials (C/S/heat/B/F) stay on raceState, never mirrored here.
+        ai: {
+            exportControlStage: 0,      // 0 none .. 3 total chip embargo (china-arc lobbying)
+            treatyStage:        0,      // 0 dormant, 1 talks, 2 framework, 3 signed, 4 implemented
+            wonderCount:        0,      // model-designed breakthroughs surfaced (wonders track)
+            controlRegime:      'private',   // MIRROR of race.controlRegime (read-only for guards)
+            reportingRegime:    false,       // MIRROR of race.incidentReporting (read-only for guards)
+        },
     };
 }
 
@@ -116,7 +130,9 @@ const WORLD_STATE_RANGES = {
     'geopolitical.gulfEscalation': { min: 0,   max: 3,   type: 'number' },
     'geopolitical.russianCrisis':     { min: 0,   max: 3,   type: 'number' },
     'geopolitical.straitClosed':        { type: 'boolean' },
-    'geopolitical.taiwanBlockade':      { type: 'boolean' },
+    // geopolitical.taiwanBlockade is RACE-OWNED (strait.js sets it; main.js mirrors
+    // it read-only) -- deliberately NOT whitelisted, so a structured effect cannot
+    // forge the Taiwan blockade. Hormuz's `straitClosed` (Gulf arc) stays writable.
     // fed
     'fed.hikeCycle':                    { type: 'boolean' },
     'fed.cutCycle':                     { type: 'boolean' },
@@ -147,6 +163,14 @@ const WORLD_STATE_RANGES = {
     'factions.farmerLaborSupport':      { min: 0,   max: 100, type: 'number' },
     'factions.mediaTrust':              { min: 0,   max: 100, type: 'number' },
     'factions.fedRelations':            { min: 0,   max: 100, type: 'number' },
+    'factions.safetyNetworkTrust':      { min: 0,   max: 100, type: 'number' },
+    'factions.labRelations':            { min: 0,   max: 100, type: 'number' },
+    // ai-policy domain (phase 5a). controlRegime / reportingRegime are race-owned
+    // MIRRORS -- deliberately NOT whitelisted, so structured effects cannot forge
+    // the regime (race-state.js stays the sole authority).
+    'ai.exportControlStage':            { min: 0,   max: 3,   type: 'number' },
+    'ai.treatyStage':                   { min: 0,   max: 4,   type: 'number' },
+    'ai.wonderCount':                   { min: 0,   max: 100, type: 'number' },
 };
 
 // -- Apply structured effects from LLM -----------------------------------

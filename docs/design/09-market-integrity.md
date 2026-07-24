@@ -59,7 +59,15 @@ fallbackValue}`.
   owns the staffing, the math plays straight) → `fallbackValue`
   (nationalized/classified). Every dispute has `disputeDeadline`;
   expiry without ruling triggers the fallback automatically. No
-  indefinite limbo.
+  indefinite limbo. Ruled at the phase-5a gate: **a timely ruling is
+  terminal and settles the contract at ruling time** — synchronously,
+  the same consequence-bundle philosophy as `setControlRegime` — so
+  no later regime fallback can override it; **post-deadline rulings
+  are void** (the deadline fallback is contractual, not a default the
+  adjudicator can beat by ruling late); and the adjudicator is
+  **resolved from the current regime at ruling/settlement time**, not
+  snapshotted at dispute-open — succession applies to disputes
+  already in flight.
 - **The R5 contract settles on terminal resolution, never mid-run
   certification** (ruled 2026-07-23, phase 3a): no auditor certifies
   takeoff — a world that would is not a world that keeps markets. Its

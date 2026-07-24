@@ -30,6 +30,7 @@ import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
 import { consensus, getBinaryQuote, contractByKey, BINARY_NOTIONAL } from './race/consensus.js';
 import { computeMarket, COMPUTE_MULTIPLIER, isComputeTradeable } from './race/compute-market.js';
+import { settleClaims } from './race/belief.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -1296,7 +1297,7 @@ export function executeBinaryTrade(key, side, qty) {
     const contract = contractByKey(key);
     if (!contract) return null;
     const quote = getBinaryQuote(key);
-    if (!quote || quote.settled || quote.frozen || quote.pending) return null;   // settled/frozen/pending -> not tradeable
+    if (!quote || quote.settled || quote.frozen || quote.pending || quote.disputed) return null;   // settled/frozen/pending/disputed -> not tradeable
 
     const fill = (side === 'long' ? quote.ask : quote.bid) * BINARY_NOTIONAL;   // per-unit $, [0, notional]
     const signedQty = side === 'long' ? qty : -qty;
@@ -1416,6 +1417,42 @@ export function settleBinaries(settlements) {
         }
     }
     return results;
+}
+
+/**
+ * The ONE shared consequence helper for Consensus settlement rows (R2/R3). Every
+ * path that settles a milestone -- the daily settlement pass, the durable-outbox
+ * drain, and the synchronous dispute-ruling hook -- routes its rows through here,
+ * so no milestone can be paid without also SCORING credibility, and no row can be
+ * double-applied. EXACTLY-ONCE by each row's `_consumed` flag (rows without the
+ * flag -- the daily computeBinarySettlements rows -- are always fresh and applied
+ * once). Applies, in order:
+ *   1. `_consumed` marking (before any effect, so a re-entrant / repeat call is a
+ *      no-op that pays nothing and scores nothing).
+ *   2. CASH via settleBinaries (PENDING_CLOSEOUT markers, payoutPerUnit null, carry
+ *      no cash and stay open).
+ *   3. CREDIBILITY: every matured YES/NO milestone scores against the player's
+ *      locked forecast (traded or not) -- the phase-4 contract.
+ * Narrative (toasts / dispute shells) is layered by the caller (main.js) off the
+ * returned `{ fresh, cashResults, matured }`. DOM-free / headless.
+ *
+ * @param {Array} rows  settleBinaries-shaped rows (from computeBinarySettlements,
+ *                      consensus.pendingRows, or ruleDispute).
+ */
+export function applyBinarySettlementRows(rows) {
+    const fresh = [];
+    for (const r of (rows || [])) {
+        if (r && !r._consumed) { r._consumed = true; fresh.push(r); }   // mark BEFORE applying (exactly-once)
+    }
+    if (fresh.length === 0) return { fresh, cashResults: [], matured: [] };
+    const cashRows = fresh.filter(r => r.payoutPerUnit != null);        // PENDING markers carry no cash
+    const cashResults = settleBinaries(cashRows);
+    // Every matured YES/NO milestone scores credibility, position or not.
+    const matured = fresh
+        .filter(r => r.outcome === 'YES' || r.outcome === 'NO')
+        .map(r => ({ rung: r.contract.predicate.rung, outcome: r.outcome === 'YES' ? 1 : 0 }));
+    if (matured.length) settleClaims(matured);
+    return { fresh, cashResults, matured };
 }
 
 // ---------------------------------------------------------------------------
