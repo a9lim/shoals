@@ -9,6 +9,8 @@ import {
     INITIAL_CAPITAL,
     MAINTENANCE_MARGIN,
     VXHCN_MAINTENANCE_MARGIN,
+    COMPUTE_MAINTENANCE_MARGIN,
+    COMPUTE_SPREAD_VOL,
     REG_T_MARGIN,
     SHORT_OPTION_MARGIN_PCT,
     BOND_FACE_VALUE,
@@ -27,6 +29,7 @@ let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
 import { consensus, getBinaryQuote, contractByKey, BINARY_NOTIONAL } from './race/consensus.js';
+import { computeMarket, COMPUTE_MULTIPLIER, isComputeTradeable } from './race/compute-market.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -121,6 +124,10 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
     } else if (type === 'vxhcnfuture') {
         const fillCost = recordVxhcnTrade(signedQty, currentVol);
         return Math.max(0.01, spreadFill + fillCost);
+    } else if (type === 'computefuture') {
+        // Compute futures carry no per-instrument impact pool (the index is a
+        // public-state process, not an order-flow book) -- spread only.
+        return Math.max(0.01, spreadFill);
     } else if (type === 'stock') {
         const fillCost = recordStockTrade(signedQty, currentVol);
         return Math.max(0.01, spreadFill + fillCost);
@@ -172,6 +179,7 @@ export function computeNetDelta() {
         if (p.type === 'stock') { net += p.qty; continue; }
         if (p.type === 'bond')  continue;
         if (p.type === 'binary') continue;   // binaries carry no delta
+        if (p.type === 'computefuture') continue;   // compute futures carry no delta (public-index process)
         const sv = _optionSigma(p);
         if (!sv) continue;
         _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
@@ -187,6 +195,7 @@ export function computeGrossNotional() {
         if (p.type === 'stock') { gross += Math.abs(p.qty) * market.S; continue; }
         if (p.type === 'bond')  continue;
         if (p.type === 'binary') continue;   // binaries carry no delta/notional here
+        if (p.type === 'computefuture') continue;   // compute futures: no delta/gross-notional (like VXHCN futures)
         const sv = _optionSigma(p);
         if (!sv) continue;
         _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
@@ -239,6 +248,10 @@ function _marginForShort(type, qty, fillPrice, currentPrice, currentVol, current
         case 'vxhcnfuture':
             return REG_T_MARGIN * fillPrice * qty;
 
+        case 'computefuture':
+            // Reg-T initial margin, mirroring VXHCN futures.
+            return REG_T_MARGIN * fillPrice * qty;
+
         case 'call':
         case 'put': {
             // Short option margin: max(SHORT_OPTION_MARGIN_PCT * underlying value, premium received)
@@ -261,6 +274,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
         return Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
     }
     if (type === 'vxhcnfuture') return VXHCN_MAINTENANCE_MARGIN * mid * absQty;
+    if (type === 'computefuture') return COMPUTE_MAINTENANCE_MARGIN * mid * absQty;
     return MAINTENANCE_MARGIN * mid * absQty;
 }
 
@@ -280,11 +294,19 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
  * @param {number} [skipIdx]       - Index in portfolio.positions to exclude
  *                                   (used when extending existing short, to
  *                                    avoid double-counting the old position)
+ * @param {number} [proposedReserved] - Reserved collateral the proposed short
+ *                                   will hold (old + new when extending). Must be
+ *                                   included so prospective equity matches the
+ *                                   canonical portfolioValue (which counts every
+ *                                   position's _reservedMargin). Passed for
+ *                                   compute futures (09/3a canonical-equity rule);
+ *                                   0 preserves the existing behavior for other
+ *                                   short types.
  * @returns {boolean} true if the trade is safe
  */
 function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                             currentPrice, currentVol, currentRate, currentDay,
-                            skipIdx, q) {
+                            skipIdx, q, proposedReserved = 0) {
     let equity = portfolio.cash + cashDelta;
     let required = shortMaintenance;
 
@@ -303,14 +325,18 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                 required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
             } else if (pos.type === 'vxhcnfuture') {
                 required += VXHCN_MAINTENANCE_MARGIN * mid * absQty;
+            } else if (pos.type === 'computefuture') {
+                required += COMPUTE_MAINTENANCE_MARGIN * mid * absQty;
             } else {
                 required += MAINTENANCE_MARGIN * mid * absQty;
             }
         }
     }
 
-    // Add the proposed short position's MTM to equity
-    equity += shortMtm;
+    // Add the proposed short position's MTM to equity, plus its reserved
+    // collateral (the player's own sequestered cash -- canonical portfolioValue
+    // counts it, so the admission decision must too).
+    equity += shortMtm + proposedReserved;
 
     required *= getRegulationEffect('marginMult', 1) / capitalMultiplier();
     return equity >= required;
@@ -345,6 +371,9 @@ export function executeMarketOrder(
     strike, expiryDay, strategyName, q
 ) {
     if (portfolio.restricted) return null;   // account restricted -> no order entry
+    // Compute-future lifecycle gate: only an active/listed/open/unfrozen/unsettled
+    // contract is tradeable (rejects fabricated + settled keys and a frozen book).
+    if (type === 'computefuture' && !isComputeTradeable(strike)) return null;
     if (side === 'short' && type === 'stock' && getRegulationEffect('shortStockDisabled', false)) {
         if (typeof showToast !== 'undefined') showToast('Short stock sales currently banned by regulation.', 3000);
         return null;
@@ -356,7 +385,8 @@ export function executeMarketOrder(
     portfolio.totalTrades++;
 
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-    const spreadVol = type === 'bond' ? market.sigmaR : type === 'vxhcnfuture' ? market.xi : currentVol;
+    const spreadVol = type === 'bond' ? market.sigmaR : type === 'vxhcnfuture' ? market.xi
+        : type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
     const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, spreadVol, expiryDay || 0, currentDay);
 
     // Find existing position of same type+strike+expiry+strategy for netting
@@ -402,7 +432,8 @@ export function executeMarketOrder(
                 // Post-trade margin check (skip existing long being closed)
                 const shortMtm = -openingShortQty * mid;
                 const shortMaint = _maintenanceForShort(type, openingShortQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-                if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx, q)) return null;
+                const propRes = type === 'computefuture' ? margin : 0;
+                if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx, q, propRes)) return null;
             }
 
         } else if (oldQty < 0 && signedQty > 0) {
@@ -448,7 +479,9 @@ export function executeMarketOrder(
             const totalAbsQty = Math.abs(oldQty) + absQty;
             const combinedMtm = -totalAbsQty * mid;
             const combinedMaint = _maintenanceForShort(type, totalAbsQty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-            if (!_postTradeMarginOk(cashDelta, combinedMtm, combinedMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx, q)) return null;
+            // Combined reserved = old (skipped in the loop) + new proposed piece.
+            const propRes = type === 'computefuture' ? ((existing._reservedMargin || 0) + margin) : 0;
+            if (!_postTradeMarginOk(cashDelta, combinedMtm, combinedMaint, currentPrice, currentVol, currentRate, currentDay, existingIdx, q, propRes)) return null;
             existing._reservedMargin = (existing._reservedMargin || 0) + margin;
         }
 
@@ -472,6 +505,14 @@ export function executeMarketOrder(
                 portfolio.closedBorrowCost += existing.borrowCost;
                 existing.borrowCost = 0;
             }
+        } else if (type === 'computefuture' && Math.sign(oldQty) === Math.sign(signedQty)) {
+            // Same-direction extend: compute futures carry a volume-weighted-average
+            // entry basis so settlement cash AND reported P&L derive from the same
+            // basis -- money conserves under multi-fill by construction (09 compute
+            // row). Flips are re-stamped above; partial reduces keep their basis;
+            // closes are removed. This basis rule is scoped to compute futures --
+            // the chassis convention for other position types is unchanged.
+            existing.entryPrice = (existing.entryPrice * Math.abs(oldQty) + fill * Math.abs(signedQty)) / Math.abs(newQty);
         }
         existing.qty = newQty;
         existing.fillPrice = fill;
@@ -507,7 +548,8 @@ export function executeMarketOrder(
         // Verify post-trade equity exceeds maintenance margin
         const shortMtm = -qty * mid;
         const shortMaint = _maintenanceForShort(type, qty, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-        if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, undefined, q)) return null;
+        const propRes = type === 'computefuture' ? margin : 0;
+        if (!_postTradeMarginOk(cashDelta, shortMtm, shortMaint, currentPrice, currentVol, currentRate, currentDay, undefined, q, propRes)) return null;
     }
 
     portfolio.cash += cashDelta;
@@ -700,9 +742,17 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
         return executeBinaryTrade(pos.strike, side, Math.abs(pos.qty)) != null;
     }
 
+    // A frozen/settled compute future cannot be flattened (mobilized decree
+    // conversion / halted book) -- reported as stuck by liquidateAll, never a
+    // fictional fill (09). It clears when the decree conversion settles it.
+    if (pos.type === 'computefuture' && (computeMarket.frozen || computeMarket.settled[pos.strike])) {
+        return false;
+    }
+
     const absQty = Math.abs(pos.qty);
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
-    const spreadVol = pos.type === 'bond' ? market.sigmaR : pos.type === 'vxhcnfuture' ? market.xi : currentVol;
+    const spreadVol = pos.type === 'bond' ? market.sigmaR : pos.type === 'vxhcnfuture' ? market.xi
+        : pos.type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
 
     if (pos.qty > 0) {
         const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay);
@@ -1037,6 +1087,8 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
             total += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
         } else if (pos.type === 'vxhcnfuture') {
             total += VXHCN_MAINTENANCE_MARGIN * mid * absQty;
+        } else if (pos.type === 'computefuture') {
+            total += COMPUTE_MAINTENANCE_MARGIN * mid * absQty;
         } else {
             total += MAINTENANCE_MARGIN * mid * absQty;
         }
@@ -1079,6 +1131,8 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
                 required += Math.max(SHORT_OPTION_MARGIN_PCT * currentPrice * absQty, mid * absQty);
             } else if (pos.type === 'vxhcnfuture') {
                 required += VXHCN_MAINTENANCE_MARGIN * mid * absQty;
+            } else if (pos.type === 'computefuture') {
+                required += COMPUTE_MAINTENANCE_MARGIN * mid * absQty;
             } else {
                 required += MAINTENANCE_MARGIN * mid * absQty;
             }
@@ -1358,6 +1412,67 @@ export function settleBinaries(settlements) {
             }
             portfolio.cash += cashChange;
             results.push({ key: s.key, label: s.label, outcome: s.outcome, qty: pos.qty, payout, pnl });
+            portfolio.positions.splice(i, 1);
+        }
+    }
+    return results;
+}
+
+// ---------------------------------------------------------------------------
+// Compute futures settlement (overhaul phase 3b)
+// ---------------------------------------------------------------------------
+//
+// Compute futures TRADE through executeMarketOrder (the same chokepoints /
+// restriction guard / netting / Reg-T-short mechanics as VXHCN futures), but
+// SETTLE event-driven through this op -- ordinary maturity settlement, the
+// blockade force-majeure adjustment (folded into the settle price by the curve),
+// and mobilized decree conversion -- so processExpiry never touches them (a
+// compute future falls through processExpiry's type checks, like a binary).
+//
+// The cash mechanics MIRROR the VXHCN-future expiry path exactly, parameterized
+// by the settlement price: a long receives settlePrice x |qty|; a short returns
+// its Reg-T collateral and pays settlePrice x |qty|. The realized P&L therefore
+// equals signedQty × COMPUTE_MULTIPLIER × (settlePrice − entryBasis) with shorts
+// symmetric -- the exact 09 decree-closeout formula when settlePrice is the
+// decree price (COMPUTE_MULTIPLIER is 1, folded into the direct settlement).
+//
+// entryBasis NETTING NOTE: compute futures DEVIATE from the chassis first-entry
+// convention -- `entryPrice` is maintained as the volume-weighted average fill
+// price on same-direction extends (re-stamped on a flip past zero, kept on
+// partial reduces). Ruled phase 3b, recorded in 09: formula-priced closeout pays
+// off entryBasis directly, so only a VWAP basis conserves cash under multi-fill.
+// Stock / bond / VXHCN-future keep first-entry basis -- they close through
+// market fills, where cash conserves regardless of the display basis.
+
+/**
+ * Cash-settle the player's compute-future positions for a batch of settlements
+ * from compute-market.js (computeFutureSettlements). Each settlement carries a
+ * quote-independent `settlePrice` (index points): the maturity index for
+ * ORDINARY / FORCE_MAJEURE, the decree price for DECREE -- identical for every
+ * holder, never dependent on cost basis (09 invariant 4). Settled positions are
+ * removed. Returns per-position result rows { key, kind, qty, settlePrice, pnl }.
+ */
+export function settleComputeFutures(settlements, race) {
+    const results = [];
+    for (const s of settlements) {
+        for (let i = portfolio.positions.length - 1; i >= 0; i--) {
+            const pos = portfolio.positions[i];
+            if (pos.type !== 'computefuture' || pos.strike !== s.key) continue;
+            const absQty = Math.abs(pos.qty);
+            const settleVal = s.settlePrice * COMPUTE_MULTIPLIER * absQty;
+            const basis = pos.entryPrice * COMPUTE_MULTIPLIER * absQty;
+            let cashChange, pnl;
+            if (pos.qty > 0) {
+                cashChange = settleVal;             // long receives the marked value (prepaid at entry)
+                pnl = settleVal - basis;            // = +qty × mult × (settlePrice − entryBasis)
+            } else {
+                const reserved = pos._reservedMargin ?? _marginForShort(
+                    'computefuture', absQty, pos.entryPrice, 0, 0, 0, 0, pos.strike, pos.expiryDay);
+                cashChange = reserved - settleVal;  // return Reg-T collateral, pay the marked value
+                pnl = basis - settleVal;            // = −qty × mult × (settlePrice − entryBasis) (symmetric)
+            }
+            portfolio.cash += cashChange;
+            results.push({ key: s.key, kind: s.kind, qty: pos.qty, settlePrice: s.settlePrice, pnl });
             portfolio.positions.splice(i, 1);
         }
     }

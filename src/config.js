@@ -22,6 +22,13 @@ export const EXPIRY_COUNT = 8;      // number of active expiry dates
 export const INITIAL_CAPITAL = 10000;
 export const MAINTENANCE_MARGIN = 0.25;
 export const VXHCN_MAINTENANCE_MARGIN = 0.30; // higher for VX futures (vol-of-vol risk)
+// Ratified (02a phase-3b block): compute-future margins mirror the VXHCN-future
+// convention (Reg-T initial for shorts); maintenance a touch higher than VXHCN
+// for the strait tail-jump risk. COMPUTE_SPREAD_VOL feeds the stock/bond spread
+// model in _fillPrice (compute futures have no vol of their own; illiquid ->
+// wider spread; spread-only fills, no impact pool).
+export const COMPUTE_MAINTENANCE_MARGIN = 0.35;
+export const COMPUTE_SPREAD_VOL = 3.0;
 export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
 

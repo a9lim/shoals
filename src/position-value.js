@@ -11,13 +11,14 @@ import { TRADING_DAYS_PER_YEAR, BOND_FACE_VALUE } from './config.js';
 import { getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact } from './price-impact.js';
 import { market } from './market.js';
 import { getBinaryMark, BINARY_NOTIONAL } from './race/consensus.js';
+import { getComputeMark } from './race/compute-market.js';
 
 let _tree = null;
 
 /**
  * Compute the fair (mid) unit price for a single unit of an instrument.
  *
- * @param {string} type       - 'stock'|'bond'|'vxhcnfuture'|'binary'|'call'|'put'
+ * @param {string} type       - 'stock'|'bond'|'vxhcnfuture'|'computefuture'|'binary'|'call'|'put'
  * @param {number} S          - Current spot price
  * @param {number} vol        - Current implied volatility (annualized)
  * @param {number} rate       - Current risk-free rate
@@ -42,6 +43,13 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
         case 'vxhcnfuture': {
             const futPrice = computeVXHCNFuturePrice(market.v, market.kappa, market.theta, market.xi, dte);
             return futPrice + getVxhcnImpact(market.xi);
+        }
+        case 'computefuture': {
+            // Compute future. Mark = the public compute-index curve at this
+            // maturity (compute-market.js); `strike` carries the maturity key.
+            // Driven ONLY by public state (release/cert/strait), never a CRR tree
+            // or the Heston process -- no greeks, no per-instrument impact pool.
+            return getComputeMark(strike);
         }
         case 'binary': {
             // Consensus milestone binary. Mark = quote mid (probability, [0,1])

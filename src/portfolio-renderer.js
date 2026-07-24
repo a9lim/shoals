@@ -22,19 +22,37 @@ function _computeMarginDisplay(equity, required) {
 }
 
 // ---------------------------------------------------------------------------
+// positionLabel (pure; DTE display source)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build a position-row label. Single source of truth for both the initial render
+ * and the daily in-place update, so the DTE clock can't diverge between them.
+ * Compute futures carry a RACE-clock `expiryDay`; subtracting the sim `day` would
+ * print a nonsense DTE, so it is omitted for them (the maturity lives in the
+ * compute panel, shown against raceState.day). All other instruments are
+ * sim-clock. Exported for headless display-source testing.
+ */
+export function positionLabel(pos, day) {
+    const absQty    = Math.abs(pos.qty);
+    const typeLabel = posTypeLabel(pos.type, pos.qty);
+    const isOption  = pos.type === 'call' || pos.type === 'put';
+    const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
+    const expiryStr = (pos.expiryDay != null && pos.type !== 'computefuture') ? ' ' + fmtDte(pos.expiryDay - day) : '';
+    return typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
+}
+
+// ---------------------------------------------------------------------------
 // _buildPositionRow
 // ---------------------------------------------------------------------------
 
 function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
     const absQty     = Math.abs(pos.qty);
-    const typeLabel  = posTypeLabel(pos.type, pos.qty);
     const pnl        = computePositionPnl(pos, currentPrice, vol, rate, day, q);
     const value      = computePositionValue(pos, currentPrice, vol, rate, day, q);
     const entryTotal = pos.entryPrice * absQty;
     const isOption   = pos.type === 'call' || pos.type === 'put';
-    const strikeStr  = isOption && pos.strike != null ? ' K' + pos.strike : '';
-    const expiryStr  = pos.expiryDay != null ? ' ' + fmtDte(pos.expiryDay - day) : '';
-    const labelStr   = typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
+    const labelStr   = positionLabel(pos, day);
 
     const row = document.createElement('div');
     row.className = 'data-row pos-row stat-row';
@@ -216,13 +234,8 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
                 pnlEl.textContent = fmtDollar(pnl);
                 pnlEl.className = 'pos-pnl stat-value ' + pnlClass(pnl);
             }
-            // Update label (DTE changes each day)
-            const absQty = Math.abs(pos.qty);
-            const typeLabel = posTypeLabel(pos.type, pos.qty);
-            const isOption = pos.type === 'call' || pos.type === 'put';
-            const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
-            const expiryStr = pos.expiryDay != null ? ' ' + fmtDte(pos.expiryDay - day) : '';
-            const labelStr = typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
+            // Update label (DTE changes each day) -- shared source of truth.
+            const labelStr = positionLabel(pos, day);
             const labelEl = existing.querySelector('.pos-label');
             if (labelEl) labelEl.textContent = labelStr;
         } else {

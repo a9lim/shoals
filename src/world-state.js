@@ -28,6 +28,7 @@ export function createWorldState() {
             gulfEscalation: 0,
             russianCrisis:     0,
             straitClosed:              false,
+            taiwanBlockade:            false,
             energyCrisis:               false,
         },
         fed: {
@@ -115,6 +116,7 @@ const WORLD_STATE_RANGES = {
     'geopolitical.gulfEscalation': { min: 0,   max: 3,   type: 'number' },
     'geopolitical.russianCrisis':     { min: 0,   max: 3,   type: 'number' },
     'geopolitical.straitClosed':        { type: 'boolean' },
+    'geopolitical.taiwanBlockade':      { type: 'boolean' },
     // fed
     'fed.hikeCycle':                    { type: 'boolean' },
     'fed.cutCycle':                     { type: 'boolean' },

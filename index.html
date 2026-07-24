@@ -340,9 +340,9 @@
                         </select>
                         <table class="chain-tbl" id="stock-bond-table">
                             <thead><tr>
-                                <th class="chain-th">Stock</th>
+                                <th class="chain-th">HCN</th>
                                 <th class="chain-th">Bond</th>
-                                <th class="chain-th">VX</th>
+                                <th class="chain-th">VXHCN</th>
                             </tr></thead>
                             <tbody><tr>
                                 <td class="chain-cell" id="stock-price-cell" role="button" tabindex="0">—</td>
@@ -377,6 +377,19 @@
                                 <tbody id="consensus-tbody"></tbody>
                             </table>
                             <p class="panel-hint">Left-click: buy YES &middot; Right-click: sell YES</p>
+                        </div>
+                        <div id="compute-section" class="stat-group hidden">
+                            <div class="group-label">Compute Futures</div>
+                            <table class="chain-tbl" id="compute-table">
+                                <thead><tr>
+                                    <th class="chain-th">Maturity</th>
+                                    <th class="chain-th">Curve</th>
+                                    <th class="chain-th">Pos</th>
+                                    <th class="chain-th">DTE</th>
+                                </tr></thead>
+                                <tbody id="compute-tbody"></tbody>
+                            </table>
+                            <p class="panel-hint">Left-click: buy &middot; Right-click: sell/short</p>
                         </div>
                     </div>
                 </div>
@@ -468,9 +481,9 @@
                         </select>
                         <table class="chain-tbl" id="strategy-stock-bond-table">
                             <thead><tr>
-                                <th class="chain-th">Stock</th>
+                                <th class="chain-th">HCN</th>
                                 <th class="chain-th">Bond</th>
-                                <th class="chain-th">VX</th>
+                                <th class="chain-th">VXHCN</th>
                             </tr></thead>
                             <tbody><tr>
                                 <td class="chain-cell" id="strategy-stock-cell" role="button" tabindex="0">&mdash;</td>
@@ -538,8 +551,8 @@
                         <canvas class="sparkline rate-sparkline" id="rate-sparkline" width="280" height="40"></canvas>
                         <div class="stat-row">
                             <span class="stat-label-wrap">
-                                <span class="stat-label">VX</span>
-                                <button class="info-trigger" type="button" data-info="vxhcn" aria-label="Info: VX">?</button>
+                                <span class="stat-label">VXHCN</span>
+                                <button class="info-trigger" type="button" data-info="vxhcn" aria-label="Info: VXHCN">?</button>
                             </span>
                             <span class="stat-value" id="vxhcn-display">0.00</span>
                         </div>

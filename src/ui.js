@@ -164,6 +164,8 @@ export function cacheDOMElements($) {
     $.standingsFactions  = document.getElementById('standings-factions');
     $.consensusSection   = document.getElementById('consensus-section');
     $.consensusTbody     = document.getElementById('consensus-tbody');
+    $.computeSection     = document.getElementById('compute-section');
+    $.computeTbody       = document.getElementById('compute-tbody');
 }
 
 // ---------------------------------------------------------------------------
@@ -915,6 +917,9 @@ export function updateDynamicSections($, presetIndex) {
     if ($.consensusSection) {
         $.consensusSection.classList.toggle('hidden', !isDynamic);
     }
+    if ($.computeSection) {
+        $.computeSection.classList.toggle('hidden', !isDynamic);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -998,6 +1003,73 @@ export function updateConsensusPanel($, consensus, portfolio, day) {
         const cDte = document.createElement('td');
         cDte.className = 'chain-cell';
         cDte.textContent = st ? 'settled' : pending ? 'pending' : Math.max(0, c.deadline - day) + 'd';
+        row.appendChild(cDte);
+
+        tbody.appendChild(row);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Compute Futures panel (compute-index term structure -- overhaul phase 3b)
+// ---------------------------------------------------------------------------
+
+/**
+ * Render the compute-futures ladder: one row per listed maturity with the curve
+ * mark (or a settled / frozen marker), the player's net position, and days-to-
+ * maturity. Open rows carry a `data-compute-key` for the delegated buy/sell
+ * handler bound in main.js; a frozen (mobilized+) book is non-tradeable.
+ * Dynamic-only; called from updateUI when the compute market is active.
+ */
+export function updateComputePanel($, computeMarket, portfolio, day) {
+    const tbody = $.computeTbody;
+    if (!tbody) return;
+    tbody.textContent = '';
+
+    for (const c of computeMarket.contracts) {
+        const q = computeMarket.quotes[c.key] || {};
+        const settled = computeMarket.settled[c.key];
+        const tradeable = !settled && !q.settled && !q.frozen && !computeMarket.frozen;
+        const pos = portfolio.positions.find(p => p.type === 'computefuture' && p.strike === c.key);
+
+        const row = document.createElement('tr');
+        row.className = 'chain-row compute-row' + (settled ? ' consensus-settled' : '');
+        if (tradeable) row.dataset.computeKey = String(c.key);
+
+        // Maturity (the settlement day -- data label).
+        const cMat = document.createElement('td');
+        cMat.className = 'chain-cell';
+        cMat.textContent = 'Q@' + c.settleDay;
+        row.appendChild(cMat);
+
+        // Curve mark: settled/frozen marker, or the mid index level.
+        const cQuote = document.createElement('td');
+        cQuote.className = 'chain-cell';
+        if (settled) {
+            cQuote.textContent = 'settled';
+        } else if (q.frozen) {
+            cQuote.textContent = 'frozen';
+        } else if (q.mid != null) {
+            cQuote.textContent = q.mid.toFixed(1);
+        } else {
+            cQuote.textContent = '—';
+        }
+        row.appendChild(cQuote);
+
+        // Player net position (signed).
+        const cPos = document.createElement('td');
+        cPos.className = 'chain-cell';
+        if (pos) {
+            cPos.textContent = (pos.qty > 0 ? '+' : '−') + fmtQty(pos.qty);
+            cPos.classList.add(pos.qty > 0 ? 'pnl-up' : 'pnl-down');
+        } else {
+            cPos.textContent = '—';
+        }
+        row.appendChild(cPos);
+
+        // Days-to-maturity.
+        const cDte = document.createElement('td');
+        cDte.className = 'chain-cell';
+        cDte.textContent = Math.max(0, c.settleDay - day) + 'd';
         row.appendChild(cDte);
 
         tbody.appendChild(row);

@@ -39,6 +39,7 @@ import {
     C_MIN, C_MAX, OPEN_MIN, RELEASE_PULL, OPEN_LAG, CERT_RUNGS,
 } from './capability.js';
 import { freezeConsensus, isFreezeRegime } from './consensus.js';
+import { freezeComputeMarket } from './compute-market.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
@@ -292,7 +293,13 @@ export function setControlRegime(race, regime) {
     const cur = REGIME_RANK[race.controlRegime] ?? 0;
     if (REGIME_RANK[regime] < cur) return false;   // backward -> ignore, never unfreeze
     race.controlRegime = regime;
-    if (isFreezeRegime(regime)) freezeConsensus();
+    if (isFreezeRegime(regime)) {
+        freezeConsensus();
+        // Same canonical path freezes compute-futures trading + arms decree
+        // conversion (and, at the nationalization trigger, freezes the HCN
+        // nationalization reference). Never a second regime path.
+        freezeComputeMarket(race, regime);
+    }
     return true;
 }
 

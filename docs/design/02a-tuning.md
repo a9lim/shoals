@@ -186,6 +186,48 @@ its adjudication path activates when a dispute event class exists
 placeholder until `B` lands (phase 4) and are deliberately not
 recorded here.
 
+## Compute futures (phase-3b ratifications, 2026-07-23)
+
+`COMPUTE_INDEX_BASE = 100` (shares the bond-face/binary-notional
+display scale); rolling four-maturity quarterly ladder; Reg-T shorts
+with `COMPUTE_MAINTENANCE_MARGIN = 0.35`; fills are spread-only
+(`COMPUTE_SPREAD_VOL = 3.0`, no impact pool — allocation-quarter
+contracts don't trade through the equity impact book; P4 may
+revisit). Curve **structure** is ratified: demand uplift from public
+release count + certified rung + secular trend; scramble
+backwardation (near rich, saturating far); standing strait premium as
+a *pure tail* — zero at spot, saturating with maturity — so
+geography is priced only where geography bites. Curve **magnitudes**
+(the demand coefficients, scramble depth, standing-tail size, spread
+width, tension weights) are the P4-swappable placeholder quoter,
+deliberately unrecorded here — same stance as the binary quote
+magnitudes above.
+
+Blockade: the far-curve band **[0.40, 0.80]** is verbatim from the
+Strait block; the near end carries **half** the blockade adjustment
+(`BLOCKADE_NEAR_FRAC = 0.5`) so a contract settling *during* a
+blockade settles force-majeure-priced, never at a pre-blockade free
+pass.
+
+**Two straits, two flags** (ruled 2026-07-23): the compute market's
+blockade condition is `geopolitical.taiwanBlockade` (Hsinchu — the
+fabs), a new field distinct from the Gulf arc's `straitClosed`
+(Hormuz — oil), which survives from the prototype and must never
+touch the compute curve. `taiwanBlockade` stays dormant until P5
+wires the strait generator (gray-zone/blockade events per the Strait
+block above); until then the force-majeure path is harness-exercised
+only, exactly like the `controlRegime` transitions. Strait tension is
+read off the China proxies (`chinaRelations`, `tradeWarStage`).
+
+**Decree ≠ nationalization reference** (ruled 2026-07-23): the
+compute-future decree closeout uses the contract's *own listed
+multiplier* (= 1 at listing) over the formulas enumerated at listing,
+per [09](09-market-integrity.md). The U[0.60, 1.15] conversion
+multiple and the 20-session median belong solely to **HCN share
+conversion**; phase 3b builds that reference as seed-persisted state
+(drawn once at race creation from the `nationalization` substream)
+for the endings phase to consume — the two multipliers never mix.
+
 ## Market coupling
 
 η, pre-price, impact, and `B`-update magnitudes as rev 1, with two

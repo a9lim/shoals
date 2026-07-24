@@ -15,7 +15,7 @@ import {
     executeMarketOrder, closePosition, exerciseOption,
     liquidateAll, placePendingOrder, cancelOrder, cancelAllOrders,
     computeNetDelta, computeGrossNotional, portfolioValue,
-    executeBinaryTrade, settleBinaries,
+    executeBinaryTrade, settleBinaries, settleComputeFutures,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -27,7 +27,7 @@ import {
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams, updateStandings,
-    updateConsensusPanel,
+    updateConsensusPanel, updateComputePanel,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
     showPopupEvent,
@@ -78,6 +78,10 @@ import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements,
 } from './src/race/consensus.js';
+import {
+    computeMarket, initComputeMarket, resetComputeMarket, deactivateComputeMarket,
+    refreshComputeQuotes, computeFutureSettlements, stepNationalizationRef,
+} from './src/race/compute-market.js';
 
 
 // ---------------------------------------------------------------------------
@@ -548,6 +552,21 @@ function init() {
         });
     }
 
+    // Compute-futures panel: delegated buy (left) / sell-short (right) on the
+    // maturity rows. Bound once on the stable tbody (rows rebuilt each render).
+    if ($.computeTbody) {
+        $.computeTbody.addEventListener('click', (e) => {
+            const row = e.target.closest('[data-compute-key]');
+            if (row) handleComputeTrade(parseInt(row.dataset.computeKey, 10), 'long');
+        });
+        $.computeTbody.addEventListener('contextmenu', (e) => {
+            const row = e.target.closest('[data-compute-key]');
+            if (!row) return;
+            e.preventDefault();
+            handleComputeTrade(parseInt(row.dataset.computeKey, 10), 'short');
+        });
+    }
+
     document.addEventListener('shoals:unwindStrategy', (e) => {
         const name = e.detail && e.detail.name;
         if (!name) return;
@@ -620,8 +639,11 @@ function init() {
         raceState = createRaceState();
         // Consensus milestone binaries (overhaul phase 3a): list contracts + prime quotes.
         initConsensus(raceState);
+        // Compute-futures term structure (overhaul phase 3b): list ladder + prime curve.
+        initComputeMarket(raceState, eventEngine.world.geopolitical);
     } else {
         deactivateConsensus();
+        deactivateComputeMarket();
     }
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
@@ -1248,13 +1270,18 @@ function _applyRestriction(stuck, closedBefore) {
     }
 }
 
-/** True if any open position cannot currently be flattened (frozen/pending/settled binary leg). */
+/** True if any open position cannot currently be flattened (frozen/pending/settled
+ *  binary leg, or a frozen/settled compute future under decree conversion). */
 function _hasStuckLegs() {
-    if (!consensus.active) return false;
     for (const p of portfolio.positions) {
-        if (p.type !== 'binary') continue;
-        const q = consensus.quotes[p.strike];
-        if (consensus.frozen || !q || q.settled || q.pending || q.frozen) return true;
+        if (p.type === 'binary') {
+            if (!consensus.active) continue;
+            const q = consensus.quotes[p.strike];
+            if (consensus.frozen || !q || q.settled || q.pending || q.frozen) return true;
+        } else if (p.type === 'computefuture') {
+            if (!computeMarket.active) continue;
+            if (computeMarket.frozen || computeMarket.settled[p.strike]) return true;
+        }
     }
     return false;
 }
@@ -1401,6 +1428,24 @@ function _onDayComplete() {
             }
         }
         refreshBinaryQuotes(raceState);
+
+        // Compute futures (overhaul phase 3b): feed the nationalization reference
+        // with today's HCN exchange settlement mark (the authoritative process
+        // price sim.S -- impact never touches it), settle any matured / decreed /
+        // force-majeure contracts off the public compute index + strait state, then
+        // refresh the curve. `geo` (world-state geopolitical) is present whenever
+        // raceState is (both are Dynamic-only).
+        const _geo = eventEngine ? eventEngine.world.geopolitical : null;
+        stepNationalizationRef(raceState, sim.S);
+        const cSettlements = computeFutureSettlements(raceState, _geo);
+        if (cSettlements.length) {
+            const cSettled = settleComputeFutures(cSettlements, raceState);
+            for (const r of cSettled) {
+                _toast('Compute Q@' + r.key + ' ' + r.kind.toLowerCase().replace('_', ' ')
+                    + ' — P&L ' + fmtDollar(r.pnl), 4500);
+            }
+        }
+        refreshComputeQuotes(raceState, _geo);
     }
 
     // Trading-restriction release: lifts once no un-flattenable (stuck) legs
@@ -1677,6 +1722,7 @@ function updateUI(precomputedMargin) {
     updateRateDisplay($, sim.r, rateHistory);
     updateVxhcnDisplay($, market.vxhcn, vxhcnHistory);
     if (raceState && consensus.active) updateConsensusPanel($, consensus, portfolio, raceState.day);
+    if (raceState && computeMarket.active) updateComputePanel($, computeMarket, portfolio, raceState.day);
     refreshTooltip();
     if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
         _updateTradeCreditDebit();
@@ -1916,10 +1962,13 @@ function loadPreset(index) {
         raceState = createRaceState();
         // Consensus milestone binaries (overhaul phase 3a).
         initConsensus(raceState);
+        // Compute-futures term structure (overhaul phase 3b).
+        initComputeMarket(raceState, eventEngine.world.geopolitical);
     } else {
         eventEngine = null;
         raceState = null;
         deactivateConsensus();
+        deactivateComputeMarket();
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
@@ -1940,7 +1989,11 @@ function resetSim() {
     // Reset the hidden AI-race state in place with a fresh per-run seed (a new
     // world each reset). Same-preset reset only; mode changes create/null it in
     // loadPreset -- so no discarded-seed draws. Null in Classic, untouched.
-    if (raceState) { resetRaceState(raceState); resetConsensus(raceState); }
+    if (raceState) {
+        resetRaceState(raceState);
+        resetConsensus(raceState);
+        resetComputeMarket(raceState, eventEngine ? eventEngine.world.geopolitical : null);
+    }
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
@@ -2048,6 +2101,28 @@ function handleBinaryTrade(key, side) {
         _haptic('success');
     } else {
         _toast('Binary trade rejected — insufficient cash or contract closed.');
+        _haptic('error');
+    }
+    updateUI();
+    dirty = true;
+}
+
+// Compute future (overhaul phase 3b): left-click buys, right-click short-sells
+// the maturity at the trade-qty slider size. Routes through executeMarketOrder --
+// the SAME chokepoint / restriction guard / Reg-T-short mechanics as VXHCN
+// futures (no duplicate guards). `key` is both the contract key and the
+// settlement day; unitPrice('computefuture', ...) reads the cached curve mark.
+function handleComputeTrade(key, side) {
+    if (!raceState || !computeMarket.active) return;
+    if (_blockedByRestriction()) return;
+    const qty = _getTradeQty();
+    const vol = market.sigma;
+    const pos = executeMarketOrder(sim, 'computefuture', side, qty, sim.S, vol, sim.r, sim.day, key, key, undefined, sim.q);
+    if (pos) {
+        _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k Compute Q@' + key, 2500);
+        _haptic('success');
+    } else {
+        _toast('Compute trade rejected — insufficient margin or book frozen.');
         _haptic('error');
     }
     updateUI();

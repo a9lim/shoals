@@ -54,9 +54,10 @@ export function posTypeLabel(type, sideOrQty) {
     const isShort = typeof sideOrQty === 'number' ? sideOrQty < 0 : sideOrQty === 'short';
     const prefix = isShort ? 'S' : 'L';
     switch (type) {
-        case 'stock':     return prefix + ':STK';
+        case 'stock':     return prefix + ':HCN';
         case 'bond':      return prefix + ':BND';
-        case 'vxhcnfuture': return prefix + ':VX';
+        case 'vxhcnfuture': return prefix + ':VXHCN';
+        case 'computefuture': return prefix + ':CMP';
         case 'call':      return prefix + ':CALL';
         case 'put':       return prefix + ':PUT';
         default:      return type.toUpperCase();
