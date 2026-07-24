@@ -524,6 +524,78 @@ by construction, with no attenuation of the world when the player sat
 out. (Rev 1's `0.7·world + 0.3·player` blend attenuated the world
 unconditionally and capped nothing.)
 
+**Player-channel magnitudes (P6-2 ratifications, 2026-07-24).**
+Cost-of-capital channel (`coupling.js`): EMA halflife **50 trading
+days** over net persistent HCN positioning (net book delta·S/equity +
+impact-overlay flow, normalized to [−1, +1], computed
+orchestrator-side); output a bounded Halcyon velocity multiplier
+`1 + 0.05·clamp(ema, ±1)` — **cap 0.05**, both signs (sustained
+long → marginal acceleration, sustained short → marginal slowdown,
+03's stance table). The channel is an *orchestrator-passed input* to
+`advanceRace` (the `straitTension` precedent) and flows through
+`deterministicDrift`, so kinematics and the plateau detector see one
+drift. Headless MC passes nothing → the P6-1 calibration is
+bit-identical with the channel unfed (harness-probed). Calibration:
+constraint 2 measured against the final |d_W| distribution (medians
+0.143/0.144/0.150 at the three gate seeds) gives max-|d_P| coverage
+**58/62/60%** at cap 0.05 — comfortably over the ≥40% floor, while
+0.08 → 84% and 0.10 → 95% overshoot "marginal" into "authorial";
+0.05 is the ratified point. Cumulative dC ≤ ~0.16 rung-units over
+the horizon; the 50d halflife makes the realistic ramp ≈ the
+instantaneous ceiling over 1008 days.
+
+`raceEffects` retrofit magnitudes (per-effect clamp ±0.15, whitelist
+S-per-lab + heat, ledgered under event id, tracked on
+`race.playerS`): `polaris_supplicant` fund choice → **S[polaris]
++0.06** (runway; only bites in Polaris-leader worlds);
+`halcyon_osei_board` restraint choice → **S[halcyon] +0.05**
+(~0.35× median |d_W|); `china_export_controls` "Back the controls" →
+**heat +0.04** (visible-containment heat — indirect via theft/
+incident hazards, never a direct margin move; the Tianxia *velocity*
+dampener stays deferred to the evidence round). The osei event was
+toast-only in P5; P6-2 reconstructs it as a **oneShot popup**
+(coordinator-confirmed — oneShot bars S-stacking across fires;
+prose placeholders land with the P6 prose round).
+
+**Recorded imprecision (taper over-attribution)**: `playerS[halcyon]`
+ledgers the *raw applied* +0.05, but the burn taper (S_taper 0.265)
+erodes part of it before resolution, so `d_P_S` slightly overstates
+the S-channel's resolution-time contribution. Accepted: the error is
+bounded, conservative (overstates *player* share, which the
+(3/7)·|d_W| clip caps), and honest accounting of intent-at-decision
+rather than a decayed shadow. The ledger records what capital did,
+not what survived the weather.
+
+**P6-2 gate rulings (2026-07-24).** (1) *F-channel attribution*:
+firm-belief movement decomposes into the player-attributable
+conversion term (advice acts — memos, locks scored by credibility)
+and the autonomous B-wake term; `stepFirmBelief` exposes the
+decomposition and the ledger records ONLY the player component —
+the ledger charges the player for persuasion, never for the world
+waking up on its own. The orchestrator must not recompute the split;
+it consumes the exposed player-only delta (gated on `hasEverLocked`,
+zero-dropped like every channel). The decomposition must survive
+exact cancellation: when wake and conversion oppose to a net-zero
+interior step, the raw components stand unscaled — *preventing* the
+autonomous move is persuasion, and a ledger that erases offsetting
+contributions launders exactly the involvement it exists to record.
+Proportional scaling applies only when the final [0,100] clamp
+actually binds. (2) *Freeze is a mutation gate,
+not an append gate*: post-resolution, player channels are INERT —
+`applyRaceEffects` rejects (no-op, no mutation) while the ledger is
+frozen/inactive, and the orchestrator stops passing `playerCoupling`
+after the resolution latch (unfed channel → no drift term, no row).
+Check-then-mutate, never mutate-then-fail-to-record: a race
+mutation without a ledger row is the corruption 09's freeze exists
+to prevent. This extends the zombie-state ruling — after the latch,
+books are frozen AND capital moves nothing that counts; the interim
+is settlement mechanics, not a second act. (3) The plateau detector
+prices the live coupling (single-drift-source, the P6-1 lesson
+applied to the player channel: the detector reads
+`deterministicDrift` with `playerCoupling` passed — if sustained
+capital is the only thing keeping drift above 2e-4, the race has
+NOT plateaued; the ledger and `d_P_C` attribute exactly that).
+
 `controlRegime` transition gates: ratified numbers in the "Content
 plumbing (phase-5a ratifications)" block above (rev 1 never
 transcribed them; the phase-5a set is the first concrete one).

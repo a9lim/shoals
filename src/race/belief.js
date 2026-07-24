@@ -657,15 +657,46 @@ export function firmBelief(race) {
  * toward the player when the player is RIGHT EARLY -- pulled toward playerPilled
  * in proportion to POSITIVE credibility (being right early converts the firm;
  * 03/02a). Bounded [0,100]. Mutates race.F and returns it.
+ *
+ * P6-2 F-channel decomposition (02a ruling 1): the step's applied movement splits
+ * into the AUTONOMOUS B-wake term (the world waking on its own) and the PLAYER
+ * conversion term (advice acts converting the firm). Both are STAMPED on the race
+ * (`race.lastFWake` / `race.lastFConvert`) so the orchestrator ledgers ONLY the
+ * player component -- charging the player for persuasion, never for the world
+ * waking up. `race.F` is computed byte-identically to before (same op order, one
+ * final clamp); the clamp haircut, when it bites at a rail, is apportioned across
+ * the two terms in proportion to their raw contribution so the stamps sum to the
+ * actual applied delta.
  */
 export function stepFirmBelief(race, opts = {}) {
     if (!race || typeof race.F !== 'number') return F_MIN;
     const pilled = opts.playerPilled != null ? opts.playerPilled : playerPilled();
     const cred = Math.max(0, credibility());
-    let F = race.F;
-    F += F_WAKE_RATE * (marketPilled() - F);              // the world waking pulls F up
-    F += F_CONVERT_RATE * cred * Math.sign(pilled - F);   // being right early converts the firm
-    race.F = clamp(F, F_MIN, F_MAX);
+    const F0 = race.F;
+    const wakeTerm = F_WAKE_RATE * (marketPilled() - F0);              // the world waking pulls F up
+    const Fmid = F0 + wakeTerm;
+    const convertTerm = F_CONVERT_RATE * cred * Math.sign(pilled - Fmid);   // being right early converts the firm
+    const Fraw = Fmid + convertTerm;                                  // unclamped target
+    race.F = clamp(Fraw, F_MIN, F_MAX);
+    // Decompose the APPLIED movement into its two contributions. Use the RAW terms
+    // whenever the unclamped target is INTERIOR (no rail bound) -- so wake and
+    // conversion that exactly OFFSET are each recorded at full magnitude, never
+    // erased (02a P6-2 ruling amendment: preventing the autonomous move IS
+    // persuasion, and a ledger that zeroed offsetting contributions would launder the
+    // very involvement it exists to record). The earlier `applied/rawTotal` form set
+    // scale = 0 at the exact-cancellation singularity (rawTotal === 0), erasing both.
+    // Apportion proportionally ONLY when the final clamp actually binds at a rail
+    // (there Fraw != F0, so rawTotal != 0) -- the two stamps then sum to the applied
+    // delta there too. Sum identity (wake + convert == applied) holds in both regimes.
+    if (race.F === Fraw) {
+        race.lastFWake = wakeTerm;              // interior: raw terms (autonomous; never ledgered)
+        race.lastFConvert = convertTerm;        // interior: raw terms (player; the ONLY F row source)
+    } else {
+        const rawTotal = wakeTerm + convertTerm;
+        const scale = rawTotal !== 0 ? (race.F - F0) / rawTotal : 0;
+        race.lastFWake = wakeTerm * scale;
+        race.lastFConvert = convertTerm * scale;
+    }
     return race.F;
 }
 

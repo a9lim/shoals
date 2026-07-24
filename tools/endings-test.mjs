@@ -8,8 +8,10 @@
    with the day-1008 timeout extrapolation, and calibrates
    the WORLD-side terminal distribution.
 
-   Player channels do not exist yet, so d_P == 0 -- these
-   sections calibrate the WORLD-side distribution only.
+   The WORLD-side sections (A-I) run with NO player input, so
+   d_P == 0 and d_eff == d_W -- they calibrate the world-side
+   distribution and MUST keep passing untouched as P6-2 wires
+   the player channels (the no-player world does not move).
 
    Sections:
      A. Family distribution vs the 02a tuning contract
@@ -20,16 +22,31 @@
      F. Plateau regressions (saturation FP, joint capture, cap)
      G. Determinism + resolution latch
      H. Treaty track (Deal, completion, window, leak, isolation)
+     I. Blockade|family-4 anti-correlation (diagnostic)
+     -- P6-2 player-channel sections (round 2) --
+     J. No-player identity: d_P == 0, d_W == d_actual, d_eff == d_actual
+     K. Ledger reconstruction audit + applyRaceEffects (synthetic)
+     L. Bounded-influence clip: d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|)
+     M. Constraint 2: max reachable |d_P| catches >= 40% of |d_W|
 
    PROMOTE_DISTRIBUTION flips A/B/D from diagnostic to hard gates.
    Set true once the outcome-table retune (02a "Outcome-table
    levers") lands and the family table is inside the 02a bands.
    =================================================== */
 
-import { createRaceState, advanceRace, stepControlRegime, heatValue } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, stepControlRegime, heatValue, RETUNE } from '../src/race/race-state.js';
 import { stepTreaty } from '../src/race/treaty-track.js';
 import { checkResolution, HORIZON } from '../src/race/resolution.js';
 import { buildPublicView } from '../src/race/consensus.js';
+import {
+    ledger, resetLedger, deactivateLedger, freezeLedger,
+    appendLedger, ledgerTotals, ledgerEntries, applyRaceEffects,
+} from '../src/race/ledger.js';
+import { COUPLING_TUNING } from '../src/race/coupling.js';
+import { belief, initBelief, stepFirmBelief } from '../src/race/belief.js';
+
+const clampFn = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+const PLAYER_CLIP_FRAC = 3 / 7;   // 02a bounded-influence clip (mirrors resolution.js)
 
 // A/B/D are hard gates post-retune (Part 2); diagnostic during the Part-1 fix baseline.
 const PROMOTE_DISTRIBUTION = true;
@@ -121,6 +138,11 @@ const f4comp = { velocity: 0, drag: 0, theft: 0 };
 let blockadeRuns = 0, blockadeAndF4 = 0;
 // Late-determination oracle (section D).
 const oracleRows350 = [], oracleRows700 = [];
+// P6-2 section J: no-player identity. The headless world passes no player input, so
+// every resolution must carry d_P == 0, d_W == d_actual, and d_eff == d_actual (the
+// player decomposition is provably inert when unfed -- the "no-player trajectory
+// identity" the brief requires vs the committed P6-1 world).
+let playerInertOK = true;
 
 for (let i = 0; i < N; i++) {
     const seed = (BASE_SEED + i) >>> 0;
@@ -132,6 +154,10 @@ for (let i = 0; i < N; i++) {
     if (res.extrapolated) { timeoutCount++; extrapDays.push(res.extrapolationDays); if (res.axes.hitCap) capHitCount++; }
     else famInHorizon[fam]++;
     absD.push(Math.abs(res.d));
+
+    // Section J: player channels unfed => d_P == 0 and d_eff == d_actual == d_W.
+    const ax = res.axes;
+    if (ax.dP !== 0 || ax.dW !== ax.dActual || res.d !== ax.dActual) playerInertOK = false;
 
     // Family-4 composition: theft-assisted first (a successful exfiltration closed
     // the gap), else fast-velocity worlds (hidden velocity > 1), else drag-assisted
@@ -355,6 +381,216 @@ diag('I: P(blockade|family 4) < P(blockade) (intended anti-correlation)', pBlock
     `P(blockade) ${pct(pBlock)}  P(blockade|f4) ${pct(pBlockGivenF4)}`);
 
 // =========================================================================
+// P6-2 player-channel sections (round 2)
+// =========================================================================
+
+// ---- J: no-player identity (tracked in the main ensemble) ----------------
+check('J: no-player identity (d_P == 0, d_eff == d_W == d_actual, all runs)', playerInertOK);
+
+// ---- K: ledger reconstruction audit + applyRaceEffects (synthetic) -------
+// The complicity ledger records what capital DID, reconstructable from entries ALONE
+// (the beliefCauses audit basis). Exercised with SYNTHETIC entries -- the live wiring
+// (main.js appends) is node --check + live-game verified, never harness-gated.
+let ledgerOK = true, ledgerDetail = '';
+{
+    resetLedger();
+    appendLedger(10, 'C', 'cost_of_capital', 0.02, 'a');
+    appendLedger(20, 'S', 'halcyon_osei_board', 0.05, 'S[halcyon]');
+    appendLedger(20, 'heat', 'china_export_controls', 0.04, 'heat.transient');
+    appendLedger(30, 'treaty', 'treaty_ratify', 1, 'treatyStage advance');
+    appendLedger(40, 'F', 'advice_line', 0.03, 'firm belief (F)');
+    appendLedger(40, 'C', 'cost_of_capital', 0.01, 'b');
+    const zeroRow = appendLedger(50, 'C', 'cost_of_capital', 0, 'zero');   // must drop (no zero-effect rows)
+    const tot = ledgerTotals();
+    if (zeroRow !== null) { ledgerOK = false; ledgerDetail = 'zero row not dropped'; }
+    else if (ledger.entries.length !== 6) { ledgerOK = false; ledgerDetail = 'entry count ' + ledger.entries.length; }
+    else if (Math.abs(tot.C - 0.03) > 1e-12) { ledgerOK = false; ledgerDetail = 'C total ' + tot.C; }
+    else if (Math.abs(tot.S - 0.05) > 1e-12) { ledgerOK = false; ledgerDetail = 'S total ' + tot.S; }
+    else if (Math.abs(tot.treaty - 1) > 1e-12) { ledgerOK = false; ledgerDetail = 'treaty total ' + tot.treaty; }
+    else if (ledgerEntries('C').length !== 2) { ledgerOK = false; ledgerDetail = 'C entries ' + ledgerEntries('C').length; }
+    else {
+        freezeLedger();   // seal: post-freeze appends drop (09 latch)
+        if (appendLedger(60, 'C', 'x', 0.9) !== null || ledger.entries.length !== 6) { ledgerOK = false; ledgerDetail = 'freeze not sealing'; }
+        deactivateLedger();   // inactive: everything drops
+        if (appendLedger(70, 'C', 'x', 0.5) !== null) { ledgerOK = false; ledgerDetail = 'inactive append'; }
+    }
+}
+check('K: ledger reconstruction + zero-drop + freeze + deactivate', ledgerOK, ledgerDetail);
+
+// applyRaceEffects: whitelist, per-effect clamp, Tianxia floor, playerS tracking, heat clamp.
+let raceEffOK = true, raceEffDetail = '';
+{
+    resetLedger();
+    const race = { safety: { halcyon: 0.5, tianxia: 0.50, polaris: null },
+        playerS: { halcyon: 0, tianxia: 0, polaris: 0 }, heat: { transient: 0.9 } };
+    applyRaceEffects(race, [{ dial: 'velocity', amount: 1 }], 'x', 1);          // non-whitelisted dial -> ignored
+    applyRaceEffects(race, [{ dial: 'S', lab: 'polaris', amount: 0.06 }], 'x', 1);   // unspawned Polaris -> no-op
+    if (race.playerS.polaris !== 0) { raceEffOK = false; raceEffDetail = 'polaris unspawned wrote'; }
+    applyRaceEffects(race, [{ dial: 'S', lab: 'halcyon', amount: 0.05 }], 'halcyon_osei_board', 2);
+    if (Math.abs(race.safety.halcyon - 0.55) > 1e-12) { raceEffOK = false; raceEffDetail = 'S apply ' + race.safety.halcyon; }
+    if (Math.abs(race.playerS.halcyon - 0.05) > 1e-12) { raceEffOK = false; raceEffDetail = 'playerS track'; }
+    applyRaceEffects(race, [{ dial: 'S', lab: 'halcyon', amount: 0.4 }], 'x', 3);   // clamp 0.4 -> 0.15
+    if (Math.abs(race.safety.halcyon - 0.70) > 1e-12) { raceEffOK = false; raceEffDetail = 'clamp ' + race.safety.halcyon; }
+    applyRaceEffects(race, [{ dial: 'S', lab: 'tianxia', amount: -0.15 }], 'x', 4);   // Tianxia floors at S0
+    if (Math.abs(race.safety.tianxia - RETUNE.S0_tianxia) > 1e-12) { raceEffOK = false; raceEffDetail = 'tianxia floor ' + race.safety.tianxia; }
+    applyRaceEffects(race, [{ dial: 'heat', amount: 0.15 }], 'x', 5);   // heat clamps at 1.0 (0.9 -> 1.0, delta 0.10)
+    if (Math.abs(race.heat.transient - 1.0) > 1e-12) { raceEffOK = false; raceEffDetail = 'heat clamp ' + race.heat.transient; }
+    // Ledger reconstructs the applied (post-clamp) deltas exactly.
+    const t = ledgerTotals();
+    if (Math.abs(t.S - (0.05 + 0.15 + (RETUNE.S0_tianxia - 0.50))) > 1e-9) { raceEffOK = false; raceEffDetail = 'S ledger ' + t.S; }
+    if (Math.abs(t.heat - 0.10) > 1e-9) { raceEffOK = false; raceEffDetail = 'heat ledger ' + t.heat; }
+    deactivateLedger();
+}
+check('K: applyRaceEffects whitelist/clamp/floor/track/ledger', raceEffOK, raceEffDetail);
+
+// P6-2 ruling 2 (NON-synthetic, gates the live fix): freeze is a MUTATION gate, not
+// an append gate -- applyRaceEffects must be a FULL NO-OP (no S/heat/playerS mutation)
+// while the ledger is frozen or inactive. Probed directly through applyRaceEffects.
+let freezeNoopOK = true, freezeDetail = '';
+{
+    const frozenRace = () => ({ safety: { halcyon: 0.5, tianxia: 0.5, polaris: null },
+        playerS: { halcyon: 0, tianxia: 0, polaris: 0 }, heat: { transient: 0.3 } });
+    // Frozen ledger: mutation refused.
+    resetLedger(); freezeLedger();
+    let r = frozenRace();
+    applyRaceEffects(r, [{ dial: 'S', lab: 'halcyon', amount: 0.05 }, { dial: 'heat', amount: 0.1 }], 'x', 1);
+    if (r.safety.halcyon !== 0.5 || r.playerS.halcyon !== 0 || r.heat.transient !== 0.3 || ledger.entries.length !== 0) {
+        freezeNoopOK = false; freezeDetail = `frozen mutated S=${r.safety.halcyon} heat=${r.heat.transient} rows=${ledger.entries.length}`;
+    }
+    // Inactive ledger (Classic / no race): also a full no-op.
+    deactivateLedger();
+    r = frozenRace();
+    applyRaceEffects(r, [{ dial: 'S', lab: 'halcyon', amount: 0.05 }], 'x', 1);
+    if (r.safety.halcyon !== 0.5 || r.playerS.halcyon !== 0) { freezeNoopOK = false; freezeDetail = 'inactive mutated ' + r.safety.halcyon; }
+}
+check('K: freeze/inactive is a mutation gate (applyRaceEffects full no-op)', freezeNoopOK, freezeDetail);
+
+// P6-2 ruling 1 (NON-synthetic, gates the live fix): stepFirmBelief EXPOSES the F
+// decomposition and the autonomous B-wake is NEVER attributed to the player. Probed
+// through a REAL stepFirmBelief call: a fresh player (no locks => credibility 0) gets
+// zero conversion, so the whole applied F move is autonomous wake -- lastFConvert == 0
+// while F still moved -- and (lastFWake + lastFConvert) == the applied delta exactly.
+let fDecompOK = true, fDecompDetail = '';
+const fail = (m) => { if (fDecompOK) { fDecompOK = false; fDecompDetail = m; } };
+{
+    const race = createRaceState(BASE_SEED >>> 0);
+    initBelief(race);                       // fresh player: credibility 0, no locks
+    race.F = 20;                            // interior, below marketPilled so wake moves it up
+    let F0 = race.F;
+    stepFirmBelief(race);
+    let applied = race.F - F0;
+    if (Math.abs(applied) < 1e-9) fail('F did not move (probe vacuous)');
+    else if (Math.abs(race.lastFConvert || 0) > 1e-12) fail('player charged for autonomous wake: ' + race.lastFConvert);
+    else if (Math.abs((race.lastFWake + race.lastFConvert) - applied) > 1e-9) fail('decomposition != applied');
+    // Conversion path: inject positive credibility + a pilled stance -> player term nonzero, sum still holds.
+    belief.player.credibility = 0.6;
+    race.F = 20; F0 = race.F;
+    stepFirmBelief(race, { playerPilled: 100 });   // max-pilled, above F -> positive conversion
+    if (!(race.lastFConvert > 0)) fail('convert term not exposed/positive');
+    else if (Math.abs((race.lastFWake + race.lastFConvert) - (race.F - F0)) > 1e-9) fail('convert-path sum');
+
+    // EXACT CANCELLATION (the amended-ruling regression): wake and conversion exactly
+    // oppose in an unclamped interior step -- the player PREVENTED the autonomous move.
+    // Construction: force marketPilled() == 0 (crossed R4, far-future certDay), F0=12.5,
+    // credibility 1/6, playerPilled=100 -> wake = 0.08*(0-12.5) = -1, convert = 6*(1/6)*(+1)
+    // = +1, rawTotal == 0 exactly, F unchanged. The OLD `applied/rawTotal` form set
+    // scale=0 and erased BOTH stamps (laundering the involvement). The fix records the
+    // raw offsetting terms.
+    belief.rungs[4] = { crossed: true, certDay: Number.MAX_SAFE_INTEGER };   // marketPilled == 0
+    belief.player.credibility = 1 / 6;
+    race.F = 12.5;
+    stepFirmBelief(race, { playerPilled: 100 });
+    if (race.F !== 12.5) fail('cancellation moved F: ' + race.F);
+    else if (race.lastFConvert !== 1 || race.lastFWake !== -1) fail(`cancellation stamps erased/wrong: wake ${race.lastFWake} convert ${race.lastFConvert}`);
+    else if (race.lastFWake + race.lastFConvert !== 0) fail('cancellation sum != 0');
+
+    // UPPER RAIL: both terms positive, unclamped target > 100 -> clamp binds -> the two
+    // stamps apportion the haircut and still sum to the applied (+1) delta.
+    belief.rungs[4] = { crossed: true, certDay: 0 };   // marketPilled == 100
+    belief.player.credibility = 0.5;
+    race.F = 99; F0 = race.F;
+    stepFirmBelief(race, { playerPilled: 100 });        // wake +0.08, convert +3 -> Fraw 102.08 -> clamp 100
+    applied = race.F - F0;
+    if (race.F !== 100) fail('upper rail did not clamp: ' + race.F);
+    else if (Math.abs((race.lastFWake + race.lastFConvert) - applied) > 1e-9) fail('upper-rail sum != applied');
+    else if (!(race.lastFWake > 0 && race.lastFConvert > 0)) fail('upper-rail stamps lost sign');
+
+    // LOWER RAIL: both terms negative, unclamped target < 0 -> clamp binds -> stamps
+    // apportion and sum to the applied (-1) delta.
+    belief.rungs[4] = { crossed: true, certDay: Number.MAX_SAFE_INTEGER };   // marketPilled == 0
+    belief.player.credibility = 0.5;
+    race.F = 1; F0 = race.F;
+    stepFirmBelief(race, { playerPilled: 0 });          // wake -0.08, convert -3 -> Fraw -2.08 -> clamp 0
+    applied = race.F - F0;
+    if (race.F !== 0) fail('lower rail did not clamp: ' + race.F);
+    else if (Math.abs((race.lastFWake + race.lastFConvert) - applied) > 1e-9) fail('lower-rail sum != applied');
+    else if (!(race.lastFWake < 0 && race.lastFConvert < 0)) fail('lower-rail stamps lost sign');
+}
+check('K: F decomposition -- interior/cancellation/both rails (stamps survive, sum == applied)', fDecompOK, fDecompDetail);
+
+// ---- L: bounded-influence clip (verbatim d_eff formula) ------------------
+// Inject a large synthetic playerS on every lab so the LEADER's d_P_S dominates
+// (~0.4 >> (3/7)|d_W|), forcing the clip to bind, then verify resolution.js applies
+// the VERBATIM formula d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|) on res.axes.
+// The injection is read ONLY at resolution (never during the run), so the world
+// trajectory is unchanged -- a pure decomposition + clip-transcription audit.
+let clipIdentityOK = true, clipBindCount = 0, clipN = 0, clipDetail = '';
+const CLIP_BATCH = Math.min(N, 1200);
+for (let i = 0; i < CLIP_BATCH; i++) {
+    const race = createRaceState((BASE_SEED + i) >>> 0);
+    for (const k of ['halcyon', 'tianxia', 'polaris']) if (race.playerS[k] != null) race.playerS[k] = 0.4;
+    race.playerCumC = 0.1;
+    for (let d = 0; d < HORIZON && !race.resolution; d++) {
+        advanceRace(race, { straitTension: 0 });
+        stepControlRegime(race);
+        stepTreaty(race, {});
+        if (checkResolution(race, null)) break;
+    }
+    if (!race.resolution) checkResolution(race, null);
+    const a = race.resolution.axes, dEff = race.resolution.d;
+    clipN++;
+    if (Math.abs(a.dP - (a.dP_S + a.dP_C)) > 1e-9) { clipIdentityOK = false; clipDetail = 'dP decomposition sum'; }
+    else if (Math.abs(a.dW - (a.dActual - a.dP)) > 1e-9) { clipIdentityOK = false; clipDetail = 'dW != dActual - dP'; }
+    else {
+        const ref = a.dW + clampFn(a.dP, -PLAYER_CLIP_FRAC * Math.abs(a.dW), PLAYER_CLIP_FRAC * Math.abs(a.dW));
+        if (Math.abs(dEff - ref) > 1e-9) { clipIdentityOK = false; clipDetail = `d_eff ${f3(dEff)} vs ref ${f3(ref)}`; }
+    }
+    if (Math.abs(dEff - a.dActual) > 1e-9) clipBindCount++;   // clip changed the effective distance
+}
+check('L: bounded-influence clip verbatim (d_eff = d_W + clip(d_P, +-3/7|d_W|))', clipIdentityOK, clipDetail);
+check('L: clip binds (d_eff != d_actual) on the max-injection batch', clipBindCount > 0.5 * clipN,
+    `${clipBindCount}/${clipN} bound`);
+
+// ---- M: constraint 2 (channel authority vs the knife-edge |d_W|) ---------
+// The player channels must move a MEANINGFUL fraction of the knife-edge world: the max
+// reachable |d_P| (a maximal LONG threaded at the coupling cap, plus one max S[halcyon])
+// must catch >= 40% of the world |d_W| distribution. |d_W| is the no-player |d| (section
+// J), already in absD. playerCoupling=cap from day 0 is the absolute long ceiling (the
+// realistic halflife-50 ramp differs negligibly over the 1008d horizon). Reachable ceiling
+// = p90 of the max-player |d_P| (robust; not a single lucky-seed max).
+const CAP = COUPLING_TUNING.cap;
+const M_BATCH = Math.min(N, 1200);
+const maxPlayerAbsDP = [];
+for (let i = 0; i < M_BATCH; i++) {
+    const race = createRaceState((BASE_SEED + i) >>> 0);
+    if (race.safety.halcyon != null) { race.safety.halcyon = Math.min(1, race.safety.halcyon + 0.05); race.playerS.halcyon += 0.05; }
+    for (let d = 0; d < HORIZON && !race.resolution; d++) {
+        advanceRace(race, { straitTension: 0, playerCoupling: CAP });
+        stepControlRegime(race);
+        stepTreaty(race, {});
+        if (checkResolution(race, null)) break;
+    }
+    if (!race.resolution) checkResolution(race, null);
+    maxPlayerAbsDP.push(Math.abs(race.resolution.axes.dP));
+}
+const maxReachableDP = quantile(maxPlayerAbsDP, 0.90);
+const medDW = quantile(absD, 0.50);
+const coverage = absD.filter(x => x <= maxReachableDP).length / absD.length;
+diag('M: world |d_W| median in [0.135, 0.155] (final-retune 0.143-0.148)', medDW >= 0.135 && medDW <= 0.155, f3(medDW));
+check('M: constraint 2 -- max reachable |d_P| catches >= 40% of |d_W|', coverage >= 0.40,
+    `cap ${CAP}  max|dP| p90 ${f3(maxReachableDP)}  coverage ${pct(coverage)}`);
+
+// =========================================================================
 // Report
 // =========================================================================
 line(`endings-test: N=${N}, base seed=${BASE_SEED}, horizon=${HORIZON}d, ${elapsed}s  `
@@ -381,6 +617,10 @@ line(`  ratchets (run-max): nationalized ${pct(natCount / N)}  classified ${pct(
 line(`  treaty: dealPossible ${pct(dealPossibleRuns / N)}  Deal ${pct(dealRate)}  completion|eligible ${f3(completion)}  `
     + `window ${pct(windowRate)}  summit pass ${f3(summitPass)}  P(deal|window) ${f3(leakPosterior)}`);
 line(`  late-determination oracle: day350 impr ${pct(or350.improvement)}  day700 impr ${pct(or700.improvement)}`);
+line(`\n  P6-2 player channels (cap ${CAP}, halflife ${COUPLING_TUNING.halflife}d):`);
+line(`    no-player identity (J): ${playerInertOK ? 'inert (d_P == 0 all runs)' : 'VIOLATED'}`);
+line(`    constraint 2 (M): world |d_W| median ${f3(medDW)}  |  max reachable |d_P| p90 ${f3(maxReachableDP)}  |  coverage ${pct(coverage)} (>= 40%)`);
+line(`    clip (L): binds on ${clipBindCount}/${clipN} of the max-injection batch (verbatim d_eff identity ${clipIdentityOK ? 'holds' : 'VIOLATED'})`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

@@ -70,6 +70,10 @@ export const POLARIS_EVENTS = [
                 label: 'Hear them out',
                 desc: 'Take the meeting seriously; keep the channel warm. When fund-as-actor is on the table, Polaris is on it too.',
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 2 }],
+                // P6-2 raceEffect: backing the careful racer buys Polaris runway (S).
+                // Applies only where Polaris is active; contributes to d_P only in the
+                // (rare) Polaris-leader worlds. Magnitude proposed; swept/ratified in 02a.
+                raceEffects: [{ dial: 'S', lab: 'polaris', amount: 0.06 }],
                 playerFlag: 'backed_polaris_interest',
                 resultToast: 'The follow-up deck arrives that night. The last slide is just their eval curve against the frontier’s, unlabeled.',
                 // Ordinary popups schedule followups at CHOICE level only (the

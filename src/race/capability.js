@@ -279,15 +279,20 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
     }
 
     // The deterministic drift (base + recursion + all phase-6 modifiers: velocity
-    // leg A, drag leg B, follower leg 2) comes from THE shared deterministicDrift
-    // helper -- the same source the plateau detector reads (P6-1b P0 fix). Only the
-    // shock is added here (the plateau signal is shock-free).
-    const dOpts = { regime: inputs.regime, deltaSup: inputs.deltaSup, followerKf: inputs.followerKf };
+    // leg A, drag leg B, follower leg 2, P6-2 player coupling) comes from THE shared
+    // deterministicDrift helper -- the same source the plateau detector reads (P6-1b
+    // P0 fix). Only the shock is added here (the plateau signal is shock-free).
+    const coupling = inputs.playerCoupling || 0;
+    const dOpts = { regime: inputs.regime, deltaSup: inputs.deltaSup, followerKf: inputs.followerKf, playerCoupling: coupling };
+    let playerDeltaC = 0;   // the coupling's attributable contribution to Halcyon's C this tick (P6-2 ledger)
     for (const id of ['halcyon', 'tianxia', 'polaris']) {
         const lab = cap.labs[id];
         if (!lab.active) continue;
 
         const drift = deterministicDrift(cap, lab, day, dOpts);
+        // Isolate the player's share of Halcyon's drift: drift = base*(1+coupling),
+        // so the coupling contributed drift*coupling/(1+coupling) -- exact, no re-derive.
+        if (id === 'halcyon' && coupling !== 0) playerDeltaC += drift * coupling / (1 + coupling);
         const shock = DAILY_SHOCK * rng.normal();
 
         lab.C_internal = clamp(lab.C_internal + drift + shock, C_MIN, C_MAX);
@@ -296,7 +301,7 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
         }
     }
 
-    return { spawned, crossings };
+    return { spawned, crossings, playerDeltaC };
 }
 
 /**
@@ -331,6 +336,12 @@ export function deterministicDrift(cap, lab, day, opts = {}) {
         const relFrontier = frontierReleasedNonTianxia(cap);
         if (relFrontier > -Infinity) drift += opts.followerKf * Math.max(0, relFrontier - lab.C_internal);
     }
+    // P6-2 player cost-of-capital coupling: the ORCHESTRATOR-PASSED bounded
+    // multiplier on HALCYON's velocity (long persistent HCN positioning -> marginal
+    // acceleration; sustained short -> marginal slowdown, 03's stance table). Routed
+    // through THIS single drift source so the plateau detector sees it too (never a
+    // second drift path). Inert (0) headless -> the P6-1 world-side calibration stands.
+    if (lab.id === 'halcyon' && opts.playerCoupling) drift *= (1 + opts.playerCoupling);
     return drift;
 }
 

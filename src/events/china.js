@@ -104,6 +104,11 @@ export const CHINA_EVENTS = [
                 label: 'Back the controls',
                 desc: 'Weigh in for the tighter rule — aimed squarely at Tianxia’s compute, and read in Beijing as anything but economics.',
                 effects: [{ path: 'ai.exportControlStage', op: 'add', value: 1 }],
+                // P6-2 raceEffect: visible containment RAISES heat (the race reads it
+                // as escalation). The exportControlStage -> Tianxia-VELOCITY dampener
+                // stays DEFERRED to the evidence round -- heat only here. Magnitude
+                // proposed; swept/ratified in 02a.
+                raceEffects: [{ dial: 'heat', amount: 0.04 }],
                 factionShifts: [
                     { faction: 'federalistSupport', value: 2 },
                     { faction: 'labRelations', value: 1 },

@@ -132,14 +132,40 @@ export const HALCYON_EVENTS = [
         id: 'halcyon_osei_board',
         category: 'halcyon',
         likelihood: 1,
+        // P6-2 retrofit: the ruled activist-restraint DECISION. This event was
+        // TOAST-ONLY (headlines[], no choices) -- the coordinator's brief assumed an
+        // existing choice to hang S[halcyon] on, so the choice + popup were added here
+        // with PROSE: coordinator placeholders. oneShot to match the file's other popup
+        // beats (keynote/leak) and to bar S[halcyon] stacking across repeated fires.
+        // FLAGGED for coordinator review.
+        oneShot: true,
+        popup: true,   // _fireEvent collapses headlines[] to a headline for the popup
         magnitude: 'minor',
         when: (sim, world) => world.ai.frontierRung >= 2,
         headlines: [
             'The Continental, sourced to "two people near the Halcyon board": Osei has begun taking separate briefings from Dirks and Gottlieb, which is either diligence or a divorce lawyer’s intake meeting depending on which of the two people you believe.',
             'Halcyon’s board meets for six hours; the readout is one sentence about "alignment of long-term strategy." Osei’s office books no follow-on meetings for a week. Early money, late caution: the man both factions court is conspicuously letting himself be courted.',
         ],
+        context: 'PROSE: coordinator',   // PROSE: coordinator (the activist-restraint framing; lands with the P6 prose round)
         params: {},
         impulse: { xi: 0.006 },   // decaying (P4): governance risk, unpriced until it detonates
+        choices: [
+            {
+                label: 'PROSE: coordinator',   // PROSE: coordinator (back the safety-side board push)
+                desc: 'PROSE: coordinator',    // PROSE: coordinator
+                // P6-2 raceEffect: activist restraint buys a small S[halcyon] (the
+                // American margin is a practice -- it interacts with the burn taper).
+                // Magnitude proposed; swept/ratified in 02a.
+                raceEffects: [{ dial: 'S', lab: 'halcyon', amount: 0.05 }],
+                factionShifts: [{ faction: 'safetyNetworkTrust', value: 2 }],
+                playerFlag: 'backed_halcyon_restraint',
+            },
+            {
+                label: 'PROSE: coordinator',   // PROSE: coordinator (stay out of the boardroom)
+                desc: 'PROSE: coordinator',    // PROSE: coordinator
+                playerFlag: 'stayed_out_halcyon_board',
+            },
+        ],
     },
 
     // ---- The leak (mid-game superevent: the word belongs to the world now) ----

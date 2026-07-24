@@ -20,6 +20,7 @@ import { getTraitEffect, getActiveTraitIds } from './traits.js';
 import { firmCooldownMult, shiftFaction } from './faction-standing.js';
 import { getRegulationPipeline } from './regulations.js';
 import { addEventImpulse } from './race/impulse.js';
+import { applyRaceEffects } from './race/ledger.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './events/index.js';
@@ -100,6 +101,11 @@ export class EventEngine {
 
         // World state
         this.world = createWorldState();
+
+        // P6-2: race-state reference for the non-popup raceEffects chokepoint.
+        // Attached by reference by main.js in Dynamic modes (the eventEngine.world
+        // .factions pattern); null outside Dynamic modes, so the chokepoint is inert.
+        this.race = null;
 
         // Boredom tracking
         this._consecutiveMinor = 0;
@@ -481,6 +487,16 @@ export class EventEngine {
             for (const fs of event.factionShifts) {
                 shiftFaction(fs.faction, fs.value);
             }
+        }
+
+        // P6-2 raceEffects chokepoint (non-popup path): event-level raceEffects flow
+        // through the same whitelisted/clamped/ledgered route as the popup-choice path
+        // (main.js). Guarded on this.race (attached by main.js in Dynamic modes; null
+        // elsewhere, so this is inert). No retrofit event uses this yet -- the three
+        // coordinator-ruled retrofits are all popup choices -- but the chokepoint is
+        // wired per the brief so a future non-popup shell can carry raceEffects.
+        if (Array.isArray(event.raceEffects) && this.race) {
+            applyRaceEffects(this.race, event.raceEffects, event.id, day);
         }
 
         // Track consecutive minor/neutral for boredom boost

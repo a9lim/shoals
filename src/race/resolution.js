@@ -32,6 +32,7 @@ import { frontierInternalCrossDay } from './consensus.js';
 import { deterministicDrift } from './capability.js';
 import { straitTension } from './strait.js';
 import { stepTreaty } from './treaty-track.js';
+import { freezeLedger } from './ledger.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
@@ -140,8 +141,26 @@ function computeAxes(race) {
     const S_leader = leader.id === 'open' ? 0 : (race.safety[leader.id] ?? 0);
     const margin = S_leader + leadAdj(lead);
     const required = REQ_BASE + REQ_TAU_W * (1 - race.hidden.tau) + REQ_SHARP_W * race.hidden.sharpnessNorm;
-    const dW = margin - required;
-    const dP = 0;   // ROUND 2 player complicity-ledger delta
+    const d = margin - required;   // the ACTUAL threshold distance (world + player)
+
+    // ---- Bounded influence (02a, VERBATIM): d_eff = d_W + clip(d_P, -(3/7)|d_W|,
+    //      +(3/7)|d_W|). Decompose the player's attributable margin delta d_P:
+    //   S-channel: cumulative player-added S to the LEADER's lab (raceEffects).
+    //   C-channel: the leadAdj change from the player's cumulative dC to Halcyon
+    //     (the coupling-integrated race.playerCumC), signed by Halcyon's rank --
+    //     it raised Halcyon's C, so the LEADER's lead grew (Halcyon leads) or shrank
+    //     (Halcyon is the binding second) or was unaffected (Halcyon neither).
+    const dP_S = leader.id === 'open' ? 0 : (race.playerS ? (race.playerS[leader.id] || 0) : 0);
+    const playerCumC = race.playerCumC || 0;
+    let dP_C = 0;
+    if (playerCumC !== 0) {
+        let leadCF = lead;                                             // no-player counterfactual lead
+        if (leader.id === 'halcyon') leadCF = lead - playerCumC;       // Halcyon leads: its lead shrinks without the player
+        else if (rows[1] && rows[1].id === 'halcyon') leadCF = lead + playerCumC;   // Halcyon is the binding rival
+        dP_C = leadAdj(lead) - leadAdj(leadCF);
+    }
+    const dP = dP_S + dP_C;
+    const dW = d - dP;
     const dEff = dW + clamp(dP, -PLAYER_CLIP_FRAC * Math.abs(dW), PLAYER_CLIP_FRAC * Math.abs(dW));
 
     const crossingEntity = firstR5Crosser(cap);
@@ -168,8 +187,11 @@ function computeAxes(race) {
         lead,
         margin,
         required,
-        dW,
-        d: dEff,
+        dActual: d,        // world + player, pre-clip
+        dW,                // world-only (d - d_P)
+        dP,                // player-attributable (d_P_S + d_P_C)
+        dP_S, dP_C,        // channel decomposition (S from raceEffects, C from coupling)
+        d: dEff,           // clipped effective d used by the family mapping
         crossingEntity,
         alignmentResult,
         controlDisposition,
@@ -224,12 +246,18 @@ function plateauConfirmed(race) {
     const cap = race.capability;
     // Maintain the sustained-drift streak every day (once per day by construction).
     // Read THE shared deterministic drift WITH all phase-6 modifiers (velocity, drag,
-    // follower) -- omitting them under-read the leader and false-latched plateaus
-    // (P6-1b re-gate P0). The regime feeds leg B; RETUNE feeds legs B/2.
+    // follower, AND the live player coupling) -- omitting any under-reads the leader
+    // and false-latches plateaus. The player-coupling omission was the P6-2 P0 gate
+    // find (same class as the P6-1b re-gate labExpectedDrift bug): if sustained capital
+    // is the only thing holding Halcyon's drift above threshold, the race has NOT
+    // plateaued (02a P6-2 ruling 3). `race.playerCoupling` is 0 on the unfed/headless
+    // path, so deterministicDrift's Halcyon guard is falsy and this stays bit-identical.
+    // The regime feeds leg B; RETUNE feeds legs B/2; playerCoupling feeds the Halcyon leg.
     const leader = frontierLeaderLab(cap);
     const drift = leader
         ? deterministicDrift(cap, leader, race.day,
-            { regime: race.controlRegime, deltaSup: RETUNE.delta_sup, followerKf: RETUNE.k_f })
+            { regime: race.controlRegime, deltaSup: RETUNE.delta_sup, followerKf: RETUNE.k_f,
+                playerCoupling: race.playerCoupling })
         : Infinity;
     if (drift < PLATEAU_DRIFT_THRESHOLD) race.plateauStreak = (race.plateauStreak || 0) + 1;
     else race.plateauStreak = 0;
@@ -351,6 +379,10 @@ export function checkResolution(race, geo = null) {
     // Step 5: day-1008 timeout -> forward extrapolation into one of the six.
     if (!rec && race.day >= HORIZON) rec = extrapolate(race, geo);
     if (rec) {
+        // Seal the complicity ledger at the latch (09), BEFORE terminal marking --
+        // the record is final at the moment the world resolves; the P6-3 closeout
+        // cannot rewrite it.
+        freezeLedger();
         race.resolution = rec;
         // Post-resolution interim (02a phase-6 ruling): clear the ledger so the
         // race->narrative bridge cannot replay this terminal tick's transitions on

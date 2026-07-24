@@ -190,6 +190,9 @@ export function freshTransitions() {
         // controlRegime transition, consumed by the bridge / main.js narrative.
         strait: { grayZone: [], blockadeStart: null, blockadeEnd: null },
         regimeChange: null,   // { from, to } on a forward controlRegime move this tick
+        // P6-2: this tick's player-attributable dC to Halcyon (the coupling's
+        // Halcyon-C contribution). main.js ledgers it under the C channel; 0 headless.
+        playerDeltaC: 0,
     };
 }
 
@@ -301,6 +304,11 @@ export function resetRaceState(race, seed) {
     // days the leader's shock-free drift has been below threshold; confirmation
     // needs it >= 180 (sustained) AND day >= 700 (resolution.js).
     race.plateauStreak = 0;
+
+    // ---- P6-2 player coupling accounting (0 headless -> world-side identity) --
+    race.playerCoupling = 0;          // current cost-of-capital multiplier on Halcyon velocity (per tick input)
+    race.playerCumC = 0;              // cumulative player-attributable dC to Halcyon (coupling-integrated; d_P C-channel)
+    race.playerS = { halcyon: 0, tianxia: 0, polaris: 0 };   // cumulative player-attributable dS per lab (raceEffects)
 
     return race;
 }
@@ -466,17 +474,22 @@ export function advanceRace(race, inputs = {}) {
     // logically precede it.
     const accumFrozen = day < race.sAccumFreezeUntil;
     const heatPre = heatValue(race.heat);
+    // P6-2 cost-of-capital coupling: ORCHESTRATOR-PASSED per tick (the straitTension
+    // precedent), stored so the plateau detector reads the same value. 0 headless.
+    race.playerCoupling = inputs.playerCoupling || 0;
 
     // 1. Capability (internal track) + Polaris spawn. Pass the phase-6 kinematic
-    //    levers via inputs: the Tianxia fast-follower (leg 2) and the domestic
-    //    regulatory drag (leg B, which reads the CURRENT controlRegime -- last
-    //    tick's, since stepControlRegime is the orchestrated post-step). capability.js
-    //    applies velocity (leg A) from cap.velocity directly.
+    //    levers via inputs: the Tianxia fast-follower (leg 2), the domestic regulatory
+    //    drag (leg B, reads the CURRENT controlRegime), and the P6-2 player coupling.
+    //    capability.js applies velocity (leg A) from cap.velocity directly.
     const capRes = stepCapability(cap, day, endDay,
-        { ...inputs, followerKf: RETUNE.k_f, regime: race.controlRegime, deltaSup: RETUNE.delta_sup },
+        { ...inputs, followerKf: RETUNE.k_f, regime: race.controlRegime, deltaSup: RETUNE.delta_sup,
+            playerCoupling: race.playerCoupling },
         streams.capability);
     tr.spawned.push(...capRes.spawned);
     tr.crossings.push(...capRes.crossings);
+    race.playerCumC += capRes.playerDeltaC || 0;   // integrate the coupling's Halcyon-C contribution (d_P C-channel)
+    tr.playerDeltaC = capRes.playerDeltaC || 0;     // expose this tick's dC for the ledger C channel (main.js)
     if (race.safety.polaris === null && cap.labs.polaris.active) {
         race.safety.polaris = S0.polaris;
     }

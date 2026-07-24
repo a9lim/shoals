@@ -46,7 +46,7 @@ import {
     modeledStockADV, rehedgeMM,
     updateParamShifts, decayParamShifts,
     applyParamOverlays, removeParamOverlays,
-    selectImpactToast,
+    selectImpactToast, getStockImpact,
 } from './src/price-impact.js';
 import {
     listStrategies, getStrategy, saveStrategy, deleteStrategy,
@@ -98,6 +98,8 @@ import {
     decayEventImpulses,
     applyEventImpulseOverlay, removeEventImpulseOverlay, resetEventImpulses,
 } from './src/race/impulse.js';
+import { stepCoupling, resetCoupling, deactivateCoupling } from './src/race/coupling.js';
+import { resetLedger, deactivateLedger, applyRaceEffects, appendLedger } from './src/race/ledger.js';
 
 
 // ---------------------------------------------------------------------------
@@ -199,6 +201,23 @@ function _syncRaceToWorld() {
  *  public tension the compute curve does. 0 outside Dynamic mode. */
 function _straitTension() {
     return eventEngine ? straitTension(eventEngine.world.geopolitical) : 0;
+}
+/** Player net PERSISTENT HCN positioning for the P6-2 cost-of-capital coupling,
+ *  signed and normalized to [-1, +1] (long +, short -). Blends the two sources the
+ *  brief names: the STANDING net book (delta-dollar exposure to HCN over equity --
+ *  the position the player is financing) and the impact-overlay cumulative FLOW
+ *  (getStockImpact: the signed price displacement the player's sustained order flow
+ *  has left, a persistent-pressure confirmation that decays on its own clock). The
+ *  coupling EMA (halflife ~50d) then filters for sustained conviction, so a scalp
+ *  that nets flat leaves neither a lasting book nor a lasting overlay. Weights are a
+ *  live-feel choice (un-gated: headless MC never passes positioning, and the
+ *  constraint-2 harness reasons about the coupling CAP, not this formula). */
+function _hcnPositioning() {
+    const eq = Math.max(1, _portfolioEquity());
+    const bookPos = (computeNetDelta() * sim.S) / eq;                       // standing exposure / equity
+    const flow = getStockImpact(market.sigma) / Math.max(1e-9, sim.S);      // overlay displacement as a fraction of spot
+    const flowPos = Math.max(-0.3, Math.min(0.3, flow * 8));               // bounded footprint confirmation
+    return Math.max(-1, Math.min(1, bookPos + flowPos));
 }
 /** Exogenous controlRegime-ratchet signals (lobbying / election) for
  *  stepControlRegime. Built from player lobbying flags the content rounds set;
@@ -732,6 +751,11 @@ function init() {
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
         raceState = createRaceState();
+        // Attach the race by reference for the non-popup raceEffects chokepoint (P6-2).
+        eventEngine.race = raceState;
+        // Player cost-of-capital coupling + complicity ledger (P6-2): activate.
+        resetCoupling();
+        resetLedger();
         // Consensus milestone binaries (overhaul phase 3a): list contracts + prime quotes.
         initConsensus(raceState);
         // Compute-futures term structure (overhaul phase 3b): list ladder + prime curve.
@@ -746,6 +770,8 @@ function init() {
         deactivateConsensus();
         deactivateComputeMarket();
         deactivateBelief();
+        deactivateCoupling();
+        deactivateLedger();
         _unwireBeliefQuoters();
     }
     updateDynamicSections($, DEFAULT_PRESET);
@@ -1127,8 +1153,23 @@ function _processPopupQueue() {
         if (choice.deltas && eventEngine) {
             eventEngine.applyDeltas(sim, choice.deltas);
         }
+        // P6-2 treaty-channel ledger: capture treatyStage across the choice's
+        // structured effects so a player-advanced treaty step is attributed to the
+        // player (the advice/diplomacy line). Guarded on raceState.
+        const _treatyBefore = (raceState && eventEngine) ? eventEngine.world.ai.treatyStage : 0;
         if (choice.effects && eventEngine) {
             applyStructuredEffects(eventEngine.world, choice.effects);
+        }
+        if (raceState && eventEngine) {
+            const _treatyDelta = eventEngine.world.ai.treatyStage - _treatyBefore;
+            if (_treatyDelta > 0) appendLedger(sim.day, 'treaty', event.id, _treatyDelta, 'treatyStage advance');
+        }
+        // P6-2 raceEffects chokepoint (popup-choice path): the ONE sanctioned
+        // choice->race mutation route -- whitelisted dials (S per lab, heat), clamped,
+        // and ledgered under the event id (applyRaceEffects tracks race.playerS for the
+        // d_P decomposition). Guarded on raceState (null outside Dynamic modes).
+        if (choice.raceEffects && raceState) {
+            applyRaceEffects(raceState, choice.raceEffects, event.id, sim.day);
         }
         if (choice.factionShifts) {
             for (const fs of choice.factionShifts) {
@@ -1693,7 +1734,21 @@ function _onDayComplete() {
     // contracts unsettled past their deadlines (02a phase-6 interim ruling). The
     // interim instead clears the ledger + bars new trades at the latch (below).
     if (raceState) {
-        advanceRace(raceState, { straitTension: _straitTension() });
+        // P6-2 cost-of-capital coupling: fold today's net persistent HCN positioning
+        // into the EMA and pass the bounded velocity multiplier as an ORCHESTRATOR
+        // input (the straitTension precedent) -- never a mutation export. The channel
+        // routes through deterministicDrift, so the plateau detector sees it too.
+        // POST-RESOLUTION the channel is INERT (02a ruling 2): once the race has
+        // latched, the player moves nothing that counts -- pass no coupling (unfed =>
+        // zero drift term, zero C row), matching the frozen ledger. The race still
+        // advances for instrument settlement; that is settlement mechanics, not a
+        // second act. The resolving tick itself completes normally (resolution latches
+        // later this tick), so its live coupling still applies.
+        const _playerCoupling = raceState.resolution ? 0 : stepCoupling(_hcnPositioning());
+        advanceRace(raceState, { straitTension: _straitTension(), playerCoupling: _playerCoupling });
+        // Ledger the day's player-attributable dC to Halcyon (C channel; drops zero,
+        // and the frozen ledger drops it outright post-latch -- belt and suspenders).
+        appendLedger(sim.day, 'C', 'cost_of_capital', raceState.lastTransitions.playerDeltaC, 'Halcyon velocity');
         // controlRegime ratchet (overhaul phase 5a): evaluate + advance the regime
         // through the canonical setControlRegime writer BEFORE any settlement reads
         // it (a mobilized/nationalized regime freezes / fallback-settles below). A
@@ -1758,6 +1813,14 @@ function _onDayComplete() {
         if (isLockDay(raceState.day) && raceState.day !== _lastForecastLockDay) {
             _lastForecastLockDay = raceState.day;   // race.day >= 1 here; day 0 is prompted at init
             stepFirmBelief(raceState);   // F wakes toward B; converts on the player's track record
+            // P6-2 F-channel ledger (advice line): stepFirmBelief exposes the applied
+            // movement's decomposition -- ledger ONLY the PLAYER conversion term
+            // (race.lastFConvert), never the autonomous B-wake (02a ruling 1: the
+            // ledger charges the player for persuasion, not for the world waking on its
+            // own). Gated on the player ever having locked (the advice channel is silent
+            // otherwise); zero-dropped like every channel. F is 0-100; /100 keeps the
+            // epilogue's channel totals commensurable in margin-unit-ish fractions.
+            if (hasEverLocked()) appendLedger(sim.day, 'F', 'advice_line', (raceState.lastFConvert || 0) / 100, 'firm belief (F) conversion');
             _runScrutiny();              // risk committee heats on the player's belief-gap vs F
             _checkFirmConversion();      // the CIO throughline: memo, then verdict (once each)
             _promptForecastLock();
@@ -2297,6 +2360,11 @@ function loadPreset(index) {
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
         raceState = createRaceState();
+        // Attach the race by reference for the non-popup raceEffects chokepoint (P6-2).
+        eventEngine.race = raceState;
+        // Player cost-of-capital coupling + complicity ledger (P6-2): activate.
+        resetCoupling();
+        resetLedger();
         // Consensus milestone binaries (overhaul phase 3a).
         initConsensus(raceState);
         // Compute-futures term structure (overhaul phase 3b).
@@ -2313,6 +2381,8 @@ function loadPreset(index) {
         deactivateConsensus();
         deactivateComputeMarket();
         deactivateBelief();
+        deactivateCoupling();
+        deactivateLedger();
         _unwireBeliefQuoters();
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
@@ -2336,6 +2406,11 @@ function resetSim() {
     // loadPreset -- so no discarded-seed draws. Null in Classic, untouched.
     if (raceState) {
         resetRaceState(raceState);
+        // Player cost-of-capital coupling + complicity ledger (P6-2): clear the EMA +
+        // entries for the fresh run. raceState is mutated in place (singleton), so the
+        // eventEngine.race reference stays valid -- no re-attach needed.
+        resetCoupling();
+        resetLedger();
         resetConsensus(raceState);
         resetComputeMarket(raceState, eventEngine ? eventEngine.world.geopolitical : null);
         // Rebuild belief for the fresh world + re-install the belief-backed quoters
