@@ -31,6 +31,7 @@
 
 import { createRng, randomSeed, deriveSeed } from './rng.js';
 import { sampleHiddenState } from './sampler.js';
+import { stepIncidents, stepEvidence } from './incidents.js';
 import {
     createCapabilityState, stepCapability, rollTheftDecision,
     scheduleCertification, stepCertification, frontierInternal,
@@ -89,7 +90,14 @@ function computeFloor(race) {
 
 /** Fresh empty per-tick transition ledger. */
 function freshTransitions() {
-    return { spawned: [], releases: [], thefts: [], crossings: [], certifications: [] };
+    return {
+        spawned: [], releases: [], thefts: [], crossings: [], certifications: [],
+        // Phase-2 two-track ledgers. `occurred` is the silent latent track (the
+        // bridge ignores it by design); `detected`/`published` are the legible
+        // track the race->narrative bridge fires on.
+        incidents: { occurred: [], detected: [] },
+        evidence: { occurred: [], published: [] },
+    };
 }
 
 // ---- Construction / reset ------------------------------------------------
@@ -146,8 +154,15 @@ export function resetRaceState(race, seed) {
     race.F = F0;                      // firm belief (belief-adjacent; B built beside it phase 4)
     race.lastTransitions = freshTransitions();   // per-tick ledger (phase 2 consumes)
 
+    // ---- Phase-2 incident / evidence generator state ---------------------
+    race.latentIncidents = [];        // two-track incident queue (occur -> detect | never)
+    race.latentEvidence = [];         // two-track evidence queue (found -> publish | bury)
+    race.evidenceLogOdds = 0;         // cumulative found evidence log-odds (clamped ±log19)
+    race.detectionQuality = 1;        // modifiable detection-hazard multiplier (players/factions lobby it, later)
+    race.incidentReporting = false;   // mandatory-reporting regime toggle (shortens lag, thins the tail; later-phase)
+    race.incidentsEnabled = true;     // MC toggle for the substream-isolation check; always true in-game
+
     // ---- Later-phase stubs (null/empty; extend, don't reshape) -----------
-    race.latentIncidents = [];        // phase-2 two-track incident/evidence queue
     race.B = null;                    // phase-4 market belief (hazard-over-dates curve)
     race.controlRegime = 'private';   // private -> supervised -> mobilized -> nationalized (transitions later-phase)
     race.treaty = null;               // treaty discovery/initiation/summit state (later-phase)
@@ -326,6 +341,17 @@ export function advanceRace(race, inputs = {}) {
 
     // 5. Heat floor recompute (idempotent; the commit ops already updated it).
     race.heat.floor = computeFloor(race);
+
+    // 5b. Incident + evidence generators (two-track). Draw ONLY from
+    //     streams.incidents; read pre-tick heat and current C / pre-update S;
+    //     append to the latent queues and the ledger. They NEVER touch heat,
+    //     safety, or capability, so capability + theft trajectories are
+    //     bit-identical with incidents on or off (isolation check in the MC
+    //     harness). The MC harness flips incidentsEnabled to run the off-arm.
+    if (race.incidentsEnabled !== false) {
+        tr.incidents = stepIncidents(race, day, endDay, heatPre);
+        tr.evidence = stepEvidence(race, day, endDay);
+    }
 
     // 6. Safety margin per active lab. dS/dt burns with racing pace always;
     //    accumulation is culture-driven, heat-suppressed (pre-tick heat), and

@@ -87,19 +87,61 @@ let confirmedPlateau = 0;  // gated: q<0.01 AND R5 never crossed AND trailing-12
 let rawFlatline = 0;       // ungated raw diagnostic: trailing-120d < 2e-4/d over ALL runs
 let leadUnique = 0, leadTie = 0, leadLost = 0;   // leadership outcome at 1008
 
+// ---- Phase-2 incident / evidence accumulators ----------------------------
+const EARLY_W = 126, LATE_W = 126;               // occurrence-cadence windows (days)
+const OCC_EARLY_TARGET = 13.0, OCC_LATE_ANCHOR = 3.3;   // 02a: ~1/13d early, capped ~1/3.3d late
+const incTotal = [];      // detected+undetected occurrences per run
+const incEarly = [];      // occurrences in the first EARLY_W days
+const incLate = [];       // occurrences in the last LATE_W days
+const s4PerRun = [];      // S4 occurrences per run
+const detLags = [];       // pooled detection lags (detectDay − occurDay)
+const neverDetFrac = [];  // per-run never-detected fraction (by horizon)
+const evFound = [];       // evidence beats found (occurred) per run
+const evPublished = [];   // evidence beats made public per run
+let s4Checked = 0, s4Violations = 0;   // S4 generation invariant: immediacy + never-persuasion (hard FAIL)
+let nonImmediate = 0, tipCount = 0;    // insider-tip rate over non-immediate occurrences (~0.30 intent)
+
 const T_CAP = RACE_TUNING.prolifCap / RACE_TUNING.prolifInc;   // releases needed to hit the cap
 
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
     const race = createRaceState((BASE_SEED + i) >>> 0);
     let leaderC888 = null;
+    let eOcc = 0, lOcc = 0, tOcc = 0, s4 = 0;   // per-run occurrence tallies
     for (let d = 0; d < HORIZON; d++) {
         advanceRace(race);
         if (race.day === 350) sAt[350].push(leaderSafety(race));
         if (race.day === 700) sAt[700].push(leaderSafety(race));
         if (race.day === 888) leaderC888 = leaderInternal(race).C;
+        // Incident occurrence cadence (occurred track, silent -- but real).
+        const occ = race.lastTransitions.incidents.occurred;
+        tOcc += occ.length;
+        if (race.day <= EARLY_W) eOcc += occ.length;
+        if (race.day > HORIZON - LATE_W) lOcc += occ.length;
+        for (const o of occ) if (o.severity >= 4) s4++;
     }
     const cap = race.capability;
+
+    // Incident occurrence / detection / evidence per-run summaries.
+    incTotal.push(tOcc); incEarly.push(eOcc); incLate.push(lOcc); s4PerRun.push(s4);
+    let nd = 0;
+    for (const inc of race.latentIncidents) {
+        const immediate = inc.detected && inc.detectDay === inc.occurDay;   // self-disclosed in occ tick
+        if (inc.detected) detLags.push(inc.detectDay - inc.occurDay);
+        else nd++;
+        // S4 invariant: every S4 must self-disclose in its occurrence tick and
+        // never be persuasion-class (the absolute S4 rule, 02a).
+        if (inc.severity === 4) {
+            s4Checked++;
+            if (!immediate || inc.cls === 'persuasion') s4Violations++;
+        }
+        // Insider-tip rate over non-immediate occurrences (tip is drawn for every
+        // incident not detected in its occurrence tick).
+        if (!immediate) { nonImmediate++; if (inc.insiderTip) tipCount++; }
+    }
+    neverDetFrac.push(race.latentIncidents.length ? nd / race.latentIncidents.length : 0);
+    evFound.push(race.latentEvidence.length);
+    evPublished.push(race.latentEvidence.filter(e => e.published).length);
 
     // Frontier (leader-agnostic) internal-track first crossings.
     for (const r of [2, 3, 4, 5]) {
@@ -144,6 +186,35 @@ for (let i = 0; i < N; i++) {
     if (flat) rawFlatline++;                                  // ungated diagnostic
 }
 const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
+
+// ---- Substream-isolation check -------------------------------------------
+// Capability + theft trajectories must be bit-identical whether the incident /
+// evidence generators run or not: each subsystem draws ONLY from its own named
+// RNG substream, so adding the incidents stream perturbs nothing upstream.
+// Run a batch of seeds with incidents ON vs OFF and compare C_internal (all
+// labs + open), theftCount, and the internal rung-crossing days.
+function isolationOK(nSeeds) {
+    const run = (seed, enabled) => {
+        const r = createRaceState(seed >>> 0);
+        r.incidentsEnabled = enabled;
+        for (let d = 0; d < HORIZON; d++) advanceRace(r);
+        return r;
+    };
+    const capVec = (r) => ['halcyon', 'tianxia', 'polaris'].map(id => r.capability.labs[id].C_internal).concat([r.capability.open.C]);
+    for (let s = 0; s < nSeeds; s++) {
+        const seed = (BASE_SEED + s) >>> 0;
+        const on = run(seed, true), off = run(seed, false);
+        if (on.theftCount !== off.theftCount) return false;
+        const a = capVec(on), b = capVec(off);
+        for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+        for (const id of ['halcyon', 'tianxia', 'polaris']) {
+            if (JSON.stringify(on.capability.labs[id].rungInternal) !== JSON.stringify(off.capability.labs[id].rungInternal)) return false;
+        }
+    }
+    return true;
+}
+const ISO_SEEDS = Math.min(N, 50);
+const isolationPass = isolationOK(ISO_SEEDS);
 
 /** Leader = per-run argmax C_internal across active labs + open (no hardcoded Halcyon). */
 function leaderInternal(race) {
@@ -223,6 +294,34 @@ line(`  q < 0.01:                                            ${pct(plateauQ / N)
 line(`  gated raw-flatline diagnostic (!ignited & !R5 & flat):${pct(confirmedPlateau / N).padStart(7)}`);
 line(`  ungated raw-flatline diagnostic (ALL runs):          ${pct(rawFlatline / N).padStart(7)}  <- not a target`);
 
+// ---- Incidents & evidence (phase 2) --------------------------------------
+
+line('\nIncident occurrence cadence  (two-track: occurrence is silent but real)');
+const eMean = mean(incEarly), lMean = mean(incLate);
+const eIA = eMean > 0 ? EARLY_W / eMean : Infinity;
+const lIA = lMean > 0 ? LATE_W / lMean : Infinity;
+line(`  occurrences/run   mean ${f2(mean(incTotal))}   p10 ${d0(quantile(incTotal, 0.10))}   p50 ${d0(quantile(incTotal, 0.50))}   p90 ${d0(quantile(incTotal, 0.90))}`);
+line(`  early window (first ${EARLY_W}d)  mean occ ${f2(eMean)}  => 1 per ${f2(eIA)}d   (02a anchor ~1/${OCC_EARLY_TARGET}d)`);
+line(`  late  window (last  ${LATE_W}d)  mean occ ${f2(lMean)}  => 1 per ${f2(lIA)}d   (02a ceiling ~1/${OCC_LATE_ANCHOR}d; run-avg, not the cap -- diagnostic)`);
+
+line('\nSeverity-4 (gated late-tail; the "39-50% of runs" figure is the REJECTED');
+line('  flat-slice scenario, NOT a design band -- incidence is diagnostic only)');
+line(`  S4 occurrences/run  mean ${f3(mean(s4PerRun))}   max ${Math.max(...s4PerRun)}   runs with >=1 S4: ${pct(s4PerRun.filter(x => x >= 1).length / N)}   (diagnostic)`);
+line(`  S4 generation invariant: ${s4Checked} S4s checked, ${s4Violations} violation(s) `
+    + `(every S4 self-discloses in its occurrence tick AND is never persuasion-class -- generation, not bridge routing)`);
+
+line('\nDetection (per-latent-incident daily process; genuine never-detected tail)');
+line(`  detection lag days   p10 ${d0(quantile(detLags, 0.10))}   p50 ${d0(quantile(detLags, 0.50))}   p90 ${d0(quantile(detLags, 0.90))}   (diagnostic; mixed severities)`);
+line(`  never-detected fraction (by horizon)   mean ${f3(mean(neverDetFrac))}   p10 ${f3(quantile(neverDetFrac, 0.10))}   p90 ${f3(quantile(neverDetFrac, 0.90))}   (diagnostic)`);
+line(`  insider-tip rate over non-immediate occurrences   ${f3(tipCount / Math.max(1, nonImmediate))}   (02a intent ~0.30; diagnostic; n=${nonImmediate})`);
+
+line('\nEvidence beats (alignment twin; found vs published)');
+line(`  found/run     mean ${f2(mean(evFound))}   p10 ${d0(quantile(evFound, 0.10))}   p90 ${d0(quantile(evFound, 0.90))}`);
+line(`  published/run mean ${f2(mean(evPublished))}   (02a ratified cadence ~40 found / ~28 published per run; the ±log19 accumulator clamp is the stance and holds at any count)`);
+
+line('\nSubstream isolation (incidents ON vs OFF, ' + ISO_SEEDS + ' seeds)');
+line(`  capability + theft trajectories bit-identical: ${isolationPass ? 'PASS' : 'FAIL'}`);
+
 // ---- Calibration PASS/MISS against 02a targets ---------------------------
 
 line('\n' + '='.repeat(70));
@@ -252,6 +351,26 @@ function checkBand(label, got, want, lo, hi) {
 }
 checkBand('fizzle/elasticity tail', plateauByE / N, '12.0%', 0.09, 0.15);      // 12% +/-3pp
 checkBand('proliferation cap incidence', capHit / N, '35-55%', 0.35, 0.55);    // ratchet binds a strict minority
+
+// Phase-2 incident targets that 02a actually states.
+function checkVal(label, got, want, lo, hi, fmt = f2) {
+    const pass = got >= lo && got <= hi;
+    if (!pass) allPass = false;
+    line(`  ${label.padEnd(28)} ${String(want).padStart(6)}   ${fmt(got).padStart(6)}    ${pass ? 'PASS' : 'MISS'}   (band ${fmt(lo)}-${fmt(hi)})`);
+}
+// Early-window inter-arrival vs 02a's ~1/13d anchor (all runs share the same
+// C~1.75 start, so this is a clean target); +/-35% design band.
+checkVal('incident early cadence (d)', eIA, '~13d', OCC_EARLY_TARGET * 0.65, OCC_EARLY_TARGET * 1.35);
+// S4 self-disclosure is an absolute INVARIANT (not a band): every S4 must be
+// immediate-detected and never persuasion-class. Any violation is a hard FAIL.
+{
+    const pass = s4Violations === 0;
+    if (!pass) allPass = false;
+    line(`  ${'S4 generation invariant'.padEnd(28)} ${'0 viol'.padStart(6)}   ${String(s4Violations).padStart(6)}    ${pass ? 'PASS' : 'MISS'}   (of ${s4Checked} S4s checked)`);
+}
+// Substream isolation is a hard invariant.
+line(`  ${'substream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(isolationPass ? 'yes' : 'no').padStart(6)}    ${isolationPass ? 'PASS' : 'MISS'}`);
+if (!isolationPass) allPass = false;
 
 line('='.repeat(70));
 line(allPass ? 'ALL CALIBRATION TARGETS PASS' : 'ONE OR MORE TARGETS MISS -- see above');

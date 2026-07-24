@@ -27,7 +27,22 @@ const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
-const _PULSE_CATEGORIES = new Set(['fed', 'midterm', 'interjection']);
+// The race categories (overhaul phase 2) fire ONLY via the race->narrative
+// bridge (src/events/race-bridge.js), never by Poisson draw -- excluding them
+// here keeps them out of both the random pool and the one-shot pre-pass.
+const _PULSE_CATEGORIES = new Set(['fed', 'midterm', 'interjection', 'release', 'incident', 'certification']);
+
+// -- Stable, RNG-free string hash (FNV-1a) for headline-variant selection ----
+// Used to collapse `headlines: [...]` pools to one variant deterministically,
+// without consuming any RNG stream (prose choice must never perturb model draws).
+function _hashId(s) {
+    let h = 0x811c9dc5 >>> 0;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h >>> 0;
+}
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
@@ -326,6 +341,22 @@ export class EventEngine {
     }
 
     _fireEvent(event, sim, day, depth, netDelta = 0) {
+        // Variant-pool collapse: a shell may carry `headlines: [...]` instead of a
+        // scalar `headline` (race followup shells, and -- phase-5 -- variant pools
+        // on followup chains generally). Collapse to one variant here so BOTH the
+        // bridge path and the followup path render a real headline. The race bridge
+        // already collapses (+ substitutes tokens) before firing, so this is a
+        // no-op whenever `headline` is set -- it never re-picks or shifts the
+        // bridge's choice. Deterministic + RNG-free ((day + stable id hash) % N):
+        // never touches Math.random or a race RNG substream. Reassigns the local
+        // `event` to a shallow clone so the shared shell object is never mutated
+        // (which would freeze the first pick across all later firings). NOTE: this
+        // collapse does NOT substitute {tokens}; followup-fired variant pools must
+        // be token-free (the bridge owns token substitution).
+        if (!event.headline && Array.isArray(event.headlines) && event.headlines.length) {
+            const idx = (day + _hashId(event.id || '')) % event.headlines.length;
+            event = { ...event, headline: event.headlines[idx] };
+        }
         if (event.popup && event.superevent) {
             const coupling = this._computeCoupling(netDelta, event.params);
             this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);

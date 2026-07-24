@@ -132,17 +132,41 @@ p4 = min(0.005, 0.0004 · ((1−S)/0.5)² · (heat/0.5)² · σ((C_int − 4)/0.
 (A flat 0.5% over ~100–140 incidents/run would have ended 39–50% of
 runs by S4 alone and eaten the outcome table.)
 
-Detection per severity as rev 1 (S0 0.70/Exp 10d … S4 1.00/immediate;
-persuasion 0.40/Exp 90d, unlocks at C_int ≥ R3). Reporting regime:
-detection `min(1, p + 0.12)`, lags halved. Insider tip: **one
+Detection per severity — full ladder ratified 2026-07-23 (rev 1 gave
+only the endpoints): S0 0.70/Exp(10d); S1 0.78/Exp(8d); S2
+0.86/Exp(6d); S3 0.94/Exp(3d); S4 1.00/immediate (same tick —
+self-disclosing is the point); persuasion 0.40/Exp(90d), unlocks at
+C_int ≥ R3 and takes a **0.20 share** of class-draw once unlocked
+(ratified) — **severity 4 is never persuasion-class**: the absolute
+S4 self-disclosure rule dominates every reclassification (ruled
+2026-07-23, phase-2 gate). Reporting regime:
+detection `min(1, p + 0.12)`, lags halved — and activation applies
+**retroactively once**: pending latents re-roll detectability and
+remaining lag under the improved parameters at activation (the
+disclosure wave when a reporting mandate lands is deliberate; ruled
+2026-07-23). Insider tip: **one
 Bernoulli(0.3) per undetected incident** (standing-gated), drawn at
-occurrence.
+occurrence — "undetected" means every incident not detected in its
+occurrence tick, independent of whether public detection ever comes;
+the occurrence→disclosure window is the tip's whole point (ruled
+2026-07-23; gating on the never-detected tail alone starves it). Occurrence-day physical S-effects are **deferred
+entirely**: the latent-record field stays null until a 02a revision
+ratifies a magnitude (no invented truth-valued numbers in state, even
+inert ones; applying one would also double-count the calibrated S
+path).
 
-**Evidence beats:** per alignment-carrying lab ~Exp(40d); per-beat LR
+**Evidence beats:** per alignment-carrying lab ~Exp(40d) —
+alignment-carrying = **Halcyon and Polaris** (ratified 2026-07-23;
+Tianxia is anti-safety by construction and produces no alignment
+evidence, only capability signals). Per-beat LR: |log LR| ~
+U(0, log 3), sign ~ Bernoulli(τ) (kind worlds read kind, ratified),
 clipped to [⅓, 3] **and cumulative evidence log-odds clipped to
 ±log 19** — the posterior ceiling (0.95) is enforced at the
-accumulator, since ~22 beats/run would otherwise blow through it.
-Publication prob = culture; unpublished beats leak at 0.25.
+accumulator. Measured cadence ≈ 40 found / 28 published per run
+(rev 2's "~22 beats/run" rationale figure was a loose derivation —
+the clamp is the stance; the count is derived, and the clamp holds
+at any count). Publication prob = culture; unpublished beats leak
+at 0.25.
 
 ## Market coupling
 

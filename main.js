@@ -71,6 +71,7 @@ import { TIP_REAL_PROBABILITY } from './src/config.js';
 import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
 import { createRaceState, advanceRace, resetRaceState } from './src/race/race-state.js';
+import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
 
 
 // ---------------------------------------------------------------------------
@@ -1327,6 +1328,16 @@ function _onDayComplete() {
         );
         const netDelta = computeNetDelta();
         const { fired, popups } = eventEngine.maybeFire(sim, sim.day, netDelta);
+        // Race -> narrative bridge (overhaul phase 2): fire the day's race
+        // transitions (releases, certifications, detected incidents) through the
+        // same _fireEvent path, merging into the existing display arrays. Dynamic
+        // modes only (raceState is null in Classic); may add toasts/popups but
+        // must not crash. Runs right after advanceRace's ledger was produced.
+        if (raceState) {
+            const bridged = runRaceBridge(eventEngine, raceState, sim, sim.day, netDelta);
+            for (const f of bridged.fired) fired.push(f);
+            for (const p of bridged.popups) popups.push(p);
+        }
         for (const ev of popups) _popupQueue.push(ev);
         const hasSupereventPopups = popups.some(ev => ev.superevent);
         if (hasSupereventPopups) {
@@ -1744,6 +1755,11 @@ function _resetCore(index) {
     resetRegulations();
     resetLobbying();
     resetAudio();
+    // Reset the race->narrative bridge's variant-rotation counter so same-seed
+    // playback doesn't depend on process history. Guarded on raceState so Classic
+    // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
+    // since _resetCore runs before loadPreset nulls raceState.
+    if (raceState) resetRaceBridge();
     sim.reset(index);
     resetPortfolio();
     resetImpactState();

@@ -93,6 +93,21 @@ which heavy, sustained positioning (including shorts) can move through
 the impact machinery; one fill finances nothing. The ledger records
 channels, not fills ([05-endings.md](05-endings.md)).
 
+**Incident coupling rule** (ruled 2026-07-23, from the phase-2
+finding): the detected-incident stream is high-volume by design
+(~80–160 fired events per run), so incident market effects must be
+**decaying impulses or `B`-moves, never permanent additive `sim`
+parameter deltas** — a hundred permanent deltas walk every parameter
+to its clamp and the clamps become the market. The prototype's
+additive-delta convention stays correct for the *low-volume* political
+event pools; the race-bridge pools migrate to impulse/`B` coupling
+when belief lands (phase 4). **Interim (phase-2 gate, 2026-07-23):
+race-bridge event `params` are zeroed entirely** — the gate measured
+the placeholders walking `xi` 0.4→1.2 and pinning `lambda` at its
+clamp inside one run. Race events are narrative-only until the real
+coupling exists; a dead-quiet tape on a rung crossing is a smaller
+lie than a permanently poisoned one.
+
 ## Alpha decay and the regime break
 
 Market efficiency `η` rises with `max(C)` (AI enters the market long
