@@ -115,7 +115,7 @@ export const TREATY_EVENTS = [
         superevent: true,
         magnitude: 'major',
         headline: 'IT HOLDS. The communiqué is four pages; the annex is nine hundred, and the annex is the point — registries with teeth, inspectors with clearances, compute accounted for like fissile material. Both delegations sign. Nobody smiles for the cameras, which is how you know it is real: joy is for deals that flatter, and this one merely binds. The race, which paused out of something like courtesy, discovers the pause has been given a legal name.',
-        context: 'The plateau begins — the future where the wonders arrive slower, argued over, chosen; where markets get boring again, and boredom is the dividend. Long vol dies in the afternoon. The binaries collapse to their settled truths. Somewhere down the floor someone laughs, too loudly, at nothing — relief has no etiquette. Whether your fingerprints are anywhere on it is the ledger&rsquo;s question, and the ledger answers shortly.',
+        context: 'The plateau begins — the future where the wonders arrive slower, argued over, chosen; where markets get boring again, and boredom is the dividend. Long vol dies in the afternoon. The binaries collapse to their settled truths. Somewhere down the floor someone laughs, too loudly, at nothing — relief has no etiquette. Whether your fingerprints are anywhere on it is the ledger’s question, and the ledger answers shortly.',
         params: {},
         // Single acknowledge choice (the strait_blockade "Mark the book" pattern):
         // one choice, no followups, no effects. showPopupEvent iterates choices, so
