@@ -80,7 +80,7 @@ export const TREATY_EVENTS = [
         // as a belt-and-suspenders guard on the bridge path.
         when: (sim, world) => world.ai.summitLive === true,
         headline: 'THE WINDOW. Reykjavik, of all places, because nobody could object to it — one live negotiation, heads of delegation with actual authority, verification text on the table that the track-two people would recognize as their own. The groundwork held: the registry exists, the hinge turns. Summit week begins with the whole race holding its breath, which is to say: with every desk on earth watching an event risk that has no hedge and no comparable.',
-        context: 'Verification, mutually assured compute destruction, the long plateau — the future where markets get boring again and the wonders arrive slower, argued over, chosen. Your fingerprints are on this: the registry lobbying, the channels kept warm, the leak that did not happen. You have a voice in the American delegation’s prep room. One voice among several. The room is influence, not authorship — and the other side’s true position is the best-kept secret of the era.',
+        context: 'Verification, mutually assured compute destruction, the long plateau — the future where markets get boring again and the wonders arrive slower, argued over, chosen. The groundwork that held may or may not carry your fingerprints — the registry, the channels kept warm, the leak that did not happen — but the desk that priced this future all decade has a chair in the American delegation’s prep room either way. One voice among several. The room is influence, not authorship — and the other side’s true position is the best-kept secret of the era.',
         choices: [
             {
                 label: 'Counsel the deal',
@@ -115,7 +115,7 @@ export const TREATY_EVENTS = [
         superevent: true,
         magnitude: 'major',
         headline: 'IT HOLDS. The communiqué is four pages; the annex is nine hundred, and the annex is the point — registries with teeth, inspectors with clearances, compute accounted for like fissile material. Both delegations sign. Nobody smiles for the cameras, which is how you know it is real: joy is for deals that flatter, and this one merely binds. The race, which paused out of something like courtesy, discovers the pause has been given a legal name.',
-        context: 'The plateau begins — the future where the wonders arrive slower, argued over, chosen; where markets get boring again, and boredom is the dividend. Long vol dies in the afternoon. The binaries collapse to their settled truths. Somewhere down the floor someone laughs, too loudly, at nothing — relief has no etiquette. Your fingerprints are on this, whatever the size of the print.',
+        context: 'The plateau begins — the future where the wonders arrive slower, argued over, chosen; where markets get boring again, and boredom is the dividend. Long vol dies in the afternoon. The binaries collapse to their settled truths. Somewhere down the floor someone laughs, too loudly, at nothing — relief has no etiquette. Whether your fingerprints are anywhere on it is the ledger&rsquo;s question, and the ledger answers shortly.',
         params: {},
         // Single acknowledge choice (the strait_blockade "Mark the book" pattern):
         // one choice, no followups, no effects. showPopupEvent iterates choices, so

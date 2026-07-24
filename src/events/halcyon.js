@@ -146,7 +146,7 @@ export const HALCYON_EVENTS = [
             'The Continental, sourced to "two people near the Halcyon board": Osei has begun taking separate briefings from Dirks and Gottlieb, which is either diligence or a divorce lawyer’s intake meeting depending on which of the two people you believe.',
             'Halcyon’s board meets for six hours; the readout is one sentence about "alignment of long-term strategy." Osei’s office books no follow-on meetings for a week. Early money, late caution: the man both factions court is conspicuously letting himself be courted.',
         ],
-        context: 'Meridian’s stake plus your personal book makes the firm a name Halcyon’s board secretary has to pronounce correctly. Osei’s people are counting noses for a restraint slate — more eval before release, an internal brake with an actual handle. Gottlieb’s people are counting the same noses for the opposite conclusion. Both sides have decided, independently, that your nose is worth counting.',
+        context: 'Meridian is a name Halcyon’s board secretary has learned to pronounce correctly, and a desk that prices HCN all day has a kind of voice whether or not it holds a single share. Osei’s people are counting noses for a restraint slate — more eval before release, an internal brake with an actual handle. Gottlieb’s people are counting the same noses for the opposite conclusion. Both sides have decided, independently, that your nose is worth counting.',
         params: {},
         impulse: { xi: 0.006 },   // decaying (P4): governance risk, unpriced until it detonates
         choices: [
