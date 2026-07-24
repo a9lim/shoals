@@ -26,8 +26,9 @@
 
    THE INTEGRITY RULE (09 "Information hygiene"): `B` updates
    ONLY on LEGIBLE events -- releases, certifications,
-   DETECTED incidents, PUBLISHED evidence, and LEAKS (insider
-   tips / leaked beats) -- never on latent truth (C_internal,
+   DETECTED incidents, PUBLISHED evidence, DISCLOSED thefts,
+   and LEAKS (insider tips / leaked beats / the player's own
+   leak verb) -- never on latent truth (C_internal,
    C_released, tau, S, heat). `stepBelief` consumes ONLY
    `race.lastTransitions` (the per-tick ledger), never the
    latent queues and never a state-diff. Every non-random `B`
@@ -116,6 +117,11 @@ const A_ROUTINE = 0.06;      // a routine (no-rung) release is a faint cadence n
 const RUNG_SPACING = 150;    // UNRATIFIED implied days between successive rung crossings
 const A_LEAK = 0.30;         // RATIFIED leak blend: B_new = 0.7*B + 0.3*L (alignment channel)
 const ALIGN_INCIDENT = 0.06; // additive alignment hit per DETECTED incident, x(severity+1) (bounded by clamp)
+// RATIFIED (02a evidence machinery): a DISCLOSED weight theft folds -0.20 into the
+// alignment sentiment, once per disclosure (`theftdisc_` fold-id class). A theft
+// becoming public is unambiguous bad news about the security of the frontier --
+// which is why it is a fixed magnitude, not severity-scaled like an incident.
+const ALIGN_THEFT_DISCLOSURE = 0.20;
 const ALIGN_CLAMP = Math.log(19);   // alignment sentiment clamp (posterior ceiling 0.95, mirrors evidence)
 
 // eta / compute-demand (UNRATIFIED shapes).
@@ -435,6 +441,17 @@ export function stepBelief(race) {
         _foldAlignment(-ALIGN_INCIDENT * (sev + 1), A_LEAK, `tip_${occ.id}`, 'insider-tip');
     }
 
+    // 5b. DISCLOSED weight thefts (evidence machinery round). The occurrence was
+    //     silent (and stays silent -- `tr.thefts` is never read here); the
+    //     DISCLOSURE is the legible event, so it folds off the disclosure ledger
+    //     only, once per disclosure id. A fixed -0.20 into the bounded alignment
+    //     sentiment; the crossing-date timeline is untouched (a theft moves who
+    //     has what, not when the world gets there -- and the capability
+    //     discontinuity it caused is already in the release/certification stream).
+    for (const dis of (tr.theftDisclosures || [])) {
+        _foldAlignment(-ALIGN_THEFT_DISCLOSURE, 1, `theftdisc_${dis.id}`, 'theft-disclosed');
+    }
+
     // 6. Optional random chatter (OFF by default; draws from the belief
     //    substream, never an existing one). Random moves are the only B moves
     //    exempt from the causal-ID rule -- but they are still ledgered (a
@@ -455,6 +472,35 @@ function _foldAlignment(logLR, weight, id, cause) {
     belief.alignment = clamp(next, -ALIGN_CLAMP, ALIGN_CLAMP);
     _recordCause(id, cause, null, before, belief.alignment, weight);
     return true;
+}
+
+/**
+ * The belief half of the insider channel's LEAK verb (evidence machinery round):
+ * fold the leaked incident's DETECTION-CLASS sentiment now, on leak day, under
+ * THE DETECTION'S OWN fold id `det_${id}` (02a, verbatim).
+ *
+ * Folding under the detection's id is the whole mechanism: the existing leak-once
+ * `processed` set then makes the real detection's later fold in stepBelief a
+ * no-op. For an incident that would EVENTUALLY DETECT anyway, the TOTAL `B` move
+ * is therefore IDENTICAL leaked or unleaked -- leaking buys TIMING and public
+ * pressure, never extra belief mass. For the never-detectable tail the identity
+ * does NOT hold, by design: the unleaked counterfactual folds nothing, and the
+ * leak's fold is mass the world would otherwise never get -- overriding that
+ * tail is what the verb is for (gate ruling, evidence round). No new idempotency
+ * machinery, and the audit ledger records who claimed the fold (cause
+ * 'player-leak' vs 'incident-detected'), so beliefCauses() reconstruction holds.
+ *
+ * Same weight (1, additive) and same magnitude (-ALIGN_INCIDENT*(sev+1)) as the
+ * detection fold -- by construction, not by coincidence.
+ *
+ * @param {string} id        the incident id (NOT pre-prefixed; `det_` is added here)
+ * @param {number} severity  the incident's severity 0..4
+ * @returns {boolean} true if this call was the fold that landed
+ */
+export function foldPlayerLeak(id, severity) {
+    if (!belief.active || !belief.processed || id == null) return false;
+    const sev = severity ?? 0;
+    return _foldAlignment(-ALIGN_INCIDENT * (sev + 1), 1, `det_${id}`, 'player-leak');
 }
 
 /** Small random jitter (noise path; OFF by default). Ledgered under a 'noise'

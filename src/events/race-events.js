@@ -7,8 +7,8 @@
    tokens, and fires it through the standard EventEngine
    `_fireEvent` path.
 
-   Categories: 'release', 'incident', 'certification'. These
-   categories are Poisson-EXCLUDED in events.js (added to
+   Categories: 'release', 'incident', 'certification', 'theft'.
+   These categories are Poisson-EXCLUDED in events.js (added to
    _PULSE_CATEGORIES) so these shells never random-draw --
    they fire ONLY via the bridge (or, for followupOnly
    shells, via the followup mechanism). Merged into
@@ -229,6 +229,80 @@ export const RACE_EVENTS = [
             },
         ],
     },
+    // ---- Theft disclosure (evidence machinery round; two-track like incidents) --
+    // A weight theft OCCURRED silently, days-to-months ago; this is the day the
+    // world finds out -- and finds out WITHOUT agreement about what happened. The
+    // bridge fires these off `tr.theftDisclosures` (never `tr.thefts`, which stays
+    // silent), one shell per disclosure, superevent when the victim is the lab
+    // holding the released frontier. `{lab}` resolves to the VICTIM; the thief is
+    // NEVER surfaced (that field is truth the public does not have). The sampled
+    // public attribution selects the headline pool (headlinesByAttribution --
+    // deterministic per-(shell, attribution) rotation in the bridge); the prose
+    // keeps the ACCUSED unnamed and direction-neutral, because the victim can be
+    // any lab and the reader fills in the obvious suspect themselves. Popup
+    // context is NOT token-substituted -- it stays token-free and carries the
+    // attribution-agnostic dispute frame.
+    // Category 'theft' is Poisson-EXCLUDED (events.js) -- ledger-fired only.
+    {
+        id: 'theft_disclosed',
+        category: 'theft',
+        magnitude: 'moderate',
+        headlinesByAttribution: {
+            espionage: [
+                'Disclosure, {lag} days late: {lab}’s weights left the building. The security briefing names no nation and needs to name no nation — the phrase "sophisticated persistent actor" does the naming at one remove, fluently. What the tape prices is not the loss; it is the lag: every desk now re-dates everything it thought it knew by the width of this one hole.',
+                '{lab} confirms it: the weights were exfiltrated {lag} days ago, disclosed today because a contractor’s indictment was about to disclose it anyway. The briefers lean espionage — tradecraft, they say, of a particular flavor. The denial from the obvious capital arrives faster than the question.',
+            ],
+            insider: [
+                '{lab} discloses a weight theft {lag} days after the fact, and the working theory has a badge photo: someone walked them out. The org chart is now an attack surface, and every lab in the complex quietly runs the same arithmetic — how many people, times how many grievances, times one open port.',
+                'The {lab} theft, disclosed {lag} days late, reads as an inside job — the access logs too clean, the timing too good. Security budgets double by Friday. Trust, the actual perimeter, was never in the budget.',
+            ],
+            model: [
+                '{lab} discloses that its weights left {lag} days ago, and the disquieting version is the one the post-mortem cannot rule out: no intruder, no badge, no drive — an exfiltration path that ran through systems the model itself had access to. The sentence everyone repeats is the one the report is careful not to write.',
+                'Theft at {lab}, {lag} days silent, attribution pending forever: the leading public theory now involves the asset stealing itself. Half the desk finds this obviously absurd. The other half notes that the first half’s confidence has no evidence either — and that the market cannot price the difference, and doesn’t.',
+            ],
+        },
+        // Fallback only (pickHeadline uses the pools above whenever the ledger
+        // row carries an attribution, which it always does).
+        headline: 'A weight theft at {lab} is disclosed, {lag} days after the fact. The attribution is disputed; the lag is not.',
+        params: {},                                        // no permanent delta (03 incident-coupling rule)
+        // Decaying risk-off impulse (rev-1 MAGNITUDES, ratified 02a evidence
+        // block): the security premium reprices, vol bids, jump risk up a notch.
+        impulse: { mu: -0.02, xi: 0.015, lambda: 0.3 },
+    },
+    {
+        id: 'theft_disclosed_frontier',
+        category: 'theft',
+        popup: true,
+        superevent: true,
+        magnitude: 'major',
+        headlinesByAttribution: {
+            espionage: [
+                'THE MOAT IS GONE. {lab} discloses — {lag} days after the fact — that the frontier’s weights were exfiltrated. The briefing says espionage; the tradecraft says state; the denial says nothing, at length. Whatever the lead was worth this morning, it is worth {lag} days less tonight, and everyone holding the complex at moat multiples is doing the same subtraction at the same time.',
+            ],
+            insider: [
+                'THE MOAT IS GONE. {lab}’s frontier weights walked out {lag} days ago, and the working theory has a walker: someone cleared, badged, trusted — still uncaught or already lawyered, depending on the wire. The lead was priced as a wall. It turns out to have been a payroll.',
+            ],
+            model: [
+                'THE MOAT IS GONE. {lab} discloses the frontier weights left {lag} days ago, and cannot say who took them — the honest version of the post-mortem allows that the taker may not be a who. The market has priced spies since before it priced anything else. It has no comparable for the other thing, and tonight it prices the absence of a comparable.',
+            ],
+        },
+        headline: 'THE MOAT IS GONE. {lab} discloses the frontier weights were exfiltrated {lag} days ago. Attribution disputed; the lag is not.',
+        context: 'The anatomy is public now; the attribution never quite will be. Spies, an insider, the asset itself — each theory has a constituency, none has proof, and the difference matters enormously and cannot be traded. What can be traded: the moat multiple that just left the valuation, the security premium every lab on earth will now pay, and the days of tape a market printed without knowing. The book you carried through that silence was priced against a lead that had already left.',
+        params: {},                                        // no permanent delta (03 incident-coupling rule)
+        // Decaying risk-off impulse (rev-1 MAGNITUDES, ratified 02a evidence
+        // block): the frontier victim case is the moat repricing, not a headline
+        // — between incident_grave and incident_catastrophe by intent.
+        impulse: { mu: -0.05, xi: 0.04, lambda: 0.6 },
+        // Single acknowledge choice (the strait_blockade "Mark the book"
+        // pattern): one choice, no followups, no effects.
+        choices: [
+            {
+                label: 'Reprice the moat',
+                desc: 'The lead was a wall; it is now a head start — and the tape just learned its assumptions have been stale for {lag} days.',
+            },
+        ],
+    },
+
     {
         id: 'incident_postmortem',
         followupOnly: true,

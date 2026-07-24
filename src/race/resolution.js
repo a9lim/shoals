@@ -257,7 +257,13 @@ function plateauConfirmed(race) {
     const drift = leader
         ? deterministicDrift(cap, leader, race.day,
             { regime: race.controlRegime, deltaSup: RETUNE.delta_sup, followerKf: RETUNE.k_f,
-                playerCoupling: race.playerCoupling })
+                playerCoupling: race.playerCoupling,
+                // Export controls (evidence machinery round) dampen TIANXIA's compute
+                // leg. When Tianxia is the leader, omitting the stage would over-read
+                // its drift and DELAY a real plateau -- the mirror of the P6-2
+                // playerCoupling omission. Kinematics and detector price ONE drift, so
+                // the detector reads the stage advanceRace stored this tick. 0 headless.
+                exportControlStage: race.exportControlStage })
         : Infinity;
     if (drift < PLATEAU_DRIFT_THRESHOLD) race.plateauStreak = (race.plateauStreak || 0) + 1;
     else race.plateauStreak = 0;
@@ -337,6 +343,12 @@ function evaluateLadder(race, extrapolated) {
 function extrapolate(race, geo) {
     const startDay = race.day;
     const tension = straitTension(geo);   // frozen public tension; 0 headless
+    // Export-control stage: FROZEN at the value the live world last passed, exactly
+    // as `tension` freezes the live public geopolitics (the policy world stops at the
+    // moment the desk's story ends; the physical world keeps running). Captured ONCE
+    // here and re-passed every extrapolated tick -- advanceRace normalizes an absent
+    // stage to 0, so re-passing is what keeps the captured value in force. 0 headless.
+    const exportStage = race.exportControlStage || 0;
     // ABSOLUTE cap (02a P6-3 ruling 2): the world continues to a FIXED endpoint
     // (HORIZON + EXTRAP_CAP), never a decade past whenever the DESK happened to leave.
     // For the timeout path startDay == HORIZON, so this is byte-identical to the old
@@ -346,7 +358,7 @@ function extrapolate(race, geo) {
     // never changes the oracle.
     const capDay = HORIZON + EXTRAP_CAP;
     while (race.day < capDay) {
-        advanceRace(race, { straitTension: tension });
+        advanceRace(race, { straitTension: tension, exportControlStage: exportStage });
         // Neutral-signal control-regime stepping (02a phase-6 ruling): the
         // political-control axis reads the EXTRAPOLATED world, not the day the
         // desk's story ended. "Neutral" == no exogenous pushes (exo {}); the

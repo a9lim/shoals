@@ -16,19 +16,42 @@
       YES/NO, deadline auto-fallback, regime fallback, the
       mobilized adjudicator, and non-tradeability.
 
+   ...and the EVIDENCE MACHINERY round (2026-07-24):
+
+   G. exportControlStage -> Tianxia compute dampener: stage-0
+      bit-identity (the calibration invariant), exact drift
+      monotonicity in the stage, compute-leg-only (k_f
+      untouched), and the directional cut to Tianxia
+      capability + family-4 incidence at a forced stage 3.
+   H. Leak coupling (`_tipIncidentId`): unconditional detection
+      forcing on a 4d clock, the fold-once-under-`det_${id}`
+      belief identity (leaked == unleaked in total mass), and
+      the frozen/inactive gate.
+   I. Theft disclosure track: eligibility 0.75, mean lag 40d,
+      public attribution 0.55/0.30/0.15, complete ledger rows,
+      and on/off trajectory bit-identity.
+
    All numeric bands are DESIGN bands; the tuning is RATIFIED in
    02a's "Content plumbing (phase-5a ratifications, 2026-07-23)"
-   block. Exits 1 on any MISS.
+   and "Evidence machinery (pre-P7 ratifications, 2026-07-24)"
+   blocks. Exits 1 on any MISS.
 
    Usage:  node tools/plumbing-test.mjs [N]
    =================================================== */
 
+import { createHash } from 'node:crypto';
 import {
     createRaceState, advanceRace, stepControlRegime, setControlRegime,
-    heatValue, REGIME_RANK, CONTROL_REGIMES,
+    heatValue, REGIME_RANK, CONTROL_REGIMES, RETUNE,
 } from '../src/race/race-state.js';
 import { CONTROL_TUNING } from '../src/race/control-regime.js';
 import { BLOCKADE_HEAT } from '../src/race/strait.js';
+import { deterministicDrift, EXPORT_CONTROL_GROWTH, normalizeExportStage } from '../src/race/capability.js';
+import { forceLeakDetection, LEAK_FORCED_MEAN_LAG } from '../src/race/incidents.js';
+import { DISCLOSE_PROB, DISCLOSE_MEAN_LAG, PUBLIC_ATTRIBUTIONS } from '../src/race/theft-disclosure.js';
+import { stepTreaty } from '../src/race/treaty-track.js';
+import { checkResolution } from '../src/race/resolution.js';
+import { resetLedger, deactivateLedger, freezeLedger, raceChannelsLive } from '../src/race/ledger.js';
 import {
     consensus, initConsensus, deactivateConsensus, refreshBinaryQuotes,
     computeBinarySettlements, openDispute, ruleDispute, disputeAdjudicator,
@@ -42,9 +65,14 @@ import {
     portfolio, resetPortfolio, executeBinaryTrade, executeMarketOrder,
     settleComputeFutures, portfolioValue, applyBinarySettlementRows,
 } from '../src/portfolio.js';
-import { initBelief, deactivateBelief, lockForecast, credibility } from '../src/race/belief.js';
+import {
+    belief, initBelief, deactivateBelief, lockForecast, credibility,
+    stepBelief, foldPlayerLeak, beliefCauses, beliefProcessed,
+} from '../src/race/belief.js';
 import { market, syncMarket } from '../src/market.js';
-import { eventBaseRateScale, BASE_RATE_MAX_MULT } from '../src/events.js';
+import { eventBaseRateScale, BASE_RATE_MAX_MULT, EventEngine } from '../src/events.js';
+import { runRaceBridge, resetRaceBridge } from '../src/events/race-bridge.js';
+import { getEventById } from '../src/events/index.js';
 import { NON_FED_POISSON_RATE } from '../src/config.js';
 import { createWorldState, applyStructuredEffects } from '../src/world-state.js';
 
@@ -515,6 +543,344 @@ check('gray-zone fires at tension 1', grayAtTension1 > 0, `${grayAtTension1} tot
     check('F6: forward escalation still honored', fwd);
 }
 
+// =====================================================================
+// EVIDENCE MACHINERY ROUND (2026-07-24)
+// =====================================================================
+
+/** SHA-256 over the full daily PHYSICAL trajectory (C both tracks / S / heat /
+ *  theftCount / rung + certification stamps) -- the P6-2 pattern. This is the
+ *  quantity every "bit-identical" claim in this round is about: the race's
+ *  physical state, not the narrative/belief ledgers layered on top. */
+function trajectoryHash(seed, opts, mutate) {
+    const race = createRaceState(seed >>> 0);
+    if (mutate) mutate(race);
+    const h = createHash('sha256');
+    for (let d = 0; d < HORIZON; d++) {
+        advanceRace(race, opts);
+        const c = race.capability;
+        h.update([
+            c.labs.halcyon.C_internal, c.labs.tianxia.C_internal,
+            c.labs.polaris.active ? c.labs.polaris.C_internal : 'x', c.open.C,
+            c.labs.halcyon.C_released, c.labs.tianxia.C_released,
+            race.safety.halcyon, race.safety.tianxia,
+            race.safety.polaris === null ? 'x' : race.safety.polaris,
+            heatValue(race.heat), race.heat.floor, race.heat.transient, race.theftCount,
+            JSON.stringify(c.labs.halcyon.rungInternal), JSON.stringify(c.labs.tianxia.rungInternal),
+            JSON.stringify(c.labs.halcyon.rungCertified), JSON.stringify(c.labs.tianxia.rungCertified),
+        ].join('|') + '\n');
+    }
+    return h.digest('hex');
+}
+
+// =====================================================================
+// G. exportControlStage -> Tianxia compute dampener
+// =====================================================================
+const IDENT_SEEDS = Math.max(100, Math.min(N, 120));
+let stageIdentOK = true, discIdentOK = true;
+let damp0 = null, damp3 = null;
+{
+    // G1. STAGE-0 BIT-IDENTITY -- the calibration invariant. Three arms must agree
+    //     over >= 100 seeds: no inputs at all (race-mc / every pre-round harness),
+    //     an explicit stage 0, and the disclosure track switched OFF. Any drift here
+    //     would silently invalidate every 02a calibration band recorded pre-round.
+    for (let s = 0; s < IDENT_SEEDS; s++) {
+        const seed = (BASE_SEED + s) >>> 0;
+        const bare = trajectoryHash(seed, undefined);
+        const stage0 = trajectoryHash(seed, { straitTension: 0, exportControlStage: 0 });
+        const discOff = trajectoryHash(seed, undefined, (r) => { r.theftDisclosureEnabled = false; });
+        if (bare !== stage0) stageIdentOK = false;
+        if (bare !== discOff) discIdentOK = false;
+    }
+    check(`G1: stage-0 trajectory bit-identical to no-stage over ${IDENT_SEEDS} seeds`, stageIdentOK);
+    check(`G1: theft-disclosure ON/OFF trajectory bit-identical over ${IDENT_SEEDS} seeds`, discIdentOK);
+
+    // G2. Growth table transcription + stage normalization (02a verbatim).
+    check('G2: EXPORT_CONTROL_GROWTH == [1.30, 1.20, 1.06, 0.90] (02a verbatim)',
+        JSON.stringify(EXPORT_CONTROL_GROWTH) === JSON.stringify([1.30, 1.20, 1.06, 0.90]));
+    check('G2: stage normalization clamps + rounds (absent -> 0, 9 -> 3, -1 -> 0)',
+        normalizeExportStage(undefined) === 0 && normalizeExportStage(null) === 0
+        && normalizeExportStage(9) === 3 && normalizeExportStage(-1) === 0 && normalizeExportStage(2.4) === 2);
+
+    // G3. EXACT drift monotonicity in the stage, and COMPUTE-LEG-ONLY: the stage
+    //     must strictly slow Tianxia's drift at every step, must not touch any other
+    //     lab, and must leave the fast-follower term k_f untouched (controls bind
+    //     chips, never weights already released). Deterministic -- no MC needed.
+    {
+        const race = createRaceState(4242);
+        for (let d = 0; d < 500; d++) advanceRace(race);
+        const cap = race.capability;
+        const base = { regime: race.controlRegime, deltaSup: RETUNE.delta_sup, followerKf: RETUNE.k_f };
+        const tx = [0, 1, 2, 3].map(s => deterministicDrift(cap, cap.labs.tianxia, race.day, { ...base, exportControlStage: s }));
+        let strict = true;
+        for (let i = 1; i < tx.length; i++) if (!(tx[i] < tx[i - 1])) strict = false;
+        check('G3: Tianxia drift STRICTLY decreasing in stage 0->3', strict,
+            tx.map(x => x.toExponential(3)).join(' > '));
+        const hal = [0, 3].map(s => deterministicDrift(cap, cap.labs.halcyon, race.day, { ...base, exportControlStage: s }));
+        check('G3: Halcyon drift untouched by the stage (Tianxia-only dampener)', hal[0] === hal[1]);
+        // k_f isolation: the follower term's CONTRIBUTION (drift with k_f minus drift
+        // without) must be identical at stage 0 and stage 3 for the same C -- the
+        // dampener rides mu_b only. Compare at a FIXED C by restoring it.
+        const cInt = cap.labs.tianxia.C_internal;
+        const kf = (s) => {
+            cap.labs.tianxia.C_internal = cInt;
+            const withKf = deterministicDrift(cap, cap.labs.tianxia, race.day, { ...base, exportControlStage: s });
+            const noKf = deterministicDrift(cap, cap.labs.tianxia, race.day, { ...base, followerKf: 0, exportControlStage: s });
+            return withKf - noKf;
+        };
+        check('G3: fast-follower k_f term identical at stage 0 and 3 (chips, not weights)',
+            Math.abs(kf(0) - kf(3)) < 1e-15, `${kf(0).toExponential(3)} vs ${kf(3).toExponential(3)}`);
+    }
+
+    // G4. DIRECTIONAL probe (not a band, 02a): a sustained stage 3 from day 0 must
+    //     visibly cut Tianxia capability and family-4 incidence vs stage 0.
+    const DAMP_N = Math.min(N, 800);
+    function dampArm(stage) {
+        let c504 = 0, n504 = 0, fam4 = 0, txLeads = 0;
+        for (let i = 0; i < DAMP_N; i++) {
+            const race = createRaceState((BASE_SEED + i) >>> 0);
+            for (let d = 0; d < HORIZON && !race.resolution; d++) {
+                advanceRace(race, { straitTension: 0, exportControlStage: stage });
+                if (race.day === 504) { c504 += race.capability.labs.tianxia.C_internal; n504++; }
+                stepControlRegime(race); stepTreaty(race, {}); checkResolution(race, null);
+            }
+            if (!race.resolution) checkResolution(race, null);
+            if (race.resolution.family === 4) fam4++;
+            if (race.capability.labs.tianxia.C_internal > race.capability.labs.halcyon.C_internal) txLeads++;
+        }
+        return { c504: c504 / n504, fam4: fam4 / DAMP_N, txLeads: txLeads / DAMP_N };
+    }
+    damp0 = dampArm(0); damp3 = dampArm(3);
+    check('G4: stage 3 cuts mean Tianxia C@504 vs stage 0', damp3.c504 < damp0.c504,
+        `${damp3.c504.toFixed(4)} < ${damp0.c504.toFixed(4)}`);
+    check('G4: stage 3 cuts Tianxia-leads-at-1008 vs stage 0', damp3.txLeads < damp0.txLeads,
+        `${pct(damp3.txLeads)} < ${pct(damp0.txLeads)}`);
+    // "Visibly": a >= 25% relative cut in family-4 incidence (directional, generous).
+    check('G4: stage 3 VISIBLY cuts family-4 incidence (>= 25% relative)',
+        damp3.fam4 < damp0.fam4 * 0.75, `${pct(damp3.fam4)} vs ${pct(damp0.fam4)} at stage 0`);
+}
+
+// =====================================================================
+// H. Leak coupling via _tipIncidentId
+// =====================================================================
+{
+    // H1. Detection forcing: a never-detectable incident becomes detectable on the
+    //     4d clock, and the daily pass then finds it inside ~a week in expectation.
+    //     P(detect within 7d) = 1 - exp(-7/4) = 0.826.
+    let forcedOK = true, noopOK = true, unknownOK = true;
+    const detDays = [];
+    const LEAK_N = Math.min(N, 600);
+    let within7 = 0, leakRuns = 0;
+    for (let i = 0; i < LEAK_N; i++) {
+        const race = createRaceState((BASE_SEED + 9000 + i) >>> 0);
+        for (let d = 0; d < 400; d++) advanceRace(race);
+        // Pick a NEVER-detectable, undetected latent incident (the tail the verb overrides).
+        const target = race.latentIncidents.find(x => !x.detected && !x.detectable);
+        if (!target) continue;
+        const res = forceLeakDetection(race, target.id);
+        if (!res || !res.forced || !target.detectable || target.meanLag > LEAK_FORCED_MEAN_LAG) forcedOK = false;
+        const leakDay = race.day;
+        for (let d = 0; d < 60 && !target.detected; d++) advanceRace(race);
+        leakRuns++;
+        if (target.detected) {
+            detDays.push(target.detectDay - leakDay);
+            if (target.detectDay - leakDay <= 7) within7++;
+        }
+        // Already-detected: a second force is a no-op that reports itself.
+        const again = forceLeakDetection(race, target.id);
+        if (target.detected && (!again || again.forced !== false || again.alreadyDetected !== true)) noopOK = false;
+        if (forceLeakDetection(race, 'inc_does_not_exist') !== null) unknownOK = false;
+    }
+    const meanDetLag = detDays.length ? detDays.reduce((a, b) => a + b, 0) / detDays.length : NaN;
+    check('H1: leak forces detectable=true on the 4d clock (never-detected tail overridden)', forcedOK);
+    check('H1: leaked incident detects within a week in ~82% of cases (1-e^-7/4)',
+        within7 / leakRuns >= 0.75 && within7 / leakRuns <= 0.90,
+        `${pct(within7 / leakRuns)} of ${leakRuns}; mean lag ${meanDetLag.toFixed(2)}d (target ${LEAK_FORCED_MEAN_LAG})`);
+    check('H1: mean forced detection lag ~ 4d', meanDetLag > 3 && meanDetLag < 5.5, `${meanDetLag.toFixed(2)}d`);
+    check('H1: re-forcing an already-detected incident is a no-op', noopOK);
+    check('H1: unknown incident id -> null (stale popup safe)', unknownOK);
+
+    // H2. THE belief identity: the leak folds under the DETECTION's own id, so the
+    //     total alignment displacement is IDENTICAL leaked vs unleaked -- only the
+    //     DAY differs. Two arms over the same synthetic detection ledger.
+    const inc = { id: 'inc_probe_1', source: 'halcyon', severity: 2, cls: 'accident', occurDay: 10, detectDay: 30, lag: 20 };
+    const detLedger = {
+        releases: [], certifications: [], strait: null, theftDisclosures: [],
+        incidents: { occurred: [], detected: [inc] }, evidence: { occurred: [], published: [] },
+    };
+    // Arm A (unleaked): the detection alone.
+    initBelief(null);
+    belief.day = 30;
+    stepBelief({ day: 30, lastTransitions: detLedger });
+    const alignA = belief.alignment;
+    const causesA = beliefCauses().filter(c => c.id === `det_${inc.id}`);
+    // Arm B (leaked on day 12, detection lands day 30).
+    initBelief(null);
+    belief.day = 12;
+    const folded = foldPlayerLeak(inc.id, inc.severity);
+    const alignAfterLeak = belief.alignment;
+    const leakCauses = beliefCauses().filter(c => c.id === `det_${inc.id}`);
+    belief.day = 30;
+    stepBelief({ day: 30, lastTransitions: detLedger });
+    const alignB = belief.alignment;
+    const causesB = beliefCauses().filter(c => c.id === `det_${inc.id}`);
+    check('H2: leak fold lands under the DETECTION\'s own id `det_${id}`',
+        folded === true && leakCauses.length === 1 && leakCauses[0].cause === 'player-leak'
+        && beliefProcessed(`det_${inc.id}`) === true);
+    check('H2: TOTAL alignment displacement identical leaked vs unleaked',
+        Math.abs(alignA - alignB) < 1e-15, `${alignA} vs ${alignB}`);
+    check('H2: the leak moved B EARLY (day 12, not day 30)',
+        Math.abs(alignAfterLeak - alignB) < 1e-15 && alignAfterLeak !== 0
+        && leakCauses[0].day === 12);
+    check('H2: the real detection\'s later fold is a NO-OP (exactly one cause entry)',
+        causesA.length === 1 && causesB.length === 1
+        && causesB[0].cause === 'player-leak' && causesA[0].cause === 'incident-detected');
+    // A second leak of the same incident is idempotent (the processed set).
+    check('H2: re-leaking the same incident folds nothing (idempotent)',
+        foldPlayerLeak(inc.id, inc.severity) === false && belief.alignment === alignB);
+
+    // H2b. The never-detectable TAIL is the asymmetry the identity above does
+    //      NOT cover (gate ruling): without the leak the incident never folds
+    //      (it never detects); the leak's fold is mass the counterfactual never
+    //      gets. The override IS the difference -- that is what the verb is for.
+    const emptyLedger = {
+        releases: [], certifications: [], strait: null, theftDisclosures: [],
+        incidents: { occurred: [], detected: [] }, evidence: { occurred: [], published: [] },
+    };
+    initBelief(null);
+    belief.day = 40;
+    stepBelief({ day: 40, lastTransitions: emptyLedger });
+    const alignTailUnleaked = belief.alignment;
+    initBelief(null);
+    belief.day = 12;
+    const foldedTail = foldPlayerLeak('inc_probe_tail', 2);
+    const alignTailLeaked = belief.alignment;
+    check('H2b: never-detectable tail -- unleaked counterfactual folds NOTHING',
+        alignTailUnleaked === 0);
+    check('H2b: never-detectable tail -- the leak fold is NEW mass (-0.18 at sev 2)',
+        foldedTail === true && Math.abs(alignTailLeaked - (-0.18)) < 1e-12,
+        `${alignTailLeaked}`);
+    deactivateBelief();
+    // Belief inactive (Classic): the fold is inert, never a crash on a null set.
+    check('H2: fold inert while belief is inactive (Classic)', foldPlayerLeak('inc_x', 3) === false);
+
+    // H3. The frozen/inactive GATE -- the same one applyRaceEffects uses. main.js
+    //     guards the leak on raceChannelsLive(), so a leak after the terminal latch
+    //     (frozen) or in Classic (inactive) does nothing MECHANICAL.
+    deactivateLedger();
+    check('H3: gate CLOSED while the ledger is inactive (Classic)', raceChannelsLive() === false);
+    resetLedger();
+    check('H3: gate OPEN in a live Dynamic run', raceChannelsLive() === true);
+    freezeLedger();
+    check('H3: gate CLOSED after the terminal latch (freezeLedger)', raceChannelsLive() === false);
+    deactivateLedger();
+}
+
+// =====================================================================
+// I. Theft disclosure track
+// =====================================================================
+let discRows = 0, discEligible = 0, discThefts = 0;
+{
+    const DISC_N = Math.min(N, 2000);
+    const lags = [];
+    const attrTally = {}; for (const a of PUBLIC_ATTRIBUTIONS) attrTally[a] = 0;
+    let sameTick = 0, disclosedLatents = 0, rowShapeOK = true, publicIndependent = 0, trueEspionage = 0;
+    for (let i = 0; i < DISC_N; i++) {
+        const race = createRaceState((BASE_SEED + i) >>> 0);
+        for (let d = 0; d < HORIZON; d++) {
+            advanceRace(race);
+            for (const row of race.lastTransitions.theftDisclosures) {
+                discRows++;
+                lags.push(row.lag);
+                if (row.lag <= 0) sameTick++;
+                if (attrTally[row.publicAttribution] === undefined) rowShapeOK = false;
+                else attrTally[row.publicAttribution]++;
+                if (row.id == null || row.from == null || row.to == null
+                    || row.theftDay == null || row.day !== race.day
+                    || row.lag !== row.day - row.theftDay) rowShapeOK = false;
+            }
+        }
+        discThefts += race.theftCount;
+        for (const t of race.latentThefts) {
+            if (t.disclosable) discEligible++;
+            if (t.disclosed) disclosedLatents++;
+            // The record's TRUE attribution is always 'espionage' on the dyad path;
+            // the PUBLISHED one is sampled independently, so they disagree often.
+            if (t.disclosed) {
+                trueEspionage += (t.trueAttribution === 'espionage') ? 1 : 0;
+                if (t.publicAttribution !== t.trueAttribution) publicIndependent++;
+            }
+        }
+    }
+    const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
+    const eligFrac = discEligible / discThefts;
+    check(`I1: disclosure eligibility ~ ${DISCLOSE_PROB} (the never-disclosed tail is real)`,
+        eligFrac >= 0.71 && eligFrac <= 0.79, `${pct(eligFrac)} of ${discThefts} thefts`);
+    check('I1: a quarter of thefts stay rumor forever (eligibility strictly < 1)',
+        eligFrac < 0.95 && discEligible < discThefts, `${discThefts - discEligible} never-disclosable`);
+    // Right-censored at the horizon, so the OBSERVED mean lag sits below the 40d
+    // Exp mean; the band allows the censoring without allowing a wrong rate.
+    check(`I2: disclosure lag mean consistent with Exp(${DISCLOSE_MEAN_LAG}) under horizon censoring`,
+        mean(lags) >= 28 && mean(lags) <= 42, `${mean(lags).toFixed(1)}d over ${lags.length} disclosures`);
+    check('I2: no theft discloses in its own commit tick (occurrence stays silent)',
+        sameTick === 0 && Math.min(...lags) >= 1, `min lag ${Math.min(...lags)}`);
+    check('I3: public attribution ~ 0.55 espionage',
+        attrTally.espionage / discRows >= 0.51 && attrTally.espionage / discRows <= 0.59,
+        pct(attrTally.espionage / discRows));
+    check('I3: public attribution ~ 0.30 insider',
+        attrTally.insider / discRows >= 0.26 && attrTally.insider / discRows <= 0.34,
+        pct(attrTally.insider / discRows));
+    check('I3: public attribution ~ 0.15 the model itself',
+        attrTally.model / discRows >= 0.12 && attrTally.model / discRows <= 0.18,
+        pct(attrTally.model / discRows));
+    check('I3: public attribution INDEPENDENT of the true one (the dispute is the story)',
+        publicIndependent > 0 && trueEspionage === disclosedLatents,
+        `${publicIndependent}/${disclosedLatents} disclosures blame the wrong thing`);
+    check('I4: ledger rows complete + exactly one per disclosure',
+        rowShapeOK && discRows === disclosedLatents, `${discRows} rows, ${disclosedLatents} disclosed`);
+
+    // I5. The BRIDGE routes the ledger: both shells exist, are Poisson-excluded,
+    //     and the frontier-victim case takes the superevent while an ordinary
+    //     victim takes the toast shell. Fires the real bridge against a stub
+    //     engine (a shell-id typo would otherwise only surface in play).
+    const shellTally = {};
+    let tokensClean = true, frontierIsSuperevent = true, victimTokenOK = true;
+    const stubEngine = {
+        world: { factions: {}, geopolitical: {}, ai: {} },
+        _fireEvent(ev) {
+            if (ev.id.startsWith('theft_')) {
+                shellTally[ev.id] = (shellTally[ev.id] || 0) + 1;
+                if (/\{[a-zA-Z]+\}/.test(ev.headline)) tokensClean = false;
+                if (ev.id === 'theft_disclosed_frontier' && !ev.superevent) frontierIsSuperevent = false;
+                if (!ev.raceMeta || ev.raceMeta.lab !== ev.raceMeta.victim) victimTokenOK = false;
+            }
+            return ev.popup ? { queued: true, event: ev } : { id: ev.id };
+        },
+    };
+    for (let i = 0; i < Math.min(N, 600); i++) {
+        const race = createRaceState((BASE_SEED + i) >>> 0);
+        initConsensus(race); initBelief(race); resetRaceBridge();
+        for (let d = 0; d < HORIZON; d++) {
+            advanceRace(race);
+            if (race.lastTransitions.theftDisclosures.length) {
+                runRaceBridge(stubEngine, race, { day: race.day }, race.day, 0);
+            }
+        }
+        deactivateConsensus(); deactivateBelief();
+    }
+    // Poisson exclusion asserted through the ENGINE's real pool (not a copy of the
+    // category set): a 'theft' shell must never be random-drawable.
+    const randomPool = new EventEngine('offline')._pools.random;
+    check('I5: both theft-disclosure shells exist and are category theft (Poisson-excluded)',
+        getEventById('theft_disclosed')?.category === 'theft'
+        && getEventById('theft_disclosed_frontier')?.category === 'theft'
+        && !randomPool.some(e => e.category === 'theft'));
+    check('I5: bridge fires BOTH shells off the ledger (frontier + ordinary victim)',
+        (shellTally.theft_disclosed_frontier || 0) > 0 && (shellTally.theft_disclosed || 0) > 0,
+        `frontier ${shellTally.theft_disclosed_frontier || 0} / ordinary ${shellTally.theft_disclosed || 0}`);
+    check('I5: frontier victim gets the superevent; every token substitutes; {lab} is the VICTIM',
+        frontierIsSuperevent && tokensClean && victimTokenOK);
+}
+
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
 line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
@@ -523,6 +889,11 @@ line('\nRegime final distribution (endogenous, tension 0):');
 for (const k of CONTROL_REGIMES) line(`  ${k.padEnd(13)} ${pct(regimeTally[k] / N)}`);
 line(`  reached >= supervised ${pct(reachSup)}   >= mobilized ${pct(reachMobFrac)}`);
 line(`\nStrait blockade incidence: baseline ${pct(baselineIncidence)} (tension 0) | hot ${pct(hotIncidence)} (tension 1)`);
+line('\nEvidence machinery:');
+line(`  export-control dampener [${EXPORT_CONTROL_GROWTH.join(', ')}]x/yr`);
+line(`    stage 0: TianxiaC@504 ${damp0.c504.toFixed(4)}  Tianxia leads ${pct(damp0.txLeads)}  family-4 ${pct(damp0.fam4)}`);
+line(`    stage 3: TianxiaC@504 ${damp3.c504.toFixed(4)}  Tianxia leads ${pct(damp3.txLeads)}  family-4 ${pct(damp3.fam4)}`);
+line(`  theft disclosure: ${discRows} disclosures / ${discEligible} eligible / ${discThefts} thefts`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

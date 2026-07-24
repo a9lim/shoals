@@ -54,6 +54,17 @@ export function deactivateLedger() { ledger.entries = []; ledger.frozen = false;
 export function freezeLedger() { ledger.frozen = true; }
 
 /**
+ * THE player->race mutation gate (02a P6-2 ruling 2), exported so every player
+ * channel shares ONE predicate rather than re-deriving it. False in Classic /
+ * no-race (inactive) and after the terminal latch (frozen): a player act past
+ * either boundary does nothing MECHANICAL -- narrative still fires, by design.
+ * `applyRaceEffects` gates on this, and so does the insider channel's leak verb
+ * (the evidence machinery round's `raceLeak`), so a leak after the latch is inert
+ * for exactly the same reason a raceEffects choice is.
+ */
+export function raceChannelsLive() { return ledger.active && !ledger.frozen; }
+
+/**
  * Append one attributable channel entry. Drops a zero amount (no zero-effect rows)
  * and a frozen/ inactive ledger. Returns the entry, or null if dropped.
  */
@@ -111,7 +122,7 @@ export function applyRaceEffects(race, effects, source, day) {
     // are INERT -- check BEFORE touching any dial. Mutating S/heat/playerS and only
     // then dropping the row would leave a race mutation with no ledger record, which
     // is exactly the corruption 09's freeze exists to prevent. Full no-op here.
-    if (!ledger.active || ledger.frozen) return [];
+    if (!raceChannelsLive()) return [];
     const applied = [];
     for (const eff of effects) {
         if (!eff || !RACE_EFFECT_DIALS.has(eff.dial)) continue;

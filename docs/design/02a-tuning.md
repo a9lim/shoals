@@ -1028,10 +1028,15 @@ decision precedes the code). Three items, deliberately tight:
      (−ALIGN_INCIDENT·(sev+1), weight 1) **under the detection's
      own fold id `det_${id}`** on leak day, cause `'player-leak'`.
      The existing leak-once machinery (`processed` set) then makes
-     the real detection's later fold a no-op — the total B move is
-     IDENTICAL leaked or unleaked; leaking buys timing and public
-     pressure, never extra belief mass. No new idempotency
-     machinery; the audit ledger shows who claimed the fold.
+     the real detection's later fold a no-op — for an incident that
+     would EVENTUALLY DETECT anyway, the total B move is IDENTICAL
+     leaked or unleaked; leaking buys timing and public pressure,
+     never extra belief mass. For the never-detectable tail the
+     identity deliberately does NOT hold: the unleaked
+     counterfactual folds nothing, and the leak's fold is mass the
+     world would otherwise never get — overriding that tail is the
+     verb's purpose (gate ruling). No new idempotency machinery;
+     the audit ledger shows who claimed the fold.
    The trade and sit verbs get NO race coupling (ruled at the
    content gate: the trade edge is the fact and its timing on the
    chassis; the outcome beat stays detection-agnostic).
@@ -1065,6 +1070,45 @@ sampled reliability (04's "China posterior as tradeable as the
 timeline") — assigned to P7 content, where the china.js arc can
 carry velocity-correlated readings as texture; no new machinery
 beyond what this round lands is required for it.
+
+**Implementation rulings (evidence round, 2026-07-24):**
+(1) *Dampener retroactivity RATIFIED*: the stage substitutes
+directly into the closed-form compute growth
+`sqrt(compute0)·g^(t/504)`, so raising the stage mid-run also
+revalues compute Tianxia already has — the drift RATE drops
+discontinuously while capability stays continuous. This is the
+intended physics: an embargo devalues the installed base
+(maintenance, spares, interconnect), not just future purchases —
+and it is the only variant with exact stage-0 bit-identity, which
+is the decisive tiebreak. The continuity-preserving day-offset
+alternative is rejected as machinery without a thesis.
+(2) *Leak lag is a FLOOR*: `meanLag → min(current, 4)` for
+positive lags, 4 outright for non-positive — a leak never SLOWS a
+detection that was already coming faster (S4, reporting-regime
+halved lags). (3) *Leak-shifted realizations are legitimate*: a
+leak adds detection-hazard draws downstream on the incidents
+substream, so the post-leak incident/evidence realization diverges
+from the counterfactual — acceptable; the bit-identity invariant
+is the NO-PLAYER run, and a player's leak changing the world's
+realization is the verb working. (4) *Complicity-ledger B channel
+stays CLOSED*: for would-detect-anyway incidents the leak's net B
+displacement is zero by construction (timing-only), and for the
+never-detectable tail the added fold is the verb's designed
+purpose, not a channel to account — a zero-effect row is
+forbidden either way, and the whistleblower's involvement reaches
+the endings through flags. No timing-row channel without a new
+ratification. (5) *Theft
+shell impulses ratified rev-1*: ordinary {mu −0.02, xi 0.015,
+lambda 0.3} (mirrors incident_moderate), frontier {mu −0.05, xi
+0.04, lambda 0.6} (between grave and catastrophe). (6)
+*Attribution-keyed headline pools* (coordinator, prose round):
+shells may carry `headlinesByAttribution` keyed by the ledger
+row's sampled public attribution; rotation stays deterministic via
+per-(shell, attribution) fire counters — never an RNG draw; popup
+`context` is not token-substituted and stays attribution-agnostic
+(the dispute frame). The thief field is truth and is NEVER
+surfaced; prose keeps the accused unnamed and direction-neutral
+(the victim can be any lab).
 
 ## Act III machinery (P7 ratifications, 2026-07-24)
 

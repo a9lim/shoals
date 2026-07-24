@@ -33,13 +33,14 @@ import { createRng, randomSeed, deriveSeed } from './rng.js';
 import { sampleHiddenState } from './sampler.js';
 import { stepIncidents, stepEvidence } from './incidents.js';
 import { stepStrait, freshStraitState } from './strait.js';
+import { registerTheft, stepTheftDisclosure, freshTheftQueue } from './theft-disclosure.js';
 import {
     CONTROL_REGIMES, REGIME_RANK, desiredRegime, stepControlSignals, freshControlSignals,
 } from './control-regime.js';
 import {
     createCapabilityState, stepCapability, rollTheftDecision,
     scheduleCertification, stepCertification, frontierInternal,
-    recordRungs,
+    recordRungs, normalizeExportStage,
     C_MIN, C_MAX, OPEN_MIN, RELEASE_PULL, OPEN_LAG, CERT_RUNGS,
 } from './capability.js';
 import { freezeConsensus, isFreezeRegime } from './consensus.js';
@@ -189,6 +190,10 @@ export function freshTransitions() {
         // Phase-5a: strait beats (gray-zone scares, blockade start/end) and a
         // controlRegime transition, consumed by the bridge / main.js narrative.
         strait: { grayZone: [], blockadeStart: null, blockadeEnd: null },
+        // Evidence machinery round: thefts that became PUBLIC today (the second
+        // track; occurrence stays in `thefts` and stays silent). Rows carry the
+        // SAMPLED public attribution, never the record's true one.
+        theftDisclosures: [],
         regimeChange: null,   // { from, to } on a forward controlRegime move this tick
         // P6-2: this tick's player-attributable dC to Halcyon (the coupling's
         // Halcyon-C contribution). main.js ledgers it under the C channel; 0 headless.
@@ -233,6 +238,10 @@ export function resetRaceState(race, seed) {
         incidents: createRng(deriveSeed(seed, 'incidents')),
         strait: createRng(deriveSeed(seed, 'strait')),
         treaty: createRng(deriveSeed(seed, 'treaty')),
+        // Evidence machinery round: the theft DISCLOSURE track's own named
+        // substream (convention 5) -- so adding it perturbs no existing
+        // trajectory for the same seed (race C/S/heat stay bit-identical).
+        theftDisclosure: createRng(deriveSeed(seed, 'theftDisclosure')),
     };
 
     race.capability = createCapabilityState(hidden);
@@ -265,6 +274,14 @@ export function resetRaceState(race, seed) {
     race.detectionQuality = 1;        // modifiable detection-hazard multiplier (players/factions lobby it, later)
     race.incidentReporting = false;   // mandatory-reporting regime toggle (shortens lag, thins the tail; later-phase)
     race.incidentsEnabled = true;     // MC toggle for the substream-isolation check; always true in-game
+
+    // ---- Evidence machinery round: theft disclosure track ----------------
+    race.latentThefts = freshTheftQueue();      // two-track theft queue (commit -> disclose | rumor forever)
+    race.theftDisclosureEnabled = true;         // MC toggle for the on/off bit-identity arm; always true in-game
+    // Orchestrator-passed export-control stage (world.ai.exportControlStage 0..3),
+    // STORED so the plateau detector and the extrapolation path read the same value
+    // the kinematics did (the playerCoupling precedent -- one drift, one stage).
+    race.exportControlStage = 0;
 
     // ---- Later-phase stubs (null/empty; extend, don't reshape) -----------
     race.B = null;                    // phase-4 market belief (hazard-over-dates curve)
@@ -379,6 +396,13 @@ export function commitTheft(race, fromId, toId, epsilon, endDay, attribution = '
     race.sAccumFreezeUntil = endDay + THEFT_S_FREEZE_DAYS;
     race.heat.floor = computeFloor(race);
     const record = { from: fromId, to: toId, epsilon, attribution, day: endDay };
+    // Evidence machinery round: enter the DISCLOSURE track (narrative + belief
+    // only). One Bernoulli(0.75) eligibility draw from the theftDisclosure
+    // substream -- the physical bundle above is untouched, and the draw comes
+    // from a stream nothing else reads, so C/S/heat stay bit-identical. The
+    // occurrence record's SHAPE is deliberately unchanged: disclosure consumers
+    // read `tr.theftDisclosures` rows (which carry their own id), never this one.
+    registerTheft(race, record, endDay);
     return { record, crossings };
 }
 
@@ -458,7 +482,9 @@ export function setControlRegime(race, regime) {
  * of state-diffing.
  *
  * @param {object} race    state from createRaceState
- * @param {object} [inputs] { racingPace? } -- neutral defaults for phase 1
+ * @param {object} [inputs] orchestrator-passed inputs -- { straitTension,
+ *   playerCoupling, exportControlStage }; every one absent => the neutral
+ *   headless world (bit-identical to the pre-round calibration).
  */
 export function advanceRace(race, inputs = {}) {
     const day = race.day;
@@ -477,14 +503,21 @@ export function advanceRace(race, inputs = {}) {
     // P6-2 cost-of-capital coupling: ORCHESTRATOR-PASSED per tick (the straitTension
     // precedent), stored so the plateau detector reads the same value. 0 headless.
     race.playerCoupling = inputs.playerCoupling || 0;
+    // Export-control stage (evidence machinery round): ORCHESTRATOR-PASSED per tick
+    // (the straitTension / playerCoupling precedent -- main.js reads
+    // world.ai.exportControlStage). STORED so the plateau detector and the
+    // extrapolation path price the SAME drift the kinematics did. Absent -> 0 ->
+    // bit-identical to the pre-round build (race-mc passes nothing, by design).
+    race.exportControlStage = normalizeExportStage(inputs.exportControlStage);
 
     // 1. Capability (internal track) + Polaris spawn. Pass the phase-6 kinematic
     //    levers via inputs: the Tianxia fast-follower (leg 2), the domestic regulatory
-    //    drag (leg B, reads the CURRENT controlRegime), and the P6-2 player coupling.
+    //    drag (leg B, reads the CURRENT controlRegime), the P6-2 player coupling, and
+    //    the export-control compute dampener (Tianxia's compute leg only).
     //    capability.js applies velocity (leg A) from cap.velocity directly.
     const capRes = stepCapability(cap, day, endDay,
         { ...inputs, followerKf: RETUNE.k_f, regime: race.controlRegime, deltaSup: RETUNE.delta_sup,
-            playerCoupling: race.playerCoupling },
+            playerCoupling: race.playerCoupling, exportControlStage: race.exportControlStage },
         streams.capability);
     tr.spawned.push(...capRes.spawned);
     tr.crossings.push(...capRes.crossings);
@@ -510,6 +543,13 @@ export function advanceRace(race, inputs = {}) {
         for (const r of rel.releasedCrossings) tr.crossings.push({ lab: rel.labId, rung: r, track: 'released' });
         for (const r of rel.openCrossings) tr.crossings.push({ lab: 'open', rung: r, track: 'internal' });
     }
+
+    // 2b. Theft DISCLOSURE pass (evidence machinery round). Runs BEFORE this tick's
+    //     theft roll, exactly as incidents.js runs detection before occurrence, so a
+    //     theft can never disclose in its own commit tick (occurrence is silent by
+    //     design). Draws ONLY from streams.theftDisclosure and touches no dial, so
+    //     C/S/heat trajectories are bit-identical with the track on or off.
+    tr.theftDisclosures = stepTheftDisclosure(race, day, endDay);
 
     // 3. Theft: decide (pre-tick heat drives the hazard), record EVERY attempt in
     //    the ledger, commit only on success. Successful records carry the full

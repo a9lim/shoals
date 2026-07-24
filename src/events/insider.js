@@ -15,10 +15,11 @@
                   personal legal exposure. The print is
                   subpoenable.
      - LEAK IT  : to Rachel Tan -> public pressure, source
-                  at risk. SEAM: detection acceleration and
-                  the B evidence-fold land with the evidence
-                  machinery round (`_tipIncidentId` is
-                  stamped for it).
+                  at risk. MECHANICAL since the evidence
+                  machinery round: `raceLeak: true` forces the
+                  leaked incident detectable on a 4d clock and
+                  folds `B` early under the detection's own id
+                  (timing, never extra belief mass).
      - SIT ON IT: nothing moves; the source's trust grows;
                   the channel deepens.
 
@@ -58,8 +59,15 @@ export const INSIDER_EVENTS = [
                     { faction: 'mediaTrust', value: 10 },
                     { faction: 'safetyNetworkTrust', value: -8 },   // burning a source strains the network
                 ],
-                // SEAM: detection acceleration + B evidence-fold (0.7B + 0.3L, once per
-                // evidence ID) land with the evidence machinery round via _tipIncidentId.
+                // LEAK COUPLING (evidence machinery round, 02a): the declarative field
+                // main.js's raceEffects chokepoint reads, resolving the popup's
+                // `_tipIncidentId`. Two effects, one route, one gate (the same
+                // frozen/inactive gate as raceEffects -- inert post-latch and in
+                // Classic): the leaked incident becomes detectable UNCONDITIONALLY on a
+                // 4d clock, and `B` takes the detection-class fold NOW, under the
+                // detection's own id -- so the total belief move is identical leaked or
+                // unleaked. You buy timing and public pressure, never extra belief mass.
+                raceLeak: true,
                 followups: [{ id: 'insider_leak_outcome', mtth: 12 }],
                 resultToast: 'Tan listens without typing, which is how you know she is typing somewhere else.',
             },
@@ -82,9 +90,11 @@ export const INSIDER_EVENTS = [
         // Detection-agnostic by ruling (content gate): the incident may print
         // later, or never -- the quiet-tape ambiguity is the design. What is
         // certain either way is the residue: the positioning window exists in
-        // the records whether or not the news ever does. The tip->detection
-        // outcome coupling (_tipIncidentId) lands with the evidence machinery
-        // round; this beat is the part that is true in every world.
+        // the records whether or not the news ever does. The TRADE verb gets NO
+        // race coupling (ruled at the content gate and re-ratified in 02a's
+        // evidence-machinery block: the edge is the fact and its timing on the
+        // chassis) -- only the LEAK verb is mechanical. This beat is the part
+        // that is true in every world.
         headline: 'Two weeks on, the thing you know is still not news — maybe it never files, maybe the candle comes next month and your book reads as prophecy. What exists either way is the window: a stretch of positioning, timestamped, that answers to nothing public. Compliance flags it without knowing what it is looking at and files the flag in the folder such flags accumulate in. Folders like that have a way of becoming exhibits, later, all at once.',
         params: {},
         impulse: { xi: 0.004 },   // decaying (P4): the residue stays, whatever the tape does

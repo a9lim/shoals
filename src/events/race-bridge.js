@@ -22,7 +22,9 @@
      incidents     -> DETECTED incidents only, severity-scaled
                       (S0/S1 toast-minor, S2 toast-moderate, S3 popup,
                        S4 superevent); persuasion class distinct
-     thefts        -> stub (records intent, fires nothing -- see bridgeThefts)
+     thefts        -> DISCLOSED thefts only (tr.theftDisclosures); the
+                      occurrence track (tr.thefts) stays silent. Frontier
+                      victim -> superevent, otherwise the ordinary shell
      evidence      -> NOT bridged this slice (generated + laddered in the race
                       state; surfaced through belief / the insider channel later)
 
@@ -140,6 +142,19 @@ export function substituteTokens(str, meta, shellId) {
 // order (which is itself determined by the model, not the other way around).
 const _fireCount = new Map();
 function pickHeadline(ev) {
+    // Attribution-keyed pools (theft disclosure): the sampled PUBLIC attribution
+    // on the ledger row selects the pool, rotation stays deterministic via a
+    // per-(shell, attribution) fire counter -- never an RNG draw. Falls through
+    // to the plain pools when the shell has none or the meta lacks the key.
+    const meta = ev.raceMeta;
+    const byAttr = ev.headlinesByAttribution;
+    if (byAttr && meta && meta.publicAttribution && Array.isArray(byAttr[meta.publicAttribution])) {
+        const pool = byAttr[meta.publicAttribution];
+        const key = ev.id + ':' + meta.publicAttribution;
+        const n = _fireCount.get(key) || 0;
+        _fireCount.set(key, n + 1);
+        return pool[n % pool.length];
+    }
     if (Array.isArray(ev.headlines) && ev.headlines.length) {
         const n = _fireCount.get(ev.id) || 0;
         _fireCount.set(ev.id, n + 1);
@@ -284,8 +299,11 @@ function bridgeRegime(tr, emit) {
 // tells the player an incident EXISTS before the world learns it -- the trade
 // verb's edge is positioning ahead of the detection beat the machinery will
 // fire anyway. Gate/throttle numbers recorded in 02a (phase-5 content note).
-// SEAM: `_tipIncidentId` is stamped for the leak->detection-acceleration and
-// leak->B evidence-fold coupling, which land with the evidence machinery round.
+// `_tipIncidentId` (+ raceMeta.severity) is the LEAK verb's handle: the evidence
+// machinery round's `raceLeak` choice field reads it at the main.js chokepoint to
+// force detection (incidents.js) and fold `B` early (belief.js). The severity
+// travels on raceMeta so the fold needs no latent-state read of its own; no token
+// renders it, so the tip prose still says only that something happened.
 
 const TIP_TRUST_GATE = 20;      // channel exists at init standing; deepens by sitting
 const TIP_THROTTLE_DAYS = 45;   // min days between tips
@@ -297,7 +315,7 @@ function bridgeTips(tr, emit, world, day) {
     if (day - _lastTipDay < TIP_THROTTLE_DAYS) return;
     for (const occ of (tr.incidents ? tr.incidents.occurred : [])) {
         if (!occ.insiderTip) continue;
-        const ev = shell('insider_tip', {}, { source: occ.source });
+        const ev = shell('insider_tip', {}, { source: occ.source, severity: occ.severity });
         if (ev) {
             ev._tipIncidentId = occ.id;
             _lastTipDay = day;
@@ -335,18 +353,46 @@ function bridgeSummit(tr, emit) {
     if (tr.treatyOutcome) emit(shell(tr.treatyOutcome.implemented ? 'treaty_holds' : 'treaty_resolution', {}, {}));
 }
 
-// ---- Thefts (stub: records intent, fires nothing) ------------------------
+// ---- Thefts: DISCLOSURE only (evidence machinery round) -------------------
+// The two-track rule again, one layer down: a theft OCCURS silently (tr.thefts,
+// never read here -- surfacing it would leak the discontinuity ahead of its
+// designed disclosure path) and the world learns later, or never. The disclosure
+// track (src/race/theft-disclosure.js) writes tr.theftDisclosures; this fires
+// off THAT ledger. The public attribution on the row is SAMPLED and often wrong
+// -- the dispute is the story, so the prose gets it as raceMeta, not as truth.
 
-function bridgeThefts(tr) {
-    // DELIBERATE NO-OP for this slice. Detected-theft narrative comes later:
-    // thefts have their OWN disclosure track (attribution is sampled and
-    // disputed -- spies, or the model itself -- and the public post-mortem
-    // rarely settles it), which this thin slice does not build. The successful
-    // records in tr.thefts carry { from, to, epsilon, attribution, day }; a later
-    // phase adds the theft occurrence->disclosure two-track and its event shells.
-    // Nothing is fired here on purpose -- surfacing a theft as narrative now
-    // would leak the discontinuity ahead of its designed disclosure path.
-    void tr.thefts;
+/** The lab holding the RELEASED frontier, from PUBLIC released-rung records only
+ *  (never a continuous-C read): highest claimed rung, ties broken by the earlier
+ *  crossing day. Used to decide whether a disclosed theft is the frontier case
+ *  (superevent) or an ordinary one. */
+function releasedFrontierLab(race) {
+    const cap = race.capability;
+    let best = null;
+    for (const id of ['halcyon', 'tianxia', 'polaris']) {
+        const lab = cap.labs[id];
+        if (!lab.active) continue;
+        let top = 0, day = Infinity;
+        for (const r of [5, 4, 3, 2, 1]) {
+            if (lab.rungReleased[r] != null) { top = r; day = lab.rungReleased[r]; break; }
+        }
+        if (best === null || top > best.top || (top === best.top && day < best.day)) best = { id, top, day };
+    }
+    return best ? best.id : null;
+}
+
+function bridgeThefts(tr, emit, race) {
+    const rows = tr.theftDisclosures;
+    if (!rows || !rows.length) return;
+    const frontier = releasedFrontierLab(race);
+    for (const dis of rows) {
+        // {lab} resolves to the VICTIM (raceMeta.lab) -- the disclosure is about
+        // whose weights left, not about who is accused of taking them.
+        const meta = {
+            lab: dis.from, victim: dis.from, thief: dis.to,
+            publicAttribution: dis.publicAttribution, lag: dis.lag, theftDay: dis.theftDay,
+        };
+        emit(shell(dis.from === frontier ? 'theft_disclosed_frontier' : 'theft_disclosed', {}, meta));
+    }
 }
 
 // ---- Public entry --------------------------------------------------------
@@ -391,7 +437,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     bridgeSpawn(tr, emit);
     bridgeSummit(tr, emit);
     bridgeTips(tr, emit, engine.world, day);
-    bridgeThefts(tr);
+    bridgeThefts(tr, emit, race);
 
     return { fired, popups };
 }

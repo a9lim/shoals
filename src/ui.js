@@ -1271,6 +1271,22 @@ const _popupCategoryMeta = {
     desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
     margin:         { label: 'Margin Call',         color: 'var(--down)' },
     gameover:       { label: 'Game Over',           color: 'var(--ext-red)' },
+    // Race-era categories (overhaul): previously fell through to 'desk'.
+    release:        { label: 'The Race',            color: 'var(--vxhcn)' },
+    certification:  { label: 'Consensus Markets',   color: 'var(--vxhcn)' },
+    incident:       { label: 'Incident Report',     color: 'var(--ext-red)' },
+    theft:          { label: 'Exfiltration',        color: 'var(--ext-red)' },
+    strait:         { label: 'The Strait',          color: 'var(--ext-rose)' },
+    regime:         { label: 'The State',           color: 'var(--ext-indigo)' },
+    halcyon:        { label: 'Halcyon',             color: 'var(--vxhcn)' },
+    china:          { label: 'Beijing',             color: 'var(--ext-red)' },
+    polaris:        { label: 'Polaris',             color: 'var(--ext-cyan)' },
+    wonder:         { label: 'The Wonders',         color: 'var(--ext-lime)' },
+    policy:         { label: 'Washington',          color: 'var(--ext-indigo)' },
+    treaty:         { label: 'Geneva',              color: 'var(--ext-blue)' },
+    summit:         { label: 'Reykjavik',           color: 'var(--ext-blue)' },
+    insider:        { label: 'The Channel',         color: 'var(--ext-orange)' },
+    ghostwritten:   { label: 'Unsigned',            color: 'var(--ext-cyan)' },
 };
 
 export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude, superevent = false) {

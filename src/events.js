@@ -47,6 +47,10 @@ const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 const _PULSE_CATEGORIES = new Set([
     'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
     'strait', 'regime', 'dispute',
+    // 'theft' (evidence machinery round): theft disclosures fire from the
+    // race ledger's OWN disclosure track (bridgeThefts), never Poisson --
+    // a theft the story invents is a theft the model never committed.
+    'theft',
     'polaris', 'insider', 'conversion',
     // 'summit' (P6): treaty_window is a race-model DECISION -- it fires from the
     // bridge on the window-open ledger transition, never Poisson (the Poisson

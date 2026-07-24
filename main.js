@@ -74,7 +74,7 @@ import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
 import { createRaceState, advanceRace, resetRaceState, stepControlRegime } from './src/race/race-state.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
-import { applyReportingRegime } from './src/race/incidents.js';
+import { applyReportingRegime, forceLeakDetection } from './src/race/incidents.js';
 import { straitTension } from './src/race/strait.js';
 import { stepTreaty } from './src/race/treaty-track.js';
 import { checkResolution, resolveNow } from './src/race/resolution.js';
@@ -94,14 +94,17 @@ import {
     binaryQuoteFromBelief, computeCurveFromBelief, impliedTimeline,
     isLockDay, lockForecast,
     playerPilled, stepFirmBelief, scrutinyGap, marketPilled, hasEverLocked, credibility,
-    canSendMemos, firmBelief,
+    canSendMemos, firmBelief, foldPlayerLeak,
 } from './src/race/belief.js';
 import {
     decayEventImpulses,
     applyEventImpulseOverlay, removeEventImpulseOverlay, resetEventImpulses,
 } from './src/race/impulse.js';
 import { stepCoupling, resetCoupling, deactivateCoupling } from './src/race/coupling.js';
-import { resetLedger, deactivateLedger, applyRaceEffects, appendLedger, ledgerTotals } from './src/race/ledger.js';
+import {
+    resetLedger, deactivateLedger, applyRaceEffects, appendLedger, ledgerTotals,
+    raceChannelsLive,
+} from './src/race/ledger.js';
 
 
 // ---------------------------------------------------------------------------
@@ -205,6 +208,13 @@ function _syncRaceToWorld() {
  *  public tension the compute curve does. 0 outside Dynamic mode. */
 function _straitTension() {
     return eventEngine ? straitTension(eventEngine.world.geopolitical) : 0;
+}
+/** Public export-control stage 0..3 (world.ai.exportControlStage, moved by policy
+ *  events), fed to the race as the Tianxia compute dampener -- the straitTension
+ *  precedent: an ORCHESTRATOR-PASSED input, never a race-side read of world state.
+ *  0 outside Dynamic mode, which is the undamped baseline. */
+function _exportControlStage() {
+    return eventEngine ? (eventEngine.world.ai.exportControlStage || 0) : 0;
 }
 /** Player net PERSISTENT HCN positioning for the P6-2 cost-of-capital coupling,
  *  signed and normalized to [-1, +1] (long +, short -). Blends the two sources the
@@ -1186,6 +1196,23 @@ function _processPopupQueue() {
         if (choice.raceEffects && raceState) {
             applyRaceEffects(raceState, choice.raceEffects, event.id, sim.day);
         }
+        // Leak coupling (evidence machinery round): the insider channel's LEAK verb,
+        // declared as `raceLeak: true` on the choice, applied at THIS chokepoint --
+        // the same place raceEffects lands, behind the SAME frozen/inactive gate
+        // (raceChannelsLive: inert post-terminal-latch and in Classic, where the
+        // narrative followup still fires and nothing mechanical does). Two effects
+        // from the popup's stamped `_tipIncidentId`:
+        //   (1) detection forcing -- the leaked incident becomes detectable
+        //       unconditionally on a 4d memoryless clock (RNG-free);
+        //   (2) the B evidence-fold NOW, under the DETECTION's own fold id, so the
+        //       real detection's later fold is a no-op. Would-detect-anyway
+        //       incidents: total belief move identical leaked or unleaked (timing,
+        //       not mass). Never-detectable tail: the fold is NEW mass the world
+        //       would otherwise never get -- the override is the verb's point.
+        if (choice.raceLeak && raceState && event._tipIncidentId && raceChannelsLive()) {
+            const leaked = forceLeakDetection(raceState, event._tipIncidentId);
+            if (leaked) foldPlayerLeak(leaked.id, leaked.severity ?? event.raceMeta?.severity);
+        }
         if (choice.factionShifts) {
             for (const fs of choice.factionShifts) {
                 let value = fs.value;
@@ -1871,7 +1898,16 @@ function _onDayComplete() {
         // second act. The resolving tick itself completes normally (resolution latches
         // later this tick), so its live coupling still applies.
         const _playerCoupling = raceState.resolution ? 0 : stepCoupling(_hcnPositioning());
-        advanceRace(raceState, { straitTension: _straitTension(), playerCoupling: _playerCoupling });
+        // Export controls (evidence machinery round): the third orchestrator-passed
+        // input. Binds Tianxia's COMPUTE leg only (the fast-follower distillation term
+        // is untouched -- controls bind chips, never weights already released), and is
+        // STORED on the race so the plateau detector and any extrapolation price the
+        // same drift the kinematics did.
+        advanceRace(raceState, {
+            straitTension: _straitTension(),
+            playerCoupling: _playerCoupling,
+            exportControlStage: _exportControlStage(),
+        });
         // Ledger the day's player-attributable dC to Halcyon (C channel; drops zero,
         // and the frozen ledger drops it outright post-latch -- belt and suspenders).
         appendLedger(sim.day, 'C', 'cost_of_capital', raceState.lastTransitions.playerDeltaC, 'Halcyon velocity');

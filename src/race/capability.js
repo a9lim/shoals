@@ -100,6 +100,38 @@ const DESP_V_SCALE = 0.30;
 const DESP_FOLLOW_FLOOR = 0.25;   // ~= Halcyon release appetite; distillation floor
 const DESP_RUNAWAY_SCALE = 0.60;
 
+// ---- Export controls -> Tianxia compute dampener (02a evidence machinery) --
+// Tianxia's ANNUAL compute growth factor by `world.ai.exportControlStage` 0..3
+// (the 0.8-1.6x range reserved at the P6-1b lever block; baseline 1.30 is stage
+// 0, so an absent/undefined stage is BIT-IDENTICAL to the pre-round build):
+// entity lists trim the exponent, broad chip controls nearly flatten it, a full
+// embargo sends it below 1 (clusters age out faster than gray-market
+// replacement). The dampener binds the COMPUTE leg ONLY -- the fast-follower
+// distillation term k_f is untouched, because controls bind chips and never
+// weights already released (03's satire line is the mechanism, verbatim), and
+// `cap.velocity` still multiplies the now-slower drift (controls slow even a
+// faster-than-believed Tianxia; they never reverse distillation).
+export const EXPORT_CONTROL_GROWTH = [1.30, 1.20, 1.06, 0.90];
+
+/** Normalize an orchestrator-passed exportControlStage to an integer 0..3.
+ *  Absent / undefined / non-numeric -> 0 (the undamped baseline). */
+export function normalizeExportStage(stage) {
+    const s = Number(stage);
+    if (!Number.isFinite(s)) return 0;
+    return clamp(Math.round(s), 0, EXPORT_CONTROL_GROWTH.length - 1);
+}
+
+/** The annual compute-growth factor a lab actually grows at. Only Tianxia is
+ *  export-control-sensitive; every other lab keeps its sampled `computeGrowth`.
+ *  Stage 0 deliberately returns `lab.computeGrowth` ITSELF rather than
+ *  EXPORT_CONTROL_GROWTH[0] -- the two are equal by construction (1.30), and
+ *  short-circuiting makes the stage-0 path bit-identical to the pre-round build
+ *  structurally, not by numeric coincidence. */
+function effectiveComputeGrowth(lab, stage) {
+    if (lab.id !== 'tianxia' || !stage) return lab.computeGrowth;
+    return EXPORT_CONTROL_GROWTH[normalizeExportStage(stage)];
+}
+
 export function strategicDesperation(cap) {
     const tianxia = cap.labs.tianxia;
     const vDeficit = clamp((DESP_V_PIVOT - cap.velocity) / DESP_V_SCALE, 0, 1);
@@ -121,9 +153,11 @@ function sigmoid(x) {
     return 1 / (1 + Math.exp(-x));
 }
 
-/** compute(t)^0.5 = sqrt(compute0) * base^(t/504). base=2 => yearly doubling. */
-function computeSqrt(lab, day) {
-    return Math.sqrt(lab.compute0) * Math.pow(lab.computeGrowth, day / 504);
+/** compute(t)^0.5 = sqrt(compute0) * base^(t/504). base=2 => yearly doubling.
+ *  `growth` overrides the lab's own annual factor (the export-control dampener);
+ *  omitted / undefined keeps lab.computeGrowth, so the stage-0 path is exact. */
+function computeSqrt(lab, day, growth) {
+    return Math.sqrt(lab.compute0) * Math.pow(growth === undefined ? lab.computeGrowth : growth, day / 504);
 }
 
 /** Fresh {1..5 -> null} rung-crossing record. */
@@ -283,7 +317,8 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
     // deterministicDrift helper -- the same source the plateau detector reads (P6-1b
     // P0 fix). Only the shock is added here (the plateau signal is shock-free).
     const coupling = inputs.playerCoupling || 0;
-    const dOpts = { regime: inputs.regime, deltaSup: inputs.deltaSup, followerKf: inputs.followerKf, playerCoupling: coupling };
+    const dOpts = { regime: inputs.regime, deltaSup: inputs.deltaSup, followerKf: inputs.followerKf,
+        playerCoupling: coupling, exportControlStage: inputs.exportControlStage };
     let playerDeltaC = 0;   // the coupling's attributable contribution to Halcyon's C this tick (P6-2 ledger)
     for (const id of ['halcyon', 'tianxia', 'polaris']) {
         const lab = cap.labs[id];
@@ -314,14 +349,21 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
  * velocity-boosted / follower-boosted leader and false-latched plateaus). 02a rules
  * the raw trailing-120d endpoint difference OUT (noise-dominated), so the shock-free
  * expected drift is the plateau signal. `opts` carries the modifier inputs
- * { regime, deltaSup, followerKf }; absent/zero => that modifier is inert (matching
- * race-mc, which never steps the regime). Returns 0 for an inactive/absent lab;
- * never mutates.
+ * { regime, deltaSup, followerKf, playerCoupling, exportControlStage }; absent/zero
+ * => that modifier is inert (matching race-mc, which never steps the regime and
+ * passes no export-control stage). Returns 0 for an inactive/absent lab; never
+ * mutates. EVERY caller that extrapolates drift (the plateau detector included)
+ * must pass the SAME exportControlStage the kinematics saw -- kinematics and
+ * detector price ONE drift (the P6 convention).
  */
 export function deterministicDrift(cap, lab, day, opts = {}) {
     if (!lab || !lab.active) return 0;
     const q = cap.q;
-    const mu_b = G0 * computeSqrt(lab, day) * Math.pow(lab.talent, 0.3) * cap.E;
+    // Export controls bind the COMPUTE leg (Tianxia only): the annual growth base
+    // becomes stage-indexed. Stage 0 / absent leaves computeSqrt untouched, so
+    // headless and pre-round trajectories are bit-identical.
+    const mu_b = G0 * computeSqrt(lab, day, effectiveComputeGrowth(lab, opts.exportControlStage))
+        * Math.pow(lab.talent, 0.3) * cap.E;
     const mu_r = R0 * cap.sharpness * lab.C_internal
         * sigmoid((lab.C_internal - RECUR_MID) / RECUR_WIDTH);
     let drift = q * (mu_b + mu_r) + (1 - q) * mu_b * Math.max(0, 1 - lab.C_internal / PLATEAU_CEIL);

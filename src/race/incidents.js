@@ -308,6 +308,57 @@ export function applyReportingRegime(race) {
     return { rescued, shortened };
 }
 
+// ---- Player leak: forced detection (evidence machinery round) --------------
+
+/** Remaining mean lag a LEAKED incident detects on: a memoryless hazard 1/4 per
+ *  day from the leak day. "The story forces the filing inside a week, usually"
+ *  (02a evidence-machinery block). */
+export const LEAK_FORCED_MEAN_LAG = 4;
+
+/**
+ * Force the world to find out: the mechanical half of the insider channel's LEAK
+ * verb (`raceLeak` on the choice; the incident id arrives via the tip popup's
+ * `_tipIncidentId`). Two mutations on the leaked incident's latent record:
+ *   - `detectable = true` UNCONDITIONALLY -- the never-detected tail is
+ *     overridden BY DESIGN. Guaranteeing the world finds out is what the verb
+ *     is FOR (02a); a leak that might vanish is not a leak.
+ *   - remaining `meanLag` set to 4 days -- as a FLOOR on the hazard, so an
+ *     already-faster clock is kept (memoryless, so this is a hazard change from
+ *     the leak day forward, not a rewritten history). See the inline note.
+ * Already-detected: no-op (the world already knows; nothing left to force).
+ *
+ * DETERMINISTIC: draws from NO substream itself. It DOES perturb downstream
+ * realizations, though: making an incident detectable adds a hazard draw per
+ * day to the detection pass, advancing `streams.incidents` relative to the
+ * unleaked counterfactual (02a ruling: legitimate -- the no-player run is the
+ * bit-identity invariant, and a leak changing the world's realization is the
+ * verb working). Physical race dials are untouched either way. Returns the
+ * detection-relevant summary { id, source, severity, cls, forced, alreadyDetected }
+ * so the caller can fold `B` without reading latent state itself, or null if the
+ * id is unknown (a stale popup, or Classic mode).
+ *
+ * @param {object} race        race state
+ * @param {string} incidentId  the latent incident id (`_tipIncidentId`)
+ */
+export function forceLeakDetection(race, incidentId) {
+    if (!race || !incidentId || !Array.isArray(race.latentIncidents)) return null;
+    const inc = race.latentIncidents.find(i => i.id === incidentId);
+    if (!inc) return null;
+    const alreadyDetected = !!inc.detected;
+    let forced = false;
+    if (!alreadyDetected) {
+        inc.detectable = true;
+        // 02a says "set to 4". Read as a FLOOR on the hazard, never a ceiling: an
+        // incident already on a faster clock (an S3 at 3d, anything under the
+        // reporting regime's halved lags) must not be SLOWED by being leaked. A
+        // non-positive stored lag (the immediate class) would be skipped forever by
+        // the daily pass, so it takes the 4d clock outright.
+        inc.meanLag = inc.meanLag > 0 ? Math.min(inc.meanLag, LEAK_FORCED_MEAN_LAG) : LEAK_FORCED_MEAN_LAG;
+        forced = true;
+    }
+    return { id: inc.id, source: inc.source, severity: inc.severity, cls: inc.cls, forced, alreadyDetected };
+}
+
 // ---- Evidence beats (the alignment-side twin, same latent-queue machinery) --
 
 /**
