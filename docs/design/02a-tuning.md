@@ -984,6 +984,88 @@ resolution-free race-mc horizon and benign); top-entity lead p50
 [0.35, 0.55] held); rung KM medians R2 230 / R3 645 / R4 804 /
 R5 916 (±10% band held); fizzle tail 12.0%.
 
+## Evidence machinery (pre-P7 ratifications, 2026-07-24)
+
+The round assigned at the phase-5 content gate, ratified here BEFORE
+implementation (the dampener perturbs race trajectories; the design
+decision precedes the code). Three items, deliberately tight:
+
+1. **exportControlStage → Tianxia compute dampener.** Enters
+   `advanceRace(race, { …, exportControlStage })` as an
+   orchestrator-passed input — the straitTension/playerCoupling
+   precedent — read from `world.ai.exportControlStage` by main.js.
+   Headless race-mc passes nothing → stage 0 → **bit-identical
+   trajectories**, so the calibration bands stay the stage-0
+   invariant; a harness section forces stages and asserts direction.
+   The plug point is Tianxia's fixed 1.3×/yr compute growth (the
+   0.8–1.6× range reserved at the P6-1b lever block). Annual growth
+   factor by stage: **[1.30, 1.20, 1.06, 0.90]** — entity lists trim
+   the exponent, broad chip controls nearly flatten it, full embargo
+   sends it below 1 (clusters age out faster than gray-market
+   replacement). The dampener binds the COMPUTE leg only: the
+   fast-follower distillation term `k_f` is untouched — controls
+   bind chips, never weights already released; 03's satire line is
+   the mechanism, verbatim. `chinaTrue.velocity` still multiplies
+   the (now slower) drift — controls slow even a
+   faster-than-believed Tianxia, they never reverse distillation.
+   Directional probe (not a band): sustained stage 3 from day 0
+   must visibly cut Tianxia terminal capability and family-4
+   incidence; stage 0 must be bit-identical to the pre-round build.
+
+2. **Leak coupling via `_tipIncidentId`** (the insider channel's
+   leak verb, stamped since content round 7). Two effects, one
+   route, applied at choice resolution through the SAME
+   frozen/inactive gate as `applyRaceEffects` (a leak after the
+   terminal latch does nothing mechanical):
+   - **Detection forcing**: the leaked incident becomes
+     `detectable = true` unconditionally (the never-detected tail
+     is overridden BY DESIGN — guaranteeing the world finds out is
+     what the verb is for) and its remaining `meanLag` is set to
+     **4 days** (memoryless hazard from leak day; the story forces
+     the filing inside a week, usually). Already-detected: no-op.
+   - **B evidence-fold, once per evidence ID**: the leak folds the
+     incident's detection-class sentiment
+     (−ALIGN_INCIDENT·(sev+1), weight 1) **under the detection's
+     own fold id `det_${id}`** on leak day, cause `'player-leak'`.
+     The existing leak-once machinery (`processed` set) then makes
+     the real detection's later fold a no-op — the total B move is
+     IDENTICAL leaked or unleaked; leaking buys timing and public
+     pressure, never extra belief mass. No new idempotency
+     machinery; the audit ledger shows who claimed the fold.
+   The trade and sit verbs get NO race coupling (ruled at the
+   content gate: the trade edge is the fact and its timing on the
+   chassis; the outcome beat stays detection-agnostic).
+
+3. **Theft disclosure track** (replaces the bridgeThefts stub).
+   Thefts keep occurring silently — `commitTheft`'s physical
+   bundle (discontinuity, heat floor, 90d S-freeze) is complete
+   and UNTOUCHED at occurrence. Disclosure is narrative + belief
+   only, so race trajectories stay bit-identical with the track on
+   or off: rolls draw from a NEW named substream
+   `streams.theftDisclosure` (convention 5; extension-stable).
+   Memoryless daily hazard over undisclosed thefts: **pDisclose
+   0.75, meanLag 40d** — the never-disclosed tail is real (a
+   quarter of thefts stay rumor forever). At disclosure, PUBLIC
+   attribution is sampled — **espionage 0.55 / insider 0.30 / the
+   model itself 0.15** — independent of the record's true
+   attribution (public post-mortems rarely settle it; the dispute
+   is the story). Ledger rows `tr.theftDisclosures`
+   {from, to, theftDay, day, lag, publicAttribution}; the bridge
+   fires shells off the ledger (prose coordinator-written, frontier
+   victim gets the superevent treatment), B folds **−0.20** into
+   alignment sentiment once per disclosure (`theftdisc_` id class),
+   market coupling rides decaying impulses on the shells per the
+   standing incident-coupling rule. NO treaty mutation this round
+   (the "treaty dies or gets suddenly serious" beat is prose
+   gesture until P7 wires it); NO tips on thefts (the channel
+   stays incident-fed).
+
+Deliberately OUT of this round: `chinaTrue` intelligence beats with
+sampled reliability (04's "China posterior as tradeable as the
+timeline") — assigned to P7 content, where the china.js arc can
+carry velocity-correlated readings as texture; no new machinery
+beyond what this round lands is required for it.
+
 ## The knife-edge principle (a9, 2026-07-23 — binding tuning constraints)
 
 Nothing is set in stone: no outcome — doom, triumph, shutdown, the
