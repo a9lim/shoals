@@ -1066,6 +1066,105 @@ timeline") — assigned to P7 content, where the china.js arc can
 carry velocity-correlated readings as texture; no new machinery
 beyond what this round lands is required for it.
 
+## Act III machinery (P7 ratifications, 2026-07-24)
+
+04's qualitative shape made mechanical. One public driver behind
+everything, per the standing rule (η, the released frontier).
+
+**The driver.** A smoothed machine parameter `x ∈ [0,1]`, owned by
+main.js (not race state — it is presentation pacing): daily
+`x += (target − x)·0.15`, with `target` = 0 through R3 released,
+**0.6** at R4, **1.0** at R5, **+0.1** (capped) under mobilized+.
+~Three trading weeks of crossfade after each step — the world
+changes timbre the week the model ships, not the second.
+Degradation is a projection of the same driver:
+`d = max(0, (x − 0.5) / 0.5)`. Audio wiring: `setMachineIntensity(x)`
+daily; `glitchAudio` from degradation beats (below); `silenceDesk()`
+at the terminal latch, before the resolution-day beat — the band
+stops mid-note, then the accounting. Mapping magnitudes are feel
+numbers (coordinator's, at wiring review); the SHAPE — one public
+driver, smoothed, two projections — is ratified.
+
+**Substep event lane** (tempo compression's engine change): at
+frontierRung ≥ 4 the DISCRETIONARY Poisson pass moves from
+day-granularity to substep-granularity — same expected rate (the
+day-level accept/cooldown scaling is unchanged), arrival uniform
+over the 16 substeps; the popup queue drains at substep boundaries
+while the lane is live. The day stops being the atomic unit of
+history exactly when it stops being one in-fiction. Race-bridge and
+ledger-fired beats STAY at day-complete — transitions are computed
+at day boundaries, and firing them mid-day would misstate when the
+model moved.
+
+**Manual latency ladder** (agency migration): manual orders execute
+with a substep lag by released rung — R≤3: 0, R4: 1, R5: 3 with
+spread ×1.25, R5 ∧ mobilized+: 6 with spread ×1.5 ("advisory").
+Standing orders and resting pending orders execute at their trigger
+substep with NO lag (precommitments are the fast path — that is the
+mechanic). Ladder shape ratified; numbers rev-1-tunable at the feel
+round.
+
+**Standing orders** (the delegation layer, 04): menu-authored
+precommitments, never free-form. Unlocked at frontierRung ≥ 3;
+editable until R5, then LOCKED for the run (the lock binds exactly
+when reneging gets tempting — that is the design; a9 adjudicates at
+the feel round if it plays as friction instead). v1 menu of six:
+(a) severity-≥3 detection → cut gross 50%; (b) blockade → halve HCN
+exposure; (c) margin utilization > 80% → bonds liquidate first;
+(d) rung certification → harvest ITM binary longs; (e) tips →
+auto-sit (the compliance precommitment: kills the edge, buys F and
+scrutiny relief); (f) HCN daily move > 8% → flatten delta to ±20.
+Execution announces itself by toast at the trigger substep. UI is
+ui.js-built inside the existing sidebar tab structure reusing
+existing classes — NO styles.css/index.html edits by agents; a9
+styles at her leisure.
+
+**Presentation degradation** (03: all display, zero pricing): chain
+quotes hold for `floor(d·6)` substeps before snapping; the live
+candle transiently repaints wrong then corrects (p = 0.04·d per
+substep); sparklines skip frames; VXHCN spot PUBLICATION goes stale
+(the index holds its last print for stretches growing with d) while
+fills, marks-for-margin, and VXHCN futures settlement ALWAYS use
+true computed values (09: settle on truth, display the failure).
+Degradation clusters fire `glitchAudio` (severity by cluster size,
+wall-clock rate-limited ≥ 15s) — eyes and ears fail together.
+Printed history never mutates.
+
+**The room** (04's endgame branch point): trigger = leader lab
+`C_internal ≥ R5_threshold − 0.15` at day-complete, once per run,
+strictly PRE-terminal (fires only while resolution is unlatched; a
+run the world ends first has no room, legitimately — the window was
+the room in Deal-bound runs, and the room's advise-the-deal option
+appears only while `summitLive`). Standing gate: in the room iff
+**≥ 2** of {credibility > 0.55, safetyNetworkTrust ≥ 45,
+labRelations ≥ 55, firm-converted latch, briefed_fixedpoint ∨
+backed_halcyon_restraint, treasury_backchannel}; voice weight =
+criteria count, scaling the advice's whitelisted `raceEffects`
+(standard ±0.15 clamp, ledgered — the loudest row the ledger will
+ever carry). Category 'room' is NOT terminal-safe: its effects
+require a live world by construction. Below the gate: no beat — the
+ending arrives as weather, on the news, which the existing feed
+already is. The `treasury_backchannel` flag lands with P7-3's
+fund-as-actor beat (04 wires it to the room explicitly).
+
+**Classification blackout** (controlRegime = classified): the bridge
+suppresses public detection shells and fires classified-brief
+variants instead (prose coordinator's) with impulses zeroed; B
+folds for incident detections are SUPPRESSED except severity 4
+(undeniable); the insider-tip Bernoulli rises 0.3 → 0.5 — the
+channel is the only feed left, exactly as 04's ratchet wiring
+promises. Releases and wonders still print (products ship);
+Consensus and compute are already frozen by the regime machinery.
+
+**Sub-round split**: P7-1 systemic (driver + substep lane + latency
++ degradation + VXHCN staleness + audio wiring), P7-2 standing
+orders (rules engine + ui.js panel), P7-3 the room + blackout +
+treasury-backchannel beat + the coordinator's prose round. Headless
+gates cover what is headless (lane rate-invariance, latency
+arithmetic, standing-order trigger evaluation, room gating,
+blackout suppression); pure-display degradation is exempt from
+harness coverage by nature, and a9 plays the rest.
+
 ## The knife-edge principle (a9, 2026-07-23 — binding tuning constraints)
 
 Nothing is set in stone: no outcome — doom, triumph, shutdown, the
