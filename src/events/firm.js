@@ -1076,31 +1076,35 @@ export const FIRM_EVENTS = [
     },
 
     // ===================================================================
-    //  FIRM-CONVERSION RE-AIM (overhaul phase 5a SKELETON)
-    //  "The firm conversion" (04): the CIO arc. Act I the skeptic + the
-    //  scrutiny loop (existing quarterly-review machinery); Act II the
-    //  grudging memo ("walk me through the thesis"); Act III conversion or
-    //  ejection. The game's most persistent human throughline -- the
-    //  person who thought you were crazy deciding out loud how much crazy
-    //  the evidence now licenses. Runs on firm belief `F` (race.F) +
-    //  credibility. Category 'conversion' is Poisson-EXCLUDED, so these
-    //  stay DORMANT; the content rounds fire them off the scrutiny loop.
-    //  PROSE: coordinator (all "[P] ..." placeholders).
+    //  FIRM CONVERSION (04; prose landed content round 8)
+    //  The CIO arc: Act I the skeptic + the scrutiny loop (quarterly-
+    //  review machinery); Act II the grudging memo; Act III conversion.
+    //  The game's most persistent human throughline. Fired by main.js's
+    //  _checkFirmConversion on lock days -- memo once when the
+    //  credibility gate opens and F wakes (>= 40), verdict once at
+    //  F >= 75. Category 'conversion' stays Poisson-EXCLUDED by design.
+    //  Ejection is the endings phase's branch, not an event here.
     // ===================================================================
     {
         id: 'firm_conversion_memo',
         category: 'conversion',
         popup: true,
         magnitude: 'moderate',
-        // PROSE: coordinator. Act II: the grudging memo, gated on F waking + credibility.
-        headline: '[P] The CIO’s memo: "Walk me through the thesis." The person who laughed at you in Act I is deciding out loud how much crazy the evidence now licenses.',
-        // PROSE: coordinator
-        context: '[P] Being right early converts the firm. Your track record is the currency here, not this quarter’s P&L. What do you tell them?',
+        headline: 'A calendar invite from the CIO’s office, subject line "Thesis review," thirty minutes, no agenda attached because the agenda is you. He opens by closing his laptop: "I have watched you be early three times now. Early twice is luck. Walk me through it — not the trades, the world. What do you think is happening?" It is the first question he has asked you in this building that he does not already have an answer to.',
+        context: 'This is what being right early buys: not applause — an audience. The track record is the currency; this quarter’s P&L is not even in the room. Make the case and the firm starts moving toward your world, with everything its book can move. Hedge, and you stay a tolerated anomaly — safer, smaller, alone with the divergence.',
         choices: [
-            // PROSE: coordinator
-            { label: '[P] Make the case', desc: '[P] Convert the CIO; high F turns the fund’s book into a race-relevant flow.', playerFlag: 'made_the_case' },
-            // PROSE: coordinator
-            { label: '[P] Hedge the answer', desc: '[P] Keep your head down; the divergence stays your problem.' },
+            {
+                label: 'Make the case',
+                desc: 'The cadence arithmetic, the gap, the thing the market refuses to price. Say all of it, plainly, to the one person who can move the firm.',
+                playerFlag: 'made_the_case',
+                resultToast: 'He takes notes for the first ten minutes, then stops taking notes, which is better.',
+            },
+            {
+                label: 'Hedge the answer',
+                desc: 'Give him the risk-managed version. Keep the thesis yours, the blame contained, and the firm exactly where it is.',
+                playerFlag: 'hedged_the_case',
+                resultToast: '"Sensible," he says, in the tone the word deserves. The door closes politely.',
+            },
         ],
     },
     {
@@ -1108,12 +1112,16 @@ export const FIRM_EVENTS = [
         category: 'conversion',
         popup: true,
         magnitude: 'major',
-        // PROSE: coordinator. Act III: conversion (amplifier) or ejection.
-        headline: '[P] The verdict: conversion or ejection. If converted, the CIO becomes your amplifier and the book becomes a lever on the race itself.',
+        headline: 'THE CONVERSION. The CIO circulates his own memo this time, firm-wide, and the first line is a surrender flying colors: "The thesis this desk has carried for some time is now the house view." Position limits move. Mandates rewrite. The fund’s book — all of it, not your sleeve of it — begins expressing a view about the end of the world as an asset class. He stops you in the corridor after: "I thought you were crazy." A beat. "Keep being crazy slightly ahead of me. That is the job now."',
+        context: 'The person who thought you were wrong has decided, out loud, in writing, how much crazy the evidence licenses — and the answer is: yours, plus a balance sheet. The desk’s reach just changed order of magnitude. So did what it touches: a book this size is not a bet on the race anymore. It is a participant.',
         params: {},
         choices: [
-            // PROSE: coordinator
-            { label: '[P] Acknowledge', desc: '[P] The relationship resolves. The desk’s reach just changed.' },
+            {
+                label: 'Take the mandate',
+                desc: 'The amplifier is on. Everything you believe now trades at firm scale — including the mistakes.',
+                playerFlag: 'firm_converted',
+                resultToast: 'The morning meeting runs long. Nobody calls the thesis yours anymore, which is how you know it won.',
+            },
         ],
     },
 ];

@@ -291,30 +291,35 @@ export const MEDIA_EVENTS = [
     },
 
     // ===================================================================
-    //  GHOSTWRITTEN-DISCOURSE ADDITIONS (overhaul phase 5a SKELETON)
-    //  "The ghostwritten world" (04): AI in the discourse, not just the
-    //  market. Played for comedy until it isn't -- op-eds nobody can
-    //  source move `B`; the government flail turns abruptly competent
-    //  when the memos stop being human. Category 'ghostwritten' is
-    //  Poisson-EXCLUDED, so these stay DORMANT until the content rounds.
-    //  Past a rung these become persuasion-class campaigns (incident
-    //  ladder, incidents.js) -- occurrence quiet, detection the scandal.
-    //  PROSE: coordinator (all "[P] ..." placeholders).
+    //  THE GHOSTWRITTEN WORLD (04; prose landed content round 8)
+    //  AI in the discourse, not just the market. Comedy at rung 3;
+    //  the straight register's first warning at rung 4. Past a rung the
+    //  REAL version is the persuasion-class incident ladder (incidents.js)
+    //  -- occurrence quiet, detection the scandal; these are the ambient
+    //  texture around that machinery, Poisson-live with rung guards.
     // ===================================================================
     {
         id: 'ghostwritten_memo',
         category: 'ghostwritten',
+        likelihood: (sim, world) => world.ai.frontierRung >= 3 ? 1.5 : 0,
         magnitude: 'minor',
-        // PROSE: coordinator. Comedy register: the CIO's letter grows a fondness for "delve".
-        headline: '[P] The CIO’s quarterly letter arrives with bullet points and a suspicious fondness for "delve." Cole’s monologues have tightened; he drafts in Halcyon Chat and denies it.',
+        headlines: [
+            'The CIO’s quarterly letter arrives with a new structure, confident subheadings, and a suspicious fondness for the word "delve." Nobody comments. The following week, three rival funds’ letters arrive with the same structure, the same confidence, and — a compliance associate counts — the same fondness. The style is spreading through the industry at the speed of a subscription tier.',
+            'Cole’s monologues have tightened: the digressions land, the callbacks call back, the seven-minute open runs 6:58. He tells his producer he has "been sleeping better." He drafts in Halcyon Chat and denies it with the specific indignation of a man reading the denial off a second monitor.',
+            'A Lassiter floor speech arrives fully structured — thesis, three supporting pillars, a peroration with internal rhyme — and the C-SPAN clip goes viral among speechwriters the way X-rays once went viral among physicists: professional awe, followed immediately by professional dread. His office attributes it to "a new drafting process." The process is not named. It does not need to be.',
+        ],
         params: {},
     },
     {
         id: 'ghostwritten_competent',
         category: 'ghostwritten',
+        likelihood: (sim, world) => world.ai.frontierRung >= 4 ? 1.2 : 0,
         magnitude: 'moderate',
-        // PROSE: coordinator. The satire's last joke and the straight register's first warning.
-        headline: '[P] The government flail turns abruptly competent — loopholes close, the czar’s testimony parses — precisely when the memos stop being human. Synthetic analysis is moving Consensus now.',
+        headlines: [
+            'The new export rule closes, in one drafting pass, four loopholes that survived three previous rules and two administrations — cross-referenced, watertight, elegant. The trade bar reads it with the unease of specialists recognizing work no colleague could have done. The flail has turned abruptly competent, at precisely the moment the memos stopped being human, and only one of those two facts made the news.',
+            'The czar’s testimony parses. Every answer is responsive, every number reconciles, every hostile question dies in a prepared crossfire it seems to have walked into on purpose. Veterans of the format call it the best committee performance in memory. The memo prepping it, per one person in the room, "arrived finished." Nobody asks finished by whom, on television.',
+            'A Consensus contract moves four points on an analysis nobody can source — no byline, no fund, a document that appeared in the discourse the way weather appears, and was too good to ignore. The desk reads it twice: once for the argument, which is excellent, and once for the authorship, which is the actual information. Synthetic analysis is moving the scoreboard now. The scoreboard has not been told.',
+        ],
         params: {},
         impulse: { xi: 0.006 },   // decaying (P4): the tape reads a mind it cannot source
     },

@@ -90,6 +90,7 @@ import {
     binaryQuoteFromBelief, computeCurveFromBelief, impliedTimeline,
     isLockDay, lockForecast,
     playerPilled, stepFirmBelief, scrutinyGap, marketPilled, hasEverLocked, credibility,
+    canSendMemos, firmBelief,
 } from './src/race/belief.js';
 import {
     decayEventImpulses,
@@ -1353,6 +1354,24 @@ function _showComplianceTermination() {
  * INVERTS (conventional books underperform an AGI-loaded benchmark). Modest,
  * bounded firmStanding pressure -- UNRATIFIED gap thresholds.
  */
+/** The firm-conversion throughline (04; content round 8): the CIO deciding out
+ *  loud how much crazy the evidence now licenses. Checked quarterly on lock days
+ *  AFTER stepFirmBelief: the grudging memo fires once when the credibility gate
+ *  opens and F has begun to wake; the conversion verdict fires once when F
+ *  crosses conviction with the gate still open. Ejection is the endings phase's
+ *  branch, not an event here. Latches reset in _resetCore. */
+let _firmMemoFired = false, _firmVerdictFired = false;
+function _checkFirmConversion() {
+    if (!raceState) return;
+    const F = firmBelief(raceState);
+    if (!_firmMemoFired && canSendMemos() && F >= 40) {
+        _firmMemoFired = true;
+        _fireRaceShell('firm_conversion_memo');
+    } else if (_firmMemoFired && !_firmVerdictFired && canSendMemos() && F >= 75) {
+        _firmVerdictFired = true;
+        _fireRaceShell('firm_conversion_verdict');
+    }
+}
 function _runScrutiny() {
     if (!raceState) return;
     if (!hasEverLocked()) return;                  // no stated posterior -> no belief gap to scrutinize
@@ -1717,6 +1736,7 @@ function _onDayComplete() {
             _lastForecastLockDay = raceState.day;   // race.day >= 1 here; day 0 is prompted at init
             stepFirmBelief(raceState);   // F wakes toward B; converts on the player's track record
             _runScrutiny();              // risk committee heats on the player's belief-gap vs F
+            _checkFirmConversion();      // the CIO throughline: memo, then verdict (once each)
             _promptForecastLock();
         }
     }
@@ -2185,6 +2205,8 @@ function _resetCore(index) {
     // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
     // since _resetCore runs before loadPreset nulls raceState.
     if (raceState) resetRaceBridge();
+    _firmMemoFired = false;
+    _firmVerdictFired = false;
     resetEventImpulses();          // clear the decaying race-event impulse overlay (phase 4)
     _lastForecastLockDay = -1;
     sim.reset(index);
