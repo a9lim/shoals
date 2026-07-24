@@ -425,6 +425,20 @@ magnitudes rev-1-tunable — the same clause as the phase-4 table.
 Blockade duration, gray-zone silence during an active blockade, and
 the latched mobilization gate are ratified above in the Strait block.
 
+**Content-round wiring numbers** (2026-07-24, coordinator): insider
+channel feed — bridge fires flagged occurrences as tips gated on
+`safetyNetworkTrust ≥ 20` (the init standing: the channel exists
+weakly from day one and deepens by sitting), throttled to one tip
+per 45 days minimum and one per day maximum (~5–8/run; the channel
+is a person, not a feed). The tip's trade edge is real without
+extra machinery: detection fires later and moves the tape. The
+leak verb's detection-acceleration and B evidence-fold ride
+`_tipIncidentId`, a stamped seam for the evidence machinery round.
+Wonder cadence: likelihood functions of the released rung (0 below
+each act gate, then rising; cascade 2.5 at R4+) — the wonder feed
+compounds on the same public variable as everything else, which is
+the ambivalence rule as wiring.
+
 ## Bounded influence (margin units, not log-odds)
 
 Track world and player deltas to each terminal quantity separately.

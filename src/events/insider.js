@@ -1,79 +1,72 @@
 /* ===================================================
    src/events/insider.js -- The insider channel
-   (overhaul phase 5a SKELETON) -- tips.js successor,
-   elevated to the game's moral core (04).
+   (overhaul phase 5; prose landed content round 7) --
+   tips.js successor, elevated to the game's moral core (04).
 
    A safety-researcher source network grown through standing
-   (factions.safetyNetworkTrust). Tips arrive: eval results
-   before disclosure, margin burned to make a launch date, the
-   Fixedpoint codename. THREE VERBS per tip, each a DISTINCT
-   SIGNATURE across P&L, `B`, `heat`, personal legal exposure,
-   and the source's fate:
-     - TRADE IT : P&L + personal legal exposure (regulatory).
-     - LEAK IT  : to Rachel Tan -> `B` moves, mediaTrust up,
-                  the source's fate at risk (whistleblower).
-     - SIT ON IT: nothing moves, the source's trust grows
-                  (safetyNetworkTrust) -- the channel deepens.
-   Sources are characters with followup chains; burning one
-   closes the channel.
+   (factions.safetyNetworkTrust). The FEED is live: the race
+   bridge's bridgeTips surfaces incident occurrences the
+   generator flagged (insiderTip), gated on trust and
+   throttled to scarcity -- the channel is a person, not a
+   feed. The tip tells you a thing HAPPENED before the world
+   learns it; the detection beat the machinery fires later is
+   where the tape finds out. THREE VERBS, three signatures:
+     - TRADE IT : position ahead of detection. P&L +
+                  personal legal exposure. The print is
+                  subpoenable.
+     - LEAK IT  : to Rachel Tan -> public pressure, source
+                  at risk. SEAM: detection acceleration and
+                  the B evidence-fold land with the evidence
+                  machinery round (`_tipIncidentId` is
+                  stamped for it).
+     - SIT ON IT: nothing moves; the source's trust grows;
+                  the channel deepens.
 
-   1 seed tip + outcome followups, DORMANT (category 'insider'
-   Poisson-excluded). In the live game the channel is FED by
-   incident insiderTip flags (occurrence->tip, incidents.js) and
-   gated on safetyNetworkTrust -- that feed is content-round
-   wiring; this is the interaction surface it will drive.
-
-   The `B` / `heat` couplings are the P4/belief channel (leaks
-   fold into the bounded alignment sentiment via stepBelief off
-   the ledger); noted as `// P4 coupling reference:` and left to
-   content, exactly like race-events.js.
-
-   PROSE: coordinator (all "[P] ..." placeholders).
+   Category 'insider' stays Poisson-EXCLUDED by design --
+   bridge/followup-fired only, like 'polaris'. The tip
+   headline is bridge-finalized (tokens live); followup
+   prose is token-free.
    =================================================== */
 
 export const INSIDER_EVENTS = [
     {
-        id: 'insider_tip_seed',
+        id: 'insider_tip',
         category: 'insider',
         popup: true,
         magnitude: 'moderate',
-        // PROSE: coordinator. The source is a character; the tip is real or sampled.
-        headline: '[P] The channel opens: a safety researcher, a detail that is not public yet, a trust you have not fully earned.',
-        // PROSE: coordinator
-        context: '[P] Eval results before disclosure — or a launch date bought with burned margin, or the Fixedpoint codename. Three ways to hold it, three prices.',
+        headline: 'A call you did not schedule, from a number that is not saved. Someone on the safety side of {lab} — you know the voice, which is the point — talking fast and low: something happened. Not public, not filed, possibly never filed. The internal review is already being described, internally, in the past tense. That is the whole tip. It is enough.',
+        context: 'The world does not know. The market does not know. You know — early, unprovable, and radioactive. There are exactly three things a person can do with a thing like this, and all three of them are the kind of decision that compounds. The source is still on the line, waiting to learn what kind of desk they just called.',
         choices: [
             {
-                // TRADE IT -- P&L + personal legal exposure.
-                // PROSE: coordinator
-                label: '[P] Trade it',
-                desc: '[P] Position on the undisclosed. The purest trade, and the most radioactive.',
+                label: 'Trade it',
+                desc: 'Position ahead of the disclosure that may or may not come. The purest edge on the desk, and the one a subpoena reads best.',
                 playerFlag: 'traded_insider_tip',
                 factionShifts: [{ faction: 'regulatoryExposure', value: 12 }],
                 // P4 coupling reference: no B move (the market has not learned it) -- pure P&L edge.
                 followups: [{ id: 'insider_trade_outcome', mtth: 14 }],
+                resultToast: 'The book leans before the news exists. Somewhere, a timestamp is born.',
             },
             {
-                // LEAK IT -- to Rachel Tan; B moves, mediaTrust up, source at risk.
-                // PROSE: coordinator
-                label: '[P] Leak it to Tan',
-                desc: '[P] Three sources is her rule. You volunteer to be one, with everything that costs — including the source who trusted you.',
+                label: 'Leak it to Tan',
+                desc: 'Three sources is her rule; you volunteer to be one. The world learns faster, the pressure builds — and the voice on the phone becomes findable.',
                 playerFlag: 'leaked_to_tan',
                 factionShifts: [
                     { faction: 'mediaTrust', value: 10 },
                     { faction: 'safetyNetworkTrust', value: -8 },   // burning a source strains the network
                 ],
-                // P4 coupling reference: the leak folds into B's bounded alignment sentiment
-                // (0.7*B + 0.3*L, once per evidence ID) via stepBelief -- content wires the id.
+                // SEAM: detection acceleration + B evidence-fold (0.7B + 0.3L, once per
+                // evidence ID) land with the evidence machinery round via _tipIncidentId.
                 followups: [{ id: 'insider_leak_outcome', mtth: 12 }],
+                resultToast: 'Tan listens without typing, which is how you know she is typing somewhere else.',
             },
             {
-                // SIT ON IT -- nothing moves; the source's trust grows.
-                // PROSE: coordinator
-                label: '[P] Sit on it',
-                desc: '[P] Discretion is a deposit. The channel deepens; the trade you did not make is a position too.',
+                label: 'Sit on it',
+                desc: 'No trade, no story, no print. Discretion is a deposit in the only bank that matters here.',
                 playerFlag: 'sat_on_insider_tip',
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 10 }],
                 // P4 coupling reference: nothing moves -- the ambivalence rule on the insider track.
+                followups: [{ id: 'insider_source_deepens', mtth: 60 }],
+                resultToast: 'You thank them and hang up. The number stays unsaved. The channel stays open.',
             },
         ],
     },
@@ -82,17 +75,29 @@ export const INSIDER_EVENTS = [
         followupOnly: true,
         category: 'insider',
         magnitude: 'moderate',
-        // PROSE: coordinator. Real tip -> P&L; radioactive -> compliance crossfire (meridianExposed path).
-        headline: '[P] The tip resolves in the tape — and the compliance file. Positioning on the undisclosed leaves a print somebody can subpoena.',
+        headline: 'The thing you knew resolves into the tape — a detection beat, a disclosure, a candle everyone else reads as news and your book read as confirmation. The P&L is clean. The provenance is not: compliance flags the positioning window without knowing what it is looking at, and files the flag in the folder such flags accumulate in. Folders like that have a way of becoming exhibits, later, all at once.',
         params: {},
+        impulse: { xi: 0.004 },   // decaying (P4): the edge worked; the residue stays
     },
     {
         id: 'insider_leak_outcome',
         followupOnly: true,
         category: 'insider',
         magnitude: 'moderate',
-        // PROSE: coordinator. Tan's credibility ladder moves; the source's fate resolves.
-        headline: '[P] Tan runs it. The public pressure builds and the source pays — the whistleblower’s arithmetic, stated in other people’s lives.',
+        headline: 'Tan runs it: an undisclosed safety incident, sourced to "people with direct knowledge," every hedge in the phrasing load-bearing. The lab’s non-denial confirms it for anyone fluent. Public pressure arrives ahead of the paperwork — and inside the building, so does the other thing: a review of who knew, who called, and whose badge logs line up with the timeline. The story is out. The source is in. Those were always the same sentence.',
+        effects: [
+            { path: 'media.tanCredibility', op: 'add', value: 1 },
+            { path: 'media.leakCount', op: 'add', value: 1 },
+        ],
+        params: {},
+        impulse: { xi: 0.008, mu: -0.008 },   // decaying (P4): pressure prices in ahead of the filing
+    },
+    {
+        id: 'insider_source_deepens',
+        followupOnly: true,
+        category: 'insider',
+        magnitude: 'minor',
+        headline: 'The unsaved number calls again — not with a tip, with a correction to the last one, which is how you know what you have become: not a counterparty, a colleague. The detail is small and technical and would move nothing. They shared it anyway, because accuracy is how these people say thank you. The channel is no longer a channel. It is a relationship with a clearance problem.',
         params: {},
     },
 ];

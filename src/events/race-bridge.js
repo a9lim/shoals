@@ -185,6 +185,7 @@ export function finalize(ev) {
  */
 export function resetRaceBridge() {
     _fireCount.clear();
+    _lastTipDay = -Infinity;
 }
 
 // ---- Releases ------------------------------------------------------------
@@ -274,6 +275,38 @@ function bridgeRegime(tr, emit) {
     if (id) emit(shell(id, {}, { from: rc.from, to: rc.to }));
 }
 
+// ---- Insider tips (content round 7: the channel's feed) -------------------
+// Occurrence stays silent (the two-track rule); the ONE legitimate leak from
+// the latent track is the insider channel. Occurrences the generator flagged
+// (insiderTip, Bernoulli 0.3 at occurrence -- incidents.js) surface as tip
+// popups, gated on safetyNetworkTrust and throttled hard: the channel is a
+// person, not a feed, and scarcity IS the texture (~5-8 tips/run). The tip
+// tells the player an incident EXISTS before the world learns it -- the trade
+// verb's edge is positioning ahead of the detection beat the machinery will
+// fire anyway. Gate/throttle numbers recorded in 02a (phase-5 content note).
+// SEAM: `_tipIncidentId` is stamped for the leak->detection-acceleration and
+// leak->B evidence-fold coupling, which land with the evidence machinery round.
+
+const TIP_TRUST_GATE = 20;      // channel exists at init standing; deepens by sitting
+const TIP_THROTTLE_DAYS = 45;   // min days between tips
+let _lastTipDay = -Infinity;
+
+function bridgeTips(tr, emit, world, day) {
+    const trust = world && world.factions ? (world.factions.safetyNetworkTrust || 0) : 0;
+    if (trust < TIP_TRUST_GATE) return;
+    if (day - _lastTipDay < TIP_THROTTLE_DAYS) return;
+    for (const occ of (tr.incidents ? tr.incidents.occurred : [])) {
+        if (!occ.insiderTip) continue;
+        const ev = shell('insider_tip', {}, { source: occ.source });
+        if (ev) {
+            ev._tipIncidentId = occ.id;
+            _lastTipDay = day;
+            emit(ev);
+        }
+        break;   // at most one tip per day -- see above
+    }
+}
+
 // ---- Lab spawn (content round 3: the Polaris schism) ---------------------
 // The sampler decides WHEN Polaris exists (~day 400, its own draw); the walkout
 // superevent is that ledger transition made narrative -- never a Poisson draw,
@@ -341,6 +374,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     bridgeStrait(tr, emit);
     bridgeRegime(tr, emit);
     bridgeSpawn(tr, emit);
+    bridgeTips(tr, emit, engine.world, day);
     bridgeThefts(tr);
 
     return { fired, popups };

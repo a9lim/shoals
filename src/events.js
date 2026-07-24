@@ -39,8 +39,9 @@ const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 // leaves this set exactly when its arc's prose lands ('halcyon' round 1,
 // 'china' round 2, 'wonder' round 4, 'policy' round 5, 'treaty' round 6;
 // guards/likelihoods on `world.ai.frontierRung` gate act placement).
-// 'polaris' stays excluded by DESIGN, not dormancy: its chain fires off the
-// bridge's spawn transition.
+// 'polaris' and 'insider' stay excluded by DESIGN, not dormancy: polaris
+// chains off the bridge's spawn transition, insider off bridgeTips (the
+// trust-gated, throttled occurrence feed).
 const _PULSE_CATEGORIES = new Set([
     'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
     'strait', 'regime', 'dispute',
