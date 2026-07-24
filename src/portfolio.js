@@ -26,6 +26,7 @@ import { capitalMultiplier } from './faction-standing.js';
 let _greekTrees = null;
 import { computePositionValue, unitPrice } from './position-value.js';
 import { market } from './market.js';
+import { consensus, getBinaryQuote, contractByKey, BINARY_NOTIONAL } from './race/consensus.js';
 
 // ---------------------------------------------------------------------------
 // State
@@ -45,6 +46,7 @@ export const portfolio = {
     marginCallCount:  0, // incremented when margin call triggers
     peakValue:        INITIAL_CAPITAL, // max equity seen
     maxDrawdown:      0, // max (1 - equity/peak) seen
+    restricted:       false, // account trading restriction (forced liquidation left un-flattenable legs)
 };
 
 // Auto-increment counters (not exported — internal)
@@ -73,8 +75,21 @@ export function resetPortfolio(capital) {
     portfolio.marginCallCount  = 0;
     portfolio.peakValue        = cap;
     portfolio.maxDrawdown      = 0;
+    portfolio.restricted       = false;
     _nextPositionId = 1;
     _nextOrderId    = 1;
+}
+
+/**
+ * Cancel every pending order (order entry is barred, not the standing book).
+ * liquidateAll only visits positions; a forced liquidation must also clear
+ * orders so none survives to fill on a restricted account.
+ * @returns {number} count cancelled.
+ */
+export function cancelAllOrders() {
+    const n = portfolio.orders.length;
+    portfolio.orders.length = 0;
+    return n;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +171,7 @@ export function computeNetDelta() {
     for (const p of portfolio.positions) {
         if (p.type === 'stock') { net += p.qty; continue; }
         if (p.type === 'bond')  continue;
+        if (p.type === 'binary') continue;   // binaries carry no delta
         const sv = _optionSigma(p);
         if (!sv) continue;
         _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
@@ -170,6 +186,7 @@ export function computeGrossNotional() {
     for (const p of portfolio.positions) {
         if (p.type === 'stock') { gross += Math.abs(p.qty) * market.S; continue; }
         if (p.type === 'bond')  continue;
+        if (p.type === 'binary') continue;   // binaries carry no delta/notional here
         const sv = _optionSigma(p);
         if (!sv) continue;
         _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
@@ -277,7 +294,9 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
         equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
         if (pos._reservedMargin) equity += pos._reservedMargin;
 
-        if (pos.qty < 0) {
+        // Binary shorts are fully collateralized (see checkMargin) -- no
+        // maintenance requirement beyond the reserved collateral.
+        if (pos.qty < 0 && pos.type !== 'binary') {
             const absQty = Math.abs(pos.qty);
             const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
             if (pos.type === 'call' || pos.type === 'put') {
@@ -325,6 +344,7 @@ export function executeMarketOrder(
     currentPrice, currentVol, currentRate, currentDay,
     strike, expiryDay, strategyName, q
 ) {
+    if (portfolio.restricted) return null;   // account restricted -> no order entry
     if (side === 'short' && type === 'stock' && getRegulationEffect('shortStockDisabled', false)) {
         if (typeof showToast !== 'undefined') showToast('Short stock sales currently banned by regulation.', 3000);
         return null;
@@ -533,6 +553,7 @@ export function placePendingOrder(
     type, side, qty, orderType, triggerPrice,
     strike, expiryDay, strategyName, legs, execMult
 ) {
+    if (portfolio.restricted) return null;   // account restricted -> no order entry
     const order = {
         id:           _nextOrderId++,
         type,
@@ -573,6 +594,7 @@ export function cancelOrder(orderId) {
  * @returns {Object[]} Array of filled position objects.
  */
 export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, currentDay, q) {
+    if (portfolio.restricted) return [];   // account restricted -> pending orders do not fill
     const filled = [];
     const remaining = [];
 
@@ -669,6 +691,15 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
     if (idx === -1) return false;
 
     const pos = portfolio.positions[idx];
+
+    // Binaries close through the canonical binary quote/netting op -- NEVER the
+    // option-impact _fillPrice path. Returns false if the contract is
+    // frozen/settled/pending and cannot be flattened (reported by liquidateAll).
+    if (pos.type === 'binary') {
+        const side = pos.qty > 0 ? 'short' : 'long';   // close = opposite side, full size
+        return executeBinaryTrade(pos.strike, side, Math.abs(pos.qty)) != null;
+    }
+
     const absQty = Math.abs(pos.qty);
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
     const spreadVol = pos.type === 'bond' ? market.sigmaR : pos.type === 'vxhcnfuture' ? market.xi : currentVol;
@@ -995,6 +1026,10 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
 
     for (const pos of portfolio.positions) {
         if (pos.qty >= 0) continue; // Only short positions
+        // Binary shorts are fully collateralized (reserved = full notional, held
+        // in _reservedMargin): no separate maintenance requirement -- the
+        // collateral already covers the entire max loss.
+        if (pos.type === 'binary') continue;
 
         const absQty = Math.abs(pos.qty);
         const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
@@ -1034,7 +1069,10 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
         equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
         if (pos._reservedMargin) equity += pos._reservedMargin;
 
-        if (pos.qty < 0) {
+        // Binary shorts are fully collateralized (reserved covers the whole max
+        // loss); they add their MTM + reserved to equity above but nothing to the
+        // maintenance requirement.
+        if (pos.qty < 0 && pos.type !== 'binary') {
             const absQty = Math.abs(pos.qty);
             const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
             if (pos.type === 'call' || pos.type === 'put') {
@@ -1061,13 +1099,20 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
 // ---------------------------------------------------------------------------
 
 /**
- * Close all open positions at current market prices.
+ * Close all open positions at current market prices. Iterates by descending
+ * index so a position that CANNOT be flattened (e.g. a frozen/pending binary)
+ * is reported rather than force-filled or spun on forever. Never a fictional
+ * fill (09).
+ * @returns {{ stuck: Array<{id:number,type:string,key:number}> }} un-flattenable legs.
  */
 export function liquidateAll(sim, currentPrice, currentVol, currentRate, currentDay, q) {
-    while (portfolio.positions.length > 0) {
-        const pos = portfolio.positions[portfolio.positions.length - 1];
-        closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+    const stuck = [];
+    for (let i = portfolio.positions.length - 1; i >= 0; i--) {
+        const pos = portfolio.positions[i];
+        const ok = closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+        if (!ok) stuck.push({ id: pos.id, type: pos.type, key: pos.strike });
     }
+    return { stuck };
 }
 
 // ---------------------------------------------------------------------------
@@ -1158,4 +1203,163 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
     }
 
     return { delta, gamma, theta, vega, rho };
+}
+
+// ---------------------------------------------------------------------------
+// Consensus milestone binaries (overhaul phase 3a)
+// ---------------------------------------------------------------------------
+//
+// Binaries net on the standard key convention (type + strike + expiryDay +
+// strategyName), where `strike` carries the contract key and `expiryDay` the
+// deadline. Signed qty (long = YES, short = written YES). Marks come from
+// unitPrice('binary', ...) = quote mid x notional. Shorts are FULLY
+// COLLATERALIZED: _reservedMargin holds the whole notional (premium sequestered
+// inside it), so max loss = notional - premium and a short can never lose more
+// than its collateral (09 "Binary shorts are fully collateralized"). No greeks,
+// no impact overlay, no borrow. Binaries carry no maintenance requirement
+// beyond that collateral (see checkMargin / marginRequirement guards) and are
+// settled event-driven by settleBinaries -- processExpiry skips them.
+
+/**
+ * Buy (side='long' = YES) or sell (side='short' = written YES) a Consensus
+ * milestone binary at the current quote. Fills at ask (buy) / bid (sell) x
+ * notional, nets against any existing position on the same contract key, and
+ * fully collateralizes shorts. Compute-then-commit: all cash / collateral is
+ * computed and guarded before a single field is mutated, so a rejected trade
+ * leaves the book untouched. Binaries are cash-funded -- a trade is rejected
+ * if it would drive cash negative (no leverage / no margin debit on binaries).
+ *
+ * @param {number} key   contract key (consensus.js)
+ * @param {string} side  'long' (buy YES) | 'short' (sell YES)
+ * @param {number} qty   units, positive
+ * @returns {Object|null} the position (new/updated), or null if not tradeable /
+ *                        unaffordable.
+ */
+export function executeBinaryTrade(key, side, qty) {
+    if (!(qty > 0)) return null;
+    if (portfolio.restricted) return null;                      // account restricted -> no order entry
+    if (consensus.frozen) return null;                          // book frozen (mobilized+) -> orders barred
+    const contract = contractByKey(key);
+    if (!contract) return null;
+    const quote = getBinaryQuote(key);
+    if (!quote || quote.settled || quote.frozen || quote.pending) return null;   // settled/frozen/pending -> not tradeable
+
+    const fill = (side === 'long' ? quote.ask : quote.bid) * BINARY_NOTIONAL;   // per-unit $, [0, notional]
+    const signedQty = side === 'long' ? qty : -qty;
+    const notionalQty = BINARY_NOTIONAL;
+
+    const idx = portfolio.positions.findIndex(p =>
+        p.type === 'binary' && p.strike === key && (p.strategyName || null) === null);
+    const existing = idx === -1 ? null : portfolio.positions[idx];
+    const oldQty = existing ? existing.qty : 0;
+    const absOld = Math.abs(oldQty);
+    const newQty = oldQty + signedQty;
+
+    // --- Compute cashDelta, resulting reserved collateral, and entry price ---
+    let cashDelta = 0;
+    let newReserved = 0;
+    let newEntry = fill;
+
+    if (absOld === 0) {
+        // Fresh position.
+        if (signedQty > 0) { cashDelta = -fill * qty; }
+        else { cashDelta = fill * qty - notionalQty * qty; newReserved = notionalQty * qty; }
+    } else if (Math.sign(oldQty) === Math.sign(signedQty)) {
+        // Same-direction extend (weighted-average entry).
+        const reservedOld = existing._reservedMargin || 0;
+        if (signedQty > 0) { cashDelta = -fill * qty; }
+        else { cashDelta = fill * qty - notionalQty * qty; newReserved = reservedOld + notionalQty * qty; }
+        newEntry = (existing.entryPrice * absOld + fill * qty) / Math.abs(newQty);
+    } else if (qty <= absOld) {
+        // Opposite direction, reduce / exact close (position keeps its side + entry).
+        newEntry = existing.entryPrice;
+        if (oldQty > 0) {
+            cashDelta = fill * qty;                                   // sell to close long: credit
+        } else {
+            const reservedOld = existing._reservedMargin ?? (notionalQty * absOld);
+            const returned = reservedOld * (qty / absOld);
+            cashDelta = returned - fill * qty;                        // buy to close short: return prorated collateral
+            newReserved = reservedOld - returned;
+        }
+    } else {
+        // Opposite direction, flip past zero: close all of old, open (qty-absOld) new.
+        const opening = qty - absOld;
+        newEntry = fill;
+        if (oldQty > 0) {
+            // close long, open short
+            cashDelta = fill * absOld + (fill * opening - notionalQty * opening);
+            newReserved = notionalQty * opening;
+        } else {
+            // close short (return all collateral), open long
+            const reservedOld = existing._reservedMargin ?? (notionalQty * absOld);
+            cashDelta = reservedOld - fill * absOld - fill * opening;
+            newReserved = 0;
+        }
+    }
+
+    // Guard: binaries are cash-funded -- never let a trade drive cash negative.
+    if (portfolio.cash + cashDelta < 0) return null;
+
+    // --- Commit ---
+    portfolio.cash += cashDelta;
+    portfolio.totalTrades++;
+
+    if (newQty === 0) {
+        if (existing) { existing.fillPrice = fill; portfolio.positions.splice(idx, 1); }
+        return existing;
+    }
+    if (existing) {
+        existing.qty = newQty;
+        existing.entryPrice = newEntry;
+        existing.fillPrice = fill;
+        if (newQty < 0) existing._reservedMargin = newReserved;
+        else delete existing._reservedMargin;
+        if ((oldQty > 0) !== (newQty > 0)) existing.entryDay = market.day;   // flipped side -> re-stamp
+        return existing;
+    }
+    const pos = {
+        id: _nextPositionId++, type: 'binary', qty: newQty,
+        strike: key, expiryDay: contract.deadline, entryPrice: newEntry,
+        entryDay: market.day, fillPrice: fill,
+    };
+    if (newQty < 0) pos._reservedMargin = newReserved;
+    portfolio.positions.push(pos);
+    return pos;
+}
+
+/**
+ * Cash-settle the player's binary positions for a batch of settlements from
+ * consensus.js (computeBinarySettlements). Each settlement carries a
+ * quote-independent `payoutPerUnit` (dollars): notional for YES, 0 for NO,
+ * fallbackValue x notional for impossibility -- identical for every holder,
+ * never dependent on cost basis (09 invariant 4). Long YES receives the payout;
+ * a fully-collateralized short returns its reserved collateral and pays the
+ * payout to the YES side. Settled positions are removed. Returns per-position
+ * result rows { key, label, outcome, qty, payout, pnl } for UI toasts.
+ */
+export function settleBinaries(settlements) {
+    const results = [];
+    for (const s of settlements) {
+        if (s.payoutPerUnit == null) continue;   // PENDING_CLOSEOUT marker -- no cash, position stays open
+        for (let i = portfolio.positions.length - 1; i >= 0; i--) {
+            const pos = portfolio.positions[i];
+            if (pos.type !== 'binary' || pos.strike !== s.key) continue;
+            const absQty = Math.abs(pos.qty);
+            const payout = s.payoutPerUnit * absQty;
+            const basis = pos.entryPrice * absQty;
+            let cashChange, pnl;
+            if (pos.qty > 0) {
+                cashChange = payout;              // long receives the payout
+                pnl = payout - basis;
+            } else {
+                const reserved = pos._reservedMargin ?? (BINARY_NOTIONAL * absQty);
+                cashChange = reserved - payout;   // return collateral, pay the YES side
+                pnl = basis - payout;             // premium collected minus payout owed
+            }
+            portfolio.cash += cashChange;
+            results.push({ key: s.key, label: s.label, outcome: s.outcome, qty: pos.qty, payout, pnl });
+            portfolio.positions.splice(i, 1);
+        }
+    }
+    return results;
 }

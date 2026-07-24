@@ -6,7 +6,7 @@
    Pure functions -- no internal state.
    ===================================================== */
 
-import { fmtNum, pnlClass, fmtDte, fmtRelDay, posTypeLabel } from './format-helpers.js';
+import { fmtNum, pnlClass, fmtDte, fmtRelDay, fmtQty, posTypeLabel } from './format-helpers.js';
 import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, posKey } from './chain-renderer.js';
 import { vasicekBondPrice, computeVXHCNFuturePrice } from './pricing.js';
@@ -162,6 +162,8 @@ export function cacheDOMElements($) {
     $.standingsSection   = document.getElementById('standings-section');
     $.standingsWorld     = document.getElementById('standings-world');
     $.standingsFactions  = document.getElementById('standings-factions');
+    $.consensusSection   = document.getElementById('consensus-section');
+    $.consensusTbody     = document.getElementById('consensus-tbody');
 }
 
 // ---------------------------------------------------------------------------
@@ -909,6 +911,96 @@ export function updateDynamicSections($, presetIndex) {
     }
     if ($.standingsSection) {
         $.standingsSection.classList.toggle('hidden', !isDynamic);
+    }
+    if ($.consensusSection) {
+        $.consensusSection.classList.toggle('hidden', !isDynamic);
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Consensus Markets panel (milestone binaries -- overhaul phase 3a)
+// ---------------------------------------------------------------------------
+
+/**
+ * Pure helper: CSS class for a settled outcome cell. Returns '' for FALLBACK
+ * (and anything without a directional color) so callers never pass '' to
+ * classList.add (which throws). Exported for unit testing.
+ */
+export function consensusOutcomeClass(outcome) {
+    if (outcome === 'YES') return 'pnl-up';
+    if (outcome === 'NO') return 'pnl-down';
+    return '';   // FALLBACK / pending -> neutral
+}
+
+/**
+ * Render the Consensus milestone-binary book: one row per listed contract with
+ * the compact predicate, the live quote (bid-ask in cents, or the settled
+ * outcome / pending marker), the player's net position, and days-to-deadline.
+ * Open rows carry a `data-binary-key` for the delegated buy/sell-YES handler
+ * bound in main.js; settled / pending / frozen rows are non-tradeable.
+ * Dynamic-only; called from updateUI when consensus is active.
+ */
+export function updateConsensusPanel($, consensus, portfolio, day) {
+    const tbody = $.consensusTbody;
+    if (!tbody) return;
+    tbody.textContent = '';
+
+    for (const c of consensus.contracts) {
+        const q = consensus.quotes[c.key] || {};
+        const st = consensus.settled[c.key];
+        const pending = consensus.pendingCloseout && consensus.pendingCloseout[c.key];
+        const tradeable = !st && !pending && !q.frozen && !q.pending;
+        const pos = portfolio.positions.find(p => p.type === 'binary' && p.strike === c.key);
+
+        const row = document.createElement('tr');
+        row.className = 'chain-row consensus-row' + ((st || pending) ? ' consensus-settled' : '');
+        if (tradeable) row.dataset.binaryKey = String(c.key);
+
+        // Milestone (compact predicate label -- data, not narrative flavor).
+        const cMile = document.createElement('td');
+        cMile.className = 'chain-cell';
+        cMile.textContent = 'R' + c.predicate.rung + ' by ' + c.deadline;
+        row.appendChild(cMile);
+
+        // Quote: settled outcome, pending-closeout marker, or bid-ask in cents.
+        const cQuote = document.createElement('td');
+        cQuote.className = 'chain-cell';
+        let quoteCls = '';
+        if (st) {
+            cQuote.textContent = st.outcome === 'YES' ? 'YES'
+                : st.outcome === 'FALLBACK' ? (c.fallbackValue * 100).toFixed(0) + '¢'
+                : 'NO';
+            quoteCls = consensusOutcomeClass(st.outcome);
+        } else if (pending) {
+            cQuote.textContent = 'closeout';
+        } else if (q.frozen) {
+            cQuote.textContent = 'frozen';
+        } else if (q.bid != null) {
+            cQuote.textContent = Math.round(q.bid * 100) + '–' + Math.round(q.ask * 100) + '¢';
+        } else {
+            cQuote.textContent = '—';
+        }
+        if (quoteCls) cQuote.classList.add(quoteCls);
+        row.appendChild(cQuote);
+
+        // Player net position (signed; YES side).
+        const cPos = document.createElement('td');
+        cPos.className = 'chain-cell';
+        if (pos) {
+            cPos.textContent = (pos.qty > 0 ? '+' : '−') + fmtQty(pos.qty);
+            cPos.classList.add(pos.qty > 0 ? 'pnl-up' : 'pnl-down');
+        } else {
+            cPos.textContent = '—';
+        }
+        row.appendChild(cPos);
+
+        // Days-to-deadline (or terminal marker).
+        const cDte = document.createElement('td');
+        cDte.className = 'chain-cell';
+        cDte.textContent = st ? 'settled' : pending ? 'pending' : Math.max(0, c.deadline - day) + 'd';
+        row.appendChild(cDte);
+
+        tbody.appendChild(row);
     }
 }
 

@@ -13,8 +13,9 @@ import {
     portfolio, resetPortfolio, checkPendingOrders, processExpiry,
     chargeBorrowInterest, processDividends, checkMargin, aggregateGreeks,
     executeMarketOrder, closePosition, exerciseOption,
-    liquidateAll, placePendingOrder, cancelOrder,
+    liquidateAll, placePendingOrder, cancelOrder, cancelAllOrders,
     computeNetDelta, computeGrossNotional, portfolioValue,
+    executeBinaryTrade, settleBinaries,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -26,6 +27,7 @@ import {
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams, updateStandings,
+    updateConsensusPanel,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
     showPopupEvent,
@@ -72,6 +74,10 @@ import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
 import { createRaceState, advanceRace, resetRaceState } from './src/race/race-state.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
+import {
+    consensus, initConsensus, resetConsensus, deactivateConsensus,
+    refreshBinaryQuotes, computeBinarySettlements,
+} from './src/race/consensus.js';
 
 
 // ---------------------------------------------------------------------------
@@ -527,6 +533,21 @@ function init() {
         }
     });
 
+    // Consensus panel: delegated buy/sell-YES on the milestone rows. Bound once
+    // on the stable tbody (rows are rebuilt each render) -- no listener stacking.
+    if ($.consensusTbody) {
+        $.consensusTbody.addEventListener('click', (e) => {
+            const row = e.target.closest('[data-binary-key]');
+            if (row) handleBinaryTrade(parseInt(row.dataset.binaryKey, 10), 'long');
+        });
+        $.consensusTbody.addEventListener('contextmenu', (e) => {
+            const row = e.target.closest('[data-binary-key]');
+            if (!row) return;
+            e.preventDefault();
+            handleBinaryTrade(parseInt(row.dataset.binaryKey, 10), 'short');
+        });
+    }
+
     document.addEventListener('shoals:unwindStrategy', (e) => {
         const name = e.detail && e.detail.name;
         if (!name) return;
@@ -597,6 +618,10 @@ function init() {
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
         raceState = createRaceState();
+        // Consensus milestone binaries (overhaul phase 3a): list contracts + prime quotes.
+        initConsensus(raceState);
+    } else {
+        deactivateConsensus();
     }
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
@@ -984,11 +1009,15 @@ function _processPopupQueue() {
             for (const trade of choice.trades) {
                 let targets;
                 if (trade.action === 'close_all') {
-                    for (const p of snapshot) {
-                        pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
-                    }
-                    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
-                    closed = snapshot.length;
+                    // P&L captured per position BEFORE liquidation (positions vanish);
+                    // summed only over the ids actually removed (frozen legs excluded).
+                    const pnlById = new Map();
+                    for (const p of snapshot) pnlById.set(p.id, computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q));
+                    const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    const stuckIds = new Set(stuck.map(s => s.id));
+                    for (const p of snapshot) if (!stuckIds.has(p.id)) pnlSum += pnlById.get(p.id);
+                    closed = snapshot.length - stuck.length;
+                    if (stuck.length) _toast(`${stuck.length} Consensus contract${stuck.length > 1 ? 's' : ''} frozen — could not flatten.`, 4000);
                     break;
                 } else if (trade.action === 'close_type') {
                     targets = snapshot.filter(p => p.type === trade.type);
@@ -1060,12 +1089,17 @@ function _processPopupQueue() {
         if (event._marginAction) {
             const vol = market.sigma;
             if (choice.playerFlag === 'margin_liquidated') {
-                liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                const closedBefore = portfolio.positions.length;
+                const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                _applyRestriction(stuck, closedBefore);
                 chainDirty = true;
                 updateUI();
-                if (portfolio.cash < sim.S) {
+                // Assess deficit on CANONICAL equity, never raw cash -- and only
+                // when the book is fully flat (a legal frozen book is restricted,
+                // not insolvent).
+                if (stuck.length === 0 && _portfolioEquity() < 0) {
                     _showGameOver('Forced liquidation left your account in deficit by '
-                        + fmtDollar(Math.abs(portfolio.cash))
+                        + fmtDollar(Math.abs(_portfolioEquity()))
                         + '. Regulators have flagged the account for review.');
                 }
             } else if (choice.playerFlag === 'margin_partial') {
@@ -1080,10 +1114,12 @@ function _processPopupQueue() {
                 const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
                 if (recheck.triggered) {
                     _toast('Still below margin. Full liquidation required.', 4000);
-                    liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    const closedBefore = portfolio.positions.length;
+                    const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                    _applyRestriction(stuck, closedBefore);
                     chainDirty = true;
                     updateUI();
-                    if (portfolio.cash < sim.S) {
+                    if (stuck.length === 0 && _portfolioEquity() < 0) {
                         _showGameOver('Forced liquidation left your account in deficit.');
                     }
                 }
@@ -1185,11 +1221,50 @@ function _regStatusLabel(entry) {
 }
 
 function _portfolioEquity() {
-    let equity = portfolio.cash;
-    for (const p of portfolio.positions) {
-        equity += computePositionValue(p, sim.S, market.sigma, sim.r, sim.day, sim.q);
+    // Canonical equity: includes reserved short collateral (_reservedMargin).
+    // Omitting it under-counts equity for collateralized shorts (binary shorts
+    // sequester the whole notional), which can spuriously trip rogue-trading /
+    // review thresholds -- so always go through portfolioValue.
+    return portfolioValue(sim.S, market.sigma, sim.r, sim.day, sim.q);
+}
+
+/**
+ * Apply a real trading restriction after a forced liquidation that could not
+ * flatten every leg (frozen Consensus contracts). Sets the persistent flag,
+ * cancels ALL pending orders (liquidateAll only visits positions), and reports
+ * the TRUE outcome (n closed, m frozen). No stuck legs -> no restriction, plain
+ * "liquidated" toast.
+ */
+function _applyRestriction(stuck, closedBefore) {
+    const closed = closedBefore - stuck.length;
+    if (stuck.length > 0) {
+        portfolio.restricted = true;
+        const cancelled = cancelAllOrders();
+        _toast(`Liquidation: ${closed} closed, ${stuck.length} frozen leg${stuck.length > 1 ? 's' : ''} remain`
+            + (cancelled ? `; ${cancelled} pending order${cancelled > 1 ? 's' : ''} cancelled` : '')
+            + '. Account restricted until they clear.', 5000);
+    } else {
+        _toast(`All ${closed} position${closed !== 1 ? 's' : ''} liquidated.`, 4000);
     }
-    return equity;
+}
+
+/** True if any open position cannot currently be flattened (frozen/pending/settled binary leg). */
+function _hasStuckLegs() {
+    if (!consensus.active) return false;
+    for (const p of portfolio.positions) {
+        if (p.type !== 'binary') continue;
+        const q = consensus.quotes[p.strike];
+        if (consensus.frozen || !q || q.settled || q.pending || q.frozen) return true;
+    }
+    return false;
+}
+
+/** Order-entry guard: toast + block when the account is restricted. */
+function _blockedByRestriction() {
+    if (!portfolio.restricted) return false;
+    _toast('Account restricted — trading disabled until frozen positions clear.', 3500);
+    _haptic('error');
+    return true;
 }
 
 function _showInterjection(text) {
@@ -1301,8 +1376,40 @@ function _onDayComplete() {
     }
 
     // Advance the hidden AI-race state machine one completed day (overhaul
-    // phase 1). Neutral inputs; nothing reads it yet, so this is invisible.
-    if (raceState) advanceRace(raceState);
+    // phase 1). Neutral inputs; the bridge (phase 2) + Consensus binaries
+    // (phase 3a) read the ledger it produces.
+    if (raceState) {
+        advanceRace(raceState);
+        // Consensus binaries: settle on this tick's certified crossings /
+        // deadlines / impossibility (consumes race.lastTransitions.certifications
+        // -- the ledger, never state-diffing), then refresh quotes off the public
+        // (released/certified) view. Runs before the event bridge so a settled
+        // milestone's toast reads after the race headline.
+        const settlements = computeBinarySettlements(raceState);
+        if (settlements.length) {
+            const settled = settleBinaries(settlements);
+            for (const r of settled) {
+                _toast('Consensus: ' + r.label + ' settled ' + r.outcome
+                    + ' — P&L ' + fmtDollar(r.pnl), 4500);
+            }
+            // Terminal (R5) crossings held for closeout: notify if the player holds one.
+            for (const s of settlements) {
+                if (s.outcome === 'PENDING_CLOSEOUT'
+                    && portfolio.positions.some(p => p.type === 'binary' && p.strike === s.key)) {
+                    _toast('Consensus: ' + s.label + ' reached — held for terminal closeout.', 4500);
+                }
+            }
+        }
+        refreshBinaryQuotes(raceState);
+    }
+
+    // Trading-restriction release: lifts once no un-flattenable (stuck) legs
+    // remain (the frozen contracts have settled -- nationalization fallback or
+    // deadline) AND canonical equity is non-negative. _resetCore always clears it.
+    if (portfolio.restricted && !_hasStuckLegs() && _portfolioEquity() >= 0) {
+        portfolio.restricted = false;
+        _toast('Trading restriction lifted — account reopened.', 3500);
+    }
 
     // Fire dynamic events
     if (eventEngine) {
@@ -1464,7 +1571,8 @@ function _onDayComplete() {
                     label: 'Liquidate all positions',
                     desc: 'Dump everything at market. Stop the bleeding.',
                     playerFlag: 'margin_liquidated',
-                    resultToast: 'All positions liquidated.',
+                    // No static resultToast -- the _marginAction handler reports the
+                    // TRUE outcome (n closed, m frozen) via _applyRestriction.
                 },
                 {
                     label: 'Sell stock first',
@@ -1568,6 +1676,7 @@ function updateUI(precomputedMargin) {
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
     updateVxhcnDisplay($, market.vxhcn, vxhcnHistory);
+    if (raceState && consensus.active) updateConsensusPanel($, consensus, portfolio, raceState.day);
     refreshTooltip();
     if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
         _updateTradeCreditDebit();
@@ -1805,9 +1914,12 @@ function loadPreset(index) {
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
         raceState = createRaceState();
+        // Consensus milestone binaries (overhaul phase 3a).
+        initConsensus(raceState);
     } else {
         eventEngine = null;
         raceState = null;
+        deactivateConsensus();
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
@@ -1828,7 +1940,7 @@ function resetSim() {
     // Reset the hidden AI-race state in place with a fresh per-run seed (a new
     // world each reset). Same-preset reset only; mode changes create/null it in
     // loadPreset -- so no discarded-seed draws. Null in Classic, untouched.
-    if (raceState) resetRaceState(raceState);
+    if (raceState) { resetRaceState(raceState); resetConsensus(raceState); }
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
@@ -1864,6 +1976,7 @@ function _getTriggerPrice() {
 }
 
 function _executeOrPlace(type, side, qty, strike, expiryDay) {
+    if (_blockedByRestriction()) return;
     const vol = market.sigma;
     const orderType = _getOrderType();
     if (orderType === 'market') {
@@ -1922,8 +2035,28 @@ function handleChainCellClick(info) {
     _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike ?? undefined, expiryDay);
 }
 
+// Consensus milestone binary (overhaul phase 3a): left-click buys YES,
+// right-click sells YES, at the trade-qty slider size. Market-only (no
+// pending-order flow for binaries this slice).
+function handleBinaryTrade(key, side) {
+    if (!raceState || !consensus.active) return;
+    if (_blockedByRestriction()) return;
+    const qty = _getTradeQty();
+    const pos = executeBinaryTrade(key, side, qty);
+    if (pos) {
+        _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k YES', 2500);
+        _haptic('success');
+    } else {
+        _toast('Binary trade rejected — insufficient cash or contract closed.');
+        _haptic('error');
+    }
+    updateUI();
+    dirty = true;
+}
+
 
 function handleTradeSubmit(data) {
+    if (_blockedByRestriction()) return;
     const vol = market.sigma;
     const { type, side, qty, strike, expiryDay, orderType, limitPrice } = data;
 
@@ -2122,6 +2255,7 @@ function handleDeleteStrategy() {
 }
 
 function handleTradeExecStrategy() {
+    if (_blockedByRestriction()) return;
     const id = $.tradeStrategySelect ? $.tradeStrategySelect.value : '';
     if (!id) return;
     const strat = getStrategy(id);

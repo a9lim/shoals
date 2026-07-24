@@ -46,6 +46,10 @@ function _computeEquity(portfolio, sim) {
     let equity = portfolio.cash;
     for (const pos of portfolio.positions) {
         equity += computePositionValue(pos, sim.S, Math.sqrt(sim.v), sim.r, sim.day, sim.q);
+        // Reserved short collateral is the player's money (returned on close/
+        // settlement) -- omitting it under-counts equity for collateralized
+        // shorts (binary shorts sequester the whole notional).
+        if (pos._reservedMargin) equity += pos._reservedMargin;
     }
     return equity;
 }

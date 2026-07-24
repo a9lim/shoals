@@ -365,6 +365,19 @@
                             <button id="trade-exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute Strategy</button>
                         </div>
                         <p class="panel-hint trade-hint" id="trade-hint">Left-click: buy &middot; Right-click: sell/short &middot; Hover: bid/ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-Ask Spreads">?</button></p>
+                        <div id="consensus-section" class="stat-group hidden">
+                            <div class="group-label">Consensus Markets</div>
+                            <table class="chain-tbl" id="consensus-table">
+                                <thead><tr>
+                                    <th class="chain-th">Milestone</th>
+                                    <th class="chain-th">Quote</th>
+                                    <th class="chain-th">Pos</th>
+                                    <th class="chain-th">DTE</th>
+                                </tr></thead>
+                                <tbody id="consensus-tbody"></tbody>
+                            </table>
+                            <p class="panel-hint">Left-click: buy YES &middot; Right-click: sell YES</p>
+                        </div>
                     </div>
                 </div>
                 <!-- Portfolio Tab -->

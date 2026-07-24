@@ -321,8 +321,9 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
         $.dividendDisplay.className = 'stat-value ' + (totalDividends !== 0 ? pnlClass(totalDividends) : '');
     }
 
-    // Default (non-strategy) positions -- DOM diff
-    const defaultPos = portfolio.positions.filter(p => !p.strategyName);
+    // Default (non-strategy) positions -- DOM diff. Consensus binaries are shown
+    // in their own panel (Dynamic-only), not this list, so exclude them here.
+    const defaultPos = portfolio.positions.filter(p => !p.strategyName && p.type !== 'binary');
     _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'No open positions.', q);
 
     // Strategy positions -- grouped by name, single box per strategy

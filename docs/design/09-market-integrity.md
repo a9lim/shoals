@@ -60,6 +60,14 @@ fallbackValue}`.
   (nationalized/classified). Every dispute has `disputeDeadline`;
   expiry without ruling triggers the fallback automatically. No
   indefinite limbo.
+- **The R5 contract settles on terminal resolution, never mid-run
+  certification** (ruled 2026-07-23, phase 3a): no auditor certifies
+  takeoff — a world that would is not a world that keeps markets. Its
+  `evidenceStandard` is the resolution ladder's R5-crossing terminal,
+  paid through the post-1008/terminal closeout matrix below (wired
+  with the endings phase); its deadline still settles NO in a run
+  that neither crossed nor terminated. R2–R4 settle on certification
+  as normal — `CERT_RUNGS = [2, 3, 4]` is by design, not omission.
 
 ## The nationalization reference (protected)
 

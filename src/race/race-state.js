@@ -38,6 +38,7 @@ import {
     recordRungs,
     C_MIN, C_MAX, OPEN_MIN, RELEASE_PULL, OPEN_LAG, CERT_RUNGS,
 } from './capability.js';
+import { freezeConsensus, isFreezeRegime } from './consensus.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
@@ -263,6 +264,36 @@ function baselineReleasePolicy(race, endDay, heat) {
         }
     }
     return fired;
+}
+
+// ---- Control-regime transition (canonical op) ----------------------------
+
+/** Valid controlRegime values (09): the state's grip tightening in order. */
+export const CONTROL_REGIMES = ['private', 'supervised', 'mobilized', 'nationalized', 'classified'];
+// Monotone rank (nationalized/classified are terminal peers). The regime only
+// ever tightens -- a freeze, once public, never unwinds mid-run.
+const REGIME_RANK = { private: 0, supervised: 1, mobilized: 2, nationalized: 3, classified: 3 };
+
+/**
+ * Set the control regime -- the ONE canonical mutation path for
+ * `race.controlRegime` (mirrors commitTheft / commitRelease). Later phases wire
+ * the transition triggers; the op must exist and be the sole writer so the
+ * side effects travel with the state change. Transitions are MONOTONE: only
+ * equal-or-forward moves are honored (private -> supervised -> mobilized ->
+ * nationalized/classified); a backward move is ignored (never unfreezes).
+ * Reaching a freeze regime (mobilized/nationalized/classified) SYNCHRONOUSLY
+ * freezes the Consensus classes (09: trading halts the moment the impossibility
+ * becomes public; fallback settlement of nationalized/classified is a separate
+ * step in computeBinarySettlements). No-ops on an unknown or backward regime.
+ * @returns {boolean} true if the regime was applied.
+ */
+export function setControlRegime(race, regime) {
+    if (!CONTROL_REGIMES.includes(regime)) return false;
+    const cur = REGIME_RANK[race.controlRegime] ?? 0;
+    if (REGIME_RANK[regime] < cur) return false;   // backward -> ignore, never unfreeze
+    race.controlRegime = regime;
+    if (isFreezeRegime(regime)) freezeConsensus();
+    return true;
 }
 
 // ---- Daily tick ----------------------------------------------------------

@@ -168,6 +168,24 @@ the clamp is the stance; the count is derived, and the clamp holds
 at any count). Publication prob = culture; unpublished beats leak
 at 0.25.
 
+## Consensus binaries (phase-3a ratifications, 2026-07-23)
+
+`BINARY_NOTIONAL = 100` (mirrors bond face; per-unit prices share the
+bond display scale). Contract deadlines: R2 → day 420, R3 → 756,
+R4 → 880, R5 → 1000 — calibrated against the *measured certified* KM
+medians (R2 ~405, R3 ~736, R4 ~860) so each certifiable contract is
+genuinely two-sided (~57–60% YES), per the knife-edge principle.
+Binary longs are cash-funded (no leverage); shorts post full-notional
+collateral with premium sequestered. R5 settles only via terminal
+closeout ([09](09-market-integrity.md), oracle discipline) — the
+harness's "R5 100% NO" is the pre-endings artifact of runs that never
+terminate, not the design. `disputeDeadline` rides every tuple per 09;
+its adjudication path activates when a dispute event class exists
+(P5) — certification disputes are meanwhile resolved upstream in
+`stepCertification`'s disputed-lag draw. Quote magnitudes are
+placeholder until `B` lands (phase 4) and are deliberately not
+recorded here.
+
 ## Market coupling
 
 η, pre-price, impact, and `B`-update magnitudes as rev 1, with two
