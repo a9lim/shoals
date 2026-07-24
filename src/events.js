@@ -36,12 +36,12 @@ const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 // are ALSO excluded: the machinery shells fire via the bridge / followups, and
 // the remaining content skeletons stay dormant (placeholder prose) until their
 // content round -- they must never Poisson-fire into the live game. A category
-// leaves this set exactly when its arc's prose lands ('halcyon' left in content
-// round 1; guards on `world.ai.frontierRung` gate act placement from there).
+// leaves this set exactly when its arc's prose lands ('halcyon' round 1,
+// 'china' round 2; guards on `world.ai.frontierRung` gate act placement).
 const _PULSE_CATEGORIES = new Set([
     'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
     'strait', 'regime', 'dispute', 'policy', 'treaty', 'wonder',
-    'china', 'polaris', 'insider', 'ghostwritten', 'conversion',
+    'polaris', 'insider', 'ghostwritten', 'conversion',
 ]);
 
 // -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------

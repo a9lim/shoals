@@ -1,31 +1,37 @@
 /* ===================================================
    src/events/china.js -- "China in the dark" arc
-   (overhaul phase 5a SKELETON + strait machinery shells).
+   (overhaul phase 5; prose landed content round 2).
 
    Two kinds of content live here:
 
-   1. STRAIT MACHINERY SHELLS (wired, fire NOW via the race
-      bridge on race.lastTransitions.strait): gray-zone
-      scares, a blockade superevent, and the blockade-lifted
-      relief beat. Their prose is a placeholder; the MACHINERY
-      is real (strait.js generates the beats, bridgeStrait
-      fires these shells). Token-free prose -> the bridge's
-      finalize just picks/capitalizes.
+   1. STRAIT MACHINERY SHELLS (bridge-fired on
+      race.lastTransitions.strait): gray-zone scares, the
+      blockade superevent, the lift, the after-action.
+      strait.js generates the beats; bridgeStrait fires
+      these shells; the bridge finalize rotates variants.
+      Token-free prose throughout.
 
-   2. CHINA-ARC SEED EVENTS (skeleton, DORMANT): export-control
-      politics and the domestic Tianxia constituency. Category
-      'china' is Poisson-EXCLUDED (events.js _PULSE_CATEGORIES),
-      so these do not fire until the content rounds wire them.
+   2. CHINA-ARC EVENTS (live in the Poisson pool): the
+      export-control ratchet and its Beijing answer (the
+      coupling that feeds straitTension), the domestic
+      Cangjie constituency, Cambria allocation politics,
+      and the guards-vs-GPUs budget fight.
 
-   PROSE: coordinator. Every player-facing string is a terse
-   placeholder ("[P] ...") for the coordinator to replace with
-   final prose. Followup-chain topology is sketched; only 1-2
-   real seed events plus the machinery shells.
+   DEFERRED to the theft-disclosure machinery round (the
+   bridge's theft stub is a deliberate no-op until then):
+   the post-theft "why slow down if it can be stolen"
+   margin burn, and sampled-reliability chinaTrue
+   intelligence beats. Their prose lands with their
+   machinery -- a dangling followupOnly would trip the
+   index validator today.
 
-   MARKET COUPLING (03/P4): race-bridge-fired shells carry
+   MARKET COUPLING (03/P4): shells and arc events carry
    `impulse` (a DECAYING overlay), never permanent `params`
-   deltas -- same rule as race-events.js. Magnitudes are the
-   rev-1 sign intents (UNRATIFIED).
+   deltas on the race stream. The one PERMANENT mutation
+   here is world-state: the backlash followup ratchets
+   tradeWarStage/chinaRelations -- which is exactly the
+   public tension straitTension() reads. The politics load
+   the gun; strait.js decides, run by run, whether it fires.
    =================================================== */
 
 export const CHINA_EVENTS = [
@@ -34,8 +40,11 @@ export const CHINA_EVENTS = [
         id: 'strait_grayzone',
         category: 'strait',
         magnitude: 'minor',
-        // PROSE: coordinator
-        headline: '[P] Gray-zone incident near the median line: a Cambria-flagged tender, a coast-guard ram, a risk premium that was not there yesterday.',
+        headlines: [
+            'A Cambria-flagged tender takes a coast-guard ram near the median line. Nobody shoots; nobody apologizes; the water is contested enough that both are policy. By the close there is a risk premium in the far compute curve that was not there at the open, and no press release to pin it on.',
+            'Twelve aircraft cross the median line during a "routine" drill, which is four more than routine. The pattern is the message: this can be done on any Tuesday. Cambria paper prints the message a half-day before the wires carry it.',
+            'A subsea cable east of the island drops, and the repair ship is denied transit for thirty hours over a paperwork technicality that has never previously existed. The cable carries no fab traffic. The denial carries the point.',
+        ],
         params: {},                    // no permanent delta (03 incident-coupling rule)
         impulse: { xi: 0.006 },        // decaying (P4): a hair of tail premium, no direction
     },
@@ -45,13 +54,15 @@ export const CHINA_EVENTS = [
         popup: true,
         superevent: true,
         magnitude: 'major',
-        // PROSE: coordinator
-        headline: '[P] BLOCKADE. Beijing closes the water off Hsinchu. The fabs are a hundred miles from a shooting gallery, and the compute curve knows it before the Pentagon says it.',
+        headline: 'BLOCKADE. Beijing announces a "customs enforcement zone" enclosing the water off Hsinchu, effective on publication. No shots, no invasion, no timetable — just hulls where the shipping lanes were, and every accelerator on Earth’s forward supply on the wrong side of them. The Pentagon calls it "a development we are monitoring." The compute curve had finished monitoring it by 9:40.',
+        context: 'Force majeure is no longer a clause at the back of the compute contracts; it is the front page. The fabs are intact, humming, and unreachable — the distinction between destroyed capacity and stranded capacity is worth exactly the term structure. The desk marks, and waits, and learns what everyone else holding the far curve learns: there is no hedge for geography.',
         params: {},                    // no permanent delta (03 incident-coupling rule)
         impulse: { mu: -0.05, xi: 0.05, lambda: 0.8 },   // decaying (P4): compute crunch hits HCN, vol/jump up
         choices: [
-            // PROSE: coordinator
-            { label: '[P] Acknowledge', desc: '[P] The compute book reprices force-majeure. The desk marks and waits.' },
+            {
+                label: 'Mark the book',
+                desc: 'The compute positions reprice to the force-majeure schedule. Nothing to decide today; everything to decide about what you believed yesterday.',
+            },
         ],
         followups: [{ id: 'strait_postmortem', mtth: 20 }],
     },
@@ -59,8 +70,7 @@ export const CHINA_EVENTS = [
         id: 'strait_blockade_lifted',
         category: 'strait',
         magnitude: 'moderate',
-        // PROSE: coordinator
-        headline: '[P] The blockade lifts. The near curve exhales; the far tail does not fully un-price what it just learned.',
+        headline: 'The enforcement zone is rescinded as quietly as it was declared — a notice to mariners, no speech. Ships move within hours; the near curve exhales; insurance does not. The far tail keeps a standing premium it did not carry before, because the market has now seen the thing it used to merely price, and they are not the same input.',
         params: {},                    // no permanent delta (03 incident-coupling rule)
         impulse: { mu: 0.02, xi: -0.02 },   // decaying (P4): relief rally, tail bleeds
     },
@@ -69,36 +79,40 @@ export const CHINA_EVENTS = [
         followupOnly: true,
         category: 'strait',
         magnitude: 'moderate',
-        // PROSE: coordinator
-        headline: '[P] The after-action on the blockade week: what the curve priced, what the desks lost, and the standing premium that never goes back to zero.',
+        headline: 'The after-action on the blockade week circulates: which desks were short the far curve and why, which force-majeure clauses held and which are now litigation, and one MarketWire chart that will outlive the episode — the strait premium, before and after, with the "after" never returning to the "before." The Brief’s caption: "The market has updated its map."',
         params: {},
         impulse: { xi: 0.004 },
     },
 
-    // ---- China-arc seed events (skeleton, DORMANT until content rounds) ----
+    // ---- The export-control ratchet (the politics that load the gun) ------
     {
         id: 'china_export_controls',
         category: 'china',
+        likelihood: 1.2,
         popup: true,
         magnitude: 'moderate',
-        // PROSE: coordinator
-        headline: '[P] The administration tightens chip export controls — and the domestic Tianxia constituency lobbies against its own government.',
-        // PROSE: coordinator
-        context: '[P] American firms built on free Cangjie weights want the chips to keep flowing. The controls bind silicon, never weights already released. Where do you stand?',
+        when: (sim, world) => world.ai.exportControlStage < 3,
+        headline: 'The administration circulates a draft rule tightening accelerator exports — and the loudest lobbying against it is American. Half the country’s enterprise software runs on free Cangjie weights; the constituency for the other side’s model line votes, donates, and testifies. Lassiter wants the rule broader. The Chamber wants it dead. Commerce wants the comment period extended until after the midterms.',
+        context: 'The rule binds silicon, not weights — nothing already released un-releases, a point the hearing will rediscover in public, twice. Meridian’s clients sit on both sides of it, and a fund with a view can lean on the comment period. Controls slow Tianxia and buy the frontier comfort-margin; free flow keeps your software cheap and the strait calm. Pick which future you’re short.',
         choices: [
             {
-                // PROSE: coordinator
-                label: '[P] Back the controls',
-                desc: '[P] Slow Tianxia; heat the China arcs; buy a little comfort-margin (the reluctant-accelerationist trap).',
+                label: 'Back the controls',
+                desc: 'Weigh in for the tighter rule. Tianxia slows, the frontier’s lead pads out — and Beijing does not read the gesture as economics.',
                 effects: [{ path: 'ai.exportControlStage', op: 'add', value: 1 }],
+                factionShifts: [
+                    { faction: 'federalistSupport', value: 2 },
+                    { faction: 'labRelations', value: 1 },
+                ],
                 playerFlag: 'lobbied_export_controls',
                 followups: [{ id: 'china_controls_backlash', mtth: 30 }],
+                resultToast: 'Meridian’s comment letter supports the rule. Lassiter’s office calls it "constructive."',
             },
             {
-                // PROSE: coordinator
-                label: '[P] Fight the controls',
-                desc: '[P] Side with the domestic constituency; the chips keep flowing.',
+                label: 'Fight the controls',
+                desc: 'Side with the constituency. The chips keep flowing, the software stays cheap, and the race stays somebody else’s problem for another quarter.',
+                factionShifts: [{ faction: 'firmStanding', value: 1 }],
                 playerFlag: 'lobbied_deregulation',
+                resultToast: 'The comment letter opposes the rule. Three clients call to say thank you; one calls to say nothing, memorably.',
             },
         ],
     },
@@ -107,8 +121,55 @@ export const CHINA_EVENTS = [
         followupOnly: true,
         category: 'china',
         magnitude: 'moderate',
-        // PROSE: coordinator
-        headline: '[P] Beijing answers the controls — the trade war ratchets, and the strait tension with it.',
+        headline: 'Beijing answers the export rule with a "reciprocal adjustment": licensing delays on rare-earth processing, a customs inspection regime discovering sudden enthusiasm, and a Liang Wei speech about "technological containment" that names no one and means everyone. The trade war ratchets one click. So, invisibly, does the arithmetic in the strait.',
+        effects: (world) => {
+            world.geopolitical.tradeWarStage = Math.min(4, world.geopolitical.tradeWarStage + 1);
+            world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
+        },
+        params: { mu: -0.01, sigma: 0.01 },
+        impulse: { xi: 0.01 },   // decaying (P4): the tail thickens a hair
+    },
+
+    // ---- The domestic constituency (proliferation with a lobby) -----------
+    {
+        id: 'china_constituency',
+        category: 'china',
+        likelihood: 1.5,
+        magnitude: 'minor',
+        when: (sim, world) => world.geopolitical.tradeWarStage >= 1 || world.ai.exportControlStage >= 1,
+        headlines: [
+            'A Fortune 500 CIO, testifying against the export rules, is asked why an American company runs its logistics on Cangjie weights. "Because they are free, Senator." Asked if that concerns him: "The invoice does not arrive with a flag on it." The clip does numbers in Shenzhen.',
+            'The Cangjie Developers Conference — the American one, in Austin — draws eleven thousand attendees and two protesters. The keynote is a supply-chain demo running on weights Beijing gave away and silicon Washington is trying to embargo. Nobody on stage sees the sentence as strange, which is the story.',
+            'MarketWire runs the divergence chart again: the non-frontier software complex, up on cheap Cangjie inference, against HCN, flat — the market pricing proliferation as a margin story for everyone except the company it is aimed at. Sharma: "Free is a price. Somebody is paying it. The ticker just isn’t listed here."',
+        ],
         params: {},
+        impulse: { mu: -0.008, xi: 0.004 },   // decaying (P4): the moat quietly shoaling
+    },
+
+    // ---- Cambria allocation (politics in two capitals) --------------------
+    {
+        id: 'china_cambria_allocation',
+        category: 'china',
+        likelihood: 1.5,
+        magnitude: 'minor',
+        headlines: [
+            'Cambria posts allocation guidance. Karras takes four questions in nine minutes: capacity is "committed through the horizon," priority is "contractual," the Austin fab is "progressing" — and, on invasion risk, the answer that has become a genre: "We publish our capacity numbers." The call ends. The oracle bones are read for a week.',
+            'The Austin fab breaks ground, again — the third groundbreaking in as many years, each with a larger flag and the same two-years-out completion date. The subsidy is real, the tools are ordered, and the geography it is meant to solve remains, for now, exactly where it was.',
+            'A leak from the allocation committee: next quarter’s marginal wafer went to the frontier, again, over a hyperscaler bid that offered more money. Cambria does not comment on allocation. The hyperscaler does not comment on losing. The lesson — that the queue is priced in something other than dollars — is not lost on either capital.',
+        ],
+        params: {},
+        impulse: { xi: 0.008 },   // decaying (P4): the chokepoint reminds everyone it chooses
+    },
+
+    // ---- Guards vs GPUs (the budget fight before the theft) ---------------
+    {
+        id: 'china_guards_vs_gpus',
+        category: 'china',
+        likelihood: 1,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.frontierRung >= 2,
+        headline: 'A line item surfaces from Halcyon’s planning cycle, secondhand and denied: the security budget and the training budget went to the same committee, and one of them left with the money. Weight custody, insider vetting, the compartmentalization program — funded, per the leak, at "roughly a datacenter’s worth of priority." The people who track such things note that the entity most interested in that ratio does not read the Brief. It has other channels.',
+        params: {},
+        impulse: { xi: 0.01 },   // decaying (P4): the tail risk nobody can name yet
     },
 ];
