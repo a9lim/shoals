@@ -609,9 +609,15 @@ flagged as interpretation, arbitrated:
    (won with margin) / **1.25** (ambiguous dawn), boring-world
    **1.00** (the Deal — flat is the point), doom equity recovery
    **0.35**, fizzle **0.55 ± 0.15** (seeded), doom bond recovery
-   **0.40** (the classic convention, knowingly). PROVISIONAL —
-   ratified as structure-sound; magnitudes get a feel pass at the
-   prose round. 09 fixes the shape, not the numbers.
+   **0.40** (the classic convention, knowingly). RATIFIED (feel
+   pass at the prose round, 2026-07-24): the magnitudes sit
+   correctly under the epilogue registers — 1.60 under "the growth
+   prints," 1.25 under the melt-up no audit can fault, 1.00 under a
+   Desk page whose whole sentence is that nothing below is
+   dramatic, 0.35/0.40 under "recovery assumptions were applied
+   where assumptions were all that remained," 0.55 ± 0.15 under an
+   unwind that ends at prices, without incident. 09 fixes the
+   shape; these are now the numbers.
 2. *HCN options settle intrinsic-vs-family-mark in ALL terminal
    families*, not only nationalization — at the world's end there is
    no remaining time value to price; declared accelerated

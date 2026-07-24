@@ -1398,7 +1398,7 @@ function _showGameOver(contextText, endingId = 'forced_resignation', headline = 
         choices: [
             {
                 label: 'Accept your fate',
-                desc: 'There is no way out. The investigation has begun.',
+                desc: 'No appeal, no counter, no hedge. From here the story continues without your hands on it.',
                 playerFlag: 'game_over',
                 resultToast: 'Your career at Meridian Capital is over.',
             },
