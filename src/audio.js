@@ -3,6 +3,24 @@
    Rhodes piano, upright bass, brush drums, and sparse
    muted trumpet over a slow Am progression with
    intimate room reverb.
+
+   Act III (the machine register): one continuous
+   parameter `setMachineIntensity(x)` re-renders the SAME
+   16-bar form with progressively less humanity — the
+   swing straightens, the trumpet goes first, velocities
+   compress, the Rhodes' warmth detune tunes out, the
+   room reverb dries to an anechoic void, and the brushes
+   yield to a tick grid that keeps its own time. The
+   harmony never changes; the band does. Underneath, a
+   Shepard riser climbs forever without arriving, and the
+   tick grid subdivides (quarters → 8ths → 16ths) at
+   constant BPM — the day is still a day, it just
+   contains more. `glitchAudio(severity)` is the failing
+   terminal made audible; `silenceDesk()` is the terminal
+   latch — the jazz cuts mid-note, the hum and the ticks
+   persist. Valence unsigned by design (03): the melt-up
+   and the unraveling sound the same.
+
    All Web Audio API — no external audio files.
    Leaf module. No DOM access.
    =================================================== */
@@ -20,12 +38,33 @@ let _droneNodes = [];
 let _musicNodes = [];
 let _musicFadeTimer = null;
 
+/* Act III machine register */
+let _machine = 0;               // 0 = the band, 1 = the machine
+let _machineGain = null;        // machine layer bus (ticks + Shepard) — survives silenceDesk
+let _machineTimer = null;
+let _machineNext = 0;           // tick-grid look-ahead cursor (its own time, not the band's)
+let _shepardGain = null;
+let _shepardVoices = [];        // { osc, gain, nextCycle, offset }
+let _glitchDelay = null;        // normally-silent feedback delay: the stutter chain
+let _glitchFb = null;
+let _glitchWet = null;
+let _deskSilenced = false;
+
 /* ---- Constants ---- */
 
 const BPM = 72;
 const BEAT = 60 / BPM;          // ~0.833 s
 const LOOP_DUR = 64 * BEAT;     // ~53.3 s (16 bars of 4)
-const SW = 0.62;                // swing: upbeats at 62% of beat
+const SW = 0.62;                // swing: upbeats at 62% of beat (the human baseline)
+
+/** Live swing ratio: the groove dies by geometry as the machine takes over. */
+function _swing() { return SW - 0.12 * _machine; }
+
+/** Human timing breath: ±6 ms at machine 0, quantized to nothing at machine 1. */
+function _jit() { return (1 - _machine) * (Math.random() * 2 - 1) * 0.006; }
+
+/** Linear blend helper for the machine transformation. */
+function _lerp(a, b, t) { return a + (b - a) * t; }
 
 /* Note frequency table (octaves 2–5, all chromatic) */
 const N = (() => {
@@ -144,42 +183,45 @@ const BASS_LINE = [
 /* Rhodes comp: hand-placed for musical phrasing. Strong downbeats
    on phrase entries, ghostly fills between, bars of deliberate
    silence for breathing room. ghost=true → muted percussive touch
-   (darker filter, lower volume, no bell partial emphasis). */
+   (darker filter, lower volume, no bell partial emphasis).
+   sw=true → the hit sits on the swung upbeat; the offset is
+   resolved at schedule time via _swing() so the syncopation
+   straightens with the machine. */
 const COMP = [
     // ---- A (bars 0–3) ----
-    { beat: 0,       ch: 'Am9', dur: 1.2, vol: 0.9 },               // opening chord
-    { beat: 2 + SW,  ch: 'Am9', dur: 0.4, vol: 0.4, ghost: true },  // ghost fill
-    { beat: 5,       ch: 'Dm9', dur: 0.8, vol: 0.65 },              // answer on beat 2
-    { beat: 7,       ch: 'Dm9', dur: 0.6, vol: 0.5 },               // beat 4, leading
-    { beat: 8 + SW,  ch: 'Hd',  dur: 0.7, vol: 0.55 },              // syncopated tension
-    { beat: 13,      ch: 'E7',  dur: 1.0, vol: 0.7 },               // dominant on 2
-    { beat: 15 + SW, ch: 'E7',  dur: 0.3, vol: 0.35, ghost: true }, // ghost upbeat
+    { beat: 0,  ch: 'Am9', dur: 1.2, vol: 0.9 },                    // opening chord
+    { beat: 2,  ch: 'Am9', dur: 0.4, vol: 0.4, ghost: true, sw: true },  // ghost fill
+    { beat: 5,  ch: 'Dm9', dur: 0.8, vol: 0.65 },                   // answer on beat 2
+    { beat: 7,  ch: 'Dm9', dur: 0.6, vol: 0.5 },                    // beat 4, leading
+    { beat: 8,  ch: 'Hd',  dur: 0.7, vol: 0.55, sw: true },         // syncopated tension
+    { beat: 13, ch: 'E7',  dur: 1.0, vol: 0.7 },                    // dominant on 2
+    { beat: 15, ch: 'E7',  dur: 0.3, vol: 0.35, ghost: true, sw: true }, // ghost upbeat
 
     // ---- A' (bars 4–7) ----
-    { beat: 16,      ch: 'Am9', dur: 1.5, vol: 0.85 },              // long release
-    { beat: 21,      ch: 'FM7', dur: 0.8, vol: 0.6 },               // bittersweet lift
-    { beat: 22 + SW, ch: 'FM7', dur: 0.4, vol: 0.4, ghost: true },
-    { beat: 24,      ch: 'Hd',  dur: 0.7, vol: 0.6 },               // darkening
-    { beat: 26,      ch: 'Hd',  dur: 0.5, vol: 0.45 },
-    { beat: 29,      ch: 'E7',  dur: 1.2, vol: 0.65 },              // sustained tension
+    { beat: 16, ch: 'Am9', dur: 1.5, vol: 0.85 },                   // long release
+    { beat: 21, ch: 'FM7', dur: 0.8, vol: 0.6 },                    // bittersweet lift
+    { beat: 22, ch: 'FM7', dur: 0.4, vol: 0.4, ghost: true, sw: true },
+    { beat: 24, ch: 'Hd',  dur: 0.7, vol: 0.6 },                    // darkening
+    { beat: 26, ch: 'Hd',  dur: 0.5, vol: 0.45 },
+    { beat: 29, ch: 'E7',  dur: 1.2, vol: 0.65 },                   // sustained tension
 
     // ---- B (bars 8–11): bridge — sparser, lighter touch ----
-    { beat: 32,      ch: 'FM7', dur: 1.0, vol: 0.7 },               // new section start
-    { beat: 34 + SW, ch: 'FM7', dur: 0.3, vol: 0.3, ghost: true },
-    { beat: 38,      ch: 'Em7', dur: 0.7, vol: 0.5 },               // just one hit — space
-    { beat: 40 + SW, ch: 'Dm9', dur: 0.8, vol: 0.55 },              // syncopated descent
-    { beat: 42 + SW, ch: 'Dm9', dur: 0.4, vol: 0.35, ghost: true },
-    { beat: 44,      ch: 'CM7', dur: 0.9, vol: 0.7 },               // brightness
-    { beat: 46,      ch: 'CM7', dur: 0.7, vol: 0.55 },              // two clear statements
+    { beat: 32, ch: 'FM7', dur: 1.0, vol: 0.7 },                    // new section start
+    { beat: 34, ch: 'FM7', dur: 0.3, vol: 0.3, ghost: true, sw: true },
+    { beat: 38, ch: 'Em7', dur: 0.7, vol: 0.5 },                    // just one hit — space
+    { beat: 40, ch: 'Dm9', dur: 0.8, vol: 0.55, sw: true },         // syncopated descent
+    { beat: 42, ch: 'Dm9', dur: 0.4, vol: 0.35, ghost: true, sw: true },
+    { beat: 44, ch: 'CM7', dur: 0.9, vol: 0.7 },                    // brightness
+    { beat: 46, ch: 'CM7', dur: 0.7, vol: 0.55 },                   // two clear statements
 
     // ---- C (bars 12–15): tension → resolution ----
-    { beat: 49,      ch: 'Hd',  dur: 0.7, vol: 0.6 },
-    { beat: 51 + SW, ch: 'Hd',  dur: 0.3, vol: 0.3, ghost: true },
-    { beat: 52,      ch: 'E7',  dur: 0.8, vol: 0.7 },               // dominant pedal begins
-    { beat: 54 + SW, ch: 'E7',  dur: 0.4, vol: 0.4, ghost: true },
-    { beat: 55,      ch: 'E7',  dur: 0.6, vol: 0.6 },
-    { beat: 56 + SW, ch: 'E7',  dur: 0.5, vol: 0.45 },              // sparse held tension
-    { beat: 60,      ch: 'Am9', dur: 1.8, vol: 0.9 },               // resolution
+    { beat: 49, ch: 'Hd',  dur: 0.7, vol: 0.6 },
+    { beat: 51, ch: 'Hd',  dur: 0.3, vol: 0.3, ghost: true, sw: true },
+    { beat: 52, ch: 'E7',  dur: 0.8, vol: 0.7 },                    // dominant pedal begins
+    { beat: 54, ch: 'E7',  dur: 0.4, vol: 0.4, ghost: true, sw: true },
+    { beat: 55, ch: 'E7',  dur: 0.6, vol: 0.6 },
+    { beat: 56, ch: 'E7',  dur: 0.5, vol: 0.45, sw: true },         // sparse held tension
+    { beat: 60, ch: 'Am9', dur: 1.8, vol: 0.9 },                    // resolution
 ];
 
 /* Melody fragments: muted trumpet, Am pentatonic (A C D E G).
@@ -260,6 +302,28 @@ function _createCtx() {
         _musicGain.gain.value = 1;
         _musicGain.connect(_master);
 
+        /* Machine layer bus (Act III): ticks + Shepard riser. Deliberately
+           NOT a child of _jazzGain — it neither ducks with the mood mix nor
+           dies with silenceDesk. The machines keep their own time. */
+        _machineGain = _ctx.createGain();
+        _machineGain.gain.value = 1;
+        _machineGain.connect(_master);
+
+        /* Glitch chain: a parallel feedback delay off the jazz bus, wet gain
+           held at zero — silent and free until glitchAudio opens it. The dry
+           path is untouched, so there is no latency cost in normal play. */
+        _glitchDelay = _ctx.createDelay(0.5);
+        _glitchDelay.delayTime.value = 0.09;
+        _glitchFb = _ctx.createGain();
+        _glitchFb.gain.value = 0;
+        _glitchWet = _ctx.createGain();
+        _glitchWet.gain.value = 0;
+        _jazzGain.connect(_glitchDelay);
+        _glitchDelay.connect(_glitchFb);
+        _glitchFb.connect(_glitchDelay);
+        _glitchDelay.connect(_glitchWet);
+        _glitchWet.connect(_master);
+
         _setupReverb();
     } catch { /* AudioContext unavailable */ }
 }
@@ -320,7 +384,12 @@ function _ensureNoise() {
 }
 
 /** Rhodes piano note: sine fundamental + detuned bell partial (2×).
-    Ghost voicings use darker filter and suppress the bell. */
+    Ghost voicings use darker filter and suppress the bell.
+    Machine transformation: the ~2.6-cent bell detune (the warmth —
+    a slow beat against the fundamental) tunes to exactly 2.000×,
+    the filter opens hard and bright, ghosts lose their ghostliness
+    (a precise quiet note is not a ghost), and the attack sharpens
+    from a touch to a trigger. */
 function _rhodesNote(freq, time, durBeats, vol, isGhost) {
     const dur = durBeats * BEAT;
     const dest = _jazzGain;
@@ -331,20 +400,22 @@ function _rhodesNote(freq, time, durBeats, vol, isGhost) {
 
     const osc2 = _ctx.createOscillator();
     osc2.type = 'sine';
-    osc2.frequency.value = freq * 2.003;   // ~2.6 cents sharp — warmth
+    osc2.frequency.value = freq * _lerp(2.003, 2.0, _machine);
 
     const bellG = _ctx.createGain();
     bellG.gain.value = isGhost ? 0.15 : 0.3;
 
+    const openF = _lerp(2200, 3800, _machine);
     const flt = _ctx.createBiquadFilter();
     flt.type = 'lowpass';
-    flt.frequency.value = isGhost ? 1200 : 2200;
+    flt.frequency.value = isGhost ? _lerp(1200, openF, _machine) : openF;
     flt.Q.value = 0.7;
 
+    const atk = _lerp(0.012, 0.003, _machine);
     const rel = Math.min(0.25, dur * 0.3);
     const g = _ctx.createGain();
     g.gain.setValueAtTime(0, time);
-    g.gain.linearRampToValueAtTime(vol, time + 0.012);
+    g.gain.linearRampToValueAtTime(vol, time + atk);
     g.gain.linearRampToValueAtTime(vol * 0.85, time + 0.062);
     g.gain.linearRampToValueAtTime(vol * 0.7, time + dur - rel);
     g.gain.linearRampToValueAtTime(0, time + dur);
@@ -361,9 +432,12 @@ function _rhodesNote(freq, time, durBeats, vol, isGhost) {
 }
 
 /** Upright bass: triangle body + sub-octave sine warmth.
-    Pluck envelope — fast attack, natural decay into sustain. */
+    Pluck envelope — fast attack, natural decay into sustain.
+    Machine transformation: the ring shortens toward sequenced
+    staccato and the body brightens toward a synth voice — the
+    same line, walked by something that never had hands. */
 function _bassNote(freq, time, durBeats, vol) {
-    const dur = durBeats * BEAT;
+    const dur = durBeats * BEAT * _lerp(1, 0.65, _machine);
     const dest = _jazzGain;
     const decay = Math.max(dur * 0.3, 0.1);
 
@@ -373,7 +447,7 @@ function _bassNote(freq, time, durBeats, vol) {
 
     const flt1 = _ctx.createBiquadFilter();
     flt1.type = 'lowpass';
-    flt1.frequency.value = 350;
+    flt1.frequency.value = _lerp(350, 560, _machine);
     flt1.Q.value = 1;
 
     const g1 = _ctx.createGain();
@@ -503,6 +577,27 @@ function _rideTing(time, vol, dest) {
     src.stop(time + 0.25);
 }
 
+/** Machine tick: a 6 ms filtered click — not a drum, a clock.
+    Lives on the machine bus; the grid it marks is its own. */
+function _clickTick(time, vol) {
+    _ensureNoise();
+    const src = _ctx.createBufferSource();
+    src.buffer = _noiseBuffer;
+
+    const bp = _ctx.createBiquadFilter();
+    bp.type = 'bandpass';
+    bp.frequency.value = 2400;
+    bp.Q.value = 9;
+
+    const g = _ctx.createGain();
+    g.gain.setValueAtTime(vol, time);
+    g.gain.linearRampToValueAtTime(0, time + 0.006);
+
+    src.connect(bp); bp.connect(g); g.connect(_machineGain);
+    src.start(time);
+    src.stop(time + 0.02);
+}
+
 /** Muted trumpet: heavily filtered sawtooth with vibrato.
     Slow attack, nasal quality from LP resonance. */
 function _trumpetNote(freq, time, durBeats, vol) {
@@ -541,37 +636,52 @@ function _trumpetNote(freq, time, durBeats, vol) {
 
 /* =============== JAZZ LOOP =============== */
 
-/** Schedule one full 16-bar loop starting at t0. */
+/** Schedule one full 16-bar loop starting at t0.
+    The machine parameter is read at schedule time, so the same
+    composition re-renders each pass with whatever humanity is
+    left: swing via _swing(), timing breath via _jit(), velocity
+    compression toward the mean, the trumpet gone early, the
+    brushes fading under the tick grid's rise. */
 function _scheduleLoop(t0) {
     const dest = _jazzGain;
+    const sw = _swing();
+    const m = _machine;
 
     /* Walking bass */
     for (const b of BASS_LINE)
-        _bassNote(b.note, t0 + b.beat * BEAT, b.dur, 0.20);
+        _bassNote(b.note, t0 + b.beat * BEAT + _jit(), b.dur, 0.20);
 
-    /* Rhodes comping */
+    /* Rhodes comping — dynamics flatten as the machine rises: every
+       hit compresses toward the same mezzo velocity, which is what
+       "expressive" sounds like after quantization. */
     for (const c of COMP) {
         const v = VOICING[c.ch];
         const baseVol = c.ghost ? 0.015 : 0.035;
+        const vol = _lerp(c.vol, 0.62, m * 0.8);
+        const at = t0 + (c.beat + (c.sw ? sw : 0)) * BEAT + _jit();
         for (const freq of v)
-            _rhodesNote(freq, t0 + c.beat * BEAT, c.dur, baseVol * c.vol, !!c.ghost);
+            _rhodesNote(freq, at, c.dur, baseVol * vol, !!c.ghost);
     }
 
     /* Drums: continuous brush circles with dab backbeats,
        sparse kick on structural downbeats, cross-stick on
-       turnaround bars, ride shimmer on swung upbeats. */
+       turnaround bars, ride shimmer on swung upbeats.
+       The kit is the machine's first conquest — the circles thin
+       to nothing and the swung shimmer dies with the swing itself;
+       what replaces them ticks on the machine bus, in its own time. */
+    const brush = 1 - m * 0.85;
     for (let bar = 0; bar < 16; bar++) {
         const b = bar * 4;
 
         // Brush circles: forward stroke on beats, back stroke on upbeats
         for (let i = 0; i < 4; i++) {
-            _brushSwish(t0 + (b + i) * BEAT, 0.30, 0.018, dest);
-            _brushSwish(t0 + (b + i + SW) * BEAT, 0.22, 0.010, dest);
+            _brushSwish(t0 + (b + i) * BEAT, 0.30, 0.018 * brush, dest);
+            _brushSwish(t0 + (b + i + sw) * BEAT, 0.22, 0.010 * brush, dest);
         }
 
         // Dab accents on 2 and 4
-        _brushDab(t0 + (b + 1) * BEAT, 0.030, dest);
-        _brushDab(t0 + (b + 3) * BEAT, 0.030, dest);
+        _brushDab(t0 + (b + 1) * BEAT, 0.030 * brush, dest);
+        _brushDab(t0 + (b + 3) * BEAT, 0.030 * brush, dest);
 
         // Kick: only at section starts (every 4 bars)
         if (bar % 4 === 0)
@@ -579,21 +689,24 @@ function _scheduleLoop(t0) {
 
         // Cross-stick on beat 4 of turnaround bars
         if (bar === 3 || bar === 7 || bar === 15)
-            _crossStick(t0 + (b + 3) * BEAT, 0.025, dest);
+            _crossStick(t0 + (b + 3) * BEAT, 0.025 * brush, dest);
     }
 
     // Ride shimmer: swung upbeats, every other bar
     for (let bar = 0; bar < 16; bar += 2) {
         const b = bar * 4;
-        _rideTing(t0 + (b + SW) * BEAT, 0.012, dest);
-        _rideTing(t0 + (b + 2 + SW) * BEAT, 0.010, dest);
+        _rideTing(t0 + (b + sw) * BEAT, 0.012 * (1 - m), dest);
+        _rideTing(t0 + (b + 2 + sw) * BEAT, 0.010 * (1 - m), dest);
     }
 
-    /* Melody: 60% chance per loop, alternate phrases for variety */
-    if (Math.random() < 0.6) {
+    /* Melody: 60% chance per loop, alternate phrases for variety.
+       The breath instrument goes first — you can't fake breath.
+       Gone entirely past machine 0.4, and it does not come back. */
+    const pMelody = 0.6 * Math.max(0, 1 - m / 0.4);
+    if (Math.random() < pMelody) {
         const phrase = Math.random() < 0.5 ? MELODY_A : MELODY_B;
-        for (const m of phrase)
-            _trumpetNote(m.note, t0 + m.beat * BEAT, m.dur, 0.018);
+        for (const mel of phrase)
+            _trumpetNote(mel.note, t0 + mel.beat * BEAT + _jit(), mel.dur, 0.018);
     }
 }
 
@@ -644,6 +757,118 @@ function _stopDrone() {
     _droneNodes = [];
 }
 
+/* =============== MACHINE LAYER (Act III) ===============
+
+   Two voices, one bus, its own scheduler — deliberately not
+   phase-locked to the band. The Shepard riser climbs an octave
+   forever without arriving: recursion as an auditory illusion.
+   The tick grid marks time at constant BPM but finer and finer
+   subdivision — the day is still a day, it just contains more.
+   Both are inaudible until machine intensity crosses ~0.5. */
+
+const SHEP_PERIOD = 40;         // seconds per octave climb
+const SHEP_BASES = [55, 110, 220, 440];   // A's, under the drone's A
+
+/* Raised-cosine gain window (sin²) — hides each voice's wrap. */
+const SHEP_WIN = (() => {
+    const w = new Float32Array(65);
+    for (let i = 0; i <= 64; i++) w[i] = Math.sin(Math.PI * i / 64) ** 2;
+    return w;
+})();
+
+function _startMachine() {
+    if (_machineTimer || !_ctx) return;
+
+    if (_shepardVoices.length === 0) {
+        _shepardGain = _ctx.createGain();
+        _shepardGain.gain.value = 0;
+
+        const lp = _ctx.createBiquadFilter();
+        lp.type = 'lowpass';
+        lp.frequency.value = 1400;
+        lp.Q.value = 0.5;
+
+        _shepardGain.connect(lp);
+        lp.connect(_machineGain);
+
+        const now = _ctx.currentTime;
+        for (let k = 0; k < SHEP_BASES.length; k++) {
+            const osc = _ctx.createOscillator();
+            osc.type = 'sine';
+            osc.frequency.value = SHEP_BASES[k];
+
+            const win = _ctx.createGain();
+            win.gain.value = 0;
+
+            osc.connect(win);
+            win.connect(_shepardGain);
+            osc.start();
+
+            // Stagger the voices a quarter-period apart so the ensemble
+            // always has a voice mid-climb — the rise never pauses.
+            _shepardVoices.push({ osc, win, lpNode: lp, nextCycle: now + k * (SHEP_PERIOD / 4) });
+        }
+    }
+
+    _machineNext = _ctx.currentTime + 0.1;
+    _machineSchedule();
+}
+
+function _machineSchedule() {
+    if (!_ctx) return;
+    const now = _ctx.currentTime;
+
+    /* Shepard cycles: per voice, one octave of detune per period under
+       the sin² window, cycles abutting exactly. */
+    for (const v of _shepardVoices) {
+        while (v.nextCycle < now + 6) {
+            const tc = v.nextCycle;
+            v.osc.detune.setValueAtTime(0, tc);
+            v.osc.detune.linearRampToValueAtTime(1200, tc + SHEP_PERIOD);
+            v.win.gain.setValueCurveAtTime(SHEP_WIN, tc, SHEP_PERIOD);
+            v.nextCycle = tc + SHEP_PERIOD;
+        }
+    }
+
+    /* Tick grid: subdivision sharpens with the machine — quarters past
+       0.5, 8ths past 0.75, 16ths past 0.9 — with a soft accent every
+       4th beat: the machine has a meter too, just not the band's. */
+    const x = _machine;
+    const sub = x >= 0.9 ? 0.25 : x >= 0.75 ? 0.5 : 1;
+    const on = Math.min(1, Math.max(0, (x - 0.5) / 0.1));
+    while (_machineNext < now + 4) {
+        if (on > 0) {
+            const beatPos = Math.round(_machineNext / BEAT);
+            for (let s = 0; s < 1; s += sub) {
+                const accent = (s === 0 && beatPos % 4 === 0) ? 1.5 : 1;
+                _clickTick(_machineNext + s * BEAT, 0.007 * on * accent);
+            }
+        }
+        _machineNext += BEAT;
+    }
+
+    clearTimeout(_machineTimer);
+    _machineTimer = setTimeout(_machineSchedule, 2000);
+}
+
+function _stopMachine() {
+    clearTimeout(_machineTimer);
+    _machineTimer = null;
+    for (const v of _shepardVoices) {
+        try { v.osc.stop(); } catch {}
+        try { v.osc.disconnect(); } catch {}
+        try { v.win.disconnect(); } catch {}
+    }
+    if (_shepardVoices.length > 0) {
+        try { _shepardVoices[0].lpNode.disconnect(); } catch {}
+    }
+    _shepardVoices = [];
+    if (_shepardGain) {
+        try { _shepardGain.disconnect(); } catch {}
+        _shepardGain = null;
+    }
+}
+
 /* =============== PUBLIC API =============== */
 
 export function initAudio() {
@@ -656,7 +881,7 @@ export function initAudio() {
 }
 
 export function setAmbientMood(mood) {
-    if (!_isReady()) return;
+    if (!_isReady() || _deskSilenced) return;
     const mix = MOOD_MIX[mood];
     if (!mix) return;
 
@@ -790,6 +1015,108 @@ export function stopMusic(fadeMs = 1000) {
     }
 }
 
+/**
+ * Act III machine intensity, 0..1 (P7 wires the driver). Monotone in
+ * spirit — the transformation is designed as a one-way slide — but the
+ * function itself is stateless about direction and safe to call daily.
+ * Loop-rendered changes (swing, dynamics, trumpet, instruments) land on
+ * the next scheduled pass; the room and the machine layer ramp live.
+ */
+export function setMachineIntensity(x) {
+    _machine = Math.max(0, Math.min(1, x));
+    if (!_isReady()) return;
+    const now = _ctx.currentTime;
+
+    // The room leaves: club air at 0, anechoic void at 1.
+    if (_reverbSend) {
+        _reverbSend.gain.cancelScheduledValues(now);
+        _reverbSend.gain.setValueAtTime(_reverbSend.gain.value, now);
+        _reverbSend.gain.linearRampToValueAtTime(_lerp(0.3, 0.05, _machine), now + 8);
+    }
+
+    // The machine layer wakes past ~0.5.
+    if (_machine > 0.45 && !_machineTimer) _startMachine();
+    if (_shepardGain) {
+        const level = Math.max(0, (_machine - 0.55) / 0.45) * 0.05;
+        _shepardGain.gain.cancelScheduledValues(now);
+        _shepardGain.gain.setValueAtTime(_shepardGain.gain.value, now);
+        _shepardGain.gain.linearRampToValueAtTime(level, now + 8);
+    }
+
+    // Deep in: the building's hum goes six cents wrong. The fifth of
+    // the drone, slightly sharp — nothing a player could name.
+    if (_droneNodes.length > 2) {
+        const det = _droneNodes[2].osc.detune;
+        det.cancelScheduledValues(now);
+        det.setValueAtTime(det.value, now);
+        det.linearRampToValueAtTime(_machine > 0.85 ? 6 : 0, now + 10);
+    }
+}
+
+/**
+ * The terminal failing to keep up, made audible (P7's degradation
+ * events fire these). 1 = dropout (the feed blinks), 2 = stutter
+ * (a skipping repeat of the last instant), 3 = stutter with warble
+ * (the repeat itself is wrong). Presentation-layer only, like the
+ * visual degradation: nothing musical mutates.
+ */
+export function glitchAudio(severity) {
+    if (!_isReady()) return;
+    const now = _ctx.currentTime;
+
+    if (severity <= 1) {
+        const hold = 0.06 + Math.random() * 0.12;
+        _master.gain.cancelScheduledValues(now);
+        _master.gain.setValueAtTime(_master.gain.value, now);
+        _master.gain.linearRampToValueAtTime(0, now + 0.005);
+        _master.gain.setValueAtTime(0, now + 0.005 + hold);
+        _master.gain.linearRampToValueAtTime(_volume, now + 0.025 + hold);
+        return;
+    }
+
+    const long = severity >= 3;
+    const hold = long ? 0.6 : 0.35;
+    const dry = _jazzGain.gain.value;
+
+    _glitchFb.gain.setValueAtTime(long ? 0.88 : 0.82, now);
+    _glitchWet.gain.setValueAtTime(long ? 0.7 : 0.55, now);
+    if (long) {
+        // Warble: the delay line itself drifts, pitch-smearing the repeats.
+        _glitchDelay.delayTime.setValueAtTime(0.09, now);
+        _glitchDelay.delayTime.linearRampToValueAtTime(0.14, now + hold);
+        _jazzGain.gain.setValueAtTime(dry, now);
+        _jazzGain.gain.linearRampToValueAtTime(dry * 0.4, now + 0.05);
+    }
+
+    _glitchWet.gain.setValueAtTime(long ? 0.7 : 0.55, now + hold);
+    _glitchWet.gain.linearRampToValueAtTime(0, now + hold + 0.05);
+    _glitchFb.gain.setValueAtTime(0, now + hold + 0.05);
+    _glitchDelay.delayTime.setValueAtTime(0.09, now + hold + 0.1);
+    if (long) {
+        _jazzGain.gain.setValueAtTime(dry * 0.4, now + hold);
+        _jazzGain.gain.linearRampToValueAtTime(dry, now + hold + 0.2);
+    }
+}
+
+/**
+ * The terminal latch (P7 wires this at game over): the band stops
+ * mid-note — no fade, no cadence, the tune simply does not continue.
+ * The drone holds and the machine layer persists: the human part of
+ * the sound dies, and the machines do not notice. One-way until
+ * resetAudio.
+ */
+export function silenceDesk() {
+    if (!_ctx || _deskSilenced) return;
+    _deskSilenced = true;
+    _jazzPlaying = false;
+    clearTimeout(_jazzTimer);
+    _jazzTimer = null;
+    const now = _ctx.currentTime;
+    _jazzGain.gain.cancelScheduledValues(now);
+    _jazzGain.gain.setValueAtTime(_jazzGain.gain.value, now);
+    _jazzGain.gain.linearRampToValueAtTime(0, now + 0.03);
+}
+
 export function setVolume(v) {
     _volume = Math.max(0, Math.min(1, v));
     if (_master) _master.gain.value = _volume;
@@ -804,8 +1131,27 @@ export function resetAudio() {
     clearTimeout(_jazzTimer);
     _jazzTimer = null;
     _currentMood = null;
+
+    // Act III unwinds: the band is human again on the next run.
+    _machine = 0;
+    _deskSilenced = false;
+    _stopMachine();
     if (_ctx) {
         const now = _ctx.currentTime;
+        if (_master) {
+            _master.gain.cancelScheduledValues(now);
+            _master.gain.setValueAtTime(_volume, now);
+        }
+        if (_reverbSend) {
+            _reverbSend.gain.cancelScheduledValues(now);
+            _reverbSend.gain.setValueAtTime(0.3, now);
+        }
+        if (_glitchWet) {
+            _glitchWet.gain.cancelScheduledValues(now);
+            _glitchWet.gain.setValueAtTime(0, now);
+            _glitchFb.gain.setValueAtTime(0, now);
+            _glitchDelay.delayTime.setValueAtTime(0.09, now);
+        }
         if (_jazzGain) {
             _jazzGain.gain.setValueAtTime(_jazzGain.gain.value, now);
             _jazzGain.gain.linearRampToValueAtTime(0, now + 0.3);
