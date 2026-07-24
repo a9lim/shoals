@@ -230,6 +230,13 @@ for the endings phase to consume — the two multipliers never mix.
 
 ## Market coupling
 
+**η reads the released frontier** (ruled 2026-07-23, phase 4): 03's
+"η rises with `max(C)`" means `max(C_released)` — the licensing
+rationale ("quant shops license the models too") only reaches shipped
+models, and a public-state-derived η keeps the corruption-invariance
+harness meaningful. Latent `C_internal` never touches market
+efficiency; it acts only through evidence, like everything else.
+
 η, pre-price, impact, and `B`-update magnitudes as rev 1, with two
 hardenings (per [09-market-integrity.md](09-market-integrity.md)):
 every non-random `B` move carries a causal evidence ID; and **leaks
@@ -245,6 +252,71 @@ credibility = EMA(α = 0.25, init 0) of (1 − 2·Brier). Gates: memos
 > 0.55; fund-as-actor > 0.65 ∧ `F` > 60.
 
 `F` ∈ [0,100] starts 15; moves as rev 1.
+
+## Belief and coupling (phase-4 ratifications, 2026-07-23)
+
+`B` is a per-rung logistic hazard `{m, w}` over crossing dates, widths
+`w = {90, 140, 120, 160}` for R2–R5 at listing, `RUNG_SPACING = 150`
+for rungs pulled forward by a certification below them; seeded so
+day-0 `F_R(deadline)` equals the listing base rate *exactly* — the
+seeds are solved against the survival-conditioned law, giving
+day-zero implied medians {393, 721, 846, 863} against measured KM
+{405, 736, 860}. Widths **tighten with evidence** (ruled at the
+phase-4 gate): `w ← w·(1 − 0.15·α)` on each timeline update, floor
+25 — the market sharpens as the race resolves, which is Act III's
+"repricing all at once" in mechanism form. The quoted probability is
+the **survival-conditioned** `P(T ≤ D | T > today)` — no progress as
+the deadline nears IS decay toward NO; the unconditional CDF is a
+seeding device only, re-solved so day-0 quotes stay exact. Every
+`m`/`w`/monotonicity mutation is ledgered under the originating
+event ID — monotonicity corrections are consequences of their
+trigger, not anonymous drift.
+
+**Two-channel routing** (ratified): the crossing-date timeline moves
+only on releases and certifications (claim blend `A_CLAIM = 0.55`;
+cert marks crossed and pulls the next rung at `A_CERT_NEXT = 0.35`
+toward `day + 150`; routine cadence `A_ROUTINE = 0.06`; monotone `m`
+re-enforced each step). Incidents, insider tips, and evidence fold
+into a **bounded alignment sentiment** (±log 19; published evidence
+additive `logLR`; leaks `0.7·B + 0.3·L` once per evidence ID —
+the ratified anchor; `ALIGN_INCIDENT = 0.06` per severity step).
+Rationale: ~30 tips/run would walk an every-event timeline into
+runaway, and the player's timeline edge dies if every tip moves `B`.
+P5 policy/dispute events may still move the timeline directly — they
+are legible events with causal IDs — and the alignment channel is the
+settlement basis for P5's incident-flavored Consensus contracts.
+
+`η = clamp((releasedFrontierRung − 1)/4, 0, 1)`; Act-II pre-pricing
+scales event impulses by `(1 − 0.6·η)`. Event impulses are a
+**decaying overlay** (half-life 5 trading days, magnitudes = the
+rev-1 coupling reference values carried on the shells); permanent
+additive deltas on the race stream remain forbidden per
+[03](03-market-mechanics.md). Compute belief lift: the structural
+curve × `(1 + 0.15·P(R5 by day+252))`, dte-uniform by ratified
+simplification. Belief noise is **off** — every `B` move is causal;
+the `belief` substream is reserved for a future decision recorded
+here first.
+
+`F` lives on `race.F` with its logic in belief.js (revisit at the
+P5 roster-v2 pass); starts 15, clamped [0, 100]; wakes toward market
+pilledness at 0.08, converts toward the player's side at
+`6·max(0, cred)`. Market pilledness reads **R4** while the compute
+lift reads **R5** — ratified asymmetry, not drift: firm culture
+wakes on the visible recursion-adjacent frontier, compute demand
+scrambles on the terminal rung; scrutiny fires on belief gap > 20 with a ±3
+firmStanding nudge — **two-sided by rule**: −3 divergent and
+underperforming, +3 divergent and outperforming (the committee
+grudgingly respects P&L) — interim until P5 rewrites the review
+content. Lock semantics (ruled at the phase-4 gate): "mandatory"
+binds the *vector*, not participation — a lock, when made, is the
+full 4-rung vector or nothing; skipping a lock day is allowed,
+scores no Brier, and stalls the credibility EMA (staleness is its
+own penalty — a player who never locks never clears the memo/fund
+gates). Locks are immutable once accepted: no off-grid days, no
+retroactive edits, idempotent replay only. Day 0 is a real prompted
+lock, never a manufactured market-prior forecast. The forecast-lock
+UI is the minimal 3-preset popup; the timeline-vs-posterior
+dashboard belongs to a later phase.
 
 ## Bounded influence (margin units, not log-odds)
 

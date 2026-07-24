@@ -59,7 +59,9 @@ import { createRaceState, advanceRace, setControlRegime } from '../src/race/race
 import {
     consensus, initConsensus, refreshBinaryQuotes, computeBinarySettlements,
     buildPublicView, getBinaryQuote, getBinaryMark, pendingTerminalCloseout, BINARY_NOTIONAL,
+    setBinaryQuoteSource, placeholderQuote as placeholderQuoteRef,
 } from '../src/race/consensus.js';
+import { initBelief, stepBelief, binaryQuoteFromBelief } from '../src/race/belief.js';
 import {
     portfolio, resetPortfolio, executeBinaryTrade, settleBinaries,
     executeMarketOrder, closePosition, liquidateAll, processExpiry, portfolioValue,
@@ -630,6 +632,79 @@ let restrictBlocksBinary = false, cancelAllWorks = false, releaseAfterNat = fals
     }
 }
 
+// ---- Z. Belief-backed quoter swapped in (phase 4) ------------------------
+// The REAL P4 quoter (belief.js) replaces the placeholder via setBinaryQuoteSource,
+// stepped in lockstep with the race off the public ledger. Re-runs the two
+// load-bearing probes against it: (1) listing calibration -- day-0 mids equal the
+// listing base rate, two-sided; (2) full-corruption invariance -- corrupting every
+// continuous hidden field leaves the belief-backed quote bit-identical (B is built
+// from the ledger, so it never reads latent state). Restores the placeholder after.
+
+let zListingOK = true, zInvarianceOK = true, zActiveOK = false;
+{
+    // initConsensus RESETS _quoteSource to the placeholder, so the belief source
+    // must be installed AFTER every initConsensus (a helper enforces the order).
+    const initBook = (race) => { initConsensus(race); initBelief(race); setBinaryQuoteSource(binaryQuoteFromBelief); };
+
+    // (1) Listing calibration with the belief quoter.
+    {
+        const race = createRaceState((BASE_SEED + 91000) >>> 0);
+        initBook(race); refreshBinaryQuotes(race);
+        for (const c of consensus.contracts) {
+            const mid = getBinaryQuote(c.key).mid;
+            const within = Math.abs(mid - c.baseRate) <= 0.08;
+            const twoSided = mid > 0.05 && mid < 0.95;
+            if (!within || !twoSided) zListingOK = false;
+            assert(within, `belief listing mid ${mid.toFixed(3)} not within 8pp of base ${c.baseRate} (key=${c.key})`);
+            assert(twoSided, `belief listing mid ${mid.toFixed(3)} not two-sided (key=${c.key})`);
+        }
+    }
+
+    // (2) The belief quoter is REALLY the source (distinguishes it from the
+    //     placeholder): at a mid-run state the belief mid differs from what the
+    //     placeholder would have printed for the same public view.
+    {
+        const race = createRaceState((BASE_SEED + 91200) >>> 0);
+        initBook(race);
+        for (let d = 0; d < 700; d++) { advanceRace(race); stepBelief(race); computeBinarySettlements(race); }
+        refreshBinaryQuotes(race);
+        const view = buildPublicView(race);
+        let anyDiff = false;
+        for (const c of consensus.contracts) {
+            if (consensus.settled[c.key] || consensus.pendingCloseout[c.key]) continue;
+            const beliefMid = getBinaryQuote(c.key).mid;             // belief source is installed
+            const placeholderMid = placeholderQuoteRef(view, c);     // what the placeholder WOULD print
+            if (Math.abs(beliefMid - placeholderMid) > 1e-3) anyDiff = true;
+        }
+        zActiveOK = anyDiff;
+        assert(zActiveOK, 'belief-backed quote never diverged from the placeholder (source may not be installed)');
+    }
+
+    // (3) Full-corruption invariance with the belief quoter (belief stepped daily).
+    const DAYS = [200, 420, 500, 756, 900, 1000];
+    for (let s = 0; s < 6; s++) {
+        for (const D of DAYS) {
+            const seed = (BASE_SEED + 91100 + s) >>> 0;
+            const raceA = createRaceState(seed); initBook(raceA);
+            for (let d = 0; d < D; d++) { advanceRace(raceA); stepBelief(raceA); computeBinarySettlements(raceA); }
+            refreshBinaryQuotes(raceA);
+            const qA = JSON.stringify(consensus.quotes);
+
+            const raceB = createRaceState(seed); initBook(raceB);
+            for (let d = 0; d < D - 1; d++) { advanceRace(raceB); stepBelief(raceB); computeBinarySettlements(raceB); }
+            advanceRace(raceB); stepBelief(raceB);   // clean belief step off the day-D ledger
+            corruptContinuous(raceB);                 // corrupt AFTER B has folded the clean ledger
+            computeBinarySettlements(raceB);
+            refreshBinaryQuotes(raceB);
+            const qB = JSON.stringify(consensus.quotes);
+            if (qA !== qB) zInvarianceOK = false;
+            assert(qA === qB, `belief quote changed under corruption (seed ${s}, D=${D})`);
+        }
+    }
+
+    setBinaryQuoteSource(null);   // restore the placeholder for any later use
+}
+
 // ---- Report --------------------------------------------------------------
 
 line(`consensus-test: N=${N} runs, base seed=${BASE_SEED}, horizon=${HORIZON}d`);
@@ -685,6 +760,11 @@ line('\nH. Trading-restriction enforcement + release');
 line(`  restricted rejects market / pending / fill / binary:  ${restrictBlocksTrade ? 'ok' : 'FAIL'} / ${restrictBlocksPending ? 'ok' : 'FAIL'} / ${restrictBlocksFill ? 'ok' : 'FAIL'} / ${restrictBlocksBinary ? 'ok' : 'FAIL'}`);
 line(`  cancelAllOrders clears the pending book:              ${cancelAllWorks ? 'ok' : 'FAIL'}`);
 line(`  restriction releasable after nationalization settles: ${releaseAfterNat ? 'ok' : 'FAIL'}`);
+
+line('\nZ. Belief-backed quoter (phase 4, swapped in via setBinaryQuoteSource)');
+line(`  listing mids == base rate, two-sided:                 ${zListingOK ? 'ok' : 'FAIL'}`);
+line(`  belief source really installed (diverges from placeholder): ${zActiveOK ? 'ok' : 'FAIL'}`);
+line(`  full-corruption invariance with the real quoter:      ${zInvarianceOK ? 'holds' : 'VIOLATED'}`);
 
 line('\n' + '='.repeat(72));
 if (failures === 0) {

@@ -19,6 +19,7 @@ import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
 import { firmCooldownMult, shiftFaction } from './faction-standing.js';
 import { getRegulationPipeline } from './regulations.js';
+import { addEventImpulse } from './race/impulse.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './events/index.js';
@@ -357,6 +358,23 @@ export class EventEngine {
             const idx = (day + _hashId(event.id || '')) % event.headlines.length;
             event = { ...event, headline: event.headlines[idx] };
         }
+
+        // CANONICAL impulse dispatch (phase 4): a race shell carries `impulse`
+        // (a DECAYING market coupling; permanent `params` deltas stay forbidden on
+        // the race stream). Seed it into the event-impulse overlay here -- the ONE
+        // path shared by bridge-fired AND followup-fired shells (incident_postmortem
+        // fires as a followup, straight through _fireEvent, so it MUST seed here).
+        // Fires at FIRE time for every kind (toast/popup/superevent), before the
+        // popup branches return. Scale = the bridge's Act-II pre-pricing factor
+        // (`_impulseScale`, default 1 off the bridge) x the player-net-delta
+        // coupling. This is orthogonal to token substitution (which the collapse
+        // above still does NOT do -- separation preserved).
+        if (event.impulse) {
+            const c = this._computeCoupling(netDelta, event.impulse);
+            const scale = (typeof event._impulseScale === 'number' ? event._impulseScale : 1) * c;
+            addEventImpulse(event.impulse, scale, { id: event.id, day, cause: 'event:' + event.id });
+        }
+
         if (event.popup && event.superevent) {
             const coupling = this._computeCoupling(netDelta, event.params);
             this.applyDeltas(sim, this._scaledParams(event.params, coupling) || event.params);

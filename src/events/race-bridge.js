@@ -26,18 +26,31 @@
      evidence      -> NOT bridged this slice (generated + laddered in the race
                       state; surfaced through belief / the insider channel later)
 
-   DOM-free. This is a NARRATIVE-ONLY bridge in phase 2: it
-   selects a shell, attaches `raceMeta` (the data the real
-   prose draws on), and fires it for its headline/popup. It
-   carries no market coupling -- every shell's `params` is
-   zeroed (03 incident-coupling rule: the detected-incident
-   stream is too high-volume for permanent additive deltas).
-   Phase 4 re-couples incidents as a decaying impulse / B-move;
-   the pre-zero sign intent is preserved in the race-events.js
-   `// P4 coupling reference:` comments.
+   DOM-free. The bridge selects a shell, attaches `raceMeta`
+   (the data the real prose draws on), and fires it for its
+   headline/popup. MARKET COUPLING (phase 4): each shell's
+   permanent `params` stays `{}` (03 incident-coupling rule --
+   the stream is too high-volume for permanent additive deltas),
+   and the coupling now rides `ev.impulse`, seeded into the
+   DECAYING event-impulse overlay (src/race/impulse.js) scaled
+   by the Act-II alpha-decay pre-pricing factor (1 - eta*frac)
+   and the player-net-delta coupling, with a causal event ID.
+   `B` moves separately in stepBelief off the ledger -- the
+   impulse is the HCN-price reaction, not the timeline belief.
    =================================================== */
 
 import { getEventById } from './index.js';
+import { buildPublicView } from '../race/consensus.js';
+import { marketEfficiency } from '../race/belief.js';
+
+// Act-II alpha decay: as market efficiency `eta` rises with the RELEASED
+// frontier (02a ruling), a fraction of each race event's move was already
+// PRE-PRICED off its legible precursor (a rung claim precedes its certification;
+// the release ladder gaps the market before the headline). The headline residual
+// the player can still catch shrinks by eta*PREPRICE_FRAC -- edges thin, exactly
+// the alpha-decay mechanic, and it is public-state-derived (eta reads only the
+// released rung). UNRATIFIED magnitude.
+const PREPRICE_FRAC = 0.6;
 
 /** Clone a shell by id, apply overrides, attach raceMeta. Null if id unknown. */
 function shell(id, overrides, raceMeta) {
@@ -259,9 +272,18 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     const tr = race.lastTransitions;
     if (!tr) return { fired: [], popups: [] };
     const fired = [], popups = [];
+    // eta from the RELEASED frontier (public view) drives Act-II alpha decay: a
+    // fraction of every race impulse is treated as already pre-priced.
+    const eta = marketEfficiency(buildPublicView(race));
+    const prePrice = 1 - eta * PREPRICE_FRAC;
     const emit = (ev) => {
         if (!ev) return;
         finalize(ev);   // variant pick + token substitution + headline capitalization
+        // Market coupling: stamp the Act-II alpha-decay pre-pricing factor on the
+        // shell so the CANONICAL impulse dispatch inside _fireEvent seeds it (the
+        // one path shared with followup-fired shells -- no double-seeding here).
+        // _fireEvent multiplies this by the player-net-delta coupling.
+        if (ev.impulse) ev._impulseScale = prePrice;
         const r = engine._fireEvent(ev, sim, day, 0, netDelta);
         if (r && r.queued) popups.push(r.event);
         else if (r) fired.push(r);

@@ -64,8 +64,9 @@ import {
     computeMarket, initComputeMarket, refreshComputeQuotes, computeFutureSettlements,
     buildComputePublicView, getComputeMark, getComputeQuote, computeContractByKey,
     isComputeTradeable, placeholderCurve, stepNationalizationRef, freezeNationalizationReference,
-    getNationalizationReference, COMPUTE_MULTIPLIER, DECREE_FORMULAS,
+    getNationalizationReference, COMPUTE_MULTIPLIER, DECREE_FORMULAS, setComputePriceSource,
 } from '../src/race/compute-market.js';
+import { initBelief, stepBelief, computeCurveFromBelief, computeUrgency, binaryProb } from '../src/race/belief.js';
 import {
     portfolio, resetPortfolio, executeMarketOrder, closePosition, liquidateAll,
     settleComputeFutures, portfolioValue, processExpiry, cancelAllOrders, checkMargin,
@@ -714,6 +715,102 @@ let dteOmittedOK = false, dteKeptOK = false;
     assert(dteKeptOK, `sim-clock row DTE missing/wrong: "${bondLabel}"`);
 }
 
+// ---- Z. Belief-backed curve swapped in (phase 4) -------------------------
+// The REAL P4 curve (belief.js: placeholderCurve x (1 + K*urgency)) replaces the
+// placeholder via setComputePriceSource, stepped in lockstep with the race off the
+// public ledger. Checks: (1) structure preserved -- a blockade still lifts the far
+// curve, high demand still backwardates; (2) the belief-demand lift genuinely
+// changes the curve when B says R4 is near; (3) full-corruption invariance -- the
+// belief-backed curve reads only B (public-derived) + the public view, so
+// corrupting every latent field leaves the whole book bit-identical. Restores the
+// placeholder after.
+
+// initComputeMarket RESETS _priceSource to the placeholder, so the belief curve
+// must be installed AFTER it (this helper enforces the order).
+function primeBelief(seed, days, geo) {
+    const race = createRaceState(seed >>> 0);
+    initComputeMarket(race, geo); initBelief(race); setComputePriceSource(computeCurveFromBelief);
+    syncFixed(race.day);
+    for (let d = 0; d < days; d++) {
+        advanceRace(race); stepBelief(race);
+        stepNationalizationRef(race, 100 + race.day * 0.05);
+        settleComputeFutures(computeFutureSettlements(race, geo), race);
+        refreshComputeQuotes(race, geo);
+    }
+    syncFixed(race.day);
+    return race;
+}
+
+let zStructureOK = false, zLiftOK = false, zInvarianceOK = true;
+{
+    // (1) Structure preserved through the market path: blockade lifts the mark.
+    {
+        const rCalm = primeBelief(BASE_SEED + 92000, 250, calmGeo);
+        const kCalm = openComputeKey();
+        const mCalm = kCalm != null ? getComputeMark(kCalm) : null;
+        const rBlock = primeBelief(BASE_SEED + 92000, 250, blockadeGeo);
+        const kBlock = openComputeKey();
+        const mBlock = kBlock != null ? getComputeMark(kBlock) : null;
+        zStructureOK = mCalm != null && mBlock != null && kCalm === kBlock && mBlock > mCalm * 1.05;
+        assert(zStructureOK, `belief curve: blockade did not lift the mark (calm ${mCalm} block ${mBlock})`);
+        void rCalm; void rBlock;
+    }
+
+    // (2) The belief-demand lift genuinely changes the curve once B says R5 is
+    //     near, AND the MARKET path really uses the belief curve. Pins the EXACT
+    //     ratified formula: lift = 1 + 0.15*P(R5 by belief.day+252) -- reading R5
+    //     (takeoff), NOT R4 (the fix-3 rung correction).
+    {
+        const race = primeBelief(BASE_SEED + 92100, 760, calmGeo);
+        const view = buildComputePublicView(race, calmGeo);
+        const withBelief = computeCurveFromBelief(view, 63);
+        const structural = placeholderCurve(view, 63);
+        // Exact formula pin: urgency reads R5, and the lift is 1 + 0.15*urgency.
+        const urgency = computeUrgency();
+        const urgencyR5 = binaryProb(5, view.day + 252);
+        const expectedLift = 1 + 0.15 * Math.max(0, Math.min(1, urgencyR5));
+        const formulaPinOK = Math.abs(urgency - urgencyR5) < 1e-12
+            && Math.abs(withBelief - structural * expectedLift) < 1e-9;
+        assert(formulaPinOK, `compute lift formula off-spec: urgency=${urgency} R5=${urgencyR5} lift=${(withBelief / structural).toFixed(5)} want ${expectedLift.toFixed(5)}`);
+        const key = openComputeKey();
+        let marketUsesBelief = false;
+        if (key != null) {
+            const dte = Math.max(0, key - race.day);
+            const mark = getComputeMark(key);
+            marketUsesBelief = Math.abs(mark - computeCurveFromBelief(view, dte)) < 1e-6
+                && Math.abs(mark - placeholderCurve(view, dte)) > 1e-6;
+        }
+        zLiftOK = urgency > 0 && withBelief > structural * (1 + 1e-6) && marketUsesBelief && formulaPinOK;
+        assert(urgency > 0 && withBelief > structural * (1 + 1e-6), `belief lift did not raise the curve (urgency=${urgency.toFixed(3)} lift=${(withBelief / structural).toFixed(4)})`);
+        assert(marketUsesBelief, 'market curve mark does not match the belief source (source may not be installed)');
+    }
+
+    // (3) Full-corruption invariance with the belief curve (belief stepped daily).
+    const installBelief = (race) => { initComputeMarket(race, calmGeo); initBelief(race); setComputePriceSource(computeCurveFromBelief); };
+    const DAYS = [130, 200, 380, 520, 760];
+    for (let s = 0; s < 6; s++) {
+        for (const D of DAYS) {
+            const seed = (BASE_SEED + 92200 + s) >>> 0;
+            const raceA = createRaceState(seed); installBelief(raceA);
+            for (let d = 0; d < D; d++) { advanceRace(raceA); stepBelief(raceA); computeFutureSettlements(raceA, calmGeo); refreshComputeQuotes(raceA, calmGeo); }
+            const qA = JSON.stringify(computeMarket.quotes), sA = JSON.stringify(computeMarket.settled);
+
+            const raceB = createRaceState(seed); installBelief(raceB);
+            for (let d = 0; d < D - 1; d++) { advanceRace(raceB); stepBelief(raceB); computeFutureSettlements(raceB, calmGeo); refreshComputeQuotes(raceB, calmGeo); }
+            advanceRace(raceB); stepBelief(raceB);   // clean belief step off the day-D ledger
+            corruptContinuous(raceB);                 // corrupt AFTER B folded the clean ledger
+            computeFutureSettlements(raceB, calmGeo);
+            refreshComputeQuotes(raceB, calmGeo);
+            const qB = JSON.stringify(computeMarket.quotes), sB = JSON.stringify(computeMarket.settled);
+            if (qA !== qB || sA !== sB) zInvarianceOK = false;
+            assert(qA === qB, `belief curve changed under corruption (seed ${s}, D=${D})`);
+            assert(sA === sB, `settlement changed under corruption with belief curve (seed ${s}, D=${D})`);
+        }
+    }
+
+    setComputePriceSource(null);   // restore the placeholder
+}
+
 // ---- Report --------------------------------------------------------------
 
 line(`compute-test: N=${N} runs (nat-multiple sample), base seed=${BASE_SEED}, horizon=${HORIZON}d`);
@@ -778,6 +875,11 @@ line(`  5  short admission uses canonical (reserved) eq:   ${boundaryCanonicalOK
 line(`  3  frozen mark immutable under public change:      ${frozenMarkImmutableOK ? 'ok' : 'FAIL'}`);
 line(`  2  no listing after freeze + settlement once:      ${noListAfterFreezeOK && firstDecreeAllOK && exactlyOnceOK ? 'ok' : 'FAIL'}`);
 line(`  6  DTE display source (compute omits, bond keeps):  ${dteOmittedOK && dteKeptOK ? 'ok' : 'FAIL'}`);
+
+line('\nZ. Belief-backed curve (phase 4, swapped in via setComputePriceSource)');
+line(`  structure preserved (blockade still lifts the mark):  ${zStructureOK ? 'ok' : 'FAIL'}`);
+line(`  belief-demand lift raises the curve when R4 is near:  ${zLiftOK ? 'ok' : 'FAIL'}`);
+line(`  full-corruption invariance with the real curve:       ${zInvarianceOK ? 'holds' : 'VIOLATED'}`);
 
 line('\n' + '='.repeat(72));
 if (failures === 0) {

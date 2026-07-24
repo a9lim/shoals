@@ -76,12 +76,22 @@ import { createRaceState, advanceRace, resetRaceState } from './src/race/race-st
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
 import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
-    refreshBinaryQuotes, computeBinarySettlements,
+    refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
 } from './src/race/consensus.js';
 import {
     computeMarket, initComputeMarket, resetComputeMarket, deactivateComputeMarket,
-    refreshComputeQuotes, computeFutureSettlements, stepNationalizationRef,
+    refreshComputeQuotes, computeFutureSettlements, stepNationalizationRef, setComputePriceSource,
 } from './src/race/compute-market.js';
+import {
+    belief, initBelief, resetBelief, deactivateBelief, stepBelief,
+    binaryQuoteFromBelief, computeCurveFromBelief, impliedTimeline,
+    isLockDay, lockForecast, settleClaims,
+    playerPilled, stepFirmBelief, scrutinyGap, marketPilled, hasEverLocked,
+} from './src/race/belief.js';
+import {
+    decayEventImpulses,
+    applyEventImpulseOverlay, removeEventImpulseOverlay, resetEventImpulses,
+} from './src/race/impulse.js';
 
 
 // ---------------------------------------------------------------------------
@@ -116,6 +126,8 @@ let rateHistory = null;   // sparkline ring buffer for risk-free rate
 let vxhcnHistory = null;    // sparkline ring buffer for VX
 let portfolioHistory = null; // sparkline ring buffer for portfolio value
 let _savedOverlays = {};
+let _savedImpulse = {};   // event-impulse overlay saved originals (restored at day-complete)
+let _lastForecastLockDay = -1;   // race-day of the last forecast-lock prompt (avoids double-firing)
 
 const _popupQueue = [];
 const playerChoices = {};
@@ -146,6 +158,17 @@ function _haptic(pattern) {
 function _syncAll() {
     syncMarket(sim);
     market.vxhcn = computeVXHCNSpot(sim.v, sim.kappa, sim.theta, sim.xi);
+}
+/** Install / restore the belief-backed Consensus + compute quote sources (P4).
+ *  The swapped-in quoters read the `belief` singleton (public-derived) + the
+ *  public view -- integrity holds by construction. */
+function _wireBeliefQuoters() {
+    setBinaryQuoteSource(binaryQuoteFromBelief);
+    setComputePriceSource(computeCurveFromBelief);
+}
+function _unwireBeliefQuoters() {
+    setBinaryQuoteSource(null);    // restore the placeholder quoter
+    setComputePriceSource(null);
 }
 function _clampRate() {
     const ceil = getRegulationEffect('rateCeiling', null);
@@ -641,9 +664,17 @@ function init() {
         initConsensus(raceState);
         // Compute-futures term structure (overhaul phase 3b): list ladder + prime curve.
         initComputeMarket(raceState, eventEngine.world.geopolitical);
+        // Market belief B + belief-backed quoters + player/firm belief (phase 4).
+        initBelief(raceState);
+        _wireBeliefQuoters();
+        refreshBinaryQuotes(raceState);
+        refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
+        _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     } else {
         deactivateConsensus();
         deactivateComputeMarket();
+        deactivateBelief();
+        _unwireBeliefQuoters();
     }
     updateDynamicSections($, DEFAULT_PRESET);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
@@ -825,6 +856,41 @@ function renderCurrentView() {
     }
 }
 
+/**
+ * Open a trading day: install the Layer-3 param overlay + the decaying event-
+ * impulse overlay (nested innermost over Layer-3), then beginDay. The overlays
+ * affect ONLY the day's substep integration -- the price PATH -- and are removed
+ * in `_closeTradingDay` BEFORE any day-complete bookkeeping. Shared by frame() /
+ * tick() / step() so the step button applies impulses too.
+ */
+function _beginTradingDay() {
+    _savedOverlays = applyParamOverlays(sim);
+    _savedImpulse = applyEventImpulseOverlay(sim);
+    sim.beginDay();
+    dayInProgress = true;
+}
+
+/**
+ * Close a trading day: finalizeDay, then REMOVE both overlays LIFO (impulse
+ * first) and re-sync the market to BASELINE params -- all BEFORE `_onDayComplete`
+ * runs. This is the phase-4 gate fix: ordinary events fire inside _onDayComplete
+ * and mutate sim params; if the overlay were still installed, removing it
+ * afterward would restore the pre-event saved originals and ERASE the legitimate
+ * event delta. With the overlay gone first, events always mutate the true
+ * baseline, and a popup pausing mid-_onDayComplete can never strand an overlay.
+ * Does NOT call `_onDayComplete` -- the caller runs it (tick() snaps the lerp
+ * between close and _onDayComplete).
+ */
+function _closeTradingDay() {
+    sim.finalizeDay();
+    dayInProgress = false;
+    removeEventImpulseOverlay(sim, _savedImpulse);   // LIFO: impulse (innermost) first
+    removeParamOverlays(sim, _savedOverlays);
+    _savedImpulse = {};
+    _savedOverlays = {};
+    _syncAll();
+}
+
 function frame(now) {
     if (playing) {
         const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
@@ -833,9 +899,7 @@ function frame(now) {
         if (!dayInProgress) {
             // Start a new day if enough time has passed since last tick
             if (now - lastTickTime >= tickInterval) {
-                _savedOverlays = applyParamOverlays(sim);
-                sim.beginDay();
-                dayInProgress = true;
+                _beginTradingDay();
                 // Advance by tickInterval (not now) to avoid drift; clamp
                 // to prevent burst catch-up after tab was backgrounded
                 lastTickTime = Math.max(lastTickTime + tickInterval, now - tickInterval);
@@ -863,13 +927,11 @@ function frame(now) {
                 _onSubstepUI();
                 if (!strategyMode) dirty = true;
             }
-            // All sub-steps done — finalize the day
+            // All sub-steps done — close the day (overlays removed) then run
+            // day-complete bookkeeping against baseline params.
             if (sim.dayComplete) {
-                sim.finalizeDay();
-                dayInProgress = false;
-                _syncAll();
+                _closeTradingDay();
                 _onDayComplete();
-                removeParamOverlays(sim, _savedOverlays);
             }
         }
     }
@@ -1153,6 +1215,15 @@ function _processPopupQueue() {
             _resetCore(DEFAULT_PRESET);
             loadPreset(DEFAULT_PRESET);
         }
+        // Forecast-lock (phase 4): commit the player's posterior claim vector at
+        // the scheduled lock day. Immutable, on-grid, current-day only -- check the
+        // return before reporting success (the window may have passed).
+        if (event._forecastLock && choice._lockVec) {
+            const rec = lockForecast(event._lockDay, choice._lockVec);
+            _toast(rec
+                ? 'Forecast locked. Credibility now scores it against every matured milestone.'
+                : 'The lock window has passed — no forecast recorded this quarter.', 4000);
+        }
         dirty = true;
     }, popupCat, event.magnitude, isSuperevent);
 }
@@ -1183,6 +1254,90 @@ function _showComplianceTermination() {
     const pages = generateEnding('forced_resignation', eventEngine?.world ?? {}, sim, portfolio,
         eventEngine ? eventEngine.eventLog : [], playerChoices, impactHistory, quarterlyReviews);
     _showEpilogue(pages);
+}
+
+/**
+ * The belief-gap scrutiny loop (overhaul phase 4): the risk committee heats on
+ * the divergence between the player's positioning and firm belief `F`. Early
+ * game the player is MORE pilled than the firm (AGI books draw heat, worse when
+ * the divergent book is also down); late game, once `F` wakes, the pressure
+ * INVERTS (conventional books underperform an AGI-loaded benchmark). Modest,
+ * bounded firmStanding pressure -- UNRATIFIED gap thresholds.
+ */
+function _runScrutiny() {
+    if (!raceState) return;
+    if (!hasEverLocked()) return;                  // no stated posterior -> no belief gap to scrutinize
+    const pilled = playerPilled();                 // player's locked posterior on the recursion rungs
+    const gap = scrutinyGap(raceState, pilled);    // player - F
+    if (Math.abs(gap) <= 20) return;               // not divergent -> no scrutiny
+    const lastRev = quarterlyReviews[quarterlyReviews.length - 1];
+    const vs = lastRev ? lastRev.vsBenchmark : 0;
+    // Two-sided by rule (02a phase-4): the committee grudgingly respects P&L --
+    // +3 divergent & outperforming, -3 divergent & underperforming.
+    const delta = vs > 0 ? 3 : vs < 0 ? -3 : 0;
+    if (delta !== 0) shiftFaction('firmStanding', delta);
+    const morePilled = gap > 0;   // player more pilled than the firm (early) vs less (late, F awake)
+    if (morePilled) {
+        _toast(vs > 0
+            ? 'The risk committee grumbles about your AGI-heavy book — then reads the P&L, and the grumbling stops.'
+            : 'Risk committee: "Explain the AGI thesis. The book is divergent and down."', vs > 0 ? 5000 : 6000);
+    } else {
+        _toast(vs > 0
+            ? 'The desk went long the future without you — but you are beating the benchmark, and they respect it.'
+            : 'The desk went long the future without you. Your conventional book is the laggard now.', vs > 0 ? 5000 : 6000);
+    }
+}
+
+/**
+ * Minimal forecast-lock UI (overhaul phase 4): a Dynamic-only popup at each lock
+ * day where the player commits a full claim vector via coarse quick-buttons
+ * (polish is later phases; the surface stays small and consistent with the
+ * existing popup pattern). The chosen preset maps to a {R2..R5} probability
+ * vector consumed by lockForecast; credibility scores it against every matured
+ * milestone.
+ */
+/** Prompt the day-0 forecast lock at game start (a REAL lock, belief.day === 0):
+ *  shown immediately, pausing the game, so the player sets their initial thesis
+ *  before the first day advances. Never a manufactured market-prior forecast. */
+function _promptDay0Lock() {
+    if (!raceState || !belief.active) return;
+    _lastForecastLockDay = 0;
+    _promptForecastLock();
+    _processPopupQueue();
+}
+
+function _promptForecastLock() {
+    if (!raceState || !belief.active) return;
+    const day = raceState.day;
+    const tl = impliedTimeline();
+    const mkt = Math.round(marketPilled());
+    _popupQueue.push({
+        category: 'desk',
+        magnitude: 'moderate',
+        headline: 'Quarterly Forecast Lock',
+        context: 'The desk logs your timeline call for the record — no retroactive edits, and it scores '
+            + 'against every milestone that matures, traded or not. The market\'s implied timeline reads '
+            + `R3 ~ day ${tl[3]}, R4 ~ day ${tl[4]} (implied pilledness ${mkt}%). Where do you stand?`,
+        choices: [
+            {
+                label: 'Pilled — the timeline is short',
+                desc: 'Autonomous research is close; recursion follows. Position for it and own the call.',
+                _lockVec: { 2: 0.92, 3: 0.80, 4: 0.60, 5: 0.45 },
+            },
+            {
+                label: 'Base case — track the tape',
+                desc: 'Roughly where the market is. No strong edge, no strong exposure.',
+                _lockVec: { 2: 0.78, 3: 0.56, 4: 0.42, 5: 0.30 },
+            },
+            {
+                label: 'Skeptical — the wall is real',
+                desc: 'Scaling bends before takeoff. The far rungs stay far.',
+                _lockVec: { 2: 0.62, 3: 0.36, 4: 0.20, 5: 0.12 },
+            },
+        ],
+        _forecastLock: true,
+        _lockDay: day,
+    });
 }
 
 function _updateTraitDisplay() {
@@ -1407,6 +1562,11 @@ function _onDayComplete() {
     // (phase 3a) read the ledger it produces.
     if (raceState) {
         advanceRace(raceState);
+        // Market belief B (overhaul phase 4): fold this completed day's LEGIBLE
+        // ledger (releases, certifications, detected incidents, published/leaked
+        // evidence) into B before anything reads a quote. Consumes ONLY
+        // race.lastTransitions -- never latent state.
+        stepBelief(raceState);
         // Consensus binaries: settle on this tick's certified crossings /
         // deadlines / impossibility (consumes race.lastTransitions.certifications
         // -- the ledger, never state-diffing), then refresh quotes off the public
@@ -1419,6 +1579,13 @@ function _onDayComplete() {
                 _toast('Consensus: ' + r.label + ' settled ' + r.outcome
                     + ' — P&L ' + fmtDollar(r.pnl), 4500);
             }
+            // Credibility (phase 4): score the player's locked forecast against
+            // every milestone that just matured YES/NO (traded or not). R5 PENDING
+            // and FALLBACK do not settle a claim.
+            const matured = settlements
+                .filter(s => s.outcome === 'YES' || s.outcome === 'NO')
+                .map(s => ({ rung: s.contract.predicate.rung, outcome: s.outcome === 'YES' ? 1 : 0 }));
+            if (matured.length) settleClaims(matured);
             // Terminal (R5) crossings held for closeout: notify if the player holds one.
             for (const s of settlements) {
                 if (s.outcome === 'PENDING_CLOSEOUT'
@@ -1446,6 +1613,16 @@ function _onDayComplete() {
             }
         }
         refreshComputeQuotes(raceState, _geo);
+
+        // Forecast locking + firm belief F + the belief-gap scrutiny loop
+        // (overhaul phase 4). Lock days are the fixed quarterly grid 0/63/126...
+        // (race clock). Day zero was prompted during initialization.
+        if (isLockDay(raceState.day) && raceState.day !== _lastForecastLockDay) {
+            _lastForecastLockDay = raceState.day;   // race.day >= 1 here; day 0 is prompted at init
+            stepFirmBelief(raceState);   // F wakes toward B; converts on the player's track record
+            _runScrutiny();              // risk committee heats on the player's belief-gap vs F
+            _promptForecastLock();
+        }
     }
 
     // Trading-restriction release: lifts once no un-flattenable (stuck) legs
@@ -1582,6 +1759,7 @@ function _onDayComplete() {
     const grossRatio = grossNotional / (market.S * modeledStockADV(market.sigma));
     updateParamShifts(grossRatio);
     decayParamShifts();
+    decayEventImpulses();   // decay the race-event market impulses once per day (phase 4)
 
     // Impact toast
     const hasOptions = portfolio.positions.some(p => p.type === 'call' || p.type === 'put');
@@ -1667,19 +1845,18 @@ function _onDayComplete() {
 // tick — advance one trading day
 // ---------------------------------------------------------------------------
 
-/** Instant full-day tick (used by step button). */
+/** Instant full-day tick (used by step button). Overlays are applied for the
+ *  day's substeps and removed before `_onDayComplete` via the shared helpers, so
+ *  the step button now applies impulses (previously it never did). */
 function tick() {
     if (dayInProgress) {
-        // Finish remaining sub-steps instantly
+        // Day already opened by frame() (overlays installed) -- finish substeps.
         while (!sim.dayComplete) _runSubstep();
-        sim.finalizeDay();
-        dayInProgress = false;
     } else {
-        // Full day: beginDay + substeps + finalizeDay
-        sim.beginDay();
+        _beginTradingDay();
         for (let i = 0; i < INTRADAY_STEPS; i++) _runSubstep();
-        sim.finalizeDay();
     }
+    _closeTradingDay();   // finalize + remove overlays LIFO + re-sync to baseline
     // Snap the lerp to the final state (no animation for step)
     const last = sim.history.last();
     if (last) {
@@ -1850,10 +2027,9 @@ function togglePlay() {
 function step() {
     if (playing) return;
 
-    // Start a new day if none in progress
+    // Start a new day if none in progress (installs overlays via the shared helper).
     if (!dayInProgress) {
-        sim.beginDay();
-        dayInProgress = true;
+        _beginTradingDay();
         chart.setLiveCandle(sim._partial);
     }
 
@@ -1862,11 +2038,9 @@ function step() {
     chart.setLiveCandle(sim._partial);
     _onSubstepUI();
 
-    // If all substeps done, finalize the day
+    // If all substeps done, close the day (overlays removed) then bookkeeping.
     if (sim.dayComplete) {
-        sim.finalizeDay();
-        dayInProgress = false;
-        _syncAll();
+        _closeTradingDay();
         _onDayComplete();
     }
 
@@ -1915,6 +2089,8 @@ function _resetCore(index) {
     // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
     // since _resetCore runs before loadPreset nulls raceState.
     if (raceState) resetRaceBridge();
+    resetEventImpulses();          // clear the decaying race-event impulse overlay (phase 4)
+    _lastForecastLockDay = -1;
     sim.reset(index);
     resetPortfolio();
     resetImpactState();
@@ -1964,11 +2140,19 @@ function loadPreset(index) {
         initConsensus(raceState);
         // Compute-futures term structure (overhaul phase 3b).
         initComputeMarket(raceState, eventEngine.world.geopolitical);
+        // Market belief B + belief-backed quoters + player/firm belief (phase 4).
+        initBelief(raceState);
+        _wireBeliefQuoters();
+        refreshBinaryQuotes(raceState);
+        refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
+        _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     } else {
         eventEngine = null;
         raceState = null;
         deactivateConsensus();
         deactivateComputeMarket();
+        deactivateBelief();
+        _unwireBeliefQuoters();
     }
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
@@ -1993,6 +2177,13 @@ function resetSim() {
         resetRaceState(raceState);
         resetConsensus(raceState);
         resetComputeMarket(raceState, eventEngine ? eventEngine.world.geopolitical : null);
+        // Rebuild belief for the fresh world + re-install the belief-backed quoters
+        // (resetConsensus/resetComputeMarket reset the source to the placeholder).
+        resetBelief(raceState);
+        _wireBeliefQuoters();
+        refreshBinaryQuotes(raceState);
+        refreshComputeQuotes(raceState, eventEngine ? eventEngine.world.geopolitical : null);
+        _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     }
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);

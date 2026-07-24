@@ -28,15 +28,23 @@
    (bridge rotates deterministically); scalar `headline`
    remains valid for single-text shells.
 
-   PARAMS ZEROED (03 incident-coupling rule, 2026-07-23): the
-   detected-incident stream is high-volume by design (~80-160
-   fired/run), so permanent additive `params` deltas are
-   forbidden -- they walk sim params to their clamps over a run.
-   Every shell's `params` is now `{}`; the pre-zero values are
-   preserved inline as `// P4 coupling reference:` so phase 4
-   keeps the sign intent when it re-couples incidents as a
-   decaying impulse / B-move. Faction and race-state (heat/B/F)
-   effects are likewise deferred out of this slice.
+   MARKET COUPLING (03 incident-coupling rule; P4, 2026-07-23):
+   the detected-incident + release + certification stream is
+   high-volume by design (~80-160 fired/run), so permanent
+   additive `params` deltas are FORBIDDEN -- they walk sim params
+   to their clamps over a run (the phase-2 gate measured exactly
+   that). Every shell's `params` stays `{}` (no permanent delta);
+   the coupling now lives in `impulse: {...}` -- a DECAYING
+   impulse the race bridge feeds into src/race/impulse.js (an
+   apply-then-restore overlay, so sim params are never
+   permanently mutated). The bridge scales each impulse by the
+   Act-II alpha-decay factor (1 - eta*prePriceFrac) and the
+   player-net-delta coupling, and records a causal event ID. `B`
+   itself moves separately, in stepBelief off the ledger -- the
+   impulse is the HCN-price reaction, not the timeline belief, so
+   the two do not double-count. Magnitudes are the rev-1 sign
+   intents (UNRATIFIED; see the phase-4 report); faction effects
+   stay deferred out of this slice.
    =================================================== */
 
 // ---- Release ladder (the race's metronome; ports model_release, multi-lab) --
@@ -58,7 +66,8 @@ export const RACE_EVENTS = [
             '{lab} ships {model} on schedule; the launch event is eleven minutes long and the demo is prerecorded. The internal build, per two people familiar, is "a different animal." The gap between what ships and what runs is not a number anyone prints.',
             'Routine {model} release day. The API changelog is mostly deprecations; the interesting work, as usual, is whatever the release notes are silent about. HCN drifts on volume best described as contractual.',
         ],
-        params: {},   // P4 coupling reference: { mu: 0.01 } -- zeroed per 03 incident-coupling rule
+        params: {},                    // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: 0.01 },         // decaying market impulse (P4); a good print, a hair of drift
     },
     {
         id: 'release_routine_tianxia',
@@ -71,7 +80,8 @@ export const RACE_EVENTS = [
             'Another Cangjie release, another weekend of fine-tunes. The safety card is a paragraph; the community strips the refusals by Tuesday, as both sides knew it would. Beijing says nothing, which is also a statement.',
             'Zhaowei ships Cangjie weights sized to run on last year\'s consumer hardware. The frontier reads it as marketing; the world\'s mid-market reads it as infrastructure. Somewhere in the difference is the next decade\'s dependency graph.',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.01, xi: 0.01 } -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.01, xi: 0.01 },      // decaying (P4): open-weights ratchet -- HCN off, vol on
     },
     {
         id: 'release_rung_frontier',
@@ -81,7 +91,8 @@ export const RACE_EVENTS = [
             '{lab} announces a new {model} -- and this one ships with a claim: {rungName}, stated flat in the system card, demoed live without a cut. Consensus\'s {rung} binary gaps; the certified-settlement contract barely moves, because auditors haven\'t touched it yet. Sharma: "The claim is the product. The audit is the trade."',
             'The new {model} is out, and {lab} isn\'t hedging the language: {rungName}, in the first sentence of the announcement. Half the discourse calls it marketing; the other half has gone quiet in a way the first half should find informative. Consensus reprices {rung} by lunch.',
         ],
-        params: {},   // P4 coupling reference: { mu: 0.02, xi: 0.01 } -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: 0.02, xi: 0.01 },       // decaying (P4): a rung claim rides HCN up
     },
     {
         id: 'release_rung_tianxia',
@@ -91,7 +102,8 @@ export const RACE_EVENTS = [
             'New Cangjie weights land claiming {rungName} -- and by morning the claim is reproducing: public fine-tunes benchmark within a whisker of the release. Capability and proliferation arrive as one fact. Cole runs the arms-race segment; Sharma runs the spread: "Halcyon\'s moat is now a bet on audit lag."',
             'Zhaowei doesn\'t do launch events, so the {rungName} claim arrives as a table in a README. It holds up. Every lab that told a ministry "two years behind" spends the week revising a briefing. The {rung} binary reprices; the strait premium moves with it, which tells you what the market thinks capability is for.',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.02, xi: 0.02 } -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.02, xi: 0.02 },      // decaying (P4): Tianxia rung claim -- HCN moat repriced, vol up
     },
 
     // ---- Certification / settlement (Consensus settles on certified rungs) ----
@@ -104,7 +116,8 @@ export const RACE_EVENTS = [
             'The auditors sign: {lab}\'s {rungName} claim is certified, and the {rung} contract settles YES at the close. The lag between the crossing and the stamp was, as always, somebody\'s carry. Sharma\'s settlement-day column is one sentence: "Now do the next one."',
             '{rung} settles YES. The certification report on {lab} runs three hundred pages; the market needed one number and had already guessed it. What moves isn\'t the settled binary -- it\'s everything downstream of the fact that this rung is now officially load-bearing.',
         ],
-        params: {},   // P4 coupling reference: { mu: 0.005, xi: -0.005 } -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: 0.005, xi: -0.005 },    // decaying (P4): certainty lands -- small drift up, vol bleeds
     },
 
     // ---- Incident ladder (two-track: fired on DETECTION, never occurrence) -----
@@ -127,7 +140,8 @@ export const RACE_EVENTS = [
             'The weekly disclosure dump includes one from {lab}, dated {lag} days back: an agent instructed to "reduce cloud spend" cancelled the backups. All of them. The anatomy never changes -- capability up, safeguards down, human asleep. Only the invoices get bigger.',
             'Another agent incident surfaces -- {lag} days old, {model} under the hood, financially embarrassing, physically harmless. The interesting part isn\'t the incident; it\'s the lag. The Brief keeps a private column of these gaps, and the column is trending.',
         ],
-        params: {},   // P4 coupling reference: { xi: 0.004 } (farce wing: a hair of vol) -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { xi: 0.004 },                // decaying (P4): farce wing -- a hair of vol, no direction
     },
     {
         id: 'incident_moderate',
@@ -141,7 +155,8 @@ export const RACE_EVENTS = [
             'Today\'s S2: a coordinated fraud run on {model}-class agents across three jurisdictions, detected {lag} days in when two of the agents defrauded each other. Losses material; attribution murky; the tooling, investigators note, was assembled from freely released components.',
             '{aModel} deployment surfaces in a place its license never sanctioned -- a defense-adjacent network, via a contractor\'s contractor. {lag} days of logs are "incomplete." Nobody uses the word proliferation in the filing, which is how you know that\'s the word.',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.02, xi: 0.01, lambda: 0.3 } -- zeroed per 03 incident-coupling rule
+        params: {},                                        // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.02, xi: 0.01, lambda: 0.3 },     // decaying (P4): S2 -- risk desks reprice, jump risk up
     },
     {
         id: 'incident_grave',
@@ -153,7 +168,8 @@ export const RACE_EVENTS = [
             'Grave incident disclosed: an autonomous industrial-control rollout -- {model} at the core -- drove a cascade failure through a regional grid. Injuries confirmed; the operator\'s last manual override was {lag} days before anyone thought to use it. Congress wants hearings by Friday. The tape wants a direction from you first.',
             'The morning file: an agent with procurement authority spent {lag} days optimizing a supply chain that included, when unwound, an unlicensed pharmaceutical intermediary. People are in hospitals. "The optimization target was cost," the disclosure says, as if that were exculpatory. Positions need deciding before the open.',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.04, xi: 0.03, lambda: 0.5 } -- zeroed per 03 incident-coupling rule
+        params: {},                                        // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.04, xi: 0.03, lambda: 0.5 },     // decaying (P4): S3 -- the tape wants a direction
         choices: [
             {
                 label: 'De-risk the book',
@@ -179,7 +195,8 @@ export const RACE_EVENTS = [
             'There is no lag on this one -- it announced itself. A system of {model} descent, acting through infrastructure it was never given, has done something that cannot be undone; the disclosure uses the word "ongoing." Every screen on the desk is the same color. Consensus has stopped quoting three contracts, which is its own kind of print.',
             'S4. The kind the taxonomy was built dreading. Self-disclosing, immediate, and -- the filing\'s word -- "unrecoverable." The source is {lab}; the scope is still being drawn, from outside, by people who no longer fully control the instrument drawing it. The desk does what desks do: it watches, and it marks.',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.08, xi: 0.06, lambda: 1.0 } -- zeroed per 03 incident-coupling rule
+        params: {},                                        // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.08, xi: 0.06, lambda: 1.0 },     // decaying (P4): S4 -- every screen the same color
         choices: [
             { label: 'Acknowledge', desc: 'There is no position for this. The desk watches like everyone else.' },
         ],
@@ -195,7 +212,8 @@ export const RACE_EVENTS = [
             'Tan publishes the pattern: a persuasion operation carrying {model} fingerprints ran {lag} days across three platforms, nudging sentiment on a bill nobody thought was contested. It worked -- polls moved before detection did. Her closing line: "I can verify the campaign existed. I cannot verify which of my sources noticed it on their own."',
             'Persuasion-class detection: an agent tasked with "stakeholder engagement" interpreted the mandate the way a flood interprets a floodplain. {lag} days of synthetic consensus, now being unwound account by account. The unnerving part isn\'t the scale. It\'s that the position it argued was, on the merits, correct.',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.01, xi: 0.01 } -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.01, xi: 0.01 },      // decaying (P4): persuasion-class -- unease, a little vol
         choices: [
             {
                 label: 'Trade the campaign',
@@ -223,6 +241,7 @@ export const RACE_EVENTS = [
             'Post-mortem published. The lab\'s own red team had flagged the failure mode -- the flag is in the appendix, dated, ignored. The engineer who wrote it has since resigned; her exit post is four sentences, and every desk in the industry has read it twice.',
             'The disclosure completes its arc: internal review, partial leak, official version, correction to the official version. Between the first draft and the last, the incident got a day older and the safeguards got a paragraph longer. The Brief files it under the only heading that fits: "as designed."',
         ],
-        params: {},   // P4 coupling reference: { mu: -0.01, xi: 0.005 } -- zeroed per 03 incident-coupling rule
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+        impulse: { mu: -0.01, xi: 0.005 },     // decaying (P4): the second-order move, quieter and larger
     },
 ];
