@@ -274,6 +274,19 @@ function bridgeRegime(tr, emit) {
     if (id) emit(shell(id, {}, { from: rc.from, to: rc.to }));
 }
 
+// ---- Lab spawn (content round 3: the Polaris schism) ---------------------
+// The sampler decides WHEN Polaris exists (~day 400, its own draw); the walkout
+// superevent is that ledger transition made narrative -- never a Poisson draw,
+// or the story and the model would disagree about whether the lab is racing.
+// Category 'polaris' stays Poisson-excluded for exactly this reason.
+
+function bridgeSpawn(tr, emit) {
+    // tr.spawned entries are plain lab-id strings (capability.js).
+    for (const sp of (tr.spawned || [])) {
+        if (sp === 'polaris') emit(shell('polaris_walkout', {}, {}));
+    }
+}
+
 // ---- Thefts (stub: records intent, fires nothing) ------------------------
 
 function bridgeThefts(tr) {
@@ -327,6 +340,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     bridgeIncidents(tr, emit);
     bridgeStrait(tr, emit);
     bridgeRegime(tr, emit);
+    bridgeSpawn(tr, emit);
     bridgeThefts(tr);
 
     return { fired, popups };
