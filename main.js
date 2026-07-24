@@ -183,6 +183,9 @@ function _syncRaceToWorld() {
     w.geopolitical.taiwanBlockade = raceState.taiwanBlockade;   // Taiwan strait (compute market reads this)
     w.ai.controlRegime = raceState.controlRegime;
     w.ai.reportingRegime = raceState.incidentReporting;
+    // Released frontier rung -- the public act proxy arc `when` guards key on
+    // (same public quantity eta and the base-rate scale read; latent C never mirrored).
+    w.ai.frontierRung = buildPublicView(raceState).releasedFrontierRung;
 }
 /** Public strait tension in [0,1] from world-state China proxies (phase 5a),
  *  fed to the strait generator so gray-zone / blockade hazard reads the same

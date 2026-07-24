@@ -396,9 +396,14 @@ substep firing pass is P7's, gated by the same driver.
 
 **Field contract** (ratified): new world domain `world.ai` —
 `exportControlStage` 0–3, `treatyStage` 0–4, `wonderCount`,
-`controlRegime` + `reportingRegime` as **race-owned read-only
-mirrors** (main.js mirrors race → world each day; event `when`
-guards read the mirror, never the race object). Existing prototype
+`controlRegime` + `reportingRegime` + `frontierRung` as **race-owned
+read-only mirrors** (main.js mirrors race → world each day; event
+`when` guards read the mirror, never the race object).
+`frontierRung` (added content round 1) is the released frontier rung
+— the public act proxy arc guards key on, the same public quantity η
+and the base-rate scale read. Ordinary narrative flags the arcs set
+(e.g. `fixedpointPublic`) live in `world.ai` as plain writable state,
+outside `WORLD_STATE_RANGES` unless deliberately whitelisted. Existing prototype
 domains are *not* slimmed yet — every candidate-dead geopolitical
 field is still read by surviving prototype `when` guards, so
 slimming rides the content-excision rounds, field by field with its

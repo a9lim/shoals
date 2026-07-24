@@ -32,14 +32,16 @@ const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 // bridge (src/events/race-bridge.js), never by Poisson draw -- excluding them
 // here keeps them out of both the random pool and the one-shot pre-pass. The
 // phase-5a machinery + skeleton categories ('strait', 'regime', 'dispute',
-// 'policy', 'treaty', 'wonder', 'halcyon', 'china', 'polaris', 'insider',
-// 'ghostwritten') are ALSO excluded: the machinery shells fire via the bridge /
-// followups, and the content skeletons stay dormant (placeholder prose) until the
-// content rounds -- they must never Poisson-fire into the live game.
+// 'policy', 'treaty', 'wonder', 'china', 'polaris', 'insider', 'ghostwritten')
+// are ALSO excluded: the machinery shells fire via the bridge / followups, and
+// the remaining content skeletons stay dormant (placeholder prose) until their
+// content round -- they must never Poisson-fire into the live game. A category
+// leaves this set exactly when its arc's prose lands ('halcyon' left in content
+// round 1; guards on `world.ai.frontierRung` gate act placement from there).
 const _PULSE_CATEGORIES = new Set([
     'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
     'strait', 'regime', 'dispute', 'policy', 'treaty', 'wonder',
-    'halcyon', 'china', 'polaris', 'insider', 'ghostwritten', 'conversion',
+    'china', 'polaris', 'insider', 'ghostwritten', 'conversion',
 ]);
 
 // -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------

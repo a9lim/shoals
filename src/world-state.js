@@ -75,6 +75,9 @@ export function createWorldState() {
             wonderCount:        0,      // model-designed breakthroughs surfaced (wonders track)
             controlRegime:      'private',   // MIRROR of race.controlRegime (read-only for guards)
             reportingRegime:    false,       // MIRROR of race.incidentReporting (read-only for guards)
+            frontierRung:       1,           // MIRROR of the released frontier rung (read-only for guards;
+                                             // the public act proxy -- same driver as eta / base-rate scale)
+            fixedpointPublic:   false,       // the codename belongs to the world (halcyon-arc one-shot sets it)
         },
     };
 }
