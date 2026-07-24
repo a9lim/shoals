@@ -96,8 +96,13 @@ export const CHINA_EVENTS = [
         context: 'The rule binds silicon, not weights — nothing already released un-releases, a point the hearing will rediscover in public, twice. Meridian’s clients sit on both sides of it, and a fund with a view can lean on the comment period. Controls slow Tianxia and buy the frontier comfort-margin; free flow keeps your software cheap and the strait calm. Pick which future you’re short.',
         choices: [
             {
+                // Desc is INTENT language by ruling (content gate): the
+                // exportControlStage -> Tianxia-velocity race coupling is the
+                // evidence-machinery round's to build (02a will ratify the
+                // dampener); until then the rule's bite is political, and the
+                // prose promises exactly that much.
                 label: 'Back the controls',
-                desc: 'Weigh in for the tighter rule. Tianxia slows, the frontier’s lead pads out — and Beijing does not read the gesture as economics.',
+                desc: 'Weigh in for the tighter rule — aimed squarely at Tianxia’s compute, and read in Beijing as anything but economics.',
                 effects: [{ path: 'ai.exportControlStage', op: 'add', value: 1 }],
                 factionShifts: [
                     { faction: 'federalistSupport', value: 2 },

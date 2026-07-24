@@ -59,14 +59,18 @@ export const POLICY_EVENTS = [
         popup: true,
         superevent: true,
         magnitude: 'major',
-        headline: 'NATIONALIZATION. The announcement takes ninety seconds and ends a listed company: Halcyon’s frontier assets pass to federal control, and HCN converts to a compensation claim at the published reference times a multiple the market has been pricing as a distribution for months. The distribution just printed. Every desk that ran the nationalization trade finds out, simultaneously, what it was actually long — and the ones who read the reference-window rules closely find the mark exactly where the rules said it would be, which is the only mercy the mechanism offers.',
-        context: 'Shares become claims; the book settles into the closeout matrix. There is no more HCN to trade, which resolves a remarkable number of open questions and replaces them with one: what, exactly, does the government now believe it bought — and was the buying about the upside, or the tail?',
+        // Prose scoped to what fires TODAY (content-gate ruling): the order and
+        // the reference publish now; the actual HCN conversion/delisting is the
+        // endings-phase machinery, and this shell's text stops where the
+        // machinery stops. P6 completes the loop.
+        headline: 'NATIONALIZATION. The order is announced in ninety seconds: Halcyon’s frontier assets pass to federal control, and the Treasury publishes the compensation terms the market has been pricing as a distribution for months — the reference window already frozen, the conversion multiple named, the timetable "expeditious." Every desk that ran the nationalization trade now knows exactly what it is long: a claim in formation, marked to rules that were written before anyone knew they would matter this specifically.',
+        context: 'The conversion process begins; the closeout matrix is no longer a hypothetical annex. What remains of the open questions is mostly one: what, exactly, does the government believe it just bought — and was the buying about the upside, or the tail?',
         params: {},
         impulse: { mu: -0.06, xi: 0.04 },   // decaying (P4): conversion shock
         choices: [
             {
-                label: 'Settle the claim',
-                desc: 'The reference was frozen before the halt, the multiple was sampled before you were born, run-wise. The matrix does the rest.',
+                label: 'Read the terms',
+                desc: 'The reference was frozen before the halt, the multiple sampled before you were born, run-wise. The matrix will do the rest when it runs.',
             },
         ],
     },
@@ -76,8 +80,13 @@ export const POLICY_EVENTS = [
         popup: true,
         superevent: true,
         magnitude: 'major',
-        headline: 'CLASSIFICATION. The frontier goes dark by statute: capability disclosures end, the filings seal, and repeating certain benchmark numbers in public becomes, as of this morning, a crime with a sentencing range. Consensus settles everything outstanding at fallback — for everyone alike, the rulebook’s one incorruptible sentence. The tape still prints; it just no longer refers to anything. The insider channel does not become more valuable. It becomes the only channel.',
-        context: 'The screens stop meaning what they meant. The desk marks the fallback, files the claims, and joins everyone else in the oldest information regime there is: what you can learn is what someone who knows decides to tell you, at their risk, for their reasons.',
+        // Prose scoped to what fires TODAY (content-gate ruling): the statute
+        // and the Consensus fallback settlement are real now; the actual
+        // darkening of the public feed (releases, certifications, detections
+        // going quiet) is the P7 regime-break machinery, and the text claims
+        // it as begun, not accomplished.
+        headline: 'CLASSIFICATION. The statute takes effect at signing: frontier capability work is a national security activity, the filings seal, and repeating certain benchmark numbers in public becomes, as of this morning, a crime with a sentencing range. Consensus settles everything outstanding at fallback — for everyone alike, the rulebook’s one incorruptible sentence. The public feed has not gone dark yet; it has been sentenced to. Every desk starts pricing how much of what it knows was about to stop being knowable.',
+        context: 'The screens will keep printing for a while on momentum and leaks. The desk marks the fallback, files the claims, and begins adjusting to the oldest information regime there is: what you can learn is what someone who knows decides to tell you, at their risk, for their reasons.',
         params: {},
         impulse: { mu: -0.05, xi: 0.04 },   // decaying (P4): information blackout
         choices: [

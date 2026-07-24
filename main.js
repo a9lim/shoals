@@ -1367,9 +1367,16 @@ function _checkFirmConversion() {
     if (!_firmMemoFired && canSendMemos() && F >= 40) {
         _firmMemoFired = true;
         _fireRaceShell('firm_conversion_memo');
-    } else if (_firmMemoFired && !_firmVerdictFired && canSendMemos() && F >= 75) {
-        _firmVerdictFired = true;
-        _fireRaceShell('firm_conversion_verdict');
+    } else if (_firmMemoFired && !_firmVerdictFired && canSendMemos()) {
+        // Hedging the memo doesn't stop the firm -- being right converts it
+        // regardless (04) -- but it costs the attribution: the verdict needs a
+        // deeper F when the CIO got the risk-managed version (75 vs 85, ruled
+        // at the content gate). The firm gets there on its own arithmetic, later.
+        const gate = playerChoices.made_the_case ? 75 : 85;
+        if (F >= gate) {
+            _firmVerdictFired = true;
+            _fireRaceShell('firm_conversion_verdict');
+        }
     }
 }
 function _runScrutiny() {

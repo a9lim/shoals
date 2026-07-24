@@ -85,15 +85,20 @@ export const TREATY_EVENTS = [
                 desc: 'Take the plateau. The race has been the risk all along; the deal is the only trade that retires it.',
                 playerFlag: 'counseled_deal',
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 5 }],
+                // Choice-level scheduling: ordinary popups never schedule
+                // top-level followups (content-gate finding). Both counsels
+                // reach the same resolution -- the room is influence, not
+                // authorship.
+                followups: [{ id: 'treaty_resolution', mtth: 20 }],
             },
             {
                 label: 'Counsel against',
                 desc: 'Verification is unverifiable; a deal you cannot audit is a head start you gift-wrap. Racing is the equilibrium that tells the truth.',
                 playerFlag: 'counseled_no_deal',
                 factionShifts: [{ faction: 'federalistSupport', value: 3 }],
+                followups: [{ id: 'treaty_resolution', mtth: 20 }],
             },
         ],
-        followups: [{ id: 'treaty_resolution', mtth: 20 }],
     },
     {
         id: 'treaty_resolution',

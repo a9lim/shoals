@@ -439,6 +439,24 @@ each act gate, then rising; cascade 2.5 at R4+) — the wonder feed
 compounds on the same public variable as everything else, which is
 the ambivalence rule as wiring.
 
+Content-gate rulings (2026-07-24, second pass): (1) the phase-4
+occurrence whisper STANDS — stepBelief folds flagged occurrences
+into alignment sentiment at occurrence, so a tipped player's edge
+is the *fact and its specificity, never exclusivity*; tip prose
+says so. (2) Hedging the conversion memo cannot stop the firm —
+being right converts it regardless (04) — but costs attribution:
+the verdict gate is F ≥ 75 made-the-case, F ≥ 85 hedged. (3)
+Ordinary popups schedule followups at choice level only (engine
+fact, now a binding convention). (4) Assigned to the evidence
+machinery round: the exportControlStage → Tianxia velocity
+dampener (ratify magnitude here first; it perturbs race
+trajectories and re-runs calibration), the tip→detection outcome
+coupling via `_tipIncidentId`, the leak detection-acceleration +
+B evidence-fold, and the theft disclosure track. Assigned to
+P6/P7: HCN conversion execution (the nationalization shell's text
+stops where today's machinery stops), the classification blackout
+(public-feed darkening), `summitLive` + the treaty holds branch.
+
 ## Bounded influence (margin units, not log-odds)
 
 Track world and player deltas to each terminal quantity separately.

@@ -72,15 +72,19 @@ export const POLARIS_EVENTS = [
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 2 }],
                 playerFlag: 'backed_polaris_interest',
                 resultToast: 'The follow-up deck arrives that night. The last slide is just their eval curve against the frontier’s, unlabeled.',
+                // Ordinary popups schedule followups at CHOICE level only (the
+                // engine's popup path returns before top-level scheduling) --
+                // content-gate finding; both branches continue the arc.
+                followups: [{ id: 'polaris_starved', mtth: 90 }],
             },
             {
                 label: 'Not our mandate',
                 desc: 'The desk trades the race; it does not run it. Sympathy is not a position.',
                 playerFlag: 'declined_polaris',
                 resultToast: 'They take it well, which is somehow worse.',
+                followups: [{ id: 'polaris_starved', mtth: 90 }],
             },
         ],
-        followups: [{ id: 'polaris_starved', mtth: 90 }],
     },
     {
         id: 'polaris_starved',

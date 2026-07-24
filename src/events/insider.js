@@ -35,16 +35,20 @@ export const INSIDER_EVENTS = [
         popup: true,
         magnitude: 'moderate',
         headline: 'A call you did not schedule, from a number that is not saved. Someone on the safety side of {lab} — you know the voice, which is the point — talking fast and low: something happened. Not public, not filed, possibly never filed. The internal review is already being described, internally, in the past tense. That is the whole tip. It is enough.',
-        context: 'The world does not know. The market does not know. You know — early, unprovable, and radioactive. There are exactly three things a person can do with a thing like this, and all three of them are the kind of decision that compounds. The source is still on the line, waiting to learn what kind of desk they just called.',
+        context: 'The world does not know. The market has a whisper of it — belief drifted a hair when it happened, the way it always does when enough badges saw something — but a whisper is not a fact, and you are now one of the only people holding the fact. Early, unprovable, radioactive. There are exactly three things a person can do with a thing like this, and all three compound. The source is still on the line, waiting to learn what kind of desk they just called.',
         choices: [
             {
                 label: 'Trade it',
-                desc: 'Position ahead of the disclosure that may or may not come. The purest edge on the desk, and the one a subpoena reads best.',
+                desc: 'You know what the tape does not — position the book yourself, ahead of a disclosure that may or may not ever come. The purest edge on the desk, and the one a subpoena reads best.',
                 playerFlag: 'traded_insider_tip',
                 factionShifts: [{ faction: 'regulatoryExposure', value: 12 }],
-                // P4 coupling reference: no B move (the market has not learned it) -- pure P&L edge.
+                // P4 coupling: B already took the occurrence whisper (stepBelief folds
+                // flagged occurrences into alignment sentiment -- ratified); the player's
+                // edge is the FACT and its specificity, not exclusivity. The positioning
+                // itself is the player's job on the chassis -- choosing the verb buys
+                // the knowledge and the exposure, never an automatic fill.
                 followups: [{ id: 'insider_trade_outcome', mtth: 14 }],
-                resultToast: 'The book leans before the news exists. Somewhere, a timestamp is born.',
+                resultToast: 'The line goes dead. The book is yours to lean — and the window has a timestamp on it.',
             },
             {
                 label: 'Leak it to Tan',
@@ -75,9 +79,15 @@ export const INSIDER_EVENTS = [
         followupOnly: true,
         category: 'insider',
         magnitude: 'moderate',
-        headline: 'The thing you knew resolves into the tape — a detection beat, a disclosure, a candle everyone else reads as news and your book read as confirmation. The P&L is clean. The provenance is not: compliance flags the positioning window without knowing what it is looking at, and files the flag in the folder such flags accumulate in. Folders like that have a way of becoming exhibits, later, all at once.',
+        // Detection-agnostic by ruling (content gate): the incident may print
+        // later, or never -- the quiet-tape ambiguity is the design. What is
+        // certain either way is the residue: the positioning window exists in
+        // the records whether or not the news ever does. The tip->detection
+        // outcome coupling (_tipIncidentId) lands with the evidence machinery
+        // round; this beat is the part that is true in every world.
+        headline: 'Two weeks on, the thing you know is still not news — maybe it never files, maybe the candle comes next month and your book reads as prophecy. What exists either way is the window: a stretch of positioning, timestamped, that answers to nothing public. Compliance flags it without knowing what it is looking at and files the flag in the folder such flags accumulate in. Folders like that have a way of becoming exhibits, later, all at once.',
         params: {},
-        impulse: { xi: 0.004 },   // decaying (P4): the edge worked; the residue stays
+        impulse: { xi: 0.004 },   // decaying (P4): the residue stays, whatever the tape does
     },
     {
         id: 'insider_leak_outcome',
