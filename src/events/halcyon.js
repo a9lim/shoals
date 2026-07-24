@@ -146,23 +146,23 @@ export const HALCYON_EVENTS = [
             'The Continental, sourced to "two people near the Halcyon board": Osei has begun taking separate briefings from Dirks and Gottlieb, which is either diligence or a divorce lawyer’s intake meeting depending on which of the two people you believe.',
             'Halcyon’s board meets for six hours; the readout is one sentence about "alignment of long-term strategy." Osei’s office books no follow-on meetings for a week. Early money, late caution: the man both factions court is conspicuously letting himself be courted.',
         ],
-        context: 'PROSE: coordinator',   // PROSE: coordinator (the activist-restraint framing; lands with the P6 prose round)
+        context: 'Meridian’s stake plus your personal book makes the firm a name Halcyon’s board secretary has to pronounce correctly. Osei’s people are counting noses for a restraint slate — more eval before release, an internal brake with an actual handle. Gottlieb’s people are counting the same noses for the opposite conclusion. Both sides have decided, independently, that your nose is worth counting.',
         params: {},
         impulse: { xi: 0.006 },   // decaying (P4): governance risk, unpriced until it detonates
         choices: [
             {
-                label: 'PROSE: coordinator',   // PROSE: coordinator (back the safety-side board push)
-                desc: 'PROSE: coordinator',    // PROSE: coordinator
+                label: 'Back the restraint slate',
+                desc: 'Quietly. A letter, a lunch, a proxy conversation where your voice arrives before you do. Restraint bought is margin banked — and margin is a practice, not a possession.',
                 // P6-2 raceEffect: activist restraint buys a small S[halcyon] (the
                 // American margin is a practice -- it interacts with the burn taper).
-                // Magnitude proposed; swept/ratified in 02a.
+                // Magnitude ratified in 02a.
                 raceEffects: [{ dial: 'S', lab: 'halcyon', amount: 0.05 }],
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 2 }],
                 playerFlag: 'backed_halcyon_restraint',
             },
             {
-                label: 'PROSE: coordinator',   // PROSE: coordinator (stay out of the boardroom)
-                desc: 'PROSE: coordinator',    // PROSE: coordinator
+                label: 'Stay out of the boardroom',
+                desc: 'You trade the company; you do not govern it. Whatever happens in that room will reach the tape soon enough, and the tape is your jurisdiction.',
                 playerFlag: 'stayed_out_halcyon_board',
             },
         ],

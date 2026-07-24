@@ -114,16 +114,17 @@ export const TREATY_EVENTS = [
         popup: true,          // popup + superevent => the engine queues the full-screen treatment
         superevent: true,
         magnitude: 'major',
-        headline: 'PROSE: coordinator',   // PROSE: coordinator (the Deal signs; prose lands with the P6 prose round)
-        context: 'PROSE: coordinator',    // PROSE: coordinator
+        headline: 'IT HOLDS. The communiqué is four pages; the annex is nine hundred, and the annex is the point — registries with teeth, inspectors with clearances, compute accounted for like fissile material. Both delegations sign. Nobody smiles for the cameras, which is how you know it is real: joy is for deals that flatter, and this one merely binds. The race, which paused out of something like courtesy, discovers the pause has been given a legal name.',
+        context: 'The plateau begins — the future where the wonders arrive slower, argued over, chosen; where markets get boring again, and boredom is the dividend. Long vol dies in the afternoon. The binaries collapse to their settled truths. Somewhere down the floor someone laughs, too loudly, at nothing — relief has no etiquette. Your fingerprints are on this, whatever the size of the print.',
         params: {},
         // Single acknowledge choice (the strait_blockade "Mark the book" pattern):
         // one choice, no followups, no effects. showPopupEvent iterates choices, so
-        // an operational superevent needs at least one.
+        // an operational superevent needs at least one. No impulse: this beat fires
+        // on the resolution tick — the market it would move is already settled.
         choices: [
             {
-                label: 'PROSE: coordinator',   // PROSE: coordinator
-                desc: 'PROSE: coordinator',    // PROSE: coordinator
+                label: 'Reprice everything',
+                desc: 'The premium comes off. The future goes long-dated. The desk learns, slowly, to price a world that intends to continue.',
             },
         ],
     },
