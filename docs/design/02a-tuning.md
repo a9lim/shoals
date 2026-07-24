@@ -431,7 +431,9 @@ channel feed — bridge fires flagged occurrences as tips gated on
 weakly from day one and deepens by sitting), throttled to one tip
 per 45 days minimum and one per day maximum (~5–8/run; the channel
 is a person, not a feed). The tip's trade edge is real without
-extra machinery: detection fires later and moves the tape. The
+extra machinery *if/when detection later fires and moves the tape*
+— tipped incidents can also stay permanently undetected (the
+never-detected tail), and that quiet-tape ambiguity is design. The
 leak verb's detection-acceleration and B evidence-fold ride
 `_tipIncidentId`, a stamped seam for the evidence machinery round.
 Wonder cadence: likelihood functions of the released rung (0 below

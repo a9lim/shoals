@@ -93,7 +93,7 @@ export const CHINA_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.ai.exportControlStage < 3,
         headline: 'The administration circulates a draft rule tightening accelerator exports — and the loudest lobbying against it is American. Half the country’s enterprise software runs on free Cangjie weights; the constituency for the other side’s model line votes, donates, and testifies. Lassiter wants the rule broader. The Chamber wants it dead. Commerce wants the comment period extended until after the midterms.',
-        context: 'The rule binds silicon, not weights — nothing already released un-releases, a point the hearing will rediscover in public, twice. Meridian’s clients sit on both sides of it, and a fund with a view can lean on the comment period. Controls slow Tianxia and buy the frontier comfort-margin; free flow keeps your software cheap and the strait calm. Pick which future you’re short.',
+        context: 'The rule binds silicon, not weights — nothing already released un-releases, a point the hearing will rediscover in public, twice. Meridian’s clients sit on both sides of it, and a fund with a view can lean on the comment period. The controls are aimed at Tianxia’s compute and priced by everyone as if aim were effect; free flow keeps your software cheap and the strait calm. Pick which future you’re short.',
         choices: [
             {
                 // Desc is INTENT language by ruling (content gate): the
