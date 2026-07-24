@@ -518,7 +518,7 @@ let decayTowardNoOK = false, decayReachesFloorOK = false;
     // R2 contract (deadline 420). With NO ledger progress, the survival-
     // conditioned quote must STRICTLY decrease as "today" advances toward the
     // deadline -- "no progress as the deadline nears IS decay toward NO" (02a).
-    const R2 = { predicate: { rung: 2 }, deadline: 420, baseRate: 0.57 };
+    const R2 = { predicate: { rung: 2 }, deadline: 420, baseRate: 0.70 };   // P6-1b recalibration
     let prev = Infinity, monotoneDown = true, start = null, near = null;
     for (const t of [0, 100, 200, 300, 400, 419]) {
         belief.day = t;   // advance "today" only; belief.rungs unchanged (no progress)
@@ -534,7 +534,7 @@ let decayTowardNoOK = false, decayReachesFloorOK = false;
     assert(decayReachesFloorOK, `quote did not reach the NO floor at the deadline (${near})`);
     // Day-0 exactness must survive the conditional re-solve: listing == base rate.
     initBelief(race);
-    assert(Math.abs(binaryQuoteFromBelief({ day: 0 }, R2) - 0.57) < 1e-6, 'day-0 exactness lost under the conditional law');
+    assert(Math.abs(binaryQuoteFromBelief({ day: 0 }, R2) - 0.70) < 1e-6, 'day-0 exactness lost under the conditional law');
 }
 
 // ==========================================================================

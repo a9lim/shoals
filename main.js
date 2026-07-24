@@ -76,6 +76,8 @@ import { createRaceState, advanceRace, resetRaceState, stepControlRegime } from 
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
 import { applyReportingRegime } from './src/race/incidents.js';
 import { straitTension } from './src/race/strait.js';
+import { stepTreaty } from './src/race/treaty-track.js';
+import { checkResolution } from './src/race/resolution.js';
 import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
@@ -187,6 +189,10 @@ function _syncRaceToWorld() {
     // Released frontier rung -- the public act proxy arc `when` guards key on
     // (same public quantity eta and the base-rate scale read; latent C never mirrored).
     w.ai.frontierRung = buildPublicView(raceState).releasedFrontierRung;
+    // Summit-window flag (P6): the declared seam the treaty_window event is gated
+    // on. Mirrors the race-side gauntlet's open window -- race-state.js stays the
+    // sole authority, this is the read-only mirror (same pattern as frontierRung).
+    w.ai.summitLive = raceState.treaty.summitOpen;
 }
 /** Public strait tension in [0,1] from world-state China proxies (phase 5a),
  *  fed to the strait generator so gray-zone / blockade hazard reads the same
@@ -1682,16 +1688,26 @@ function _onDayComplete() {
     // Advance the hidden AI-race state machine one completed day (overhaul
     // phase 1). Neutral inputs; the bridge (phase 2) + Consensus binaries
     // (phase 3a) read the ledger it produces.
+    // The race advances every day, even after it has terminally resolved (P6): the
+    // resolution latch does NOT freeze the race -- freezing it left race-instrument
+    // contracts unsettled past their deadlines (02a phase-6 interim ruling). The
+    // interim instead clears the ledger + bars new trades at the latch (below).
     if (raceState) {
         advanceRace(raceState, { straitTension: _straitTension() });
         // controlRegime ratchet (overhaul phase 5a): evaluate + advance the regime
         // through the canonical setControlRegime writer BEFORE any settlement reads
         // it (a mobilized/nationalized regime freezes / fallback-settles below). A
         // strait blockade may have opened the mobilization gate this tick. Then
-        // MIRROR the race-owned strait + regime state into world-state so the
-        // compute market sees the Taiwan blockade and event guards can read the
-        // regime. Order: advanceRace (sets taiwanBlockade) -> ratchet -> mirror.
+        // advance the treaty gauntlet (P6) and MIRROR the race-owned strait + regime
+        // + summit-window state into world-state so the compute market sees the
+        // Taiwan blockade, event guards can read the regime, and the treaty_window
+        // shell sees the open summit. Order: advanceRace (sets taiwanBlockade) ->
+        // ratchet -> treaty -> mirror.
         stepControlRegime(raceState, _exoSignals());
+        // Treaty track (P6): the hidden Reykjavik gauntlet. Consumes this tick's
+        // detection ledger for the summit-week gate; public treatyStage (events)
+        // is a pacing accelerator only. summitOpen is mirrored below to summitLive.
+        stepTreaty(raceState, { treatyStage: eventEngine.world.ai.treatyStage });
         _syncRaceToWorld();
         // Event base-rate scaling (overhaul phase 5a; 04 engine note 1): the
         // discretionary Poisson cadence scales with the PUBLIC released frontier
@@ -1745,6 +1761,26 @@ function _onDayComplete() {
             _runScrutiny();              // risk committee heats on the player's belief-gap vs F
             _checkFirmConversion();      // the CIO throughline: memo, then verdict (once each)
             _promptForecastLock();
+        }
+
+        // Terminal resolution (P6, endings round 1 + fix): the precedence ladder,
+        // checked LAST -- after this tick's settlement/belief have applied -- so the
+        // resolving tick completes normally, then checkResolution clears
+        // race.lastTransitions (killing stale-ledger replay through runRaceBridge
+        // below). The race is NOT frozen: it keeps advancing to term-end so
+        // race-instrument contracts settle at their own deadlines. On the first fire,
+        // bar new race-instrument trades (freeze the books -> executeBinaryTrade /
+        // isComputeTradeable return null); frozen quotes are display residue. This is
+        // the 02a phase-6 interim; P6-3 replaces it with the closeout + game-over
+        // surface. checkResolution is idempotent post-latch (a no-op every tick after).
+        const _resolution = checkResolution(raceState, eventEngine.world.geopolitical);
+        if (_resolution) {
+            consensus.frozen = true;        // bar new binary orders (interim; not a regime freeze)
+            computeMarket.frozen = true;    // bar new compute-future orders (interim)
+            console.log('[race resolution] day', _resolution.day, 'family', _resolution.family,
+                _resolution.terminalCause, _resolution.extrapolated ? `(extrapolated +${_resolution.extrapolationDays}d)` : '',
+                '| leader', _resolution.leader, '| d', _resolution.d.toFixed(3),
+                '| align', _resolution.axes.alignmentResult, '| regime', _resolution.axes.politicalControl);
         }
     }
 

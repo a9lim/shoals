@@ -18,6 +18,7 @@
 | `takeoffSharpness` | Beta(3, 2) → mapped [0.5, 3.0]; `sharpnessNorm = (sharpness − 0.5)/2.5` | multiplier on recursion; mass toward fast |
 | `scalingElasticity` | mixture: 12% Uniform[0.25, 0.6] (fizzle tail) + 88% Beta(5, 2) → mapped [0.6, 1.1] | overall median ≈ 0.95; the tail is a real 12% by construction |
 | `chinaTrue.position` | Normal(mean 0.8, sd 0.3) clamp [0.2, 1.6] | rung gap behind Halcyon at start |
+| `chinaTrue.velocity` | LogNormal, median 0.95, σ 0.37, clamp [0.75, 1.325] (P6-1b final, exact; own substream `chinaVelocity`. The high clamp was widened from the 1.15 guess — a fat upper TAIL, not a raised median, is what lets the fastest-Tianxia worlds cross in-horizon) | hidden multiplier on Tianxia capability drift — is Beijing slower, matched, or quietly faster; the China posterior the market argues about |
 | `chinaTrue.dealPossible` | Bernoulli(0.15) | treaty live only here |
 | `labSafetyCulture` | Halcyon Normal(0.5, 0.2) clamp [0.1, 0.9]; Polaris Normal(0.8, 0.1); Tianxia = 0.15 fixed | anti-safety by construction |
 
@@ -53,10 +54,18 @@ which bias early. The ±10% tolerance is a *design* band (how far the
 stance may drift), not a sampling band; MC sampling SD at N=1000 is
 ~2–4 days. Low-elasticity worlds (q → 0)
 asymptote near C ≈ 3.2 — the plateau is a ceiling, not a slower slope.
-**Plateau confirmation** (resolution ladder step 4): trailing 120-day
-capability growth of the leader < 0.0002/day, gated to runs where
-recursion never ignited (`q < 0.01` / `E ≤ 0.60`) and R5 was never
-crossed — see the note at the terminal mapping.
+**Plateau confirmation** (resolution ladder step 3; ratified at the
+phase-6 gate, 2026-07-24, superseding the trailing-120 raw test):
+confirmation requires ALL of — recursion never ignited (`q < 0.01` /
+`E ≤ 0.60`), R5 never crossed, **day ≥ 700**, and the smoothed
+(shock-free expected-drift) capability growth of the leader
+< 0.0002/day **sustained over the trailing 180 trading days**. An
+instantaneous drift reading is a signal, never a confirmation — the
+phase-6 gate caught a day-1 "confirmed" plateau (low-E runs sit under
+the drift threshold from the start; a stall is indistinguishable from
+being early except in hindsight). By construction most family-6 mass
+arrives via timeout extrapolation, per the phase-1 finding below —
+in-horizon confirmations are the late, demonstrably-saturating tail.
 
 **Polaris defaults** (ratified 2026-07-23; calibration-neutral —
 Halcyon leads regardless): compute grows 2×/yr like the frontier;
@@ -96,9 +105,14 @@ the 35–55% acceptance band — a strict minority, with sampling room;
 rev 2's
 0.05/0.35 saturated in ~95% of runs, a ratchet that always bound).
 
-**Theft:** attempt hazard/day = 0.0011 · clamp(0.10 + gap/0.75, 0, 1.5)
-· (1 + heat) — the 0.10 floor keeps parity-state espionage alive
-(stealing isn't only for the desperate). Success by victim security
+**Theft:** attempt hazard/day = **0.0015** (recalibrated 2026-07-24
+under the new desperation distribution; rev 1: 0.0011) · clamp(0.10 +
+1.4·desperation, 0, 1.5) · (1 + heat) — the 0.10 floor keeps
+parity-state espionage alive (stealing isn't only for the desperate).
+`desperation` is the shared strategic-desperation quantity defined at
+the strait block below (phase-6 amendment: the raw internal gap
+stopped meaning desperation once the fast-follower bounded it — see
+there). The base above IS the recalibrated value (rev 1: 0.0011). Success by victim security
 level SL1–SL4: [0.70, 0.45, 0.18, 0.04]; failed attempts cool down
 60d. Halcyon starts SL2; upgrade costs ~8% `C` velocity for 60d +
 retention events. ε ~ U(0.15, 0.35). Benchmark (SL2, no upgrade, heat
@@ -113,13 +127,36 @@ Blockade hazard (ratified 2026-07-23, phase 5a — calibrated against
 the incidence band above; measured 2.9% / 14.2% at N=2000):
 
 ```
-h_block/day = 0.0000355 · (1 + heat) · (0.5 + 2.05·tension)
-                        · (0.4 + 1.4·desperation)
-desperation = clamp((C_int[frontier] − C_int[tianxia]) / 1.2, 0, 1)
+h_block/day = BLOCKADE_BASE · (1 + heat) · (0.5 + 2.05·tension)
+                            · (0.4 + 1.4·desperation)
+
+vDeficit    = clamp((1.05 − chinaTrue.velocity) / 0.30, 0, 1)
+runaway     = clamp((C_int[frontier] − C_int[tianxia] − 0.25) / 0.60,
+                    0, 1)
+desperation = max(vDeficit, runaway)
 ```
 
-The desperation term reads the *latent* lead gap — a physical-world
-read, the same class as theft's gap term, never a market/quote read.
+**Desperation redefined (phase-6 ruling, 2026-07-24).** Rev 1 read
+`clamp((C_int[frontier] − C_int[tianxia])/1.2)` — the raw internal
+gap. The P6-1b fast-follower bounds that gap near the release lag
+(~0.13, low variance), so the raw gap stopped *meaning* desperation:
+it measures release-cycle phase, not strategic position. The
+redefinition reads what actually signifies "Beijing losing
+unconventionally-relevantly": the velocity deficit (a world where
+their program is genuinely slower — their own hidden state, which
+they of course know) OR post-ignition runaway (the frontier's
+internal track pulling away past the follow floor ≈ appetite, where
+distillation stops helping). Both are physical-world reads, the same
+class as before — never a market/quote read. Emergent and intended:
+blockades now concentrate in slow-velocity worlds, anti-correlated
+with family 4 (the tail fires in the timelines where China was
+losing; measured near-disjoint). `BLOCKADE_BASE` = **0.000052**
+(recalibrated 2026-07-24 against the UNCHANGED incidence band —
+measured 3.0% baseline / 14.6% hot; rev 1: 0.0000355; the band is
+the design invariant, the base was always derived from it). The
+vDeficit/runaway scales landed VERBATIM as specified — no shaping
+needed. Theft's gap term takes the same desperation quantity (see
+the theft block).
 Duration ~ Exp(45d) clamped [20, 120]: blockades **end** — flag, heat
 overlay, and compute force-majeure all lift together. The mobilization
 gate, once opened, stays open for the run (the political option space
@@ -204,6 +241,20 @@ its adjudication path activates when a dispute event class exists
 `stepCertification`'s disputed-lag draw. Quote magnitudes are
 placeholder until `B` lands (phase 4) and are deliberately not
 recorded here.
+
+**Listing-prior recalibration (P6-1b, 2026-07-24)**: the retuned
+kinematics (velocity / drag / follower legs) shifted the certified
+settlement frequencies, so the public listing priors move with the
+world they describe — the harness's 8pp listing-mid invariant is the
+contract, the base rates are derived. Old → new: R2 0.57 → **0.70**
+(measured 0.705 at N=2000), R3 0.56 → **0.62** (0.625), R4 0.57 →
+**0.60** (0.600); R5 stays **0.70** (designed crossing prior; measured
+crossing 0.712, within the invariant). The "genuinely two-sided
+(~57–60% YES)" knife-edge above described the pre-retune world; R2's
+70% remains two-sided enough for a live NO book, and no contract is
+degenerate. `belief.js` `RUNG_BASE` moves in lockstep — the day-0
+conditional-law seeding makes quote = listing prior *exactly*, so
+these constants are one number stored in two places by construction.
 
 ## Compute futures (phase-3b ratifications, 2026-07-23)
 
@@ -527,7 +578,238 @@ the confirmation test — the raw endpoint difference is not usable.)
 Treaty sub-gates (to make Deal ≈ 4% derivable from dealPossible 0.15):
 discovery of `dealPossible` 0.65/run · initiation 0.85 · farce-gauntlet
 survival 0.65 · summit-week-no-incident 0.75 ≈ 0.27 completion given
-eligible.
+eligible. **Summit-pass re-ratified ≈ 0.70 (2026-07-24):** the gate is
+real-incident-driven, and the P6-1b retune's kinematics run hotter
+incident cadence in exactly the windows that open late-run — measured
+0.68–0.71 at the final constants. The 0.75 was the pre-retune
+calibration target; the DEAL BAND (2.3–8, held at 3.7–4.1%) is the
+invariant, and the honest world-coupling (hot worlds fail summits
+more) is the mechanism working, not drift to fix.
+
+## Endings machinery (phase-6 ratifications, 2026-07-24)
+
+Rulings from the P6-1 gate (job `cx-20260724-080837-6434`), binding on
+the fix/retune rounds:
+
+- **Canonical resolution precedence** is this file's mapping order —
+  S4, treaty, **plateau, then R5-crossing**, timeout. 02's prose listed
+  R5 before plateau; 02 now matches this file. Materially equivalent
+  (plateau is gated ¬R5), but the canonical order is recorded once,
+  here.
+- **Plateau confirmation** as amended in the kinematics section above:
+  never-ignited gate ∧ day ≥ 700 ∧ smoothed drift < 2e-4/day sustained
+  180 trading days. Day-1 confirmations are the bug this rule kills.
+- **Treaty windows are leak-free by construction.** Window OPENING is
+  independent of `chinaTrue.dealPossible`: non-deal worlds traverse the
+  same viability-blind gauntlet pacing and open doomed windows at the
+  same rate; `dealPossible` gates only the holds outcome after the
+  window, never the opening. Posterior P(dealPossible | window) equals
+  the 0.15 prior by construction — harness-asserted (the P6-1 gate
+  measured 100% under viability-gated opening; 04/09's information
+  boundary makes that a blocker, and partial-leak middle grounds were
+  rejected: the summit convening may be *evidence* in prose, never a
+  *tell* in the joint distribution). At most ONE summit window per run
+  (04's "one live negotiation"); expected window rate ≈ the blind
+  gauntlet product ≈ 36% of runs, band [0.25, 0.45]. Deal ≈ 4% is
+  preserved because the viable-path product is unchanged.
+- **`treaty_window` is bridge-fired on the window-open transition** —
+  the window is a race-model decision, and the P5 convention (model
+  decisions fire from the ledger, never Poisson) applies; the Poisson
+  `when: summitLive` gating fired with p ≈ 0.003/window and was
+  effectively dead. Category joins the bridge-excluded set. Player
+  counsel leverage on the summit gate stays a P7 seam. **Amended at
+  the re-gate (2026-07-24): the window's OUTCOME shells are
+  bridge-fired too** — the choice-scheduled `treaty_resolution`
+  followup was outcome-blind (Deal worlds signed successfully, then
+  received the failure prose ~3 weeks later). The window popup's
+  choices schedule nothing; the treaty track's outcome transition
+  fires `treaty_resolution` (failure) or `treaty_holds` (implemented —
+  prose is the coordinator's, lands with the P6 prose round) from the
+  ledger. Same principle, one level deeper: the model decides the
+  outcome, so the model fires the news of it.
+- **Timeout/player-terminal extrapolation includes neutral-signal
+  `stepControlRegime`** — the political-control axis reads the
+  extrapolated world, not the day the desk's story ended (final
+  measurement under the retuned kinematics: 33.15% of extrapolated
+  runs change regime post-1008 and every stored political axis equals
+  the final extrapolated regime; family rates unaffected).
+- **Post-resolution interim** (until P6-3's real closeout): the
+  resolution latch clears `race.lastTransitions` (no stale-ledger
+  replay through the bridge) and bars new race-instrument trades
+  (binaries, compute futures); the frozen quotes are display residue,
+  not a market. P6-3 replaces this with the closeout matrix + game-over
+  surface atomically.
+- **Constraint-4 "forced shutdown" reading**: the ratchet set for the
+  knife-edge constraint is {nationalized, classified, permanent
+  max-heat} — forced shutdown is not a distinct model state. Heat
+  assertions measure the RUN MAXIMUM of total heat, not terminal heat.
+
+### Outcome-table levers (phase-6 retune; the "gates, S0, pace" slot)
+
+The P6-1 gate reproduced the machinery-faithful world-side table at
+52.5/14.8/2.9/0.0/3.6/11.1/15.1 vs the contract 12/18/28/12/4/12/14,
+and verified two structural causes plus one incompleteness. Sanctioned
+levers (τ, `required`, leadAdj, and the mapping gates stay untouched —
+they are the stance):
+
+1. **racingPace goes dynamic** (the recorded `f(knife-edge proximity,
+   appetite pressure)` made concrete; per-lab, daily, deterministic):
+
+   ```
+   lead[lab]  = C_int[lab] − max(C_int[rivals], C[open])   (signed)
+   closeness  = clamp(1 − lead/L_pace, 0, 1)
+   pressure   = clamp((heat − 0.30)/0.40, 0, 1)
+   racingPace[lab] = clamp(0.30
+                   + (a_c·closeness + a_p·pressure)·(1 − culture[lab]),
+                     0, 1)
+   ```
+
+   Sweep a_c, a_p, L_pace (starting guesses 0.45 / 0.15 / 0.6). The
+   `(1 − culture)` factor is the stance in one term: culture is how
+   much a lab resists racing when the race gets close — Tianxia (0.15)
+   responds almost fully, Halcyon (~0.5) halfway, Polaris (0.8) barely,
+   which is what keeps Polaris the margin-carrier despite permanently
+   saturated closeness. "Appetite pressure" is concretized as
+   heat-driven (the ambient race temperature), not release-backlog
+   pressure — contestable at review. Gate probe: forcing pace 0.70
+   moved family 1 52.5→0.7% and family 3 2.9→61.9% — the lever is
+   decisive. Big lead → baseline pace → S recovers → family 1 lives
+   exactly in runaway worlds (the leadAdj double-count is the thesis,
+   per 02).
+2. **Fast-follower term** (bounded gap, retained as a composition
+   piece — NOT a lead-producer): `dC_int[tianxia]/dt += k_f · max(0,
+   C_rel[frontier] − C_int[tianxia])` — the follower distills from the
+   RELEASED frontier (public information; hygiene holds inside the
+   kinematics). The P6-1b sweep PROVED this term alone cannot make
+   Tianxia lead (<0.1% at k_f up to 0.5 — its target is structurally
+   behind the frontier's internal track); it bounds the gap so the
+   lead-producing legs below have something to work with. Tianxia
+   compute growth stays fixed 1.3×/yr — the 0.8–1.6× range remains the
+   exportControlStage dampener's plug point (evidence round).
+3. **Sampled Tianxia velocity** (family-4 lead production, leg A):
+   `chinaTrue.velocity` — a per-run hidden multiplier on Tianxia's
+   deterministic capability drift, sampled at run start (proposed
+   LogNormal-ish, median ~0.92, range ~[0.75, 1.15]; shape swept so
+   Halcyon loses the lead at some point in ~15–25% of runs jointly
+   with legs B/k_f). This is the market's actual argument rendered as
+   hidden state — is Tianxia six months behind, two years behind, or
+   quietly faster — and 04 already promises it: "intelligence about
+   `chinaTrue` arrives with sampled reliability; the player's China
+   posterior is as tradeable as their timeline." The position draw
+   stays untouched (level prior unchanged; belief calibrations
+   undisturbed).
+4. **Domestic regulatory drag** (family-4 lead production, leg B —
+   the policy debate made mechanical): under `controlRegime ==
+   supervised`, DOMESTIC labs' (Halcyon, Polaris) capability drift
+   takes a compliance factor `×(1 − δ_sup)` (δ_sup swept, guess
+   ~0.05–0.12); Tianxia is untouched. Mobilized+ regimes impose NO
+   drag — the state is racing — but pin the domestic pace floor at
+   0.7 (mobilization burns margin instead). "Slowing down hands it to
+   China" stops being a talking point in the copy and becomes a
+   coupling in the kinematics; the worlds where the ratchet fired are
+   exactly the worlds where the gap closes. race-mc never steps the
+   regime, so its trajectories are untouched by construction.
+5. **Purchased margin: floor, not fuel** (family-4 margin survival,
+   leg C). `S0[tianxia]` rises into [0.30, 0.45] (swept), and the
+   "bought, not grown" reading is completed: bought margin doesn't
+   BURN either — `S[tianxia]` floors at its purchased base (burn never
+   takes it below `S0[tianxia]`; accumulation above it stays
+   culture-tiny). Control is non-negotiable for that principal — an
+   unaligned model threatens the Party first — so the control budget
+   is not what they cut under racing. Culture stays 0.15: no growth,
+   no safety network, no generalization. The West's margin is a
+   practice (grows, burns); Tianxia's is a purchase (static, floored).
+   Family-4's mapping window is d > −0.15 (non-failure), not d > 0 —
+   "aligned-to-Beijing" includes the ambiguous-dawn band; bad-τ
+   worlds still put Tianxia crossings in family 3 (subtitles).
+6. **Burn tapers as S falls** (all labs; fixes the |d|-tail conflict):
+   `dS_burn = −0.0012·racingPace·clamp(S/S_taper, 0, 1)`, S_taper
+   swept (guess 0.25). Margin is a practice level, not a fuel tank —
+   corner-cutting has diminishing room, S asymptotes above zero
+   instead of hitting the rail, and the deep-failure tail that blew
+   median |d| past 0.15 in the first sweep is compressed. Resolution
+   concentrates at the threshold, which is the knife-edge principle's
+   own demand.
+7. **C[open] can never be the crossing entity** under current
+   kinematics (structurally ≤ C_rel[tianxia] − 0.15) — the family-4
+   proliferation variant is unreachable until C[open] gets its own
+   dynamics (stripped fine-tunes exceeding base releases). Deferred;
+   candidate for the evidence round or P7; family 4 mass is
+   Tianxia-led for now.
+
+**Withdrawn (P6-1b sweep, 2026-07-24):** the first revision of this
+subsection validated its S0 range against the gate's "32.4% family 4
+at S0=0.60" probe — that probe was a forced-clone (Tianxia = Halcyon
+capability clone at fixed baseline pace) diagnostic, not the levers as
+specified, and the released-follower + S0 package it appeared to
+license is structurally incapable of family 4 (0% at any swept
+coefficient). Lesson, recorded: a lever's validation must be the lever
+as specified, not a neighboring experiment.
+
+**Accounting re-record (amended plateau rule, 2026-07-24):** family
+targets are **EVENTUAL** (in-horizon + timeout-extrapolated
+resolutions, per family); "timeout ~14%" in the target table is
+superseded by an **extrapolation-share** statistic — fraction of runs
+resolving via post-1008 extrapolation — with target ~25%, band
+[0.18, 0.32] (the old 14% still-racing share plus fizzle mass that the
+amended plateau rule correctly routes through extrapolation).
+In-horizon family-6 confirmations are expected ≈ 0 (allowed 0–3%): a
+plateau is mostly a fact the epilogue confirms, not the game.
+
+Post-retune the endings harness PROMOTES the family table and liveness
+to hard gates at the RENORMALIZED centers (see the renormalization
+paragraph below — the single source): f1 14±5, f2 21±6, f3 32±7,
+f4 14±5, f5 5 (2.3–8), f6 14±4 (percentage points, EVENTUAL),
+extrapolation share [0.18, 0.32].
+
+**P6-1b final constants (swept 2026-07-24, three-seed verified;
+re-centered in the shared-desperation round):**
+`a_c 0.34 / a_p 0.12 / L_pace 0.6` (a_c swept down from the 0.45
+guess — 0.45 over-burned; a_p/δ_sup/S_taper re-centered when the
+recalibrated theft benchmark added heat); `k_f 0.03`; `δ_sup 0.09`;
+`S0[tianxia] 0.43` (floor semantics); `S_taper 0.265`; velocity
+median 0.95, σ 0.37, clamp [0.75, 1.325] (hidden-state table row is
+approximate; these are exact). Measured eventual families across
+seeds {1, 90210, 424242}, full theft benchmark: f1 11.1–12.3,
+f2 22.6–24.0, f3 33.5–34.9, f4 15.3–16.9, f5 3.7–4.1, f6 10.5–11.0,
+extrapolation share 28.6–30.5%, median |d| 0.143–0.148, in-horizon
+f6 ≤ 1.4%. Family-4 composition — two decompositions, both recorded because the
+epilogue needs the causal one (gate probes, N=20k nominal / N=5k
+counterfactual): NOMINAL partition ~90.5% fast-velocity-no-theft /
+~9.5% **theft-present** (co-occurrence, deliberately not
+"theft-assisted") / 0% residual. CAUSAL (counterfactual removal):
+velocity is necessary in ~99.7% of family-4 worlds; **domestic drag
+is necessary in ~38.8%**; theft is necessary in only ~1.1%. Epilogue
+framing follows the causal table: Beijing was faster in essentially
+every China-first world; in roughly two of five, America also
+regulated itself out of the lead it would otherwise have kept; the
+theft, where it happened, was punctuation, not cause. Blockade ⊥
+family 4, by mechanism: P(blockade | f4) ~0.6% vs P(blockade) ~3% —
+the strait tail fires in the timelines where China was losing.
+
+**Eventual-band renormalization (2026-07-24, closing an arithmetic
+slip):** the original family targets summed to 86 WITH timeout as a
+14% bucket; under the eventual accounting families must sum to 100,
+so the centers renormalize (÷0.86) with widths unchanged —
+**f1 14±5, f2 21±6, f3 32±7, f4 14±5, f5 5 (2.3–8), f6 14±4** —
+and the extrapolation-share band [0.18, 0.32] is unchanged. All
+measured values above sit mid-band under the renormalized centers
+(f6 at 10.5 sits near the low edge of 10 — acceptable; the plateau
+rule deliberately routes fizzle mass through extrapolation and some
+of it lands as timeout-family-1/2 texture instead). The endings
+harness asserts these centers (adopted at the re-gate fix round,
+2026-07-24).
+
+**race-mc diagnostic re-record (P6-1b, supersedes the phase-1
+values):** S[leader] day-350 0.454 / day-700 0.401 / day-1008 0.349
+(dynamic pace + taper; the taper keeps it off the rail); leadership
+at 1008: Halcyon unique-top 44.4% / ceiling-tie 51.3% / lost 4.3%
+(was 87.2/12.5/0.3 — the race is genuinely competitive now, which
+was the point; ceiling ties are post-takeoff clamp artifacts in the
+resolution-free race-mc horizon and benign); top-entity lead p50
+0.00 under ceiling ties; proliferation-cap incidence 40.4% (band
+[0.35, 0.55] held); rung KM medians R2 230 / R3 645 / R4 804 /
+R5 916 (±10% band held); fizzle tail 12.0%.
 
 ## The knife-edge principle (a9, 2026-07-23 — binding tuning constraints)
 

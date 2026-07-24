@@ -108,12 +108,15 @@ export function disputeAdjudicator(regime) {
 // adjudication path activates when a dispute event class exists (P5) --
 // certification disputes are meanwhile resolved upstream in stepCertification.
 //
-// UNRATIFIED (magnitude, phase-4): `baseRate` is the public LISTING prior -- a
-// per-contract base rate is legitimately public information (Consensus lists at
-// market-consistent priors), calibrated to the measured outcome frequencies
-// (R2 0.571 / R3 0.563 / R4 0.572 YES; R5 0.700 crossing). The R5 base rate
-// treats a crossing as full-notional expectation; the closeout-recovery
-// multiplier is a later-phase (endings) refinement.
+// `baseRate` is the public LISTING prior -- a per-contract base rate is
+// legitimately public information (Consensus lists at market-consistent priors),
+// calibrated to the measured settlement frequencies. RECALIBRATED (P6-1b re-gate,
+// 2026-07-24) under the final retuned kinematics -- the velocity/drag/follower
+// legs shifted the certified-crossing rates: R2 0.57->0.70, R3 0.56->0.62,
+// R4 0.57->0.60 YES (measured 0.705 / 0.625 / 0.600 at N=2000; all two-sided,
+// within the harness's 8pp invariant). The R5 base rate 0.70 is the designed
+// crossing expectation (measured crossing 0.712); the closeout-recovery multiplier
+// is a later-phase (endings) refinement.
 
 function contractDefs() {
     const cert = (key, rung, deadline, disputeDeadline, baseRate) => ({
@@ -145,9 +148,9 @@ function contractDefs() {
         terminal: true,
     });
     return [
-        cert(0, 2, 420, 450, 0.57),
-        cert(1, 3, 756, 786, 0.56),
-        cert(2, 4, 880, 910, 0.57),
+        cert(0, 2, 420, 450, 0.70),
+        cert(1, 3, 756, 786, 0.62),
+        cert(2, 4, 880, 910, 0.60),
         terminal(3, 5, 1000, 1008, 0.70),   // resolution territory -> terminal closeout, never NO-against-crossing
     ];
 }
@@ -231,8 +234,11 @@ export function freezeConsensus() {
 
 // ---- The public view (integrity boundary) --------------------------------
 
-/** First internal-rung crossing day across all entities (terminal truth). */
-function frontierInternalCrossDay(cap, rung) {
+/** First internal-rung crossing day across all entities (terminal truth). Exported
+ *  (P6) so the resolution ladder reuses the single R5-crossing read rather than
+ *  duplicating it -- this is a settlement-time terminal-truth read, never a quote
+ *  input (the integrity boundary above still holds: buildPublicView never exposes it). */
+export function frontierInternalCrossDay(cap, rung) {
     let m = Infinity;
     for (const id of ['halcyon', 'tianxia', 'polaris']) {
         const lab = cap.labs[id];

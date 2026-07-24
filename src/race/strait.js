@@ -37,7 +37,7 @@
    bridge fires their narrative.
    =================================================== */
 
-import { frontierInternal } from './capability.js';
+import { strategicDesperation } from './capability.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
@@ -54,22 +54,21 @@ function poisson(rng, lambda) {
 const GRAY_MEAN = 90;   // per-day gray-zone rate = (1/90)·(1+heat)·tension
 
 // ---- Blockade constants (02a target: ~3% baseline -> 12-15% hot/desperate) --
-// The blockade hazard FORM is ratified in 02a's phase-5a block (02a gives the
-// gray-zone formula and the incidence TARGET); the coefficients below are
-// calibrated numerically against that target (tools/plumbing-test.mjs asserts the
-// 3% / 12-15% band):
+// The blockade hazard FORM is ratified in 02a's phase-5a/phase-6 block:
 //   h_block/day = BASE · (1 + heat) · (TENSION_FLOOR + TENSION_W·tension)
 //                       · (DESP_FLOOR + DESP_W·desperation)
-//   desperation = clamp((frontier − tianxia C_internal) / DESP_SCALE, 0, 1)
-// "Losing the race conventionally makes the unconventional option more
-// attractive" (04) -- the desperation term reads the latent lead gap, a
-// physical-world read (like theft's gap term), NEVER a market/quote read.
-const BLOCKADE_BASE = 0.0000355;  // per-day base hazard (tuned to ~3% baseline / ~12-15% hot)
+// where `desperation` is the SHARED strategic-desperation quantity (02a phase-6
+// amendment; strategicDesperation in capability.js) -- max(velocity deficit,
+// post-ignition runaway), replacing rev-1's raw internal gap (which the fast-
+// follower bounded near the release lag, so it stopped meaning desperation).
+// STRAIT_TUNING.blockadeBase recalibrates against the UNCHANGED incidence band
+// (~3% baseline / 12-15% hot -- the design invariant) under the new desperation
+// distribution. Exported mutable so the joint sweep can drive it.
+export const STRAIT_TUNING = { blockadeBase: 0.000052 };   // recalibrated: 3.0% baseline / 14.7% hot (rev1 0.0000355 gave 1.9%/10.2% under new desperation)
 const BLOCKADE_TENSION_FLOOR = 0.5;
 const BLOCKADE_TENSION_W = 2.05;   // tension leverage (calm 0.5 -> tense 2.55, ~5x hazard)
 const BLOCKADE_DESP_FLOOR = 0.4;
 const BLOCKADE_DESP_W = 1.4;
-const BLOCKADE_DESP_SCALE = 1.2;   // rung gap over which desperation saturates
 
 // Heat the blockade adds while active (02a: "heat +0.20"). Reversible overlay.
 export const BLOCKADE_HEAT = 0.20;
@@ -139,12 +138,14 @@ export function stepStrait(race, day, endDay, heat, tension) {
         grayZone.push({ id: `strait_gz_${endDay}_${j}`, day: endDay, tension });
     }
 
-    // 3. Blockade tail. desperation = how far Tianxia trails the frontier.
+    // 3. Blockade tail. desperation = the shared strategic-desperation quantity
+    //    (velocity deficit OR post-ignition runaway), NOT the fast-follower-bounded
+    //    raw gap. Blockades now concentrate in slow-velocity worlds -- intended,
+    //    anti-correlated with family 4 (the tail fires where China was losing).
     const tianxia = race.capability.labs.tianxia;
     if (tianxia && tianxia.active) {
-        const gap = frontierInternal(race.capability) - tianxia.C_internal;
-        const desperation = clamp(gap / BLOCKADE_DESP_SCALE, 0, 1);
-        const hazard = BLOCKADE_BASE
+        const desperation = strategicDesperation(race.capability);
+        const hazard = STRAIT_TUNING.blockadeBase
             * (1 + heat)
             * (BLOCKADE_TENSION_FLOOR + BLOCKADE_TENSION_W * tension)
             * (BLOCKADE_DESP_FLOOR + BLOCKADE_DESP_W * desperation);

@@ -90,7 +90,7 @@ const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 // day-0 belief quote from the listed base rate).
 const RUNG_LIST = [2, 3, 4, 5];
 const RUNG_DEADLINE = { 2: 420, 3: 756, 4: 880, 5: 1000 };   // consensus deadlines
-const RUNG_BASE = { 2: 0.57, 3: 0.56, 4: 0.57, 5: 0.70 };    // listing base rates
+const RUNG_BASE = { 2: 0.70, 3: 0.62, 4: 0.60, 5: 0.70 };    // listing base rates (P6-1b recalibration; in lockstep with consensus.js)
 // Expected certification lag (public knowledge, 02a): a released-rung CLAIM
 // implies certification ~this many days out. R5 has no certification (terminal);
 // its "lead" is a placeholder used only for the crossing-belief target.

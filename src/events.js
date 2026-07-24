@@ -47,6 +47,10 @@ const _PULSE_CATEGORIES = new Set([
     'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
     'strait', 'regime', 'dispute',
     'polaris', 'insider', 'conversion',
+    // 'summit' (P6): treaty_window is a race-model DECISION -- it fires from the
+    // bridge on the window-open ledger transition, never Poisson (the Poisson
+    // `when: summitLive` gating surfaced at p ~ 0.003/window, effectively dead).
+    'summit',
 ]);
 
 // -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------

@@ -72,13 +72,41 @@ const CERT_R3_DISPUTE_PROB = 0.4;   // R3: 40% disputed, adds U(20,40)d
 
 // Theft (02a). Victim-security success probabilities, indexed by SL 1..4.
 export const SL_SUCCESS = [null, 0.70, 0.45, 0.18, 0.04];
-const THEFT_BASE = 0.0011;       // attempt hazard/day base rate
-const THEFT_GAP_FLOOR = 0.10;    // keeps parity-state espionage alive
-const THEFT_GAP_SCALE = 0.75;    // gap divisor inside the clamp
-const THEFT_CLAMP_HI = 1.5;      // clamp(0.10 + gap/0.75, 0, 1.5)
+// THEFT_TUNING.base recalibrated (P6-1b re-gate) against the recorded benchmark
+// E[successes] ~= 0.6 (SL2, no upgrade, heat ~0.3) under the NEW shared-desperation
+// distribution. Exported mutable so the joint sweep can drive it (mirrors RACE_TUNING).
+export const THEFT_TUNING = { base: 0.0015 };   // recalibrated: E[successes]~0.60 (rev1 0.0011 gave 0.44 under new desperation)
+const THEFT_GAP_FLOOR = 0.10;    // 0.10 floor keeps parity-state espionage alive
+const THEFT_DESP_W = 1.4;        // 02a amended: clamp(0.10 + 1.4*desperation, 0, 1.5)
+const THEFT_CLAMP_HI = 1.5;
 const THEFT_FAIL_COOLDOWN = 60;  // failed attempts cool down 60d
 const EPSILON_LO = 0.15;         // integration-lag epsilon ~ U(0.15, 0.35)
 const EPSILON_HI = 0.35;
+
+// ---- Shared strategic-desperation quantity (02a phase-6 amendment) --------
+// vDeficit = clamp((1.05 - velocity)/0.30, 0, 1)  (Beijing's program genuinely
+//            slower -- their own hidden state)
+// runaway  = clamp((C_int[frontier] - C_int[tianxia] - 0.25)/0.60, 0, 1)  (the
+//            frontier's internal track pulling away past the follow floor ~0.25,
+//            where distillation stops helping)
+// desperation = max(vDeficit, runaway)
+// Physical-world read only (velocity + latent C), never a market/quote read. Both
+// the strait-blockade hazard and the theft attempt hazard route through this,
+// replacing their raw-internal-gap terms (the fast-follower bounded that raw gap
+// near the release lag, so it stopped MEANING desperation). Deterministic -- draws
+// nothing.
+const DESP_V_PIVOT = 1.05;   // velocity at/above which vDeficit is 0
+const DESP_V_SCALE = 0.30;
+const DESP_FOLLOW_FLOOR = 0.25;   // ~= Halcyon release appetite; distillation floor
+const DESP_RUNAWAY_SCALE = 0.60;
+
+export function strategicDesperation(cap) {
+    const tianxia = cap.labs.tianxia;
+    const vDeficit = clamp((DESP_V_PIVOT - cap.velocity) / DESP_V_SCALE, 0, 1);
+    const runaway = clamp(
+        (frontierInternal(cap) - tianxia.C_internal - DESP_FOLLOW_FLOOR) / DESP_RUNAWAY_SCALE, 0, 1);
+    return Math.max(vDeficit, runaway);
+}
 
 // ---- Math helpers --------------------------------------------------------
 
@@ -168,6 +196,7 @@ export function createCapabilityState(hidden) {
         E: hidden.scalingElasticity,
         q: smoothstep(IGNITE_LO, IGNITE_HI, hidden.scalingElasticity),   // recursion gate
         sharpness: hidden.takeoffSharpness,                              // mapped [0.5,3.0]
+        velocity: hidden.chinaTrue.velocity,                             // leg A: Tianxia drift multiplier (phase-6)
         polarisSpawnDay: hidden.polarisSpawnDay,
         appetite: { ...APPETITE },
         labs: { halcyon, tianxia, polaris },
@@ -201,6 +230,18 @@ export function frontierInternal(cap) {
         if (lab.active) m = Math.max(m, lab.C_internal);
     }
     return m;
+}
+
+/** Released capability of the leading NON-Tianxia lab (the "released frontier" the
+ *  Tianxia fast-follower distills from -- public information, so the two-track
+ *  hygiene holds inside the kinematics). Read-only; -Infinity if none active. */
+function frontierReleasedNonTianxia(cap) {
+    let leader = null;
+    for (const id of ['halcyon', 'polaris']) {
+        const lab = cap.labs[id];
+        if (lab.active && (leader === null || lab.C_internal > leader.C_internal)) leader = lab;
+    }
+    return leader ? leader.C_released : -Infinity;
 }
 
 /**
@@ -237,17 +278,16 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
         spawned.push('polaris');
     }
 
-    const q = cap.q;
+    // The deterministic drift (base + recursion + all phase-6 modifiers: velocity
+    // leg A, drag leg B, follower leg 2) comes from THE shared deterministicDrift
+    // helper -- the same source the plateau detector reads (P6-1b P0 fix). Only the
+    // shock is added here (the plateau signal is shock-free).
+    const dOpts = { regime: inputs.regime, deltaSup: inputs.deltaSup, followerKf: inputs.followerKf };
     for (const id of ['halcyon', 'tianxia', 'polaris']) {
         const lab = cap.labs[id];
         if (!lab.active) continue;
 
-        const mu_b = G0 * computeSqrt(lab, day) * Math.pow(lab.talent, 0.3) * cap.E;
-        const mu_r = R0 * cap.sharpness * lab.C_internal
-            * sigmoid((lab.C_internal - RECUR_MID) / RECUR_WIDTH);
-
-        const drift = q * (mu_b + mu_r)
-            + (1 - q) * mu_b * Math.max(0, 1 - lab.C_internal / PLATEAU_CEIL);
+        const drift = deterministicDrift(cap, lab, day, dOpts);
         const shock = DAILY_SHOCK * rng.normal();
 
         lab.C_internal = clamp(lab.C_internal + drift + shock, C_MIN, C_MAX);
@@ -257,6 +297,41 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
     }
 
     return { spawned, crossings };
+}
+
+/**
+ * Deterministic (shock-free) daily drift dC_int/dt for one lab -- the 02a ODE
+ * WITH every phase-6 retune modifier (velocity leg A, drag leg B, follower leg 2)
+ * but WITHOUT the `0.004·N(0,1)` shock term. THE ONE deterministic-drift source
+ * (P6-1b re-gate P0 fix): stepCapability's Euler step and the resolution ladder's
+ * plateau-confirmation test BOTH read it, so the plateau detector can never read a
+ * pre-retune estimate again (the bug: omitting the modifiers under-read the
+ * velocity-boosted / follower-boosted leader and false-latched plateaus). 02a rules
+ * the raw trailing-120d endpoint difference OUT (noise-dominated), so the shock-free
+ * expected drift is the plateau signal. `opts` carries the modifier inputs
+ * { regime, deltaSup, followerKf }; absent/zero => that modifier is inert (matching
+ * race-mc, which never steps the regime). Returns 0 for an inactive/absent lab;
+ * never mutates.
+ */
+export function deterministicDrift(cap, lab, day, opts = {}) {
+    if (!lab || !lab.active) return 0;
+    const q = cap.q;
+    const mu_b = G0 * computeSqrt(lab, day) * Math.pow(lab.talent, 0.3) * cap.E;
+    const mu_r = R0 * cap.sharpness * lab.C_internal
+        * sigmoid((lab.C_internal - RECUR_MID) / RECUR_WIDTH);
+    let drift = q * (mu_b + mu_r) + (1 - q) * mu_b * Math.max(0, 1 - lab.C_internal / PLATEAU_CEIL);
+    // Leg A: Tianxia velocity multiplier.
+    if (lab.id === 'tianxia') drift *= cap.velocity;
+    // Leg B: domestic (Halcyon/Polaris) regulatory drag under a supervised regime.
+    if ((lab.id === 'halcyon' || lab.id === 'polaris') && opts.regime === 'supervised' && opts.deltaSup > 0) {
+        drift *= (1 - opts.deltaSup);
+    }
+    // Leg 2: Tianxia fast-follower gap-bounder (distills from the released frontier).
+    if (lab.id === 'tianxia' && opts.followerKf > 0) {
+        const relFrontier = frontierReleasedNonTianxia(cap);
+        if (relFrontier > -Infinity) drift += opts.followerKf * Math.max(0, relFrontier - lab.C_internal);
+    }
+    return drift;
 }
 
 // ---- Certification (state + timers; Consensus settlement is phase 3) ------
@@ -353,9 +428,12 @@ export function rollTheftDecision(cap, heat, day, rng) {
         ? 'polaris' : 'halcyon';
     const victim = cap.labs[victimId];
 
-    const gap = victim.C_internal - thief.C_internal;
-    const hazard = THEFT_BASE
-        * clamp(THEFT_GAP_FLOOR + gap / THEFT_GAP_SCALE, 0, THEFT_CLAMP_HI)
+    // Attempt hazard (02a amended): the raw victim-thief gap term is replaced by
+    // the shared strategic-desperation quantity (the fast-follower made the raw gap
+    // meaningless). 0.0011*clamp(0.10 + 1.4*desperation, 0, 1.5)*(1+heat).
+    const desperation = strategicDesperation(cap);
+    const hazard = THEFT_TUNING.base
+        * clamp(THEFT_GAP_FLOOR + THEFT_DESP_W * desperation, 0, THEFT_CLAMP_HI)
         * (1 + heat);
     const pAttempt = 1 - Math.exp(-hazard);
     if (rng.next() >= pAttempt) return null;

@@ -88,6 +88,80 @@ export const RACE_TUNING = {
     prolifCap: 0.30,       // proliferation floor cap (binds in ~47% of runs)
 };
 
+/**
+ * Outcome-table retune levers (02a "Outcome-table levers", phase-6). Sanctioned
+ * knobs that shape the terminal distribution WITHOUT touching the stance (tau,
+ * required, leadAdj, the mapping gates). Exported mutable so the joint sweep can
+ * drive it (mirrors RACE_TUNING); final values are recorded back into 02a.
+ *   - a_c/a_p/L_pace : dynamic per-lab racingPace f(knife-edge proximity, heat
+ *     pressure). racingPace = clamp(0.30 + (a_c*closeness + a_p*pressure)*(1-culture),0,1),
+ *     closeness = clamp(1 - lead/L_pace, 0, 1) on the SIGNED lead (C[open] in the
+ *     rival max), pressure = clamp((heat-0.30)/0.40, 0, 1). (1-culture) is the
+ *     stance: high-culture labs resist racing when it gets close (Polaris the
+ *     margin-carrier). Feeds the dS/dt burn only -- never capability.
+ *   - k_f : Tianxia fast-follower coefficient (capability.js applies it; passed via
+ *     advanceRace inputs). 0 disables it.
+ *   - S0_tianxia : Tianxia initial safety (bought, not grown -- culture stays 0.15).
+ */
+/**
+ * Outcome-table retune levers (02a phase-6 REDESIGNED set, 2026-07-24). The
+ * withdrawn released-follower + S0-range package could not reach family-4 (P6-1b
+ * finding); the ratified set produces family-4 leads from a sampled Tianxia
+ * velocity (leg A, in sampler.js) + domestic regulatory drag under supervised
+ * (leg B), preserves the margin by flooring Tianxia's S at its purchased base
+ * (leg C), and fixes the |d|-tail with a burn taper (all labs, leg 6). Exported
+ * mutable so the joint sweep can drive it. Final values recorded in 02a.
+ *   - a_c/a_p/L_pace : dynamic per-lab racingPace (lever 1; feeds dS burn only).
+ *   - k_f            : fast-follower GAP-BOUNDER (small; composes with leg A).
+ *   - delta_sup      : domestic drift drag under a supervised regime (leg B).
+ *   - S0_tianxia     : Tianxia purchased margin base AND burn floor (leg C).
+ *   - S_taper        : burn-taper scale; burn *= clamp(S/S_taper,0,1) (leg 6).
+ */
+export const RETUNE = {
+    a_c: 0.34,          // pace closeness coeff (swept down from the 0.45 guess -- 0.45 over-burned)
+    a_p: 0.12,          // pace heat-pressure coeff (swept down: mutes the theft-heat -> deep-failure amplification)
+    L_pace: 0.6,        // pace lead-closeness scale
+    k_f: 0.03,          // fast-follower gap-bounder (small; composes with leg A)
+    delta_sup: 0.09,    // domestic drift drag under supervised (leg B)
+    S0_tianxia: 0.43,   // Tianxia purchased margin base + burn floor (leg C; within the [0.30,0.45] range)
+    S_taper: 0.265,     // burn-taper scale (leg 6; compresses the deep-failure |d| tail)
+};
+
+// Domestic labs (drag under supervised; pace floor under mobilized+).
+const DOMESTIC_LABS = new Set(['halcyon', 'polaris']);
+// Mobilized+ regimes pin the domestic pace floor at 0.7 (the state races; margin burns).
+const MOBILIZED_PLUS = new Set(['mobilized', 'nationalized', 'classified']);
+const MOBILIZED_DOMESTIC_PACE_FLOOR = 0.7;
+
+/**
+ * Dynamic per-lab racingPace (02a phase-6 lever 1), deterministic. The recorded
+ * `f(knife-edge proximity, appetite pressure)` made concrete:
+ *   lead      = C_int[lab] - max(C_int[rivals], C[open])         (signed)
+ *   closeness = clamp(1 - lead/L_pace, 0, 1)
+ *   pressure  = clamp((heat - 0.30)/0.40, 0, 1)
+ *   pace      = clamp(0.30 + (a_c*closeness + a_p*pressure)*(1 - culture), 0, 1)
+ * A comfortable lead -> baseline pace -> S recovers (family 1 lives in runaway
+ * worlds); a knife-edge -> corner-cutting -> S burns. (1 - culture) is the stance:
+ * Tianxia (0.15) races almost fully when it is close, Polaris (0.8) barely.
+ */
+function racingPaceFor(cap, id, culture, heat, regime) {
+    const self = cap.labs[id].C_internal;
+    let rivalMax = cap.open.C;
+    for (const other of ['halcyon', 'tianxia', 'polaris']) {
+        if (other === id) continue;
+        const lab = cap.labs[other];
+        if (lab.active) rivalMax = Math.max(rivalMax, lab.C_internal);
+    }
+    const lead = self - rivalMax;                                   // signed
+    const closeness = clamp(1 - lead / RETUNE.L_pace, 0, 1);
+    const pressure = clamp((heat - 0.30) / 0.40, 0, 1);
+    let pace = clamp(RACING_PACE_BASE + (RETUNE.a_c * closeness + RETUNE.a_p * pressure) * (1 - culture), 0, 1);
+    // Leg B (mobilized+): the state races -- domestic pace floored at 0.7 (no drag,
+    // margin burns instead). Inert in race-mc (regime stays 'private' there).
+    if (DOMESTIC_LABS.has(id) && MOBILIZED_PLUS.has(regime)) pace = Math.max(pace, MOBILIZED_DOMESTIC_PACE_FLOOR);
+    return pace;
+}
+
 /** Total heat = clamp(transient + floor + strait, 0, 1). The floor is a ratchet;
  *  `strait` is a REVERSIBLE blockade overlay (strait.js sets it to BLOCKADE_HEAT
  *  while a Taiwan blockade is active, back to 0 when it lifts). */
@@ -101,8 +175,10 @@ function computeFloor(race) {
         + THEFT_FLOOR_IMPULSE * race.theftCount;
 }
 
-/** Fresh empty per-tick transition ledger. */
-function freshTransitions() {
+/** Fresh empty per-tick transition ledger. Exported (P6) so the resolution latch
+ *  can replace `race.lastTransitions` with an empty ledger -- killing stale-ledger
+ *  replay through the race->narrative bridge once the run has terminally resolved. */
+export function freshTransitions() {
     return {
         spawned: [], releases: [], thefts: [], crossings: [], certifications: [],
         // Phase-2 two-track ledgers. `occurred` is the silent latent track (the
@@ -159,9 +235,10 @@ export function resetRaceState(race, seed) {
     race.capability = createCapabilityState(hidden);
 
     // Safety margin per lab. Polaris is null until it spawns (see advanceRace).
+    // Tianxia's S0 is the phase-6 retune lever (bought margin; culture still 0.15).
     race.safety = {
         halcyon: S0.halcyon,
-        tianxia: S0.tianxia,
+        tianxia: RETUNE.S0_tianxia,
         polaris: null,
         open: S0.open,
     };
@@ -189,11 +266,41 @@ export function resetRaceState(race, seed) {
     // ---- Later-phase stubs (null/empty; extend, don't reshape) -----------
     race.B = null;                    // phase-4 market belief (hazard-over-dates curve)
     race.controlRegime = 'private';   // ratchet driven by control-regime.js (phase 5a)
-    // Treaty arc (phase 5a skeleton): the latent gate lives in the sampler
-    // (hidden.chinaTrue.dealPossible); this is the DISCOVERED/public-facing arc
-    // state the treaty.js content advances. `discovered` gates the live window
-    // (02a treaty sub-gates); dormant until the treaty content lands.
-    race.treaty = { stage: 0, discovered: false, initiated: false, summitDay: null };
+    // Treaty arc (phase 5a skeleton, EXTENDED at P6 by treaty-track.js): the latent
+    // gate lives in the sampler (hidden.chinaTrue.dealPossible); this object is the
+    // race-side gauntlet state the headless treaty track advances (02a treaty
+    // sub-gates: talks -> initiation -> farce survival -> summit-week window). The
+    // gauntlet is VIABILITY-BLIND (02a phase-6 leak-free ruling): the three gates
+    // are drawn for ALL runs and gate window OPENING; dealPossible gates only the
+    // holds outcome after a clean summit. `summitOpen` is the window flag main.js
+    // mirrors to world.ai.summitLive (the seam the treaty_window event fires on).
+    // `implemented` is TERMINAL (resolution step 2 reads it -> family 5).
+    race.treaty = {
+        stage: 0,               // TREATY_STAGE enum (treaty-track.js): 0 dormant .. 5 resolved
+        talksOpened: false,     // gate 1 passed (viability-blind, all runs)
+        initiated: false,       // gate 2 passed (viability-blind)
+        farceSurvived: false,   // gate 3 passed (viability-blind) -> the gauntlet reaches a window
+        windowOpened: false,    // a summit window opened this run (viability-blind)
+        summitOpen: false,      // the Act-III window is open THIS tick (mirrored to world.ai.summitLive)
+        summitDay: null,        // day the window opened
+        windowEndDay: null,     // day the summit window closes
+        summitPassed: false,    // survived summit week with no bad incident
+        implemented: false,     // the Deal signed (summitPassed AND dealPossible) -- TERMINAL -> family 5
+        failed: false,          // the window resolved without a Deal (the common case, incl. doomed windows)
+        talksBeganDay: null,    // day the gauntlet left dormancy
+    };
+    race.treatyEnabled = true;        // MC toggle for the treaty substream-isolation probe; always true in-game
+
+    // ---- P6 terminal resolution (endings phase) --------------------------
+    // The once-per-run terminal record. null until the precedence ladder fires
+    // (resolution.js checkResolution); latched thereafter so re-invocation is a
+    // no-op. All later rounds + the epilogue consume this record's stored axes;
+    // nothing re-derives the outcome. (Shape in resolution.js.)
+    race.resolution = null;
+    // Sustained-plateau streak (P6 fix, 02a amended plateau rule): consecutive
+    // days the leader's shock-free drift has been below threshold; confirmation
+    // needs it >= 180 (sustained) AND day >= 700 (resolution.js).
+    race.plateauStreak = 0;
 
     return race;
 }
@@ -348,7 +455,6 @@ export function setControlRegime(race, regime) {
 export function advanceRace(race, inputs = {}) {
     const day = race.day;
     const endDay = day + 1;
-    const racingPace = clamp(inputs.racingPace ?? RACING_PACE_BASE, 0, 1);
     const cap = race.capability;
     const streams = race.streams;
     const tr = freshTransitions();
@@ -361,8 +467,14 @@ export function advanceRace(race, inputs = {}) {
     const accumFrozen = day < race.sAccumFreezeUntil;
     const heatPre = heatValue(race.heat);
 
-    // 1. Capability (internal track) + Polaris spawn.
-    const capRes = stepCapability(cap, day, endDay, inputs, streams.capability);
+    // 1. Capability (internal track) + Polaris spawn. Pass the phase-6 kinematic
+    //    levers via inputs: the Tianxia fast-follower (leg 2) and the domestic
+    //    regulatory drag (leg B, which reads the CURRENT controlRegime -- last
+    //    tick's, since stepControlRegime is the orchestrated post-step). capability.js
+    //    applies velocity (leg A) from cap.velocity directly.
+    const capRes = stepCapability(cap, day, endDay,
+        { ...inputs, followerKf: RETUNE.k_f, regime: race.controlRegime, deltaSup: RETUNE.delta_sup },
+        streams.capability);
     tr.spawned.push(...capRes.spawned);
     tr.crossings.push(...capRes.crossings);
     if (race.safety.polaris === null && cap.labs.polaris.active) {
@@ -433,11 +545,21 @@ export function advanceRace(race, inputs = {}) {
     //    frozen post-theft (both snapshotted before any same-tick mutation).
     for (const id of ['halcyon', 'tianxia', 'polaris']) {
         if (race.safety[id] === null) continue;    // Polaris not yet spawned
-        let dS = -S_BURN * racingPace;
+        const culture = race.hidden.labCulture[id];
+        const S = race.safety[id];
+        const pace = racingPaceFor(cap, id, culture, heatPre, race.controlRegime);   // dynamic per-lab (lever 1 + leg B floor)
+        // Leg 6 (all labs): burn TAPERS as S falls -- margin is a practice level,
+        // not a fuel tank. Corner-cutting has diminishing room; S asymptotes above
+        // zero instead of hitting the rail, compressing the deep-failure |d| tail.
+        let dS = -S_BURN * pace * clamp(S / RETUNE.S_taper, 0, 1);
         if (!accumFrozen) {
-            dS += S_ACCUM * race.hidden.labCulture[id] * (1 - S_HEAT_SUPPRESS * heatPre);
+            dS += S_ACCUM * culture * (1 - S_HEAT_SUPPRESS * heatPre);
         }
-        race.safety[id] = clamp(race.safety[id] + dS, 0, 1);
+        // Leg C: Tianxia's PURCHASED margin floors at its base (burn never takes it
+        // below S0[tianxia] -- control is non-negotiable for that principal). Other
+        // labs' practice margin floors at 0.
+        const floor = (id === 'tianxia') ? RETUNE.S0_tianxia : 0;
+        race.safety[id] = clamp(S + dS, floor, 1);
     }
     // C[open] carries no safety margin (S_open = 0, no dynamics).
 

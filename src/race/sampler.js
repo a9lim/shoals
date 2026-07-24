@@ -11,9 +11,17 @@
    Pure / DOM-free -- headless-importable for MC.
    =================================================== */
 
-import { createRng, randomSeed } from './rng.js';
+import { createRng, randomSeed, deriveSeed } from './rng.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
+
+// chinaTrue.velocity tuning (02a phase-6 leg A): a per-run hidden multiplier on
+// Tianxia's deterministic capability drift, drawn from its OWN named substream
+// (deriveSeed(seed,'chinaVelocity')) so it never reorders the existing sampler
+// sequence -- same-seed stability under extension. Exported mutable for the sweep.
+// Final swept values below (02a "chinaTrue.velocity" row is exact; the fat upper
+// TAIL, not a raised median, is what produces family-4 in-horizon).
+export const VELOCITY_TUNING = { median: 0.95, sigma: 0.37, lo: 0.75, hi: 1.325 };
 
 /**
  * Sample the per-run hidden configuration from `seed`.
@@ -54,10 +62,17 @@ export function sampleHiddenState(seed) {
         scalingElasticity = 0.6 + rng.beta(5, 2) * 0.5;      // [0.6, 1.1]
     }
 
-    // chinaTrue -- Beijing's true distance behind, and whether a deal exists.
+    // chinaTrue -- Beijing's true distance behind, whether a deal exists, and the
+    // hidden velocity (leg A). position + dealPossible stay on the main stream in
+    // their original order (level prior + belief calibrations undisturbed); velocity
+    // draws from its OWN substream so existing draws never reorder.
+    const velRng = createRng(deriveSeed(seed, 'chinaVelocity'));
     const chinaTrue = {
         position: clamp(rng.normal(0.8, 0.3), 0.2, 1.6),     // rung gap behind Halcyon
         dealPossible: rng.bernoulli(0.15),                    // treaty branch live only here
+        // LogNormal-ish velocity multiplier, clamped to the recorded range.
+        velocity: clamp(VELOCITY_TUNING.median * Math.exp(VELOCITY_TUNING.sigma * velRng.normal()),
+            VELOCITY_TUNING.lo, VELOCITY_TUNING.hi),
     };
 
     // Per-lab safety culture. Tianxia fixed low (anti-safety by construction).

@@ -320,6 +320,21 @@ function bridgeSpawn(tr, emit) {
     }
 }
 
+// ---- Summit window (P6: the treaty gauntlet's live negotiation) ----------
+// The treaty window AND its OUTCOME are race-model DECISIONS, so both fire from
+// the ledger, never by Poisson (re-gate ruling): treaty_window on the window-open
+// transition, and treaty_holds (Deal) / treaty_resolution (failure/doom) on the
+// window-outcome transition. The stamps are set by stepTreaty (treaty-track.js),
+// which runs before the bridge. Category 'summit' is Poisson-excluded (events.js).
+// The window popup's choices schedule NOTHING -- the outcome fires from the model,
+// not a choice-blind followup. summitLive (mirrored true at window-open) satisfies
+// treaty_window's belt-and-suspenders `when`.
+
+function bridgeSummit(tr, emit) {
+    if (tr.treatyWindowOpen) emit(shell('treaty_window', {}, { day: tr.treatyWindowOpen.day }));
+    if (tr.treatyOutcome) emit(shell(tr.treatyOutcome.implemented ? 'treaty_holds' : 'treaty_resolution', {}, {}));
+}
+
 // ---- Thefts (stub: records intent, fires nothing) ------------------------
 
 function bridgeThefts(tr) {
@@ -374,6 +389,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     bridgeStrait(tr, emit);
     bridgeRegime(tr, emit);
     bridgeSpawn(tr, emit);
+    bridgeSummit(tr, emit);
     bridgeTips(tr, emit, engine.world, day);
     bridgeThefts(tr);
 

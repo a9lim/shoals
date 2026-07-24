@@ -231,9 +231,12 @@ lead, gone in a news cycle.
 
 Terminal-state selection is one precedence ladder, checked continuously:
 **(1)** a severity-4 incident resolves in place; **(2)** an implemented
-treaty resolves as the Deal; **(3)** `max(C, C[open])` crossing the R5
-threshold resolves as the race outcome below; **(4)** a confirmed
-plateau resolves as the fizzle; **(5)** day-1008 timeout → epilogue
+treaty resolves as the Deal; **(3)** a confirmed plateau resolves as
+the fizzle; **(4)** `max(C, C[open])` crossing the R5 threshold
+resolves as the race outcome below (order ratified 2026-07-24, see
+[02a-tuning.md](02a-tuning.md) — plateau is gated ¬R5, so the swap is
+semantically immaterial; the canonical order is recorded once, in
+02a); **(5)** day-1008 timeout → epilogue
 extrapolation: sample the remainder forward from standing state
 (decided 2026-07-23; see [05-endings.md](05-endings.md)). For the race outcome:
 
