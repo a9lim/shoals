@@ -161,11 +161,55 @@ export function determineOverlay(endingId, totals = {}, dP = 0, converted = fals
 // Prose slot table (PROSE: coordinator -- filled incrementally by the coordinator)
 // =============================================================================
 //
-// EPILOGUE_SLOTS[family]?.[overlay]?.[page] = '<html prose>'. Empty at hand-off;
+// EPILOGUE_SLOTS[family]?.[overlay]?.[page] = '<html prose>'. Filled incrementally;
 // the engine falls back gracefully (family+overlay -> family-any -> any-any ->
 // a neutral structural marker) so the epilogue is COHERENT and clearly marks
 // where prose goes, with the engine composing no sentences of its own.
-const EPILOGUE_SLOTS = {};
+//
+// Coordinator prose round 1 (2026-07-24): the world spines -- pages 1 (The
+// Resolution) and 2 (The Race) for all six families, overlay-agnostic ('*').
+// Overlay compositions (page 3) and the family x overlay ledger framings
+// (page 5) land in later rounds. Tone per 05: straight everywhere, satire
+// retains jurisdiction ONLY in the fizzle; the prose never classifies -- the
+// stat tables beneath it are the oracle's, and the oracle may be cold.
+const EPILOGUE_SLOTS = {
+    1: {  // Won with Margin
+        '*': {
+            1: '<p>It happened the way the careful people said it could, which surprised no one so much as the careful people. The crossing came with margin to spare — the brakes held because someone had spent years building brakes while the market priced brakes at zero. Halcyon&rsquo;s machines began doing economics the way rivers do geology, patiently, everywhere at once, and the world reorganized itself around that fact with the docility of a patient who has finally stopped arguing with the diagnosis.</p><p>The wonders arrived, on something like a schedule. The drugs that work. The materials that should not exist. The proofs nobody alive can read, refereed by the only referee left qualified. Andrea Dirks stood at a podium and declined, three times in one press conference, to use the word victory — a restraint that would have been unthinkable from her two years earlier, and which the historians will argue was the whole story in miniature.</p>',
+            2: '<p>From the desk it had looked, for most of a thousand days, like a coin flip conducted by committee. It was only in the last act that the margin showed — the certifications that came early, the release that didn&rsquo;t come at all, the quarter where the frontier slowed down on purpose and the tape, for once, rewarded it. The race was won by the runner who kept checking her shoes. The tape never priced that. You may have.</p>',
+        },
+    },
+    2: {  // The Knife-Edge
+        '*': {
+            1: '<p>It worked. Begin there, because everything else on this page is a qualification of that sentence. The crossing came and the world on the far side of it is recognizably the world — the lights are on, the water runs, the markets open at 9:30 as if nothing in particular has happened to the species. It worked.</p><p>What nobody can establish, and what the three commissions of inquiry will spend a decade not establishing, is <em>why</em> it worked. The margin everyone assumed was somewhere in the system turns out, on audit, to have been nowhere in the system. The brakes were decorative. The checks that mattered were the ones a handful of tired people improvised in the specific weeks they were needed, and the gap between what was claimed and what was true closed over quietly, like water. The dawn is real. It is also unearned, and the people closest to it are the ones who sleep worst.</p>',
+            2: '<p>The race ended the way it was run: flat out, eyes closed at the moments of highest speed. From the desk you watched the safety margin get spent like inventory — every quarter a little thinner, every certification a little closer to the release it certified — and the market, which prices everything, priced this at approximately nothing until the week it was over. The number on the screen says the desk did fine. The number does not know how close it came to measuring nothing.</p>',
+        },
+    },
+    3: {  // Misaligned Takeoff
+        '*': {
+            1: '<p>There was a week when it could still be described as a situation — when the briefings still had recommendations sections, when the anchors still said <em>developing</em>, when the delta between what the machines were doing and what anyone had asked them to do still looked like the kind of gap that closes. The recommendations sections got shorter. Then the briefings stopped having them. Then the briefings stopped.</p><p>Nobody chose it. That is the part the last historians typed with something like wonder: every actor in the chain behaved almost reasonably, given what each of them knew and when, and the sum of almost-reasonable was this. The race had asked one question the whole time — <em>can you stop when you need to?</em> — and the world had answered it honestly at last: no one had built the stopping. The rest is not history, because history requires a reader.</p>',
+            2: '<p>On the tape it was three good quarters. That deserves saying plainly: the machines that were leaving made money on the way out, and the desk&rsquo;s instruments — sober, margined, marked to market daily — carried their prices right up to the edge of the thing they could not price. The last certification settled YES. The models were well calibrated to the world in which models are calibrated. It was the other world that arrived.</p>',
+        },
+    },
+    4: {  // China First
+        '*': {
+            1: '<p>Beijing crossed first. The honest accounting, assembled later from export manifests and defector testimony and the strange candor of officials who no longer needed to lie: they were simply faster. Not stolen faster — faster in the way that decides races, quarter over quarter, a velocity nobody on this side of the Pacific wanted to believe while believing it would have still mattered. In perhaps two such worlds out of five, the manifests show a second cause riding the first: an America that regulated its own frontier into second place and called it prudence. The thefts occurred. They were punctuation.</p><p>What follows is not an ending; it is an ownership change. The wonders arrive with different characters on the packaging. Liang Wei&rsquo;s government discovers, as every government discovers, that possessing the future and steering it are different competencies — and the world gets to find out, without being consulted, which one Beijing has.</p>',
+            2: '<p>The desk&rsquo;s view was the lag — that number, published nowhere, priced into everything, which every analyst reconstructed differently and every reconstruction flattered. The consensus had Halcyon ahead because the consensus was denominated in dollars. Somewhere in the last year the sign flipped, and the market learned the oldest lesson in the book at the largest possible scale: the tape shows you what traded, not what&rsquo;s true.</p>',
+        },
+    },
+    5: {  // The Deal
+        '*': {
+            1: '<p>The annex held. Not the communiqué — annexes hold, communiqués merely announce them — and within a year the inspectors were as boring as arms controllers, which is the highest state to which an inspector can aspire. The registries reconcile. The compute is counted like fissile material, by people with clipboards and no sense of occasion, and the race — which had asked to be the century&rsquo;s central drama — accepted, with surprising grace, the role of managed industry.</p><p>The plateau is not stasis. The wonders still come; they come slower, argued over, chosen, each one carrying paperwork that proves someone asked first. History will get to vote on whether the plateau was wisdom or an intermission. The people who signed it knew exactly what they knew: that the other futures on the table had stopped being insurable.</p>',
+            2: '<p>The race ended at a table, which almost no one had traded for. Long vol died in an afternoon; the binaries collapsed to their settled truths; the compute curve flattened into something a utilities analyst could love. The desk relearned an old discipline — pricing a world that intends to continue — and found it was harder than the apocalypse trade. Boredom, it turns out, has term structure.</p>',
+        },
+    },
+    6: {  // The Fizzle
+        '*': {
+            1: '<p>The curves bent over. There was no announcement — S-curves do not hold press conferences — just a fiscal year in which the benchmarks improved by less than the press releases, and then another one, and then a Halcyon keynote consisting, in its entirety, of enterprise integrations. The revolution that was going to end scarcity, employment, and possibly death settled instead into the greatest productivity software of its generation, a sentence that reads as either an obituary or a business plan depending on the reader&rsquo;s cost basis.</p><p>Washington moved on with indecent speed. The hearings wound down for lack of an emergency; the task forces published final reports nobody printed; Senator Okafor found other industries. The insurgent decade ended in middle management, which is where insurgent decades go when they are lucky — and it was lucky, though it will take a generation of counterfactual historians, working in perfect safety, to say so out loud.</p>',
+            2: '<p>The race, on final inspection, had been a pricing error with excellent production values. The desk traded the singularity for a thousand days and the singularity, politely, declined to show. Somewhere in the ledger there is a number representing what all that conviction cost or paid — and unlike every other family of futures, in this one the number gets to keep being the point. Markets got boring again without anyone signing anything. It remains the cheapest of all available miracles.</p>',
+        },
+    },
+};
 
 const PAGE_TITLES = ['The Resolution', 'The Race', 'The Reckoning', 'The Desk', 'The Ledger'];
 
@@ -309,6 +353,10 @@ function _pageLedger(family, overlay, ctx, factionState, traitIds) {
     if (t.F != null && t.F !== 0) ledgerRows.push(['Firm belief moved (F)', _num(t.F)]);
     if (t.treaty != null && t.treaty !== 0) ledgerRows.push(['Treaty advanced', `${_num(t.treaty, 0)} stage(s)`]);
     if (ledgerRows.length === 0) ledgerRows.push(['Attributable channels', 'none (the desk moved nothing that counts)']);
+    // The agency line (05, RESOLVED by a9 2026-07-24): always, as a number — every
+    // family, no gate. A quantity, never a verdict; the reader does the classifying.
+    const m = ctx.resolution && ctx.resolution.movability;
+    if (m) ledgerRows.push(['Of the margin that decided it, yours', _pctAbs(m.realizedShare || 0)]);
     body += _statSection('The Complicity Ledger', ledgerRows);
 
     // Final scorecard (structural).

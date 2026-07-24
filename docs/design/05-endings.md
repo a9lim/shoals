@@ -105,12 +105,14 @@ against the world outcome — not a score, a *statement*, in the accounting
 sense and the other one. In family 3 it reads as an indictment nobody is
 left to file; in family 5, as the only receipt that mattered.
 
-`OPEN (speculative, possibly too cruel):` an agency line in the ledger —
-post-resolution, reveal how much the sampled world was movable at all
-(some runs are low-agency worlds; the Landian question made empirical).
-Counterfactual honesty vs. player demoralization. Might be family-gated:
-show it in the Deal and fizzle families, withhold it in the dooms — or
-make it a New Game+ disclosure. Discuss.
+`RESOLVED (a9, 2026-07-24):` the agency line appears **always, as a
+number** — one cold ledger line in every family, a quantity, never a
+verdict. The machinery stores `resolution.movability = {dP, dW,
+realizedShare}` (P6-3); the ledger page prints the realized share and
+lets the reader do the classifying, per the tone discipline below.
+Soft-everywhere applied to the Landian question: the number is the
+soft answer; "a low-agency world" would be the hard one. No family
+gate — flinching in the dooms would read as the game protecting you.
 
 ## Tone discipline
 
