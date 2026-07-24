@@ -78,6 +78,8 @@ export function createWorldState() {
             frontierRung:       1,           // MIRROR of the released frontier rung (read-only for guards;
                                              // the public act proxy -- same driver as eta / base-rate scale)
             fixedpointPublic:   false,       // the codename belongs to the world (halcyon-arc one-shot sets it)
+            summitLive:         false,       // the treaty window is open (set ONLY by the Act-III summit
+                                             // machinery, P6/P7 -- never by an event effect; gates treaty_window)
         },
     };
 }
