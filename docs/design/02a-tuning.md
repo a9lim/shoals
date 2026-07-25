@@ -1302,6 +1302,36 @@ EDITABLE until R5 then LOCKED for the run; run-scoped state
 cleared by reset (precommitments are authored per run — never
 localStorage); parameters fixed in v1, arming is the choice.
 
+**P7-2 implementation rulings (2026-07-24):** (1) *"ITM long
+binary" = quote mid > 0.5* — even money, not in-profit-vs-entry;
+the harvest sells what the market now calls likely, which is the
+certification-jump intent. The panel says "trading above even
+money" so the claim matches the predicate. (2) *Cut rounding ties
+UP* — `round(|qty|·frac)`, so a 1-lot leg flattens rather than
+surviving a "50% cut"; the risk-reducing side of the tie. (3)
+*Same-tick collapse* — two grave detections in one day fire ONE
+50% cut, not a compounded 75%; per-episode semantics, and "no
+machine-gunning" decides it. (4) *(f) burns its episode on a
+rejected fill* — a short-sale ban must not turn the flatten into a
+per-substep retry hammer; the day's episode is spent either way.
+(5) *(c)'s 80% arming gate is currently unobservable* — today's
+only consumption site is a triggered margin call (>100% utilized
+by definition); the gate is implemented faithfully and becomes
+live if a future soft-trim path runs between 80% and 100%. The
+panel copy therefore claims only "if the desk is forced to
+liquidate" — never the threshold. (6) *(a) sweeps every position
+type* — including binaries and compute futures, which carry no
+gross notional by the chassis metric; the rule's fiction is a
+blunt de-risking precommitment and bluntness is the design. Frozen
+legs refuse and are reported, never force-filled. (7) *An
+intercepted tip stays in the event feed and consumes the 45-day
+tip throttle* — the call happened; the standing policy answered
+it; the record shows both. The popup never renders and the day is
+never held open (interception at `_queuePopup`, upstream of the
+barrier). (8) Panel and toast copy finalized by the coordinator
+2026-07-24 — the tip toast carries the thesis line ("You are
+reading about it afterward").
+
 **Sub-round split**: P7-1 systemic (driver + substep lane + latency
 + degradation + VXHCN staleness + audio wiring), P7-2 standing
 orders (rules engine + ui.js panel), P7-3 the room + blackout +

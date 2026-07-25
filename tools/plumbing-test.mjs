@@ -51,6 +51,17 @@
       trade is counted, so nothing survives its expiry pass) and
       run-scoped reset state (ruling 5 -- the renderer's
       transient repaint fields, the queue's ticket counter).
+   ...and the DELEGATION LAYER (P7-2, 2026-07-24):
+
+   M. Standing orders: the unlock / lock / reset gates, each
+      rule firing exactly on its predicate and exactly ONCE
+      per trigger episode, executions routing MACHINERY-instant
+      (never the P7-1 latency queue, never the ladder's widened
+      spread), the liquidation PREFERENCE reordering the forced
+      -liquidation sequence, the interception contract the
+      auto-sit rule depends on, and full inertness while
+      restricted / past the terminal latch / with nothing armed.
+
    L. Presentation degradation: hold arithmetic, and the
       invariant that every headless number (portfolio value,
       marks, the VXHCN index) is BITWISE unchanged with the
@@ -91,8 +102,14 @@ import {
     portfolio, resetPortfolio, executeBinaryTrade, executeMarketOrder,
     settleComputeFutures, portfolioValue, applyBinarySettlementRows, computeBidAsk,
     closePosition, liquidateAll, exerciseOption, processExpiry, isExpiredForTrading,
-    placePendingOrder, checkPendingOrders,
+    placePendingOrder, checkPendingOrders, liquidationSequence, computeNetDelta,
 } from '../src/portfolio.js';
+import {
+    STANDING_RULES, STANDING_TUNING, resetStandingOrders, freezeStandingOrders,
+    syncStandingOrders, standingOrdersUnlocked, standingOrdersLocked, standingOrdersView,
+    isArmed, setArmed, armedRuleIds,
+    runDayBoundaryRules, runSubstepRules, standingLiquidationOrder, tipAutoSitArmed,
+} from '../src/standing-orders.js';
 import { ChartRenderer } from '../src/chart.js';
 import {
     ACT3_TUNING, act3Target, stepAct3Driver, machineIntensity, degradation, setMachineParam,
@@ -1465,6 +1482,382 @@ let latchTrajOK = false, latchHeldSubsteps = 0;
     resetAct3();
 }
 
+// =====================================================================
+// M. Standing orders -- the delegation layer (P7-2)
+// =====================================================================
+let soRandomCalls = 0, soFillGap = '';
+const soFiredRules = new Set();
+{
+    // ---- Fixtures ------------------------------------------------------
+    // Every rule evaluation in this section routes through these two wrappers, so
+    // the report can tally which rules actually EXECUTED across the whole block
+    // (standingExecutionCount is per-run and armOnly resets it by design).
+    const soDay = (ctx) => { const r = runDayBoundaryRules(ctx); for (const x of r) if (x.legs > 0) soFiredRules.add(x.rule); return r; };
+    const soSub = (ctx) => { const r = runSubstepRules(ctx); for (const x of r) if (x.legs > 0) soFiredRules.add(x.rule); return r; };
+    const SO_VOL = 0.2, SO_RATE = 0.03;
+    const soCtx = (day = 0, S = 100) => ({ sim: null, S, vol: SO_VOL, r: SO_RATE, day, q: 0 });
+    const det = (id, severity) => ({ id, severity, source: 'halcyon', cls: 'capability', occurDay: 0, detectDay: 0, lag: 0 });
+    const ledger = ({ detected = [], certifications = [] } = {}) => ({
+        incidents: { occurred: [], detected }, certifications,
+    });
+    const qtyOf = (t) => { const p = portfolio.positions.find(x => x.type === t); return p ? p.qty : 0; };
+    function armOnly(...ids) {
+        resetStandingOrders();
+        syncStandingOrders(STANDING_TUNING.unlockRung);
+        for (const id of ids) setArmed(id, true);
+    }
+    function threeLegBook() {
+        resetPortfolio(); resetImpactState(); syncFixed(0);
+        executeMarketOrder(null, 'stock', 'long', 4, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+        executeMarketOrder(null, 'call', 'long', 2, 100, SO_VOL, SO_RATE, 0, 100, 42, undefined, 0);
+        executeMarketOrder(null, 'bond', 'long', 2, 100, SO_VOL, SO_RATE, 0, undefined, 42, undefined, 0);
+    }
+    const tightMargin = { triggered: true, equity: 100, required: 95 };    // utilization 0.95
+    const looseMargin = { triggered: false, equity: 100, required: 50 };   // utilization 0.50
+
+    // -- M1. Unlock / lock / reset semantics -----------------------------
+    resetStandingOrders();
+    check('M1: a fresh run has nothing armed, nothing unlocked, nothing locked',
+        !standingOrdersUnlocked() && !standingOrdersLocked() && armedRuleIds().length === 0);
+    check('M1: arming is refused before the released-R3 unlock',
+        setArmed('severity_cut', true) === false && !isArmed('severity_cut'));
+    syncStandingOrders(2);
+    check('M1: R2 does not unlock the panel',
+        !standingOrdersUnlocked() && setArmed('severity_cut', true) === false);
+    syncStandingOrders(3);
+    check('M1: released R3 unlocks and arming takes',
+        standingOrdersUnlocked() && setArmed('severity_cut', true) === true && isArmed('severity_cut'));
+    check('M1: an unknown rule id is refused', setArmed('not_a_rule', true) === false);
+    syncStandingOrders(4);
+    check('M1: R4 is still EDITABLE',
+        !standingOrdersLocked() && setArmed('blockade_halve', true) === true);
+    syncStandingOrders(5);
+    check('M1: released R5 LOCKS the armed set -- arming AND disarming both refused',
+        standingOrdersLocked()
+        && setArmed('cert_harvest', true) === false && !isArmed('cert_harvest')
+        && setArmed('severity_cut', false) === false && isArmed('severity_cut'));
+    syncStandingOrders(3);
+    check('M1: the lock LATCHES for the run (a lower rung cannot re-open it)',
+        standingOrdersLocked());
+    const soView = standingOrdersView();
+    check('M1: the view model carries all six rules with their FIXED params + lock state',
+        STANDING_RULES.length === 6 && soView.rules.length === 6 && soView.locked === true
+        && soView.rules.every(r => r.label && r.param && r.when)
+        && soView.rules.find(r => r.id === 'severity_cut').armed === true
+        && soView.rules.find(r => r.id === 'cert_harvest').armed === false);
+    resetStandingOrders();
+    check('M1: reset clears arming, unlock and lock (precommitments are authored per RUN)',
+        armedRuleIds().length === 0 && !standingOrdersUnlocked() && !standingOrdersLocked());
+
+    // -- M2. (a) severity >= 3 detection -> cut gross 50% ----------------
+    armOnly('severity_cut');
+    threeLegBook();
+    let reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m2a', 2)] }), blockade: false });
+    check('M2: a severity-2 detection does not trip the cut',
+        reps.length === 0 && qtyOf('stock') === 4 && qtyOf('call') === 2 && qtyOf('bond') === 2);
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m2b', 3)] }), blockade: false });
+    check('M2: a severity-3 DETECTION cuts every open leg by half, machinery-instant',
+        reps.length === 1 && reps[0].rule === 'severity_cut' && reps[0].legs === 3
+        && qtyOf('stock') === 2 && qtyOf('call') === 1 && qtyOf('bond') === 1
+        && workingOrderCount() === 0,
+        `legs ${reps[0] ? reps[0].legs : '--'}, stock ${qtyOf('stock')}`);
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m2b', 3)] }), blockade: false });
+    check('M2: the same incident id never fires twice (one fire per episode)',
+        reps.length === 0 && qtyOf('stock') === 2);
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m2c', 3), det('m2d', 4)] }), blockade: false });
+    check('M2: two grave detections in ONE tick collapse to one cut (never 75%)',
+        reps.length === 1 && qtyOf('stock') === 1,
+        `stock ${qtyOf('stock')}, positions ${portfolio.positions.length}`);
+    check('M2: a 1-lot leg cannot be halved -- it flattens (rounding on the risk-reducing side)',
+        qtyOf('call') === 0 && qtyOf('bond') === 0 && portfolio.positions.length === 1);
+
+    // -- M3. (b) blockade ONSET -> halve the HCN stock leg ---------------
+    armOnly('blockade_halve');
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+    executeMarketOrder(null, 'stock', 'long', 4, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+    executeMarketOrder(null, 'bond', 'long', 2, 100, SO_VOL, SO_RATE, 0, undefined, 42, undefined, 0);
+    reps = soDay({ ...soCtx(), transitions: ledger(), blockade: false });
+    check('M3: no blockade, no fire', reps.length === 0 && qtyOf('stock') === 4);
+    reps = soDay({ ...soCtx(), transitions: ledger(), blockade: true });
+    check('M3: the blockade ONSET halves the HCN stock leg and touches nothing else',
+        reps.length === 1 && reps[0].rule === 'blockade_halve'
+        && qtyOf('stock') === 2 && qtyOf('bond') === 2);
+    reps = soDay({ ...soCtx(), transitions: ledger(), blockade: true });
+    check('M3: a persistent blockade does not re-fire (the episode is the onset)',
+        reps.length === 0 && qtyOf('stock') === 2);
+    soDay({ ...soCtx(), transitions: ledger(), blockade: false });
+    reps = soDay({ ...soCtx(), transitions: ledger(), blockade: true });
+    check('M3: a lift followed by a new closure is a NEW episode',
+        reps.length === 1 && qtyOf('stock') === 1);
+    resetStandingOrders();
+    syncStandingOrders(3);
+    soDay({ ...soCtx(), transitions: ledger(), blockade: true });   // edge consumed while disarmed
+    setArmed('blockade_halve', true);
+    reps = soDay({ ...soCtx(), transitions: ledger(), blockade: true });
+    check('M3: arming mid-blockade does not fire on a closure that already happened',
+        reps.length === 0 && qtyOf('stock') === 1);
+
+    // -- M4. (c) the liquidation PREFERENCE (consumed, never fired) ------
+    armOnly('bonds_first');
+    check('M4: the preference is null below the 80% utilization gate, ["bond"] above it',
+        standingLiquidationOrder(looseMargin) === null
+        && (standingLiquidationOrder(tightMargin) || [])[0] === 'bond'
+        && standingLiquidationOrder(null) === null);
+    setArmed('bonds_first', false);
+    check('M4: disarmed -> no preference at all (the chassis order stands)',
+        standingLiquidationOrder(tightMargin) === null);
+    setArmed('bonds_first', true);
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+    executeMarketOrder(null, 'stock', 'long', 1, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+    executeMarketOrder(null, 'bond', 'long', 1, 100, SO_VOL, SO_RATE, 0, undefined, 42, undefined, 0);
+    executeMarketOrder(null, 'call', 'long', 1, 100, SO_VOL, SO_RATE, 0, 100, 42, undefined, 0);
+    executeMarketOrder(null, 'bond', 'long', 1, 100, SO_VOL, SO_RATE, 0, undefined, 63, undefined, 0);
+    const seq = liquidationSequence(standingLiquidationOrder(tightMargin));
+    check('M4: the armed preference hoists BOTH bonds to the front of the liquidation sequence',
+        seq != null && seq.length === 4 && seq[0].type === 'bond' && seq[1].type === 'bond'
+        && !seq.slice(2).some(p => p.type === 'bond'),
+        seq ? seq.map(p => p.type).join(',') : 'null');
+    check('M4: within a type the chassis descending-index order survives (stable)',
+        seq[0].expiryDay === 63 && seq[1].expiryDay === 42);
+    check('M4: no preference -> null sequence, so liquidateAll keeps its original loop',
+        liquidationSequence(null) === null && liquidationSequence([]) === null
+        && liquidationSequence(['vxhcnfuture']) === null);
+    const soLiq = liquidateAll(null, 100, SO_VOL, SO_RATE, 0, 0, standingLiquidationOrder(tightMargin));
+    check('M4: a preference-ordered forced liquidation still flattens the whole book',
+        soLiq.stuck.length === 0 && portfolio.positions.length === 0);
+
+    // -- M5. (d) certification -> harvest ITM long binaries --------------
+    {
+        armOnly('cert_harvest');
+        const soRace = createRaceState(4242);
+        initConsensus(soRace); initBelief(soRace);
+        refreshBinaryQuotes(soRace);
+        resetPortfolio(); resetImpactState(); syncFixed(0);
+        const kIn = consensus.contracts[0].key;
+        const kOut = consensus.contracts[1].key;
+        const kShort = consensus.contracts[2].key;
+        const setQuote = (k, mid) => {
+            const q = consensus.quotes[k];
+            q.mid = mid; q.bid = Math.max(0, mid - 0.02); q.ask = Math.min(1, mid + 0.02);
+        };
+        executeBinaryTrade(kIn, 'long', 1);
+        executeBinaryTrade(kOut, 'long', 1);
+        executeBinaryTrade(kShort, 'short', 1);
+        setQuote(kIn, 0.70); setQuote(kOut, 0.30); setQuote(kShort, 0.70);
+        const binAt = (k) => portfolio.positions.find(p => p.type === 'binary' && p.strike === k);
+        const openedAll = !!binAt(kIn) && !!binAt(kOut) && !!binAt(kShort);
+        reps = soDay({
+            ...soCtx(), blockade: false,
+            transitions: ledger({ certifications: [{ lab: 'halcyon', rung: 3, direct: true }] }),
+        });
+        check('M5: a certification sells the ITM LONG only -- the OTM long and the ITM short stay',
+            openedAll && reps.length === 1 && reps[0].rule === 'cert_harvest' && reps[0].legs === 1
+            && !binAt(kIn) && !!binAt(kOut) && !!binAt(kShort)
+            && workingOrderCount() === 0,
+            `reps ${reps.length}, legs ${reps[0] ? reps[0].legs : '--'}`);
+        reps = soDay({
+            ...soCtx(), blockade: false,
+            transitions: ledger({ certifications: [{ lab: 'halcyon', rung: 3, direct: true }] }),
+        });
+        check('M5: the same certification (lab:rung) never harvests twice',
+            reps.length === 0 && !!binAt(kOut) && !!binAt(kShort));
+        executeBinaryTrade(kIn, 'long', 1);
+        reps = soDay({
+            ...soCtx(), blockade: false,
+            transitions: ledger({ certifications: [{ lab: 'halcyon', rung: 4, direct: false, impliedBy: 4 }] }),
+        });
+        check('M5: a DIFFERENT certification is a new episode (implied certs count)',
+            reps.length === 1 && !binAt(kIn));
+        deactivateConsensus(); deactivateBelief();
+        resetPortfolio(); resetImpactState();
+    }
+
+    // -- M6. (f) delta flatten at a substep boundary ---------------------
+    armOnly('delta_flatten');
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+    executeMarketOrder(null, 'stock', 'long', 40, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+    let r6 = soSub({ ...soCtx(0, 103), dayOpen: 100 });
+    check('M6: a 3% move does not trip the flatten',
+        r6.length === 0 && computeNetDelta() === 40);
+    syncMarket({ ...FIXED_MARKET, S: 109 }); market.day = 0;
+    r6 = soSub({ ...soCtx(0, 109), dayOpen: 100 });
+    check('M6: an 8%+ move flattens net delta into +-20 with one machinery-instant trade',
+        r6.length === 1 && r6[0].rule === 'delta_flatten'
+        && Math.abs(computeNetDelta()) <= STANDING_TUNING.deltaBand
+        && workingOrderCount() === 0,
+        `delta ${computeNetDelta()} (was ${r6[0] ? r6[0].netBefore : '--'})`);
+    r6 = soSub({ ...soCtx(0, 112), dayOpen: 100 });
+    check('M6: at most ONE flatten per day, however long the condition persists',
+        r6.length === 0 && computeNetDelta() === 20);
+    executeMarketOrder(null, 'stock', 'long', 15, 109, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+    r6 = soSub({ ...soCtx(1, 109), dayOpen: 100 });
+    check('M6: a NEW day is a new episode',
+        r6.length === 1 && Math.abs(computeNetDelta()) <= STANDING_TUNING.deltaBand);
+    r6 = soSub({ ...soCtx(2, 130), dayOpen: 100 });
+    check('M6: a book already inside the band never trades, however big the move',
+        r6.length === 0 && computeNetDelta() === 20);
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+
+    // The BOUNDARY, both directions (sol gate P1). The rule is specified as
+    // strictly GREATER than 8%, and the two directions must agree: the return form
+    // |S/open - 1| does NOT, because IEEE rounds 108/100 - 1 to 0.08000000000000007
+    // (above the gate) and 92/100 - 1 to 0.07999999999999996 (below it), so an exact
+    // +8% fired while an exact -8% did not. The engine compares absolute
+    // displacement against open * moveGate, which is symmetric by construction.
+    // Each probe re-arms (resetting the once-a-day episode) and rebuilds a book far
+    // outside the delta band, so the ONLY gate under test is the move gate.
+    {
+        const moveProbe = (S) => {
+            armOnly('delta_flatten');
+            resetPortfolio(); resetImpactState(); syncFixed(0);
+            executeMarketOrder(null, 'stock', 'long', 40, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+            syncMarket({ ...FIXED_MARKET, S }); market.day = 0;
+            const fired = soSub({ ...soCtx(0, S), dayOpen: 100 }).length > 0;
+            syncFixed(0);
+            return fired;
+        };
+        const upExact = moveProbe(108), downExact = moveProbe(92);
+        const upOver = moveProbe(108.001), downOver = moveProbe(91.999);
+        const upUnder = moveProbe(107.999), downUnder = moveProbe(92.001);
+        check('M6: an EXACT +-8% move does not fire (the gate is strictly greater)',
+            upExact === false && downExact === false,
+            `+8% ${upExact} / -8% ${downExact}`);
+        check('M6: just OVER +-8% fires in both directions (symmetric boundary)',
+            upOver === true && downOver === true,
+            `+8.001% ${upOver} / -8.001% ${downOver}`);
+        check('M6: just UNDER +-8% fires in neither direction',
+            upUnder === false && downUnder === false,
+            `+7.999% ${upUnder} / -7.999% ${downUnder}`);
+        resetPortfolio(); resetImpactState(); syncFixed(0);
+    }
+
+    // -- M7. (e) the interception surface (main.js owns the queue half) ---
+    armOnly('tip_autosit');
+    check('M7: the interception gate follows the arm state', tipAutoSitArmed() === true);
+    portfolio.restricted = true;
+    check('M7: a restricted book silences the interception too', tipAutoSitArmed() === false);
+    portfolio.restricted = false;
+    {
+        const tip = getEventById('insider_tip');
+        const sit = ((tip && tip.choices) || []).find(c => c.playerFlag === 'sat_on_insider_tip');
+        // main.js identifies the SIT verb by this playerFlag and does NOT intercept
+        // when it cannot be found -- so the flag, and the declarative consequence
+        // behind it, are part of the contract.
+        check('M7: the insider tip still carries a SIT choice findable by playerFlag',
+            !!tip && !!sit && !!tip.popup && tip.category === 'insider' && tip.choices.length === 3);
+        check('M7: the sit verb\'s declarative consequence is non-empty (shifts, followups, toast)',
+            !!sit && Array.isArray(sit.factionShifts) && sit.factionShifts.length > 0
+            && Array.isArray(sit.followups) && sit.followups.length > 0 && !!sit.resultToast);
+    }
+    // The FEED contract behind the interception's own log repaint (sol gate P1). An
+    // intercepted tip is logged by `_fireEvent` at fire time -- so the feed CONTENT
+    // exists -- but the day-boundary path repaints the log DOM only for a superevent
+    // popup or a non-popup fire. Both cases Codex named are ordinary queued popups:
+    // the tip ALONE, and the tip alongside another ordinary popup. Neither produces a
+    // `fired` entry and neither is a superevent, so no day-boundary repaint happens
+    // and `_interceptByStandingOrder` must repaint itself.
+    {
+        const eng = new EventEngine('offline');
+        const tipShell = { ...getEventById('insider_tip') };
+        const ordinary = new EventEngine('offline')._pools.random
+            .find(e => e.popup && e.choices && !e.superevent && e.id !== 'insider_tip');
+        const log0 = eng.eventLog.length;
+        const rTip = eng._fireEvent(tipShell, { day: 10 }, 10, 0, 0);
+        const afterTipAlone = eng.eventLog.length;
+        const rOther = ordinary ? eng._fireEvent({ ...ordinary }, { day: 10 }, 10, 0, 0) : null;
+        check('M7: an intercepted tip is in the event log the moment it fires (alone)',
+            rTip.queued === true && afterTipAlone === log0 + 1
+            && eng.eventLog[afterTipAlone - 1].category === 'insider'
+            && eng.eventLog[afterTipAlone - 1].headline === tipShell.headline,
+            `log ${log0} -> ${afterTipAlone}`);
+        check('M7: tip + an ordinary popup log BOTH, and NEITHER reaches the `fired` lane',
+            !!ordinary && rOther.queued === true && eng.eventLog.length === log0 + 2
+            && !tipShell.superevent && !ordinary.superevent,
+            `ordinary ${ordinary ? ordinary.id : 'none'}, log ${eng.eventLog.length - log0}`);
+    }
+    freezeStandingOrders();
+    check('M7: the terminal freeze silences the interception', tipAutoSitArmed() === false);
+
+    // -- M8. Restriction / terminal / inertness / determinism ------------
+    armOnly('severity_cut', 'blockade_halve', 'cert_harvest', 'delta_flatten');
+    threeLegBook();
+    portfolio.restricted = true;
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m8a', 4)] }), blockade: true });
+    let sub8 = soSub({ ...soCtx(0, 120), dayOpen: 100 });
+    check('M8: a restricted book fires nothing and trades nothing',
+        reps.length === 0 && sub8.length === 0 && qtyOf('stock') === 4 && qtyOf('bond') === 2);
+    portfolio.restricted = false;
+    freezeStandingOrders();
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m8b', 4)] }), blockade: true });
+    sub8 = soSub({ ...soCtx(0, 120), dayOpen: 100 });
+    check('M8: past the terminal latch the engine is inert and arming is refused',
+        reps.length === 0 && sub8.length === 0 && qtyOf('stock') === 4
+        && setArmed('severity_cut', false) === false
+        && standingLiquidationOrder(tightMargin) === null);
+    resetStandingOrders();
+    syncStandingOrders(5);
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m8c', 4)] }), blockade: true });
+    sub8 = soSub({ ...soCtx(0, 120), dayOpen: 100 });
+    check('M8: nothing armed -> a full no-op even against a live ledger (Classic never even calls in)',
+        reps.length === 0 && sub8.length === 0 && qtyOf('stock') === 4
+        && standingLiquidationOrder(tightMargin) === null);
+
+    // The engine draws NO randomness: standing orders are deterministic
+    // consequences of public state, so the price path is untouched by them.
+    {
+        const realRandom = Math.random;
+        Math.random = () => { soRandomCalls++; return realRandom(); };
+        armOnly('severity_cut', 'blockade_halve', 'delta_flatten');
+        threeLegBook();
+        soDay({ ...soCtx(), transitions: ledger({ detected: [det('m8d', 4)] }), blockade: true });
+        syncMarket({ ...FIXED_MARKET, S: 112 }); market.day = 0;
+        soSub({ ...soCtx(0, 112), dayOpen: 100 });
+        Math.random = realRandom;
+        check('M8: the engine draws NO randomness',
+            soRandomCalls === 0, `${soRandomCalls} Math.random calls`);
+        syncFixed(0);
+    }
+
+    // A standing execution pays the PRE-P7 spread: it is machinery, so the P7-1
+    // ladder widening (x1.5 at R5 + mobilized) must never reach its fill.
+    {
+        const buy4 = () => {
+            resetPortfolio(); resetImpactState(); syncFixed(0);
+            executeMarketOrder(null, 'stock', 'long', 4, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+            return portfolio.cash;
+        };
+        armOnly('blockade_halve');
+        let cash0 = buy4();
+        soDay({ ...soCtx(), transitions: ledger(), blockade: true });
+        const standingProceeds = portfolio.cash - cash0;
+        cash0 = buy4();
+        executeMarketOrder(null, 'stock', 'short', 2, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0);
+        const manualPlain = portfolio.cash - cash0;
+        cash0 = buy4();
+        executeMarketOrder(null, 'stock', 'short', 2, 100, SO_VOL, SO_RATE, 0, undefined, undefined, undefined, 0, 1.5);
+        const manualWidened = portfolio.cash - cash0;
+        soFillGap = `${standingProceeds.toFixed(6)} vs manual ${manualPlain.toFixed(6)} / widened ${manualWidened.toFixed(6)}`;
+        check('M8: a standing execution fills at the pre-P7 spread, never the ladder\'s widening',
+            standingProceeds === manualPlain && standingProceeds > manualWidened, soFillGap);
+    }
+
+    // -- M9. Reset clears episode memory ---------------------------------
+    armOnly('severity_cut');
+    threeLegBook();
+    soDay({ ...soCtx(), transitions: ledger({ detected: [det('m9', 3)] }), blockade: false });
+    const firedOnce = qtyOf('stock') === 2;
+    armOnly('severity_cut');       // = reset + unlock + arm (a fresh run)
+    threeLegBook();
+    reps = soDay({ ...soCtx(), transitions: ledger({ detected: [det('m9', 3)] }), blockade: false });
+    check('M9: reset clears episode memory -- a fresh run re-fires on the same trigger id',
+        firedOnce && reps.length === 1 && qtyOf('stock') === 2);
+    check('M9: every acting rule executed at least once in this section',
+        ['severity_cut', 'blockade_halve', 'cert_harvest', 'delta_flatten'].every(r => soFiredRules.has(r)),
+        [...soFiredRules].join(', '));
+    resetStandingOrders();
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+}
+
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
 line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
@@ -1486,6 +1879,13 @@ line(`  substep lane: ${laneOffRate.toFixed(5)} events/day day-lane vs ${laneOnR
 line(`  latency ladder: ${ladderRows}`);
 line(`  display latches: index stale ${latchHeldSubsteps}/12 substeps at d = 1;`
     + ` headless trajectory identity ${latchTrajOK ? 'BITWISE' : 'VIOLATED'}`);
+line('\nStanding orders (P7-2):');
+line(`  menu of ${STANDING_RULES.length}: ${STANDING_RULES.map(r => r.id).join(', ')}`);
+line(`  gates: unlock at released R${STANDING_TUNING.unlockRung}, armed set locked at R${STANDING_TUNING.lockRung};`
+    + ` cut ${STANDING_TUNING.grossCutFrac}, util gate ${STANDING_TUNING.marginUtilGate},`
+    + ` move gate ${STANDING_TUNING.moveGate}, delta band +-${STANDING_TUNING.deltaBand}`);
+line(`  rules exercised: ${[...soFiredRules].join(', ')} (+ bonds_first preference, tip_autosit gate)`);
+line(`  RNG draws ${soRandomCalls}; standing fill ${soFillGap}`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

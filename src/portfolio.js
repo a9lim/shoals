@@ -1208,14 +1208,52 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
 // ---------------------------------------------------------------------------
 
 /**
+ * Order the book for a forced liquidation when a standing PREFERENCE hoists whole
+ * TYPES to the front (P7-2 rule (c): bonds liquidate first above 80% margin
+ * utilization). Returns a SNAPSHOT of position objects in visit order, or null
+ * when there is no preference -- in which case `liquidateAll` keeps its original
+ * descending-index loop, bit-identical to the pre-P7-2 path.
+ *
+ * Within the preferred group the preference's own type order wins; within one
+ * type the chassis descending-index order is preserved (stable sort). Snapshot,
+ * because `closePosition` splices the live array. Pure; exported for the headless
+ * gate (cross-type liquidation order is otherwise unobservable in cash terms).
+ */
+export function liquidationSequence(typeFirst) {
+    if (!typeFirst || typeFirst.length === 0) return null;
+    const first = [], rest = [];
+    for (let i = portfolio.positions.length - 1; i >= 0; i--) {
+        const pos = portfolio.positions[i];
+        (typeFirst.includes(pos.type) ? first : rest).push(pos);
+    }
+    if (first.length === 0) return null;
+    first.sort((a, b) => typeFirst.indexOf(a.type) - typeFirst.indexOf(b.type));
+    return first.concat(rest);
+}
+
+/**
  * Close all open positions at current market prices. Iterates by descending
  * index so a position that CANNOT be flattened (e.g. a frozen/pending binary)
  * is reported rather than force-filled or spun on forever. Never a fictional
  * fill (09).
+ *
+ * `typeFirst` (optional) is the P7-2 standing liquidation PREFERENCE -- an array
+ * of position types to flatten before anything else (main.js passes
+ * `standingLiquidationOrder(margin)` at the margin-liquidation sites; every other
+ * caller passes nothing and keeps the chassis order exactly).
+ *
  * @returns {{ stuck: Array<{id:number,type:string,key:number}> }} un-flattenable legs.
  */
-export function liquidateAll(sim, currentPrice, currentVol, currentRate, currentDay, q) {
+export function liquidateAll(sim, currentPrice, currentVol, currentRate, currentDay, q, typeFirst) {
     const stuck = [];
+    const seq = liquidationSequence(typeFirst);
+    if (seq) {
+        for (const pos of seq) {
+            const ok = closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);
+            if (!ok) stuck.push({ id: pos.id, type: pos.type, key: pos.strike });
+        }
+        return { stuck };
+    }
     for (let i = portfolio.positions.length - 1; i >= 0; i--) {
         const pos = portfolio.positions[i];
         const ok = closePosition(sim, pos.id, currentPrice, currentVol, currentRate, currentDay, q);

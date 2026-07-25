@@ -924,6 +924,133 @@ export function updateDynamicSections($, presetIndex) {
     if ($.computeSection) {
         $.computeSection.classList.toggle('hidden', !isDynamic);
     }
+    // Standing orders (P7-2) are Dynamic-only AND rung-gated: the mode switch can
+    // only ever HIDE the panel here; `updateStandingOrdersPanel` owns showing it
+    // (released frontier rung >= 3).
+    if (!isDynamic && $.standingOrdersSection) {
+        $.standingOrdersSection.classList.add('hidden');
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Standing orders panel (the delegation layer -- overhaul phase 7, slice 2)
+// ---------------------------------------------------------------------------
+
+let _standingSig = null;   // last rendered arm/lock signature (render-churn guard)
+
+/**
+ * Build the Standing Orders section on first use and cache it on `$`.
+ *
+ * The section is created HERE rather than in index.html by ruling (P7-2 brief:
+ * no index.html / styles.css edits) -- it reuses the sidebar's existing classes
+ * only (`stat-group` / `group-label` / `checkbox-label` / `stat-label` /
+ * `panel-hint`), the same pattern the lobby pills and the regulation badges use.
+ * It lands in the PORTFOLIO tab, immediately before the Convictions section:
+ * standing orders are a statement about the book, and they read as one there.
+ */
+function _ensureStandingOrdersSection($, onToggle) {
+    if ($.standingOrdersSection) return $.standingOrdersSection;
+    const host = document.getElementById('tab-portfolio');
+    if (!host) return null;
+
+    const section = document.createElement('div');
+    section.id = 'standing-orders-section';
+    section.className = 'stat-group hidden';
+
+    const label = document.createElement('div');
+    label.className = 'group-label';
+    label.textContent = 'Standing Orders';
+    section.appendChild(label);
+
+    const list = document.createElement('div');
+    list.id = 'standing-orders-list';
+    section.appendChild(list);
+
+    const hint = document.createElement('p');
+    hint.className = 'panel-hint';
+    section.appendChild(hint);
+
+    const convictions = document.getElementById('convictions-section');
+    if (convictions && convictions.parentNode === host) host.insertBefore(section, convictions);
+    else host.appendChild(section);
+
+    // Delegated toggle, bound ONCE on the stable list container (rows are rebuilt
+    // every render -- same discipline as the consensus/compute tbodies).
+    if (onToggle) {
+        list.addEventListener('change', (e) => {
+            const box = e.target.closest('[data-standing-rule]');
+            if (box) onToggle(box.dataset.standingRule, box.checked);
+        });
+    }
+
+    $.standingOrdersSection = section;
+    $.standingOrdersList = list;
+    $.standingOrdersHint = hint;
+    return section;
+}
+
+/**
+ * Render the standing-orders authoring panel from the engine's view model
+ * (standing-orders.js `standingOrdersView()`): one row per rule with an
+ * arm/disarm toggle and its FIXED parameter shown underneath (v1 parameters are
+ * not editable -- arming is the choice). Hidden until the released frontier rung
+ * unlocks it; after R5 every toggle is disabled and the hint says so.
+ *
+ * @param {object} $        DOM cache
+ * @param {object|null} view  standingOrdersView(), or null (Classic / no race)
+ * @param {Function} onToggle (ruleId, on) => void
+ */
+export function updateStandingOrdersPanel($, view, onToggle) {
+    const section = _ensureStandingOrdersSection($, onToggle);
+    if (!section) return;
+    if (!view || !view.unlocked) {
+        section.classList.add('hidden');
+        _standingSig = null;
+        return;
+    }
+    section.classList.remove('hidden');
+
+    // The panel changes at most once a day (and on a toggle), while updateUI runs
+    // constantly -- rebuild only when the state actually moved, so the rows are not
+    // torn down under the player's cursor every frame.
+    const sig = (view.locked ? 'L' : '-') + (view.frozen ? 'F' : '-')
+        + view.rules.map(r => (r.armed ? '1' : '0')).join('');
+    if (sig === _standingSig) return;
+    _standingSig = sig;
+
+    const list = $.standingOrdersList;
+    list.textContent = '';
+    for (const rule of view.rules) {
+        const block = document.createElement('div');
+
+        const row = document.createElement('label');
+        row.className = 'checkbox-label';
+        row.style.padding = '0.3rem 0';
+        const name = document.createElement('span');
+        name.className = 'stat-label';
+        name.textContent = rule.label;
+        row.appendChild(name);
+        const box = document.createElement('input');
+        box.type = 'checkbox';
+        box.dataset.standingRule = rule.id;
+        box.checked = rule.armed;
+        box.disabled = view.locked || view.frozen;
+        row.appendChild(box);
+        block.appendChild(row);
+
+        const param = document.createElement('p');
+        param.className = 'panel-hint';
+        param.style.margin = '0 0 6px';
+        param.textContent = rule.param;
+        block.appendChild(param);
+
+        list.appendChild(block);
+    }
+
+    // Lock state, plainly.
+    $.standingOrdersHint.textContent = view.locked
+        ? 'Locked. The rules run as written until the run ends.'
+        : 'Armed rules execute without you. Editable until the frontier reaches R5 — then the set is final.';
 }
 
 // ---------------------------------------------------------------------------

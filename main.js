@@ -28,7 +28,7 @@ import {
     updatePlayBtn, updateSpeedBtn,
     renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
     updateDynamicSections, updateEventLog, updateCongressDiagrams, updateStandings,
-    updateConsensusPanel, updateComputePanel,
+    updateConsensusPanel, updateComputePanel, updateStandingOrdersPanel,
     refreshTooltip,
     updateStrategyDropdowns, updateCreditDebit,
     showPopupEvent,
@@ -83,6 +83,12 @@ import {
     rollCandleRepaint, skipSparklineFrame, noteDegradationIncident, takeGlitchSeverity,
     setReducedMotion,
 } from './src/act3.js';
+import {
+    resetStandingOrders, freezeStandingOrders, syncStandingOrders,
+    runDayBoundaryRules, runSubstepRules, standingLiquidationOrder,
+    tipAutoSitArmed, standingOrdersView, setArmed as setStandingArmed,
+    STANDING_COPY,
+} from './src/standing-orders.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
 import { createRaceState, advanceRace, resetRaceState, stepControlRegime } from './src/race/race-state.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
@@ -285,7 +291,7 @@ function _fireRaceShell(id) {
     const base = getEventById(id);
     if (!base) return;
     const r = eventEngine._fireEvent({ ...base }, sim, sim.day, 0, 0);
-    if (r && r.queued) _popupQueue.push(r.event);
+    if (r && r.queued) _queuePopup(r.event);
     else if (r && r.headline) _toast(r.headline, 5000);
 }
 function _clampRate() {
@@ -308,6 +314,7 @@ function _runSubstep() {
     // ---- Act III substep boundary ----
     tickSubstepClock();
     _drainDeferredFills();      // manual-order latency ladder: fills due at THIS substep
+    _runStandingSubstepRules(); // P7-2 rule (f): the intraday precommitment, machinery-instant
     _fireSubstepArrival();      // the discretionary beat that landed intraday
     if (_laneLive() && !_gameOver) _processPopupQueue();
 }
@@ -385,7 +392,7 @@ function _fireSubstepArrival() {
         if (r.fired.length > 0 || r.popups.length > 0) sim.recomputeK();
         return r;
     });
-    for (const p of popups) _popupQueue.push(p);
+    for (const p of popups) _queuePopup(p);
     for (const f of fired) {
         if (f.interjection) { _showInterjection(f.headline); continue; }
         let headline = f.headline;
@@ -557,6 +564,64 @@ function _deferManual(kind, payload) {
     _haptic('medium');
     return true;
 }
+
+// ---------------------------------------------------------------------------
+// Standing orders (P7-2) -- the delegation layer's wiring
+// ---------------------------------------------------------------------------
+
+/** The chassis trade context every standing-order execution fills against. No
+ *  `spreadMult` and no act3 queue anywhere below: standing executions are
+ *  MACHINERY -- zero ladder lag, the pre-P7 fill, at the trigger substep's price
+ *  (02a: precommitments are the fast path, and that IS the mechanic). */
+function _standingCtx() {
+    return { sim, S: sim.S, vol: market.sigma, r: sim.r, day: sim.day, q: sim.q };
+}
+
+/** Announce a batch of standing-order executions (every one of them toasts) and
+ *  run the same post-trade refresh a machinery trade does. */
+function _reportStanding(reports) {
+    if (!reports || reports.length === 0) return;
+    for (const rep of reports) _toast(rep.message, 4500);
+    _haptic('medium');
+    chainDirty = true;
+    updateUI();
+    dirty = true;
+}
+
+/** Day-boundary standing orders (rules a / b / d). Dynamic modes only, and never
+ *  after the terminal latch. Evaluated once the day's race ledger, settlements
+ *  and quote refresh are final: (a) sees today's detections, (d) sees the
+ *  certified world at live quotes. Reads the PUBLIC blockade mirror. */
+function _runStandingDayRules() {
+    if (!raceState || !eventEngine || _gameOver) return;
+    _reportStanding(runDayBoundaryRules({
+        ..._standingCtx(),
+        transitions: raceState.lastTransitions,
+        blockade: !!eventEngine.world.geopolitical.taiwanBlockade,
+    }));
+}
+
+/** Substep standing orders (rule f). Runs at the substep boundary AFTER the
+ *  deferred manual fills have landed, so the delta it flattens is the true
+ *  post-fill book. The move is measured against the day's OPEN. */
+function _runStandingSubstepRules() {
+    if (!raceState || !eventEngine || _gameOver) return;
+    _reportStanding(runSubstepRules({
+        ..._standingCtx(),
+        dayOpen: sim._partial ? sim._partial.open : sim.S,
+    }));
+}
+
+/** Panel toggle handler: arm / disarm one rule. `setArmed` refuses before the
+ *  unlock, after the R5 lock and past the terminal freeze -- re-render either way
+ *  so the panel always shows the engine's real state, never the click's. */
+function _onStandingToggle(id, on) {
+    const applied = setStandingArmed(id, on);
+    if (!applied) _toast(STANDING_COPY.refusedEdit, 3000);
+    updateStandingOrdersPanel($, raceState ? standingOrdersView() : null, _onStandingToggle);
+    _haptic('light');
+}
+
 /** Common tail after modifying strategyLegs: reprice, rebuild UI, mark dirty. */
 function _refreshStrategyView() {
     strategy.resetRange(sim.S, strategyLegs);
@@ -1197,14 +1262,14 @@ function init() {
             if (!ev) { console.error(`No event with id "${id}"`); return; }
             if (!eventEngine) { console.error('eventEngine is null (not in Dynamic mode)'); return; }
             const result = eventEngine._fireEvent(ev, sim, sim.day, 0, 0);
-            if (result.queued) { _popupQueue.push(result.event); _processPopupQueue(); }
+            if (result.queued) { _queuePopup(result.event); _processPopupQueue(); }
             else { updateEventLog($, eventEngine.eventLog, chart.dayOrigin); updateCongressDiagrams($, eventEngine.world); updateStandings($, eventEngine.world, factions, getFactionDescriptor); }
             console.log('Fired:', ev.id, result);
             return result;
         },
         /** Show an arbitrary popup (no event engine needed). */
         popup(headline, context, choices) {
-            _popupQueue.push({ headline, context, choices: choices || [{ label: 'OK', desc: 'Dismiss' }], popup: true });
+            _queuePopup({ headline, context, choices: choices || [{ label: 'OK', desc: 'Dismiss' }], popup: true });
             _processPopupQueue();
         },
         /** Show a toast message. */
@@ -1505,6 +1570,58 @@ function _updateLobbyPills() {
     }
 }
 
+/**
+ * THE popup-queue chokepoint (P7-2). Every beat that could reach the player goes
+ * through here, so a standing order that INTERCEPTS a decision can do it before
+ * the beat is ever queued: an intercepted tip never holds a day open (the popup
+ * BARRIER reads this queue -- 02a P7-1 ruling 2) and never flashes on screen.
+ * Because interception happens at INSERTION, the barrier's state is untouched and
+ * `_closeCompletedDayIfPending` keeps working exactly as before -- an interception
+ * cannot leave a completed day stranded, since the queue never grew.
+ *
+ * @param {boolean} [front] unshift instead of push (margin calls / game-over jump
+ *                          the queue -- the world's news waits behind them).
+ * @returns {boolean} true when the event was actually queued.
+ */
+function _queuePopup(event, front) {
+    if (_interceptByStandingOrder(event)) return false;
+    if (front) _popupQueue.unshift(event); else _popupQueue.push(event);
+    return true;
+}
+
+/**
+ * Standing-order interception (P7-2 rule (e), the compliance precommitment): an
+ * armed auto-sit answers the insider channel for the player, unopened. The SIT
+ * choice is applied through `_applyPopupChoice` -- the SAME path a manual sit
+ * takes -- so its factionShifts, playerFlag, followups and resultToast land
+ * exactly once and nothing has to be re-implemented here.
+ *
+ * The sit verb is identified by its `playerFlag`, and a tip whose sit choice
+ * cannot be found is NOT intercepted (it shows normally): silently falling back
+ * to a positional choice could trade on a tip the player precommitted to decline,
+ * which is the one failure this rule exists to make impossible.
+ *
+ * The FEED REFRESH is mandatory here (sol gate P1): `_fireEvent` has already
+ * written the tip into `eventEngine.eventLog`, but the day-boundary path only
+ * repaints the log DOM for a superevent popup or a non-popup fire -- so an
+ * intercepted tip (the whole point of which is that you read about it afterward
+ * instead of answering it) would sit invisible in the feed until some unrelated
+ * later refresh. Repainting here keeps ruling 7's contract: the beat stays in the
+ * event feed, on the day it happened.
+ */
+function _interceptByStandingOrder(event) {
+    if (!event || _gameOver || !raceState || !eventEngine) return false;
+    if (event.id !== 'insider_tip' || !tipAutoSitArmed()) return false;
+    const choice = (event.choices || []).find(c => c.playerFlag === 'sat_on_insider_tip');
+    if (!choice) return false;
+    _applyPopupChoice(event, choice);
+    _toast(STANDING_COPY.tip_autosit, 5000);
+    updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+    updateStandings($, eventEngine.world, factions, getFactionDescriptor);
+    dirty = true;
+    return true;
+}
+
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
 function _processPopupQueue() {
     // Don't show if another overlay is open (trade dialog / a popup already up).
@@ -1548,243 +1665,7 @@ function _processPopupQueue() {
     }
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
         if (isSuperevent) stopMusic(2000);
-        const choice = event.choices[idx];
-        if (choice.deltas && eventEngine) {
-            // P7-1: a substep-lane popup can be answered MID-DAY, with the day's
-            // overlays still installed -- apply the deltas against the true
-            // baseline so the overlay restore at day close cannot erase them.
-            // No-op wrapper at a day boundary (every pre-P7 path).
-            _midDayBaseline(() => eventEngine.applyDeltas(sim, choice.deltas));
-        }
-        // P6-2 treaty-channel ledger: capture treatyStage across the choice's
-        // structured effects so a player-advanced treaty step is attributed to the
-        // player (the advice/diplomacy line). Guarded on raceState.
-        const _treatyBefore = (raceState && eventEngine) ? eventEngine.world.ai.treatyStage : 0;
-        if (choice.effects && eventEngine) {
-            applyStructuredEffects(eventEngine.world, choice.effects);
-        }
-        if (raceState && eventEngine) {
-            const _treatyDelta = eventEngine.world.ai.treatyStage - _treatyBefore;
-            if (_treatyDelta > 0) appendLedger(sim.day, 'treaty', event.id, _treatyDelta, 'treatyStage advance');
-        }
-        // P6-2 raceEffects chokepoint (popup-choice path): the ONE sanctioned
-        // choice->race mutation route -- whitelisted dials (S per lab, heat), clamped,
-        // and ledgered under the event id (applyRaceEffects tracks race.playerS for the
-        // d_P decomposition). Guarded on raceState (null outside Dynamic modes).
-        if (choice.raceEffects && raceState) {
-            applyRaceEffects(raceState, choice.raceEffects, event.id, sim.day);
-        }
-        // Leak coupling (evidence machinery round): the insider channel's LEAK verb,
-        // declared as `raceLeak: true` on the choice, applied at THIS chokepoint --
-        // the same place raceEffects lands, behind the SAME frozen/inactive gate
-        // (raceChannelsLive: inert post-terminal-latch and in Classic, where the
-        // narrative followup still fires and nothing mechanical does). Two effects
-        // from the popup's stamped `_tipIncidentId`:
-        //   (1) detection forcing -- the leaked incident becomes detectable
-        //       unconditionally on a 4d memoryless clock (RNG-free);
-        //   (2) the B evidence-fold NOW, under the DETECTION's own fold id, so the
-        //       real detection's later fold is a no-op. Would-detect-anyway
-        //       incidents: total belief move identical leaked or unleaked (timing,
-        //       not mass). Never-detectable tail: the fold is NEW mass the world
-        //       would otherwise never get -- the override is the verb's point.
-        if (choice.raceLeak && raceState && event._tipIncidentId && raceChannelsLive()) {
-            const leaked = forceLeakDetection(raceState, event._tipIncidentId);
-            if (leaked) foldPlayerLeak(leaked.id, leaked.severity ?? event.raceMeta?.severity);
-        }
-        if (choice.factionShifts) {
-            for (const fs of choice.factionShifts) {
-                let value = fs.value;
-                if (fs.when?.hasTrait && hasTrait(fs.when.hasTrait)) value += (fs.bonus || 0);
-                shiftFaction(fs.faction, value);
-            }
-        }
-        if (choice.playerFlag) {
-            playerChoices[choice.playerFlag] = sim.day;
-        }
-        if (choice.cashPenalty) {
-            portfolio.cash -= choice.cashPenalty;
-        }
-        if (choice.regulatoryAction === 'settle') {
-            settleRegulatory();
-        } else if (choice.regulatoryAction === 'cooperate') {
-            cooperateRegulatory();
-        }
-        if (choice.followups && eventEngine) {
-            for (const fu of choice.followups) {
-                eventEngine.scheduleFollowup(fu, sim.day);
-            }
-        }
-        if (choice.resultToast) {
-            _toast(choice.resultToast, 4000);
-        }
-        // -- Declarative trade execution --
-        if (choice.trades) {
-            const vol = market.sigma;
-            const snapshot = [...portfolio.positions];
-            let closed = 0;
-            let pnlSum = 0;
-            for (const trade of choice.trades) {
-                let targets;
-                if (trade.action === 'close_all') {
-                    // P&L captured per position BEFORE liquidation (positions vanish);
-                    // summed only over the ids actually removed (frozen legs excluded).
-                    const pnlById = new Map();
-                    for (const p of snapshot) pnlById.set(p.id, computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q));
-                    const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
-                    const stuckIds = new Set(stuck.map(s => s.id));
-                    for (const p of snapshot) if (!stuckIds.has(p.id)) pnlSum += pnlById.get(p.id);
-                    closed = snapshot.length - stuck.length;
-                    if (stuck.length) _toast(`${stuck.length} Consensus contract${stuck.length > 1 ? 's' : ''} frozen — could not flatten.`, 4000);
-                    break;
-                } else if (trade.action === 'close_type') {
-                    targets = snapshot.filter(p => p.type === trade.type);
-                } else if (trade.action === 'close_short') {
-                    targets = snapshot.filter(p =>
-                        (p.type === 'stock' && p.qty < 0) ||
-                        (p.type === 'call' && p.qty < 0) ||
-                        (p.type === 'put' && p.qty > 0)
-                    );
-                } else if (trade.action === 'close_long') {
-                    targets = snapshot.filter(p =>
-                        (p.type === 'stock' && p.qty > 0) ||
-                        (p.type === 'call' && p.qty > 0) ||
-                        (p.type === 'put' && p.qty < 0)
-                    );
-                } else if (trade.action === 'close_options') {
-                    targets = snapshot.filter(p => p.type === 'call' || p.type === 'put');
-                } else if (trade.action === 'hedge_unlimited_risk') {
-                    let nuu = 0;
-                    for (const p of portfolio.positions) {
-                        if (p.type === 'stock' || p.type === 'call') nuu += p.qty;
-                    }
-                    if (nuu < 0) {
-                        const hedgeQty = Math.abs(nuu);
-                        executeMarketOrder(
-                            sim, 'stock', 'long', hedgeQty,
-                            sim.S, vol, sim.r, sim.day,
-                            undefined, undefined, undefined, sim.q
-                        );
-                        _toast(`Hedge placed: bought ${hedgeQty} shares at market.`, 4000);
-                    }
-                    continue;
-                }
-                if (targets) {
-                    for (const p of targets) {
-                        pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
-                        if (closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q)) {
-                            closed++;
-                        }
-                    }
-                }
-            }
-            if (closed > 0) {
-                const sign = pnlSum >= 0 ? '+' : '';
-                _toast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
-                chainDirty = true;
-                updateUI();
-            }
-        }
-        // -- Compliance tier processing --
-        if (choice.complianceTier) {
-            applyComplianceChoice(choice.complianceTier);
-            if (getFaction('firmStanding') <= 0) {
-                _showComplianceTermination();
-            }
-        }
-        // -- Insider tip scheduling --
-        if (choice._tipAction && eventEngine) {
-            const tip = pickTip();
-            const isReal = Math.random() < TIP_REAL_PROBABILITY;
-            const eventId = isReal ? tip.realEvent : tip.fakeEvent;
-            _toast(`"Word is ${tip.hint}."`, 6000);
-            eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
-            if (isReal) {
-                shiftFaction('firmStanding', -5);
-            }
-        }
-        // Margin call actions
-        if (event._marginAction) {
-            const vol = market.sigma;
-            if (choice.playerFlag === 'margin_liquidated') {
-                const closedBefore = portfolio.positions.length;
-                const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
-                _applyRestriction(stuck, closedBefore);
-                chainDirty = true;
-                updateUI();
-                // Assess deficit on CANONICAL equity, never raw cash -- and only
-                // when the book is fully flat (a legal frozen book is restricted,
-                // not insolvent).
-                if (stuck.length === 0 && _portfolioEquity() < 0) {
-                    _showGameOver('Forced liquidation left your account in deficit by '
-                        + fmtDollar(Math.abs(_portfolioEquity()))
-                        + '. Regulators have flagged the account for review.',
-                        'margin_call_liquidation', 'Account Liquidation');
-                }
-            } else if (choice.playerFlag === 'margin_partial') {
-                // Close stock positions only
-                const stockPos = portfolio.positions.filter(p => p.type === 'stock');
-                for (const p of stockPos) {
-                    closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q);
-                }
-                chainDirty = true;
-                updateUI();
-                // Re-check margin after partial liquidation
-                const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
-                if (recheck.triggered) {
-                    _toast('Still below margin. Full liquidation required.', 4000);
-                    const closedBefore = portfolio.positions.length;
-                    const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
-                    _applyRestriction(stuck, closedBefore);
-                    chainDirty = true;
-                    updateUI();
-                    if (stuck.length === 0 && _portfolioEquity() < 0) {
-                        _showGameOver('Forced liquidation left your account in deficit.',
-                            'margin_call_liquidation', 'Account Liquidation');
-                    }
-                }
-            }
-            _haptic('heavy');
-        }
-        // Rogue trading / margin-deficit game over: the announcement popup is the
-        // BEAT; what follows is the SHARED terminal machinery (02a P6-3 ruling 2),
-        // NOT a preset reset -- latch -> extrapolate -> closeout -> epilogue, with the
-        // involvement split deciding the overlay like any other resignation.
-        if (event._gameOverAction) {
-            _triggerGameOver(event._gameOverEnding || 'forced_resignation');
-        }
-        // Forecast-lock (phase 4): commit the player's posterior claim vector at
-        // the scheduled lock day. Immutable, on-grid, current-day only -- check the
-        // return before reporting success (the window may have passed).
-        if (event._forecastLock && choice._lockVec) {
-            const rec = lockForecast(event._lockDay, choice._lockVec);
-            _toast(rec
-                ? 'Forecast locked. Credibility now scores it against every matured milestone.'
-                : 'The lock window has passed — no forecast recorded this quarter.', 4000);
-        }
-        // Reporting-regime lever (phase 5a): a policy choice enacts the mandatory
-        // incident-reporting regime (retroactive-once). Mirror the flag into
-        // world-state so guards see it, and report the disclosure wave.
-        if (choice._applyReportingRegime && raceState) {
-            const res = applyReportingRegime(raceState);
-            _syncRaceToWorld();
-            _toast('Mandatory incident reporting enacted — disclosure wave: '
-                + res.rescued + ' surfaced, ' + res.shortened + ' lags shortened.', 5000);
-        }
-        // Consensus dispute lifecycle (phase 5a): open a dispute on a contract, or
-        // record an adjudicator ruling. Content-driven; the machinery + narrative
-        // exist so the arcs can drive them.
-        if (choice._openDispute != null && raceState) {
-            const rec = openDispute(choice._openDispute, raceState.day, raceState.controlRegime);
-            if (rec) { refreshBinaryQuotes(raceState); _fireRaceShell('dispute_opened'); }
-        }
-        if (choice._ruleDispute && raceState) {
-            // A timely ruling settles SYNCHRONOUSLY (F2b) and returns the settlement
-            // row (also stashed in the outbox, R3); route it through the ONE shared
-            // consequence helper -- cash + credibility scoring + narrative -- exactly
-            // like the daily pass, so a ruled milestone is never paid without scoring.
-            const row = ruleDispute(choice._ruleDispute.key, choice._ruleDispute.outcome, raceState.day, raceState.controlRegime);
-            if (row) { _applyBinaryRows([row]); refreshBinaryQuotes(raceState); }
-        }
+        _applyPopupChoice(event, event.choices[idx]);
         dirty = true;
         // Drain the next queued popup (the overlay was hidden before this callback ran).
         // This chains the resolution-day beats and, when the queue empties, renders any
@@ -1798,8 +1679,263 @@ function _processPopupQueue() {
     }, popupCat, event.magnitude, isSuperevent);
 }
 
+/**
+ * Apply ONE popup choice's full declarative consequence. Extracted from the
+ * `showPopupEvent` callback (P7-2) so a standing order that INTERCEPTS a decision
+ * runs the identical code path a manual answer takes -- nothing double-applies,
+ * nothing goes missing, and no field ever has to be re-implemented for the
+ * automated route. Everything AROUND the consequence (the stinger, the music
+ * duck, the queue drain, the day-close retry) stays with the caller: those are
+ * about a popup having been on screen, which an intercepted beat never was.
+ */
+function _applyPopupChoice(event, choice) {
+    if (!choice) return;
+    if (choice.deltas && eventEngine) {
+        // P7-1: a substep-lane popup can be answered MID-DAY, with the day's
+        // overlays still installed -- apply the deltas against the true
+        // baseline so the overlay restore at day close cannot erase them.
+        // No-op wrapper at a day boundary (every pre-P7 path).
+        _midDayBaseline(() => eventEngine.applyDeltas(sim, choice.deltas));
+    }
+    // P6-2 treaty-channel ledger: capture treatyStage across the choice's
+    // structured effects so a player-advanced treaty step is attributed to the
+    // player (the advice/diplomacy line). Guarded on raceState.
+    const _treatyBefore = (raceState && eventEngine) ? eventEngine.world.ai.treatyStage : 0;
+    if (choice.effects && eventEngine) {
+        applyStructuredEffects(eventEngine.world, choice.effects);
+    }
+    if (raceState && eventEngine) {
+        const _treatyDelta = eventEngine.world.ai.treatyStage - _treatyBefore;
+        if (_treatyDelta > 0) appendLedger(sim.day, 'treaty', event.id, _treatyDelta, 'treatyStage advance');
+    }
+    // P6-2 raceEffects chokepoint (popup-choice path): the ONE sanctioned
+    // choice->race mutation route -- whitelisted dials (S per lab, heat), clamped,
+    // and ledgered under the event id (applyRaceEffects tracks race.playerS for the
+    // d_P decomposition). Guarded on raceState (null outside Dynamic modes).
+    if (choice.raceEffects && raceState) {
+        applyRaceEffects(raceState, choice.raceEffects, event.id, sim.day);
+    }
+    // Leak coupling (evidence machinery round): the insider channel's LEAK verb,
+    // declared as `raceLeak: true` on the choice, applied at THIS chokepoint --
+    // the same place raceEffects lands, behind the SAME frozen/inactive gate
+    // (raceChannelsLive: inert post-terminal-latch and in Classic, where the
+    // narrative followup still fires and nothing mechanical does). Two effects
+    // from the popup's stamped `_tipIncidentId`:
+    //   (1) detection forcing -- the leaked incident becomes detectable
+    //       unconditionally on a 4d memoryless clock (RNG-free);
+    //   (2) the B evidence-fold NOW, under the DETECTION's own fold id, so the
+    //       real detection's later fold is a no-op. Would-detect-anyway
+    //       incidents: total belief move identical leaked or unleaked (timing,
+    //       not mass). Never-detectable tail: the fold is NEW mass the world
+    //       would otherwise never get -- the override is the verb's point.
+    if (choice.raceLeak && raceState && event._tipIncidentId && raceChannelsLive()) {
+        const leaked = forceLeakDetection(raceState, event._tipIncidentId);
+        if (leaked) foldPlayerLeak(leaked.id, leaked.severity ?? event.raceMeta?.severity);
+    }
+    if (choice.factionShifts) {
+        for (const fs of choice.factionShifts) {
+            let value = fs.value;
+            if (fs.when?.hasTrait && hasTrait(fs.when.hasTrait)) value += (fs.bonus || 0);
+            shiftFaction(fs.faction, value);
+        }
+    }
+    if (choice.playerFlag) {
+        playerChoices[choice.playerFlag] = sim.day;
+    }
+    if (choice.cashPenalty) {
+        portfolio.cash -= choice.cashPenalty;
+    }
+    if (choice.regulatoryAction === 'settle') {
+        settleRegulatory();
+    } else if (choice.regulatoryAction === 'cooperate') {
+        cooperateRegulatory();
+    }
+    if (choice.followups && eventEngine) {
+        for (const fu of choice.followups) {
+            eventEngine.scheduleFollowup(fu, sim.day);
+        }
+    }
+    if (choice.resultToast) {
+        _toast(choice.resultToast, 4000);
+    }
+    // -- Declarative trade execution --
+    if (choice.trades) {
+        const vol = market.sigma;
+        const snapshot = [...portfolio.positions];
+        let closed = 0;
+        let pnlSum = 0;
+        for (const trade of choice.trades) {
+            let targets;
+            if (trade.action === 'close_all') {
+                // P&L captured per position BEFORE liquidation (positions vanish);
+                // summed only over the ids actually removed (frozen legs excluded).
+                const pnlById = new Map();
+                for (const p of snapshot) pnlById.set(p.id, computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q));
+                const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q);
+                const stuckIds = new Set(stuck.map(s => s.id));
+                for (const p of snapshot) if (!stuckIds.has(p.id)) pnlSum += pnlById.get(p.id);
+                closed = snapshot.length - stuck.length;
+                if (stuck.length) _toast(`${stuck.length} Consensus contract${stuck.length > 1 ? 's' : ''} frozen — could not flatten.`, 4000);
+                break;
+            } else if (trade.action === 'close_type') {
+                targets = snapshot.filter(p => p.type === trade.type);
+            } else if (trade.action === 'close_short') {
+                targets = snapshot.filter(p =>
+                    (p.type === 'stock' && p.qty < 0) ||
+                    (p.type === 'call' && p.qty < 0) ||
+                    (p.type === 'put' && p.qty > 0)
+                );
+            } else if (trade.action === 'close_long') {
+                targets = snapshot.filter(p =>
+                    (p.type === 'stock' && p.qty > 0) ||
+                    (p.type === 'call' && p.qty > 0) ||
+                    (p.type === 'put' && p.qty < 0)
+                );
+            } else if (trade.action === 'close_options') {
+                targets = snapshot.filter(p => p.type === 'call' || p.type === 'put');
+            } else if (trade.action === 'hedge_unlimited_risk') {
+                let nuu = 0;
+                for (const p of portfolio.positions) {
+                    if (p.type === 'stock' || p.type === 'call') nuu += p.qty;
+                }
+                if (nuu < 0) {
+                    const hedgeQty = Math.abs(nuu);
+                    executeMarketOrder(
+                        sim, 'stock', 'long', hedgeQty,
+                        sim.S, vol, sim.r, sim.day,
+                        undefined, undefined, undefined, sim.q
+                    );
+                    _toast(`Hedge placed: bought ${hedgeQty} shares at market.`, 4000);
+                }
+                continue;
+            }
+            if (targets) {
+                for (const p of targets) {
+                    pnlSum += computePositionPnl(p, sim.S, vol, sim.r, sim.day, sim.q);
+                    if (closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q)) {
+                        closed++;
+                    }
+                }
+            }
+        }
+        if (closed > 0) {
+            const sign = pnlSum >= 0 ? '+' : '';
+            _toast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
+            chainDirty = true;
+            updateUI();
+        }
+    }
+    // -- Compliance tier processing --
+    if (choice.complianceTier) {
+        applyComplianceChoice(choice.complianceTier);
+        if (getFaction('firmStanding') <= 0) {
+            _showComplianceTermination();
+        }
+    }
+    // -- Insider tip scheduling --
+    if (choice._tipAction && eventEngine) {
+        const tip = pickTip();
+        const isReal = Math.random() < TIP_REAL_PROBABILITY;
+        const eventId = isReal ? tip.realEvent : tip.fakeEvent;
+        _toast(`"Word is ${tip.hint}."`, 6000);
+        eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
+        if (isReal) {
+            shiftFaction('firmStanding', -5);
+        }
+    }
+    // Margin call actions
+    if (event._marginAction) {
+        const vol = market.sigma;
+        // P7-2 rule (c): the standing liquidation PREFERENCE. Not an action that
+        // fires -- an ordering the forced liquidation consumes (bonds first above
+        // 80% utilization). null while disarmed, and the chassis order is then
+        // bit-identical to the pre-P7-2 path.
+        const _liqOrder = standingLiquidationOrder(checkMargin(sim.S, vol, sim.r, sim.day, sim.q));
+        if (choice.playerFlag === 'margin_liquidated') {
+            const closedBefore = portfolio.positions.length;
+            const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q, _liqOrder);
+            _applyRestriction(stuck, closedBefore);
+            chainDirty = true;
+            updateUI();
+            // Assess deficit on CANONICAL equity, never raw cash -- and only
+            // when the book is fully flat (a legal frozen book is restricted,
+            // not insolvent).
+            if (stuck.length === 0 && _portfolioEquity() < 0) {
+                _showGameOver('Forced liquidation left your account in deficit by '
+                    + fmtDollar(Math.abs(_portfolioEquity()))
+                    + '. Regulators have flagged the account for review.',
+                    'margin_call_liquidation', 'Account Liquidation');
+            }
+        } else if (choice.playerFlag === 'margin_partial') {
+            // Close stock positions only
+            const stockPos = portfolio.positions.filter(p => p.type === 'stock');
+            for (const p of stockPos) {
+                closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q);
+            }
+            chainDirty = true;
+            updateUI();
+            // Re-check margin after partial liquidation
+            const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
+            if (recheck.triggered) {
+                _toast('Still below margin. Full liquidation required.', 4000);
+                const closedBefore = portfolio.positions.length;
+                const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q,
+                    standingLiquidationOrder(recheck));
+                _applyRestriction(stuck, closedBefore);
+                chainDirty = true;
+                updateUI();
+                if (stuck.length === 0 && _portfolioEquity() < 0) {
+                    _showGameOver('Forced liquidation left your account in deficit.',
+                        'margin_call_liquidation', 'Account Liquidation');
+                }
+            }
+        }
+        _haptic('heavy');
+    }
+    // Rogue trading / margin-deficit game over: the announcement popup is the
+    // BEAT; what follows is the SHARED terminal machinery (02a P6-3 ruling 2),
+    // NOT a preset reset -- latch -> extrapolate -> closeout -> epilogue, with the
+    // involvement split deciding the overlay like any other resignation.
+    if (event._gameOverAction) {
+        _triggerGameOver(event._gameOverEnding || 'forced_resignation');
+    }
+    // Forecast-lock (phase 4): commit the player's posterior claim vector at
+    // the scheduled lock day. Immutable, on-grid, current-day only -- check the
+    // return before reporting success (the window may have passed).
+    if (event._forecastLock && choice._lockVec) {
+        const rec = lockForecast(event._lockDay, choice._lockVec);
+        _toast(rec
+            ? 'Forecast locked. Credibility now scores it against every matured milestone.'
+            : 'The lock window has passed — no forecast recorded this quarter.', 4000);
+    }
+    // Reporting-regime lever (phase 5a): a policy choice enacts the mandatory
+    // incident-reporting regime (retroactive-once). Mirror the flag into
+    // world-state so guards see it, and report the disclosure wave.
+    if (choice._applyReportingRegime && raceState) {
+        const res = applyReportingRegime(raceState);
+        _syncRaceToWorld();
+        _toast('Mandatory incident reporting enacted — disclosure wave: '
+            + res.rescued + ' surfaced, ' + res.shortened + ' lags shortened.', 5000);
+    }
+    // Consensus dispute lifecycle (phase 5a): open a dispute on a contract, or
+    // record an adjudicator ruling. Content-driven; the machinery + narrative
+    // exist so the arcs can drive them.
+    if (choice._openDispute != null && raceState) {
+        const rec = openDispute(choice._openDispute, raceState.day, raceState.controlRegime);
+        if (rec) { refreshBinaryQuotes(raceState); _fireRaceShell('dispute_opened'); }
+    }
+    if (choice._ruleDispute && raceState) {
+        // A timely ruling settles SYNCHRONOUSLY (F2b) and returns the settlement
+        // row (also stashed in the outbox, R3); route it through the ONE shared
+        // consequence helper -- cash + credibility scoring + narrative -- exactly
+        // like the daily pass, so a ruled milestone is never paid without scoring.
+        const row = ruleDispute(choice._ruleDispute.key, choice._ruleDispute.outcome, raceState.day, raceState.controlRegime);
+        if (row) { _applyBinaryRows([row]); refreshBinaryQuotes(raceState); }
+    }
+}
+
 function _showGameOver(contextText, endingId = 'forced_resignation', headline = 'Rogue Trading Investigation') {
-    _popupQueue.unshift({
+    _queuePopup({
         category: 'gameover',
         magnitude: 'major',
         headline,
@@ -1814,7 +1950,7 @@ function _showGameOver(contextText, endingId = 'forced_resignation', headline = 
         ],
         _gameOverAction: true,
         _gameOverEnding: endingId,   // routed through _triggerGameOver (the shared latch)
-    });
+    }, true);
     _processPopupQueue();
 }
 
@@ -1855,9 +1991,12 @@ function _triggerGameOver(endingId) {
     //     below never prices through a transient overlay or a half-open day.
     _abortPartialDay();
     // 1. Lock the desk: cancel pending orders AND every working (deferred) manual
-    //    order, restrict (the durable lock is _gameOver).
+    //    order, silence the delegation layer (P7-2: a precommitment cannot execute
+    //    into a closed-out book, and the tip interception stops with it), restrict
+    //    (the durable lock is _gameOver).
     cancelAllOrders();
     clearDeferredOrders();
+    freezeStandingOrders();
     portfolio.restricted = true;
 
     // TERMINAL QUEUE DISCIPLINE (02a P6-3): the world's resolution supersedes the day's
@@ -2013,7 +2152,7 @@ function _promptForecastLock() {
     const day = raceState.day;
     const tl = impliedTimeline();
     const mkt = Math.round(marketPilled());
-    _popupQueue.push({
+    _queuePopup({
         category: 'desk',
         magnitude: 'moderate',
         headline: 'Quarterly Forecast Lock',
@@ -2332,6 +2471,10 @@ function _onDayComplete() {
         // scale above (released rung + regime); never race internals. Also hands x
         // to the audio layer and opens/closes the substep lane.
         _stepAct3();
+        // Standing orders (P7-2): the panel's gates ride the SAME public released
+        // rung -- unlocked at R3, armed set locked at R5. Synced here, before any
+        // rule is evaluated below, so arming and firing agree about the world.
+        syncStandingOrders(_frontierRung());
         // Market belief B (overhaul phase 4): fold this completed day's LEGIBLE
         // ledger (releases, certifications, detected incidents, published/leaked
         // evidence) into B before anything reads a quote. Consumes ONLY
@@ -2370,6 +2513,13 @@ function _onDayComplete() {
             }
         }
         refreshComputeQuotes(raceState, _geo);
+
+        // Standing orders (P7-2), day-boundary rules: (a) severity cut, (b) blockade
+        // halve, (d) certification harvest. Placed AFTER settlement + quote refresh
+        // by design -- (d) must price its harvest off today's live quotes and skip
+        // what already settled, and (a)'s cut lands before the margin check below
+        // sees the book. Machinery-instant; one fire per trigger episode.
+        _runStandingDayRules();
 
         // Forecast locking + firm belief F + the belief-gap scrutiny loop
         // (overhaul phase 4). Lock days are the fixed quarterly grid 0/63/126...
@@ -2453,7 +2603,7 @@ function _onDayComplete() {
             for (const f of bridged.fired) fired.push(f);
             for (const p of bridged.popups) popups.push(p);
         }
-        for (const ev of popups) _popupQueue.push(ev);
+        for (const ev of popups) _queuePopup(ev);
         const hasSupereventPopups = popups.some(ev => ev.superevent);
         if (hasSupereventPopups) {
             sim.recomputeK();
@@ -2502,7 +2652,7 @@ function _onDayComplete() {
     // Portfolio-triggered popup events
     if (eventEngine) {
         const portfolioPopups = eventEngine.evaluateTriggers(sim, sim.day);
-        for (const pp of portfolioPopups) _popupQueue.push(pp);
+        for (const pp of portfolioPopups) _queuePopup(pp);
     }
 
     if (eventEngine) {
@@ -2580,7 +2730,7 @@ function _onDayComplete() {
     if (margin.triggered) {
         portfolio.marginCallCount++;
         const shortfall = margin.required - margin.equity;
-        _popupQueue.unshift({
+        _queuePopup({
             category: 'margin',
             magnitude: 'major',
             headline: 'Margin Call',
@@ -2601,7 +2751,7 @@ function _onDayComplete() {
                 },
             ],
             _marginAction: true,
-        });
+        }, true);
         _processPopupQueue();
     }
 
@@ -2704,6 +2854,9 @@ function updateUI(precomputedMargin) {
     updateVxhcnDisplay($, vxhcnShown, vxhcnHistory);
     if (raceState && consensus.active) updateConsensusPanel($, consensus, portfolio, raceState.day);
     if (raceState && computeMarket.active) updateComputePanel($, computeMarket, portfolio, raceState.day);
+    // Standing orders (P7-2): hidden until the released frontier rung unlocks the
+    // panel, and null outside Dynamic modes (the view model hides it).
+    updateStandingOrdersPanel($, raceState ? standingOrdersView() : null, _onStandingToggle);
     refreshTooltip();
     if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
         _updateTradeCreditDebit();
@@ -2923,6 +3076,7 @@ function _resetCore(index) {
     resetLobbying();
     resetAudio();
     resetAct3();   // P7-1: x -> 0, substep clock zeroed, working orders dropped, latches cleared
+    resetStandingOrders();   // P7-2: precommitments are authored per RUN -- nothing armed, nothing locked, no episode remembered
     // Reset the race->narrative bridge's variant-rotation counter so same-seed
     // playback doesn't depend on process history. Guarded on raceState so Classic
     // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
