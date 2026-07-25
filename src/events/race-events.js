@@ -229,6 +229,38 @@ export const RACE_EVENTS = [
             },
         ],
     },
+    // ---- Classified-brief shells (P7-3 blackout; PROSE: coordinator) ----------
+    // Under `controlRegime === 'classified'` the bridge routes every detected
+    // incident of severity <= 3 HERE instead of to the public ladder above (S4 is
+    // undeniable and keeps its superevent). What reaches the desk is not a story
+    // but a redacted notice -- the shape of an incident with the facts sealed --
+    // and `B` does not move on it (stepBelief suppresses the matching fold).
+    //
+    // NO `impulse` KEY AT ALL, on either shell: absent, not zeroed (02a). A
+    // blackout brief is not a market event; there is nothing for the tape to price
+    // because there is nothing in the notice to price. The absence is load-bearing
+    // -- the bridge's impulse dispatch simply never runs for these.
+    //
+    // Both are toast-weight BY DESIGN: the blackout's whole content is that the
+    // desk is no longer being consulted, so a classified brief is never a decision
+    // surface. Tokens available from raceMeta if the prose wants them: {lab},
+    // {model}, {aModel}, {lag}. Category stays 'incident' -- Poisson-excluded by
+    // the existing rule, bridge-fired only.
+    {
+        id: 'incident_brief_classified',
+        category: 'incident',
+        magnitude: 'minor',
+        headline: 'PROSE: coordinator — classified incident brief, ordinary severity (S0-S2 and persuasion class under blackout): the notice exists, the facts are sealed, the market cannot price what it is not told.',
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+    },
+    {
+        id: 'incident_brief_classified_grave',
+        category: 'incident',
+        magnitude: 'moderate',
+        headline: 'PROSE: coordinator — classified incident brief, GRAVE (S3 under blackout): the public ladder would have asked the desk for a decision here; the blackout version does not ask.',
+        params: {},                            // no permanent delta (03 incident-coupling rule)
+    },
+
     // ---- Theft disclosure (evidence machinery round; two-track like incidents) --
     // A weight theft OCCURRED silently, days-to-months ago; this is the day the
     // world finds out -- and finds out WITHOUT agreement about what happened. The

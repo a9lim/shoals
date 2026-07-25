@@ -26,6 +26,9 @@ import { WONDER_EVENTS } from './wonders.js';
 import { POLICY_EVENTS } from './policy.js';
 import { TREATY_EVENTS } from './treaty.js';
 import { INSIDER_EVENTS } from './insider.js';
+// P7-3: the room (the endgame branch point). Category 'room' is Poisson-excluded
+// and latch-fired by main.js's _checkRoom -- merged here for getEventById.
+import { ROOM_EVENTS } from './room.js';
 
 export const ALL_EVENTS = [
     ...FED_EVENTS,
@@ -46,6 +49,7 @@ export const ALL_EVENTS = [
     ...POLICY_EVENTS,
     ...TREATY_EVENTS,
     ...INSIDER_EVENTS,
+    ...ROOM_EVENTS,
 ];
 
 // -- Event-by-id lookup --

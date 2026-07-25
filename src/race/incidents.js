@@ -105,7 +105,20 @@ const REPORTING_LAG_MULT = 0.5;
 // in its occurrence tick (02a, ratified 2026-07-23) -- "undetected" is the
 // occurrence-tick sense, independent of eventual public detectability. Standing-
 // gating of whether the tip reaches the player is later-phase.
-const INSIDER_TIP_PROB = 0.30;
+export const INSIDER_TIP_PROB = 0.30;
+// CLASSIFICATION BLACKOUT (P7-3, 02a): under `controlRegime === 'classified'` the
+// insider channel is the only feed left, and it thickens -- Bernoulli 0.3 -> 0.5.
+// The rate is regime-dependent at ROLL time (never retroactive: a tip already
+// decided is not re-rolled when the statute lands). The draw is taken from the
+// SAME position in the same substream either way, so the draw COUNT is identical
+// under both regimes and a non-classified run is bit-identical to the pre-round
+// build (harness-asserted).
+export const INSIDER_TIP_PROB_CLASSIFIED = 0.50;
+
+/** Occurrence-tick insider-tip probability for the CURRENT regime. */
+function insiderTipProb(race) {
+    return race.controlRegime === 'classified' ? INSIDER_TIP_PROB_CLASSIFIED : INSIDER_TIP_PROB;
+}
 
 // ---- Evidence constants (02a) --------------------------------------------
 
@@ -174,6 +187,7 @@ export function stepIncidents(race, day, endDay, heat) {
     }
 
     // 2. Occurrence: Λ_world Poisson daily, source ∝ w_i.
+    const tipProb = insiderTipProb(race);   // regime-dependent at roll time (P7-3 blackout)
     const rows = occurrenceEntities(race);
     const heatTerm = OCC_HEAT_BASE + heat;
     let sumW = 0;
@@ -220,10 +234,11 @@ export function stepIncidents(race, day, endDay, heat) {
         // invented truth-valued numbers in state, even inert; applying one would
         // also double-count the calibrated S path.
         const sBurn = null;
-        // Insider tip: one Bernoulli(0.3) for every incident NOT detected in its
+        // Insider tip: one Bernoulli for every incident NOT detected in its
         // occurrence tick (02a) -- independent of eventual public detectability;
-        // the occurrence->disclosure window is the tip's whole point.
-        const insiderTip = !immediate && (rng.next() < INSIDER_TIP_PROB);
+        // the occurrence->disclosure window is the tip's whole point. The rate is
+        // 0.3, or 0.5 under a classified regime (the channel is the only feed left).
+        const insiderTip = !immediate && (rng.next() < tipProb);
 
         const inc = {
             id: `inc_${endDay}_${j}`,

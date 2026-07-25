@@ -123,6 +123,15 @@ const ALIGN_INCIDENT = 0.06; // additive alignment hit per DETECTED incident, x(
 // which is why it is a fixed magnitude, not severity-scaled like an incident.
 const ALIGN_THEFT_DISCLOSURE = 0.20;
 const ALIGN_CLAMP = Math.log(19);   // alignment sentiment clamp (posterior ceiling 0.95, mirrors evidence)
+// CLASSIFICATION BLACKOUT (P7-3, 02a): under `controlRegime === 'classified'` a
+// detected incident reaches the market as a redacted brief, not a story, so its
+// alignment fold is SUPPRESSED through severity 3. Severity 4 is undeniable --
+// it self-discloses in its own tick and folds unchanged, whatever the statute
+// says. This is a PUBLIC-state read (controlRegime is mirrored into world.ai and
+// carried on buildPublicView), never a latent one, so the corruption-invariance
+// contract is untouched. Suppression does NOT claim the fold id: the player's own
+// leak verb can still fold that incident (the channel that survives a blackout).
+export const BLACKOUT_FOLD_MAX_SEV = 3;
 
 // eta / compute-demand (UNRATIFIED shapes).
 const COMPUTE_BELIEF_HORIZON = 252;   // days ahead the compute market reads "R5 near" over (ratified)
@@ -413,8 +422,13 @@ export function stepBelief(race) {
     //    the timeline (a loud, incident-heavy world reads as less safe -- but
     //    incidents at the deployed rung are not crossing-date evidence).
     //    Occurrence stays SILENT -- never read.
+    //    P7-3 blackout: under a classified regime the fold is suppressed through
+    //    severity 3 (see BLACKOUT_FOLD_MAX_SEV) -- the detection happened, the
+    //    market was not told, so the market's posterior does not move.
+    const blackout = race.controlRegime === 'classified';
     for (const det of tr.incidents.detected) {
         const sev = det.severity ?? 0;
+        if (blackout && sev <= BLACKOUT_FOLD_MAX_SEV) continue;
         _foldAlignment(-ALIGN_INCIDENT * (sev + 1), 1, `det_${det.id}`, 'incident-detected');
     }
 

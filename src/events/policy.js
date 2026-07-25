@@ -149,6 +149,41 @@ export const POLICY_EVENTS = [
         ],
     },
 
+    // ---- Treasury backchannel (P7-3: fund-as-actor; PROSE: coordinator) -----
+    // 02a P7-3 semantics item 3, the fund-as-actor wager. Gated on the fund being
+    // LIVE -- `world.ai.fundLive`, the read-only mirror of main.js's monotone latch
+    // over belief.js's OWN gate predicate `canActAsFund` (credibility > 0.65 AND
+    // F > 60). The gate is never recomputed here: this `when` reads the mirror, the
+    // latch reads the predicate, and the predicate owns the thresholds.
+    // ONE-SHOT: Treasury asks once. Accepting sets `treasury_backchannel` -- the
+    // room's sixth criterion -- and costs regulatoryExposure +6, because a standing
+    // wire into Treasury is a wire. Declining sets `declined_treasury`.
+    {
+        id: 'treasury_backchannel',
+        category: 'policy',
+        oneShot: true,
+        popup: true,
+        magnitude: 'moderate',
+        when: (sim, world) => !!world.ai.fundLive,
+        headline: 'PROSE: coordinator — Treasury opens a standing backchannel to the desk: the fund is now large enough, and right enough, to be asked.',
+        context: 'PROSE: coordinator — what the wire buys (a seat at the table when the decision comes) and what it costs (a wire runs both ways, and the exposure is permanent).',
+        choices: [
+            {
+                label: 'PROSE: coordinator — take the call',
+                desc: 'PROSE: coordinator — the access is real and so is the record of it.',
+                playerFlag: 'treasury_backchannel',
+                factionShifts: [{ faction: 'regulatoryExposure', value: 6 }],
+                resultToast: 'PROSE: coordinator — the backchannel opens.',
+            },
+            {
+                label: 'PROSE: coordinator — stay a market participant',
+                desc: 'PROSE: coordinator — decline the wire; keep the distance that makes the book defensible.',
+                playerFlag: 'declined_treasury',
+                resultToast: 'PROSE: coordinator — the offer lapses.',
+            },
+        ],
+    },
+
     // ---- The government flail (satire pulse; the texture register) ----------
     {
         id: 'gov_flail',

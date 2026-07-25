@@ -79,16 +79,36 @@
 import { createHash } from 'node:crypto';
 import {
     createRaceState, advanceRace, stepControlRegime, setControlRegime,
-    heatValue, REGIME_RANK, CONTROL_REGIMES, RETUNE,
+    heatValue, REGIME_RANK, CONTROL_REGIMES, RETUNE, freshTransitions,
+    roomTrigger, roomTriggerReady, ROOM_RUNG, ROOM_MARGIN, ROOM_TRIGGER_C,
 } from '../src/race/race-state.js';
 import { CONTROL_TUNING } from '../src/race/control-regime.js';
 import { BLOCKADE_HEAT } from '../src/race/strait.js';
-import { deterministicDrift, EXPORT_CONTROL_GROWTH, normalizeExportStage } from '../src/race/capability.js';
-import { forceLeakDetection, LEAK_FORCED_MEAN_LAG } from '../src/race/incidents.js';
+import {
+    deterministicDrift, EXPORT_CONTROL_GROWTH, normalizeExportStage, frontierInternal,
+} from '../src/race/capability.js';
+import {
+    forceLeakDetection, LEAK_FORCED_MEAN_LAG, stepIncidents,
+    INSIDER_TIP_PROB, INSIDER_TIP_PROB_CLASSIFIED,
+} from '../src/race/incidents.js';
+import {
+    initIntel, deactivateIntel, intelActive, intelRead, velocityBucket,
+    INTEL_LO, INTEL_HI, INTEL_BUCKETS, INTEL_TRUTH_PROB,
+} from '../src/race/intel.js';
+import { createRng, deriveSeed } from '../src/race/rng.js';
 import { DISCLOSE_PROB, DISCLOSE_MEAN_LAG, PUBLIC_ATTRIBUTIONS } from '../src/race/theft-disclosure.js';
 import { stepTreaty } from '../src/race/treaty-track.js';
 import { checkResolution } from '../src/race/resolution.js';
-import { resetLedger, deactivateLedger, freezeLedger, raceChannelsLive } from '../src/race/ledger.js';
+import {
+    resetLedger, deactivateLedger, freezeLedger, raceChannelsLive,
+    applyRaceEffects, ledgerEntries,
+} from '../src/race/ledger.js';
+import { isTerminalSafeBeat } from '../src/endings.js';
+import {
+    ROOM_EVENT_ID, ROOM_FLAGS, ROOM_GATE, ROOM_FLAG_CRITERIA, ROOM_LEADER_SIDES,
+    ROOM_MIN_CRITERIA, ROOM_MAX_VOICE, roomVoice, roomInvited, roomChoices,
+    roomLeaderSide, roomPresentation, resetRoomRotation,
+} from '../src/events/room.js';
 import {
     consensus, initConsensus, deactivateConsensus, refreshBinaryQuotes,
     computeBinarySettlements, openDispute, ruleDispute, disputeAdjudicator,
@@ -126,7 +146,7 @@ import {
 } from '../src/price-impact.js';
 import {
     belief, initBelief, deactivateBelief, lockForecast, credibility,
-    stepBelief, foldPlayerLeak, beliefCauses, beliefProcessed,
+    stepBelief, foldPlayerLeak, beliefCauses, beliefProcessed, BLACKOUT_FOLD_MAX_SEV,
 } from '../src/race/belief.js';
 import { market, syncMarket } from '../src/market.js';
 import { eventBaseRateScale, BASE_RATE_MAX_MULT, EventEngine } from '../src/events.js';
@@ -610,12 +630,13 @@ check('gray-zone fires at tension 1', grayAtTension1 > 0, `${grayAtTension1} tot
  *  theftCount / rung + certification stamps) -- the P6-2 pattern. This is the
  *  quantity every "bit-identical" claim in this round is about: the race's
  *  physical state, not the narrative/belief ledgers layered on top. */
-function trajectoryHash(seed, opts, mutate) {
+function trajectoryHash(seed, opts, mutate, perDay) {
     const race = createRaceState(seed >>> 0);
     if (mutate) mutate(race);
     const h = createHash('sha256');
     for (let d = 0; d < HORIZON; d++) {
         advanceRace(race, opts);
+        if (perDay) perDay(race);
         const c = race.capability;
         h.update([
             c.labs.halcyon.C_internal, c.labs.tianxia.C_internal,
@@ -1858,6 +1879,645 @@ const soFiredRules = new Set();
     resetPortfolio(); resetImpactState(); syncFixed(0);
 }
 
+// =====================================================================
+// N. P7-3: the room, the blackout, the backchannel, the intel
+// =====================================================================
+let roomReachFrac = 0, roomVoiceHist = '', roomLeaderMix = '';
+let tipPrivateRate = 0, tipClassifiedRate = 0, blackoutStreamOK = true, blackoutRecordsOK = true;
+let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
+{
+    // -- N1. The room's race-side predicate ------------------------------
+    check('N1: room trigger level is R5 - 0.15 = 4.85 (02a verbatim)',
+        ROOM_RUNG === 5 && ROOM_MARGIN === 0.15 && Math.abs(ROOM_TRIGGER_C - 4.85) < 1e-12,
+        `${ROOM_TRIGGER_C}`);
+    check('N1: predicate false for a null race (Classic never convenes a room)',
+        roomTriggerReady(null) === false && roomTriggerReady(undefined) === false);
+    {
+        const race = createRaceState(777);
+        check('N1: predicate false at run start', roomTriggerReady(race) === false);
+        // EXACT threshold behaviour, on the leader whoever it is: just under is
+        // closed, exactly at the level is open.
+        race.capability.labs.halcyon.C_internal = ROOM_TRIGGER_C - 1e-9;
+        const justUnder = roomTriggerReady(race);
+        race.capability.labs.halcyon.C_internal = ROOM_TRIGGER_C;
+        const atLevel = roomTriggerReady(race);
+        check('N1: predicate opens exactly AT the threshold, not below',
+            justUnder === false && atLevel === true);
+        // It is the LEADER, not Halcyon: an unspawned lab cannot trigger it, a
+        // spawned rival can.
+        const race2 = createRaceState(778);
+        race2.capability.labs.polaris.C_internal = ROOM_TRIGGER_C + 0.2;
+        const inactiveLeader = roomTriggerReady(race2);
+        race2.capability.labs.polaris.active = true;
+        check('N1: the LEADER triggers it -- an inactive lab does not, an active rival does',
+            inactiveLeader === false && roomTriggerReady(race2) === true);
+    }
+    // -- N1b. ONE helper, both facts: `ready` + `leaderLab` (02a ruling 3) ---
+    {
+        check('N1b: roomTrigger is total on a null race (no leader, not ready)',
+            JSON.stringify(roomTrigger(null)) === '{"ready":false,"leaderLab":null}'
+            && roomTriggerReady(null) === false);
+        // `ready` must agree with the frontier-internal predicate at every state,
+        // and `leaderLab` must BE the argmax -- checked against an independent
+        // traversal over many advanced states.
+        let readyAgrees = true, leaderIsArgmax = true, sawTianxiaLead = false, sawPolarisLead = false;
+        for (let i = 0; i < Math.min(N, 300); i++) {
+            const race = createRaceState((BASE_SEED + 8000 + i) >>> 0);
+            for (let d = 0; d < HORIZON; d += 60) {
+                for (let k = 0; k < 60; k++) advanceRace(race);
+                const t = roomTrigger(race);
+                const cap = race.capability;
+                if (t.ready !== (frontierInternal(cap) >= ROOM_TRIGGER_C)) readyAgrees = false;
+                let best = -Infinity;
+                for (const id of ['halcyon', 'tianxia', 'polaris']) {
+                    const lab = cap.labs[id];
+                    if (lab.active) best = Math.max(best, lab.C_internal);
+                }
+                if (cap.labs[t.leaderLab].C_internal !== best) leaderIsArgmax = false;
+                if (t.leaderLab === 'tianxia') sawTianxiaLead = true;
+                if (t.leaderLab === 'polaris') sawPolarisLead = true;
+            }
+        }
+        check('N1b: `ready` agrees with frontierInternal >= 4.85 at every sampled state', readyAgrees);
+        check('N1b: `leaderLab` IS the argmax over active labs, at every sampled state', leaderIsArgmax);
+        // Tianxia leads organically in some worlds; Polaris spawns 0.6 BEHIND
+        // Halcyon and never leads on its own (measured: 0% of trigger days), so the
+        // polaris branch is exercised on a forced state instead of pretended into MC.
+        const forcedPolaris = createRaceState(780);
+        forcedPolaris.capability.labs.polaris.active = true;
+        forcedPolaris.capability.labs.polaris.C_internal = 5.1;
+        check('N1b: Tianxia leads in some worlds; the Polaris branch resolves when forced',
+            sawTianxiaLead && sawPolarisLead === false
+            && roomTrigger(forcedPolaris).leaderLab === 'polaris',
+            `polaris never leads organically (${sawPolarisLead ? 'saw one' : 'none seen'})`);
+        // Tie resolution: the shared iteration order (halcyon first) decides.
+        const tie = createRaceState(779);
+        tie.capability.labs.halcyon.C_internal = 5.0;
+        tie.capability.labs.tianxia.C_internal = 5.0;
+        check('N1b: an exact tie keeps the earlier lab in the shared iteration order',
+            roomTrigger(tie).leaderLab === 'halcyon');
+    }
+    // Reachability (a REPORT, not a band -- 02a fixes no room incidence): how often
+    // does a run reach the branch point at all, before the world resolves?
+    {
+        const ROOM_N = Math.min(N, 600);
+        let reached = 0;
+        const leaderTally = { halcyon: 0, tianxia: 0, polaris: 0 };
+        for (let i = 0; i < ROOM_N; i++) {
+            const race = createRaceState((BASE_SEED + 4000 + i) >>> 0);
+            let sawRoom = false;
+            for (let d = 0; d < HORIZON && !race.resolution; d++) {
+                advanceRace(race);
+                stepControlRegime(race); stepTreaty(race, {});
+                checkResolution(race, null);
+                const t = roomTrigger(race);
+                if (!race.resolution && t.ready) { sawRoom = true; leaderTally[t.leaderLab]++; break; }
+            }
+            if (sawRoom) reached++;
+        }
+        roomReachFrac = reached / ROOM_N;
+        roomLeaderMix = Object.entries(leaderTally)
+            .map(([k, v]) => `${k} ${reached ? pct(v / reached) : '0%'}`).join(' / ');
+        check('N1: the room is reachable and is NOT every run (a real branch point)',
+            roomReachFrac > 0 && roomReachFrac < 1, `${pct(roomReachFrac)} of ${ROOM_N} runs`);
+        // BOTH rooms are live: some worlds convene it with an American lab about to
+        // cross, some with Beijing about to. If one side never happened, the
+        // per-leader pools would be decoration.
+        check('N1: BOTH leader sides actually happen at the trigger (two real rooms)',
+            leaderTally.halcyon + leaderTally.polaris > 0 && leaderTally.tianxia > 0,
+            roomLeaderMix);
+    }
+
+    // -- N2. Gate arithmetic + voice scaling (the pure helpers main.js calls) --
+    check('N2: voice = satisfied-criteria count',
+        roomVoice([]) === 0 && roomVoice([true, false, false, false, false, false]) === 1
+        && roomVoice([true, true, false, false, false, false]) === 2
+        && roomVoice([true, true, true, true, true, true]) === ROOM_MAX_VOICE);
+    check('N2: seat needs >= 2 criteria (1 -> no beat, 2 -> in, 6 -> in)',
+        ROOM_MIN_CRITERIA === 2 && roomInvited(0) === false && roomInvited(1) === false
+        && roomInvited(2) === true && roomInvited(6) === true);
+    check('N2: below the gate roomChoices is EMPTY (no beat, not even a toast)',
+        roomChoices(1, true).length === 0 && roomChoices(0, false).length === 0);
+    // The deal option tracks summitLive, both ways.
+    const shell = getEventById(ROOM_EVENT_ID);
+    const dealPresent = (cs) => cs.some(c => c._roomVerb === 'deal');
+    check('N2: advise-the-deal is present ONLY while the summit window is live',
+        dealPresent(roomChoices(6, true)) && !dealPresent(roomChoices(6, false))
+        && roomChoices(6, true).length === 4 && roomChoices(6, false).length === 3);
+    check('N2: the room shell is a superevent popup, category room, with no market coupling',
+        !!shell && shell.superevent === true && shell.popup === true && shell.category === 'room'
+        && !('impulse' in shell) && JSON.stringify(shell.params) === '{}');
+    // Voice scaling: applied = base x voice/6, exactly, per effect.
+    const amt = (cs, verb, dial) => {
+        const c = cs.find(x => x._roomVerb === verb);
+        const e = c.raceEffects.find(x => x.dial === dial);
+        return e.amount;
+    };
+    const speed6 = amt(roomChoices(6, true), 'speed', 'S');
+    const speed2 = amt(roomChoices(2, true), 'speed', 'S');
+    const speed3 = amt(roomChoices(3, true), 'speed', 'S');
+    check('N2: full-voice magnitudes are 02a verbatim (speed -0.12, margin +0.12, deal heat -0.09 + S +0.04)',
+        Math.abs(speed6 - (-0.12)) < 1e-15
+        && Math.abs(amt(roomChoices(6, true), 'margin', 'S') - 0.12) < 1e-15
+        && Math.abs(amt(roomChoices(6, true), 'deal', 'heat') - (-0.09)) < 1e-15
+        && Math.abs(amt(roomChoices(6, true), 'deal', 'S') - 0.04) < 1e-15);
+    check('N2: applied effect = base x (voice/6)',
+        Math.abs(speed2 - (-0.12 * 2 / 6)) < 1e-15 && Math.abs(speed3 - (-0.12 * 3 / 6)) < 1e-15,
+        `voice2 ${speed2.toFixed(6)}, voice3 ${speed3.toFixed(6)}`);
+    check('N2: scaling DEEP-CLONES -- the shared shell is never mutated across firings',
+        shell.choices.find(c => c._roomVerb === 'speed').raceEffects[0].amount === -0.12);
+    check('N2: saying nothing carries NO raceEffects and sets room_declined',
+        (() => {
+            const c = roomChoices(2, false).find(x => x._roomVerb === 'silence');
+            return c && !c.raceEffects && c.playerFlag === ROOM_FLAGS.declined;
+        })());
+    // -- N2b. Per-leader presentation (02a ruling 3) -----------------------
+    {
+        check('N2b: sides are home (Halcyon, Polaris -- the schism) vs rival (Tianxia); unknown defaults home',
+            JSON.stringify(ROOM_LEADER_SIDES) === '["home","rival"]'
+            && roomLeaderSide('halcyon') === 'home' && roomLeaderSide('polaris') === 'home'
+            && roomLeaderSide('tianxia') === 'rival'
+            && roomLeaderSide(null) === 'home' && roomLeaderSide(undefined) === 'home');
+        // The shell carries pools for BOTH fields on BOTH sides, and NO scalar
+        // headline/context (a scalar would silently pre-empt the pools).
+        check('N2b: headline AND context pools exist for both sides; no scalar fallback on the shell',
+            ROOM_LEADER_SIDES.every(s => Array.isArray(shell.headlinesByLeader[s]) && shell.headlinesByLeader[s].length > 0
+                && Array.isArray(shell.contextsByLeader[s]) && shell.contextsByLeader[s].length > 0)
+            && !('headline' in shell) && !('context' in shell));
+        resetRoomRotation();
+        const homeShow = roomPresentation('halcyon');
+        const rivalShow = roomPresentation('tianxia');
+        check('N2b: selection tracks the leader side for BOTH headline and context',
+            homeShow.side === 'home' && rivalShow.side === 'rival'
+            && shell.headlinesByLeader.home.includes(homeShow.headline)
+            && shell.contextsByLeader.home.includes(homeShow.context)
+            && shell.headlinesByLeader.rival.includes(rivalShow.headline)
+            && shell.contextsByLeader.rival.includes(rivalShow.context)
+            && homeShow.headline !== rivalShow.headline);
+        // Deterministic rotation, per (shell, side, field): even cycling, no
+        // repeat-in-a-row, and the other side's counter is untouched.
+        resetRoomRotation();
+        const realRandom = Math.random;
+        let rotationRandomCalls = 0;
+        Math.random = () => { rotationRandomCalls++; return realRandom(); };
+        const homeSeq = [];
+        for (let i = 0; i < 5; i++) homeSeq.push(roomPresentation('halcyon').headline);
+        const rivalFirstAfterHome = roomPresentation('tianxia').headline;
+        Math.random = realRandom;
+        const homePool = shell.headlinesByLeader.home;
+        let cyclesEvenly = true, noRepeatInARow = true;
+        for (let i = 0; i < homeSeq.length; i++) {
+            if (homeSeq[i] !== homePool[i % homePool.length]) cyclesEvenly = false;
+            if (i > 0 && homePool.length > 1 && homeSeq[i] === homeSeq[i - 1]) noRepeatInARow = false;
+        }
+        check('N2b: rotation is deterministic and even per side (never an RNG draw)',
+            cyclesEvenly && noRepeatInARow && rotationRandomCalls === 0,
+            `${rotationRandomCalls} Math.random calls`);
+        check('N2b: the sides rotate INDEPENDENTLY -- home firings never advance rival',
+            rivalFirstAfterHome === shell.headlinesByLeader.rival[0]);
+        resetRoomRotation();
+        check('N2b: resetRoomRotation restarts both sides at pool[0] (same-seed replay)',
+            roomPresentation('halcyon').headline === homePool[0]
+            && roomPresentation('tianxia').headline === shell.headlinesByLeader.rival[0]);
+        resetRoomRotation();
+        // The choices stay leader-agnostic: one set, whoever leads.
+        check('N2b: the CHOICES are leader-agnostic (the advice is the advice)',
+            !shell.choices.some(c => 'headlinesByLeader' in c || '_roomSide' in c)
+            && JSON.stringify(roomChoices(6, true)) === JSON.stringify(roomChoices(6, true)));
+    }
+
+    // -- N2c. The fired event carries leaderLab (the meta contract) --------
+    {
+        for (const [lead, side] of [['halcyon', 'home'], ['tianxia', 'rival']]) {
+            resetRoomRotation();
+            const race = createRaceState(4242);
+            race.capability.labs[lead].C_internal = 5.0;
+            race.capability.labs[lead === 'halcyon' ? 'tianxia' : 'halcyon'].C_internal = 4.0;
+            const trigger = roomTrigger(race);
+            const show = roomPresentation(trigger.leaderLab);
+            const eng = new EventEngine('offline');
+            eng.race = race;
+            // The event main.js builds, verbatim in shape.
+            const ev = {
+                ...getEventById(ROOM_EVENT_ID),
+                headline: show.headline, context: show.context,
+                choices: roomChoices(6, true),
+                raceMeta: { leaderLab: trigger.leaderLab, leaderSide: show.side, voice: 6 },
+            };
+            const r = eng._fireEvent(ev, {}, 900, 0, 0);
+            const logged = eng.eventLog[eng.eventLog.length - 1];
+            check(`N2c: a ${lead}-led room fires queued with leaderLab on the meta and ${side}-side text`,
+                r && r.queued === true
+                && r.event.raceMeta.leaderLab === lead && r.event.raceMeta.leaderSide === side
+                && getEventById(ROOM_EVENT_ID).headlinesByLeader[side].includes(r.event.headline)
+                && getEventById(ROOM_EVENT_ID).contextsByLeader[side].includes(r.event.context)
+                && logged.headline === r.event.headline && logged.category === 'room'
+                && JSON.stringify(logged.params) === '{}');
+        }
+        resetRoomRotation();
+    }
+
+    check('N2: category room is Poisson-EXCLUDED and NOT terminal-safe',
+        !new EventEngine('offline')._pools.random.some(e => e.category === 'room')
+        && isTerminalSafeBeat({ category: 'room' }) === false
+        && isTerminalSafeBeat({ category: 'summit' }) === true);
+    roomVoiceHist = [2, 3, 4, 5, 6].map(v => `v${v}:${amt(roomChoices(v, true), 'speed', 'S').toFixed(3)}`).join(' ');
+
+    // -- N3. The effects land through the STANDARD chokepoint --------------
+    {
+        const race = createRaceState(4321);
+        resetLedger();
+        const S0 = race.safety.halcyon;
+        const applied = applyRaceEffects(race, roomChoices(6, true).find(c => c._roomVerb === 'speed').raceEffects,
+            ROOM_EVENT_ID, 500);
+        const rows = ledgerEntries('S');
+        check('N3: full-voice speed advice moves S[halcyon] by -0.12 and ledgers ONE row under the room',
+            applied.length === 1 && Math.abs(applied[0].amount - (-0.12)) < 1e-15
+            && Math.abs(race.safety.halcyon - (S0 - 0.12)) < 1e-15
+            && rows.length === 1 && rows[0].source === ROOM_EVENT_ID && rows[0].channel === 'S'
+            && Math.abs(race.playerS.halcyon - (-0.12)) < 1e-15,
+            `S ${S0.toFixed(3)} -> ${race.safety.halcyon.toFixed(3)}`);
+        // Voice 2 lands the scaled magnitude, not the base one.
+        const race2 = createRaceState(4322);
+        resetLedger();
+        const applied2 = applyRaceEffects(race2, roomChoices(2, true).find(c => c._roomVerb === 'speed').raceEffects,
+            ROOM_EVENT_ID, 500);
+        check('N3: a 2-voice room lands base x 1/3, ledgered at the SCALED magnitude',
+            applied2.length === 1 && Math.abs(applied2[0].amount - (-0.04)) < 1e-15
+            && Math.abs(ledgerEntries('S')[0].amount - (-0.04)) < 1e-15);
+        // The deal advice writes BOTH channels.
+        const race3 = createRaceState(4323);
+        resetLedger();
+        const heat0 = race3.heat.transient;
+        const applied3 = applyRaceEffects(race3, roomChoices(6, true).find(c => c._roomVerb === 'deal').raceEffects,
+            ROOM_EVENT_ID, 500);
+        check('N3: the deal advice writes BOTH whitelisted channels (heat and S)',
+            applied3.length === 2 && ledgerEntries('heat').length === 1 && ledgerEntries('S').length === 1
+            && Math.abs(race3.heat.transient - Math.max(0, heat0 - 0.09)) < 1e-15);
+        // The standard +-0.15 per-effect clamp still binds at the chokepoint (the
+        // room's own magnitudes sit inside it BY DESIGN -- the clamp is the
+        // guarantee, not the mechanic).
+        const race4 = createRaceState(4324);
+        resetLedger();
+        const over = applyRaceEffects(race4, [{ dial: 'S', lab: 'halcyon', amount: -0.5 }], ROOM_EVENT_ID, 500);
+        check('N3: the +-0.15 per-effect clamp binds at the chokepoint; the room sits inside it',
+            over.length === 1 && Math.abs(over[0].amount - (-0.15)) < 1e-15
+            && Math.abs(speed6) < 0.15);
+        deactivateLedger();
+    }
+
+    // -- N4. Pre-terminal exclusivity -------------------------------------
+    // main.js guards the latch on `!race.resolution` (the call sits AFTER the
+    // resolution ladder). The DOM-bound latch itself is uncovered; what is gated
+    // here is that the guard genuinely closes -- including on runs whose predicate
+    // is still true at resolution (an R5 crossing), where the PREDICATE alone
+    // would happily fire a room into a finished world.
+    {
+        let predicateTrueAtEnd = 0, guardOpenAfterLatch = 0, unresolved = 0, scanned = 0;
+        for (let i = 0; i < Math.min(N, 400); i++) {
+            const race = createRaceState((BASE_SEED + 6000 + i) >>> 0);
+            for (let d = 0; d < HORIZON && !race.resolution; d++) {
+                advanceRace(race); stepControlRegime(race); stepTreaty(race, {}); checkResolution(race, null);
+            }
+            if (!race.resolution) checkResolution(race, null);
+            scanned++;
+            if (!race.resolution) unresolved++;
+            if (roomTriggerReady(race)) predicateTrueAtEnd++;
+            // THE GUARD main.js runs, verbatim.
+            if (!race.resolution && roomTriggerReady(race)) guardOpenAfterLatch++;
+        }
+        check('N4: a latched resolution closes the room guard -- even where the predicate stays true',
+            unresolved === 0 && guardOpenAfterLatch === 0 && predicateTrueAtEnd > 0,
+            `${predicateTrueAtEnd}/${scanned} resolved runs still satisfy the raw predicate`);
+    }
+
+    // -- N5. Classification blackout --------------------------------------
+    // (a) The tip rate is regime-dependent at ROLL time, and the change consumes
+    //     the SAME draws: two arms on one seed, driven through stepIncidents
+    //     directly (which touches no dial, so the arms cannot diverge for any
+    //     other reason). Stream-position identity is asserted by drawing from both
+    //     streams AFTER the run -- that covers the draws taken inside
+    //     categorical/exponential too, which a call-counter cannot see.
+    {
+        const BO_N = Math.min(N, 200);
+        const HEAT = 0.30;
+        let tipsP = 0, occP = 0, tipsC = 0, occC = 0;
+        for (let i = 0; i < BO_N; i++) {
+            const seed = (BASE_SEED + 7100 + i) >>> 0;
+            const a = createRaceState(seed);
+            const b = createRaceState(seed);
+            b.controlRegime = 'classified';
+            for (let d = 0; d < HORIZON; d++) {
+                const ra = stepIncidents(a, d, d + 1, HEAT);
+                const rb = stepIncidents(b, d, d + 1, HEAT);
+                if (ra.occurred.length !== rb.occurred.length
+                    || ra.detected.length !== rb.detected.length) blackoutRecordsOK = false;
+                for (let k = 0; k < ra.occurred.length; k++) {
+                    const x = ra.occurred[k], y = rb.occurred[k];
+                    // Everything EXCEPT the tip flag must be identical.
+                    if (x.id !== y.id || x.source !== y.source || x.severity !== y.severity
+                        || x.cls !== y.cls || x.occurDay !== y.occurDay) blackoutRecordsOK = false;
+                    occP++; occC++;
+                    if (x.insiderTip) tipsP++;
+                    if (y.insiderTip) tipsC++;
+                }
+            }
+            // Stream position identity: the next draws must agree bit-for-bit.
+            for (let k = 0; k < 5; k++) {
+                if (a.streams.incidents.next() !== b.streams.incidents.next()) blackoutStreamOK = false;
+            }
+        }
+        tipPrivateRate = occP ? tipsP / occP : 0;
+        tipClassifiedRate = occC ? tipsC / occC : 0;
+        check('N5a: the classified tip roll consumes the SAME draws (streams stay in lockstep)',
+            blackoutStreamOK && blackoutRecordsOK,
+            `${occP} occurrences compared`);
+        check(`N5a: tip rate ${INSIDER_TIP_PROB} private -> ${INSIDER_TIP_PROB_CLASSIFIED} classified`,
+            Math.abs(tipPrivateRate - INSIDER_TIP_PROB) < 0.03
+            && Math.abs(tipClassifiedRate - INSIDER_TIP_PROB_CLASSIFIED) < 0.03,
+            `${pct(tipPrivateRate)} vs ${pct(tipClassifiedRate)}`);
+    }
+    // (b) Belief: folds suppressed through severity 3, S4 unchanged, and the
+    //     suppressed fold id stays UNCLAIMED (the player's leak still works).
+    {
+        const det = (id, severity) => ({ id, source: 'halcyon', severity, cls: 'accident', occurDay: 1, detectDay: 20, lag: 19 });
+        const mkLedger = () => {
+            const tr = freshTransitions();
+            tr.incidents.detected = [det('bo0', 0), det('bo1', 1), det('bo2', 2), det('bo3', 3), det('bo4', 4)];
+            return tr;
+        };
+        initBelief(null); belief.day = 20;
+        stepBelief({ day: 20, controlRegime: 'private', lastTransitions: mkLedger() });
+        const alignPrivate = belief.alignment;
+        const foldsPrivate = beliefCauses().filter(c => c.cause === 'incident-detected').length;
+        initBelief(null); belief.day = 20;
+        stepBelief({ day: 20, controlRegime: 'classified', lastTransitions: mkLedger() });
+        const alignBlackout = belief.alignment;
+        const foldsBlackout = beliefCauses().filter(c => c.cause === 'incident-detected');
+        check('N5b: under classified only the S4 detection folds (S0-S3 suppressed)',
+            foldsPrivate === 5 && foldsBlackout.length === 1 && foldsBlackout[0].id === 'det_bo4'
+            && BLACKOUT_FOLD_MAX_SEV === 3);
+        // The S4 fold magnitude is untouched by the regime.
+        initBelief(null); belief.day = 20;
+        const trS4 = freshTransitions();
+        trS4.incidents.detected = [det('bo4', 4)];
+        stepBelief({ day: 20, controlRegime: 'private', lastTransitions: trS4 });
+        check('N5b: the S4 fold is bit-identical under both regimes (undeniable)',
+            Math.abs(belief.alignment - alignBlackout) < 1e-15 && alignBlackout !== alignPrivate,
+            `S4-only ${belief.alignment.toFixed(4)} == blackout ${alignBlackout.toFixed(4)} != private ${alignPrivate.toFixed(4)}`);
+        // A suppressed detection leaves its fold id unclaimed, so the insider
+        // channel -- the one feed a blackout leaves open -- can still fold it.
+        initBelief(null); belief.day = 20;
+        stepBelief({ day: 20, controlRegime: 'classified', lastTransitions: mkLedger() });
+        check('N5b: a suppressed fold id stays UNCLAIMED -- the player leak still lands',
+            beliefProcessed('det_bo2') === false && foldPlayerLeak('bo2', 2) === true
+            && beliefProcessed('det_bo4') === true);
+        deactivateBelief();
+    }
+    // (c) The BRIDGE routes detections by regime: public ladder private, brief
+    //     shells classified, S4 public in both.
+    {
+        const fired = { private: [], classified: [] };
+        const stub = {
+            world: { factions: {}, geopolitical: {}, ai: {} },
+            _fireEvent(ev) { return ev.popup ? { queued: true, event: ev } : { id: ev.id }; },
+        };
+        const det = (id, severity, cls = 'accident') => ({ id, source: 'halcyon', severity, cls, occurDay: 1, detectDay: 20, lag: 19 });
+        for (const regime of ['private', 'classified']) {
+            const race = createRaceState(9191);
+            initConsensus(race); initBelief(race); resetRaceBridge();
+            race.controlRegime = regime;
+            const tr = freshTransitions();
+            tr.incidents.detected = [det('r0', 0), det('r2', 2), det('r3', 3), det('rp', 2, 'persuasion'), det('r4', 4)];
+            race.lastTransitions = tr;
+            const captured = [];
+            stub._fireEvent = (ev) => { captured.push(ev.id); return ev.popup ? { queued: true, event: ev } : { id: ev.id }; };
+            runRaceBridge(stub, race, { day: race.day }, race.day, 0);
+            fired[regime] = captured;
+            deactivateConsensus(); deactivateBelief();
+        }
+        const brief = getEventById('incident_brief_classified');
+        const briefGrave = getEventById('incident_brief_classified_grave');
+        check('N5c: private routes the PUBLIC ladder (minor/moderate/grave/persuasion/catastrophe)',
+            JSON.stringify(fired.private) === JSON.stringify(
+                ['incident_minor', 'incident_moderate', 'incident_grave', 'incident_persuasion', 'incident_catastrophe']),
+            fired.private.join(','));
+        check('N5c: classified fires NO public detection shell -- briefs instead, S4 still public',
+            JSON.stringify(fired.classified) === JSON.stringify(
+                ['incident_brief_classified', 'incident_brief_classified', 'incident_brief_classified_grave',
+                    'incident_brief_classified', 'incident_catastrophe']),
+            fired.classified.join(','));
+        check('N5c: both brief shells exist, carry NO impulse key (absent, not zeroed), and no permanent params',
+            !!brief && !!briefGrave && !('impulse' in brief) && !('impulse' in briefGrave)
+            && JSON.stringify(brief.params) === '{}' && JSON.stringify(briefGrave.params) === '{}');
+        check('N5c: the brief shells are Poisson-excluded (category incident, bridge-fired only)',
+            brief.category === 'incident' && briefGrave.category === 'incident'
+            && !new EventEngine('offline')._pools.random.some(e => e.id.startsWith('incident_brief_')));
+    }
+
+    // -- N6. Treasury backchannel (fund-as-actor) -------------------------
+    {
+        const ev = getEventById('treasury_backchannel');
+        const accept = ev.choices[0], decline = ev.choices[1];
+        check('N6: oneShot policy popup, gated on the fund latch mirror (never a recomputed gate)',
+            ev.oneShot === true && ev.category === 'policy' && ev.popup === true
+            && typeof ev.when === 'function');
+        const world = createWorldState();
+        const whenClosed = ev.when({}, world);
+        world.ai.fundLive = true;
+        check('N6: `when` closed until world.ai.fundLive, open after',
+            !whenClosed && ev.when({}, world) === true);
+        // The mirror is race/belief-owned: no structured effect may forge it.
+        const w2 = createWorldState();
+        applyStructuredEffects(w2, [{ path: 'ai.fundLive', op: 'set', value: true }]);
+        check('N6: fundLive is NOT in WORLD_STATE_RANGES -- a structured effect cannot forge it',
+            w2.ai.fundLive === false);
+        check('N6: accepting sets treasury_backchannel and costs regulatoryExposure +6',
+            accept.playerFlag === 'treasury_backchannel'
+            && accept.factionShifts.length === 1
+            && accept.factionShifts[0].faction === 'regulatoryExposure'
+            && accept.factionShifts[0].value === 6);
+        check('N6: declining sets declined_treasury and costs nothing',
+            decline.playerFlag === 'declined_treasury' && !decline.factionShifts && !decline.raceEffects);
+        // The cross-check the brief asks for: the room's sixth criterion reads the
+        // SAME flag name the accept choice writes.
+        check('N6: the room\'s sixth criterion reads the flag the accept choice writes',
+            ROOM_FLAG_CRITERIA.treasury === accept.playerFlag);
+        // Eligible through the ENGINE's real filter once the mirror is up.
+        const eng = new EventEngine('offline');
+        eng._currentDay = 800;
+        eng.world.ai.fundLive = false;
+        const before = eng._filterEligible([ev], {}).length;
+        eng.world.ai.fundLive = true;
+        check('N6: the one-shot pre-pass sees it exactly when the fund is live',
+            before === 0 && eng._filterEligible([ev], {}).length === 1
+            && eng._pools.random.some(e => e.id === 'treasury_backchannel'));
+    }
+
+    // -- N7. chinaTrue intel beats ----------------------------------------
+    {
+        check('N7: buckets cut at 0.90 / 1.10, edges belong to the UPPER bucket',
+            INTEL_LO === 0.90 && INTEL_HI === 1.10
+            && velocityBucket(0.75) === 'behind' && velocityBucket(0.8999) === 'behind'
+            && velocityBucket(0.90) === 'matched' && velocityBucket(1.0999) === 'matched'
+            && velocityBucket(1.10) === 'faster' && velocityBucket(1.325) === 'faster'
+            && velocityBucket(undefined) === null && velocityBucket(NaN) === null);
+        deactivateIntel();
+        check('N7: the read is inert while the channel is inactive (Classic)',
+            intelActive() === false && intelRead(createRaceState(1)) === null);
+        // Reliability + adjacency: p = 0.7 truthful, and noise is exactly ONE
+        // bucket off -- a 'behind' program is NEVER reported 'faster'.
+        const DRAWS = 20000;
+        const tallies = {};
+        let truthful = 0, total = 0;
+        for (const [truthBucket, v] of [['behind', 0.80], ['matched', 1.00], ['faster', 1.20]]) {
+            const race = createRaceState(5150);
+            race.hidden.chinaTrue.velocity = v;
+            initIntel(race);
+            const t = { behind: 0, matched: 0, faster: 0 };
+            for (let i = 0; i < DRAWS; i++) {
+                const r = intelRead(race);
+                t[r.bucket]++;
+                total++;
+                if (r.truthful) truthful++;
+                if (r.truthful !== (r.bucket === truthBucket)) intelAdjacencyOK = false;
+            }
+            if (truthBucket === 'behind' && t.faster !== 0) intelAdjacencyOK = false;
+            if (truthBucket === 'faster' && t.behind !== 0) intelAdjacencyOK = false;
+            tallies[truthBucket] = t;
+        }
+        intelTruthRate = truthful / total;
+        check(`N7: reliability p = ${INTEL_TRUTH_PROB} (the read is true 70% of the time)`,
+            Math.abs(intelTruthRate - INTEL_TRUTH_PROB) < 0.015, pct(intelTruthRate));
+        check('N7: noise lands exactly ONE bucket off -- never a two-notch inversion',
+            intelAdjacencyOK
+            && tallies.behind.faster === 0 && tallies.faster.behind === 0
+            && tallies.matched.behind > 0 && tallies.matched.faster > 0);
+        check('N7: a matched truth splits its noise evenly between the neighbours',
+            Math.abs(tallies.matched.behind - tallies.matched.faster) < 0.05 * DRAWS,
+            `${tallies.matched.behind} behind / ${tallies.matched.faster} faster`);
+        // OWN-SUBSTREAM BIT-IDENTITY: firing an intel read every single day must
+        // leave the race trajectory bit-for-bit unchanged.
+        for (let s = 0; s < IDENT_SEEDS; s++) {
+            const seed = (BASE_SEED + s) >>> 0;
+            const bare = trajectoryHash(seed, undefined);
+            const withIntel = trajectoryHash(seed, undefined, (r) => initIntel(r), (r) => { intelRead(r); });
+            if (bare !== withIntel) intelIdentOK = false;
+        }
+        check(`N7: intel ON/OFF trajectory bit-identical over ${IDENT_SEEDS} seeds (own substream)`,
+            intelIdentOK);
+        // End to end through the CANONICAL fire path: the shell's read selects its
+        // pool, and the velocity itself is never rendered.
+        {
+            const race = createRaceState(5151);
+            race.hidden.chinaTrue.velocity = 1.20;   // truth: faster
+            initIntel(race);
+            const eng = new EventEngine('offline');
+            eng.race = race;
+            const shellIntel = getEventById('china_intel_estimate');
+            const pools = shellIntel.headlinesByRead;
+            const seen = { behind: 0, matched: 0, faster: 0 };
+            let allFromPools = true, noVelocity = true;
+            for (let i = 0; i < 400; i++) {
+                const r = eng._fireEvent({ ...shellIntel }, {}, 300 + i, 0, 0);
+                const h = r.headline;
+                let found = null;
+                for (const b of INTEL_BUCKETS) if (pools[b].includes(h)) found = b;
+                if (!found) allFromPools = false; else seen[found]++;
+                if (h.includes('1.2') || h.includes(String(race.hidden.chinaTrue.velocity))) noVelocity = false;
+            }
+            check('N7: `intel: true` shells resolve their read through the canonical fire path',
+                allFromPools && seen.faster > 0 && seen.matched > 0 && seen.behind === 0
+                && Math.abs(seen.faster / 400 - INTEL_TRUTH_PROB) < 0.08,
+                `faster ${seen.faster} / matched ${seen.matched} / behind ${seen.behind}`);
+            check('N7: the velocity itself is NEVER rendered -- only the bucket',
+                noVelocity && INTEL_BUCKETS.every(b => Array.isArray(pools[b]) && pools[b].length > 0));
+            // -- N7b. The defensive contract (sol-gate P2, rulings 11 + 15) ----
+            // (a) NO RACE ATTACHED: the shell must still render, from the matched
+            //     pool. Before the fix `_fireEvent` skipped intel resolution
+            //     entirely without `this.race` and logged headline === undefined.
+            {
+                const engNoRace = new EventEngine('offline');
+                engNoRace.race = null;
+                const r = engNoRace._fireEvent({ ...shellIntel }, {}, 700, 0, 0);
+                const logged = engNoRace.eventLog[engNoRace.eventLog.length - 1];
+                check('N7b: an intel shell fired with NO attached race falls back to the matched pool',
+                    typeof r.headline === 'string' && pools.matched.includes(r.headline)
+                    && logged.headline === r.headline,
+                    `headline ${typeof r.headline}`);
+                // Same for an attached race whose channel is inactive.
+                deactivateIntel();
+                const engInactive = new EventEngine('offline');
+                engInactive.race = createRaceState(5152);
+                const r2 = engInactive._fireEvent({ ...shellIntel }, {}, 701, 0, 0);
+                check('N7b: an inactive intel channel also falls back to matched (never headline-less)',
+                    typeof r2.headline === 'string' && pools.matched.includes(r2.headline));
+            }
+            // (b) THE DRAW CONTRACT: with the channel ACTIVE, an unresolvable read
+            //     (missing hidden state) must still advance the stream EXACTLY
+            //     twice. Asserted at stream-POSITION level against an independent
+            //     reference stream built from the same derived seed, so this pins
+            //     the count at 2 -- not merely "nonzero".
+            {
+                const seed = 5153;
+                const race = createRaceState(seed);
+                // A 'matched' truth makes BOTH draws load-bearing (the noise branch
+                // reads the direction draw), so a predicted SEQUENCE is genuinely
+                // discriminating -- an off-by-one stream position could not reproduce it.
+                race.hidden.chinaTrue.velocity = 1.00;
+                const SEQ = 6;
+                const ref = createRng(deriveSeed(race.seed, 'intel'));
+                const u = [];
+                for (let k = 0; k < 2 * (SEQ + 1); k++) u.push(ref.next());
+                /** The read a caller gets from the pair starting at raw index `i`. */
+                const predict = (i) => (u[i] < INTEL_TRUTH_PROB)
+                    ? { bucket: 'matched', truthful: true }
+                    : { bucket: (u[i + 1] < 0.5) ? 'behind' : 'faster', truthful: false };
+                const fmt = (rs) => rs.map(r => `${r.bucket[0]}${r.truthful ? 'T' : 'F'}`).join('');
+                // Predicted sequence if the unresolvable read consumed EXACTLY 2 draws
+                // (so the next read starts at raw index 2), and if it consumed ZERO.
+                const fromTwo = [], fromZero = [];
+                for (let k = 0; k < SEQ; k++) { fromTwo.push(predict(2 + 2 * k)); fromZero.push(predict(2 * k)); }
+                initIntel(race);
+                const bad = intelRead({ day: 0 });                // active channel, NO hidden state
+                const actual = [];
+                for (let k = 0; k < SEQ; k++) actual.push(intelRead(race));
+                check('N7b: an unresolvable read on an ACTIVE channel returns null but still draws EXACTLY two',
+                    bad === null && fmt(actual) === fmt(fromTwo) && fmt(fromTwo) !== fmt(fromZero),
+                    `got ${fmt(actual)}; +2 predicts ${fmt(fromTwo)}, +0 predicts ${fmt(fromZero)}`);
+                // Independent confirmation: the position an unresolvable read leaves
+                // the stream at is the SAME one a resolvable read leaves it at.
+                initIntel(race);
+                intelRead(race);
+                const paired = [];
+                for (let k = 0; k < SEQ; k++) paired.push(intelRead(race));
+                check('N7b: unresolvable and resolvable reads cost the same (paired-seed identity)',
+                    fmt(paired) === fmt(actual));
+                // And the inactive channel is the ONE path that draws nothing.
+                deactivateIntel();
+                check('N7b: an INACTIVE channel draws nothing (no stream to advance)',
+                    intelRead(race) === null && intelActive() === false);
+                initIntel(race);
+                const firstAfterInit = intelRead(race);
+                deactivateIntel();
+                intelRead(race);                                   // must not advance anything
+                initIntel(race);
+                check('N7b: reads attempted while inactive leave the next active read unchanged',
+                    intelRead(race).bucket === firstAfterInit.bucket);
+                deactivateIntel();
+            }
+            initIntel(race);   // restore the live channel for the checks below
+            check('N7: intel beats are narrative-only (no impulse, no raceEffects, no factionShifts)',
+                ['china_intel_estimate', 'china_intel_human_source', 'china_intel_buildout'].every(id => {
+                    const e = getEventById(id);
+                    return e && e.intel === true && !('impulse' in e) && !e.raceEffects && !e.factionShifts
+                        && JSON.stringify(e.params) === '{}' && !e.headline;
+                }));
+            deactivateIntel();
+        }
+    }
+}
+
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
 line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
@@ -1886,6 +2546,19 @@ line(`  gates: unlock at released R${STANDING_TUNING.unlockRung}, armed set lock
     + ` move gate ${STANDING_TUNING.moveGate}, delta band +-${STANDING_TUNING.deltaBand}`);
 line(`  rules exercised: ${[...soFiredRules].join(', ')} (+ bonds_first preference, tip_autosit gate)`);
 line(`  RNG draws ${soRandomCalls}; standing fill ${soFillGap}`);
+line('\nP7-3 (the room, the blackout, the backchannel, the intel):');
+line(`  room: trigger C_int >= ${ROOM_TRIGGER_C}, seat at >= ${ROOM_MIN_CRITERIA}/${ROOM_MAX_VOICE} criteria`
+    + ` (safetyNetworkTrust ${ROOM_GATE.safetyNetworkTrust}, labRelations ${ROOM_GATE.labRelations});`
+    + ` reached in ${pct(roomReachFrac)} of runs`);
+line(`  room voice scaling (speed advice dS[halcyon]): ${roomVoiceHist}`);
+line(`  room presentation: per-leader pools keyed ${ROOM_LEADER_SIDES.join(' / ')}`
+    + ` (headline + context, deterministic rotation); leader seen ${roomLeaderMix}`);
+line(`  blackout: tip rate ${pct(tipPrivateRate)} private -> ${pct(tipClassifiedRate)} classified;`
+    + ` incident streams ${blackoutStreamOK && blackoutRecordsOK ? 'IN LOCKSTEP' : 'DESYNCED'};`
+    + ` B folds suppressed through S${BLACKOUT_FOLD_MAX_SEV}`);
+line(`  intel: reliability ${pct(intelTruthRate)} (target ${pct(INTEL_TRUTH_PROB)}),`
+    + ` adjacency ${intelAdjacencyOK ? 'ONE bucket' : 'VIOLATED'},`
+    + ` trajectory identity ${intelIdentOK ? 'BITWISE' : 'VIOLATED'}`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

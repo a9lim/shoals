@@ -90,7 +90,12 @@ import {
     STANDING_COPY,
 } from './src/standing-orders.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
-import { createRaceState, advanceRace, resetRaceState, stepControlRegime } from './src/race/race-state.js';
+import { createRaceState, advanceRace, resetRaceState, stepControlRegime, roomTrigger } from './src/race/race-state.js';
+import { initIntel, resetIntel, deactivateIntel } from './src/race/intel.js';
+import {
+    ROOM_EVENT_ID, ROOM_FLAGS, ROOM_GATE, ROOM_FLAG_CRITERIA,
+    roomVoice, roomInvited, roomChoices, roomPresentation, resetRoomRotation,
+} from './src/events/room.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
 import { applyReportingRegime, forceLeakDetection } from './src/race/incidents.js';
 import { straitTension } from './src/race/strait.js';
@@ -112,7 +117,7 @@ import {
     binaryQuoteFromBelief, computeCurveFromBelief, impliedTimeline,
     isLockDay, lockForecast,
     playerPilled, stepFirmBelief, scrutinyGap, marketPilled, hasEverLocked, credibility,
-    canSendMemos, firmBelief, foldPlayerLeak,
+    canSendMemos, canActAsFund, firmBelief, foldPlayerLeak,
 } from './src/race/belief.js';
 import {
     decayEventImpulses,
@@ -161,6 +166,8 @@ let portfolioHistory = null; // sparkline ring buffer for portfolio value
 let _savedOverlays = {};
 let _savedImpulse = {};   // event-impulse overlay saved originals (restored at day-complete)
 let _lastForecastLockDay = -1;   // race-day of the last forecast-lock prompt (avoids double-firing)
+let _fundLive = false;    // P7-3 fund-as-actor latch (monotone; mirrored to world.ai.fundLive)
+let _roomFired = false;   // P7-3: the room is a once-per-run branch point, gate open or shut
 
 const _popupQueue = [];
 const playerChoices = {};
@@ -220,6 +227,14 @@ function _syncRaceToWorld() {
     // on. Mirrors the race-side gauntlet's open window -- race-state.js stays the
     // sole authority, this is the read-only mirror (same pattern as frontierRung).
     w.ai.summitLive = raceState.treaty.summitOpen;
+    // Fund-as-actor latch (P7-3): belief.js's OWN gate predicate (credibility >
+    // 0.65 AND F > 60), evaluated through `canActAsFund` and never re-derived from
+    // raw credibility/F anywhere else. MONOTONE: once the desk has been a
+    // fund-scale actor, Treasury's interest does not evaporate on a credibility
+    // wobble -- so the treasury_backchannel beat cannot be raced by a one-quarter
+    // dip. Mirrored read-only for event guards, like every other w.ai mirror.
+    if (!_fundLive && canActAsFund(firmBelief(raceState))) _fundLive = true;
+    w.ai.fundLive = _fundLive;
 }
 /** Public strait tension in [0,1] from world-state China proxies (phase 5a),
  *  fed to the strait generator so gray-zone / blockade hazard reads the same
@@ -1116,6 +1131,9 @@ function init() {
         initComputeMarket(raceState, eventEngine.world.geopolitical);
         // Market belief B + belief-backed quoters + player/firm belief (phase 4).
         initBelief(raceState);
+        // chinaTrue intel reliability stream (P7-3): its own module-local RNG,
+        // seeded OUTSIDE race.streams so intel beats cannot perturb the race.
+        initIntel(raceState);
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
@@ -1124,6 +1142,7 @@ function init() {
         deactivateConsensus();
         deactivateComputeMarket();
         deactivateBelief();
+        deactivateIntel();
         deactivateCoupling();
         deactivateLedger();
         _unwireBeliefQuoters();
@@ -1742,6 +1761,12 @@ function _applyPopupChoice(event, choice) {
     if (choice.playerFlag) {
         playerChoices[choice.playerFlag] = sim.day;
     }
+    // P7-3: EVERY room path sets `sat_in_the_room` -- the seat is the beat, not one
+    // of the options, so the flag belongs to the event and not to a choice's own
+    // `playerFlag` (which the say-nothing path spends on `room_declined`). Set here,
+    // at choice time, so a room the terminal queue filter discarded never leaves a
+    // flag claiming the player was in a meeting they never saw.
+    if (event.category === 'room') playerChoices[ROOM_FLAGS.seat] = sim.day;
     if (choice.cashPenalty) {
         portfolio.cash -= choice.cashPenalty;
     }
@@ -2105,6 +2130,70 @@ function _checkFirmConversion() {
         }
     }
 }
+/**
+ * THE ROOM (P7-3; 02a Act III "The room" + P7-3 semantics item 1) -- the endgame
+ * branch point, evaluated as a day-complete LATCH on a race-side PURE predicate
+ * (`roomTriggerReady`: the leader lab's internal track within 0.15 of R5). The
+ * conversion-latch precedent: the orchestrator owns the latch, the model owns the
+ * fact, and main.js never reads a latent LEVEL.
+ *
+ * Fires ONCE per run and strictly PRE-terminal (the caller guards on an unlatched
+ * resolution; a run the world ends first has no room, legitimately -- in
+ * Deal-bound runs the summit window WAS the room). The latch burns on the first
+ * day the predicate holds whether or not the gate opens: the decision happens when
+ * it happens, and the standing accumulated AT THAT MOMENT is what buys the seat.
+ * Below the gate NOTHING fires -- not a toast; the ending arrives as weather, on
+ * the news, which the event feed already is.
+ *
+ * Voice weight = the satisfied-criteria count (2..6), scaling the advice's
+ * whitelisted raceEffects by voice/6 through `roomChoices` BEFORE the shell is
+ * fired, so the standard `_applyPopupChoice` chokepoint (whitelist, +-0.15 clamp,
+ * ledger row under this event id) is the only route the effects take.
+ *
+ * WHO leads comes from the SAME race-side helper as the predicate (`roomTrigger`
+ * returns both, one traversal) and rides the fired meta as `leaderLab`: the two
+ * rooms are different rooms, so headline AND context are selected from per-leader
+ * pools (`roomPresentation`, deterministic rotation, never RNG). The choices stay
+ * leader-agnostic -- the advice is the advice.
+ */
+function _checkRoom() {
+    if (_roomFired || !raceState || !eventEngine || _gameOver) return;
+    if (raceState.resolution) return;              // strictly pre-terminal
+    const trigger = roomTrigger(raceState);
+    if (!trigger.ready) return;                    // the leader is not at the decision yet
+    // The six criteria (02a). Criterion 1 is belief.js's OWN memo gate
+    // (credibility > 0.55) -- read through canSendMemos, never re-derived here.
+    const criteria = [
+        canSendMemos(),
+        getFaction('safetyNetworkTrust') >= ROOM_GATE.safetyNetworkTrust,
+        getFaction('labRelations') >= ROOM_GATE.labRelations,
+        _firmVerdictFired,                         // the firm-conversion latch
+        ROOM_FLAG_CRITERIA.advice.some(f => !!playerChoices[f]),
+        !!playerChoices[ROOM_FLAG_CRITERIA.treasury],
+    ];
+    const voice = roomVoice(criteria);
+    _roomFired = true;                             // the branch point is spent either way
+    if (!roomInvited(voice)) return;               // below the gate: no beat at all
+    const base = getEventById(ROOM_EVENT_ID);
+    if (!base) return;
+    const show = roomPresentation(trigger.leaderLab);
+    const ev = {
+        ...base,
+        headline: show.headline,
+        context: show.context,
+        choices: roomChoices(voice, !!eventEngine.world.ai.summitLive),
+        raceMeta: { leaderLab: trigger.leaderLab, leaderSide: show.side, voice },
+    };
+    const r = eventEngine._fireEvent(ev, sim, sim.day, 0, computeNetDelta());
+    if (r && r.queued) {
+        _queuePopup(r.event);
+        // The room fires AFTER the day's maybeFire/bridge display pass, so repaint
+        // the feed here (the interception precedent) -- the beat is in the log the
+        // day it happened, not at some later unrelated refresh.
+        updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+    }
+}
+
 function _runScrutiny() {
     if (!raceState) return;
     if (!hasEverLocked()) return;                  // no stated posterior -> no belief gap to scrutinize
@@ -2559,6 +2648,12 @@ function _onDayComplete() {
                 '| leader', _resolution.leader, '| d', _resolution.d.toFixed(3),
                 '| align', _resolution.axes.alignmentResult, '| regime', _resolution.axes.politicalControl);
         }
+
+        // THE ROOM (P7-3): the endgame branch point, checked AFTER the resolution
+        // ladder so it is strictly pre-terminal by construction -- a tick that
+        // resolves the world never also convenes a room, and the latch is not spent
+        // on a world that has already ended.
+        if (!raceState.resolution) _checkRoom();
     }
 
     // Trading-restriction release: lifts once no un-flattenable (stuck) legs
@@ -3082,8 +3177,11 @@ function _resetCore(index) {
     // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
     // since _resetCore runs before loadPreset nulls raceState.
     if (raceState) resetRaceBridge();
+    resetRoomRotation();   // P7-3: per-leader pool rotation is run-scoped (the resetRaceBridge precedent)
     _firmMemoFired = false;
     _firmVerdictFired = false;
+    _fundLive = false;    // P7-3: the fund-as-actor latch is run-scoped
+    _roomFired = false;   // P7-3: the room is a once-per-RUN branch point
     resetEventImpulses();          // clear the decaying race-event impulse overlay (phase 4)
     _lastForecastLockDay = -1;
     sim.reset(index);
@@ -3142,6 +3240,7 @@ function loadPreset(index) {
         initComputeMarket(raceState, eventEngine.world.geopolitical);
         // Market belief B + belief-backed quoters + player/firm belief (phase 4).
         initBelief(raceState);
+        initIntel(raceState);   // P7-3 intel reliability stream (outside race.streams)
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
@@ -3152,6 +3251,7 @@ function loadPreset(index) {
         deactivateConsensus();
         deactivateComputeMarket();
         deactivateBelief();
+        deactivateIntel();
         deactivateCoupling();
         deactivateLedger();
         _unwireBeliefQuoters();
@@ -3187,6 +3287,7 @@ function resetSim() {
         // Rebuild belief for the fresh world + re-install the belief-backed quoters
         // (resetConsensus/resetComputeMarket reset the source to the placeholder).
         resetBelief(raceState);
+        resetIntel(raceState);   // P7-3: fresh intel stream for the fresh world
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine ? eventEngine.world.geopolitical : null);

@@ -1332,6 +1332,109 @@ barrier). (8) Panel and toast copy finalized by the coordinator
 2026-07-24 — the tip toast carries the thesis line ("You are
 reading about it afterward").
 
+**P7-3 semantics (ratified 2026-07-24, pre-dispatch):** (1) *The
+room*: trigger, standing gate, and voice as the Act III block
+above. Evaluation is a main.js day-complete latch (`_checkRoom`,
+the conversion-latch precedent) on a race-side PURE predicate
+export (leader lab `C_internal ≥ R5_threshold − 0.15`) — main.js
+never pokes latents directly. Fired ONCE, strictly pre-terminal,
+category 'room': Poisson-excluded, latch-fired, NOT terminal-safe
+(discarded by the terminal queue filter — its effects require a
+live world). Menu: advise speed / advise margin / advise the deal
+(present only while `summitLive`) / say nothing. Full-voice
+raceEffects magnitudes: speed S[halcyon] −0.12; margin S[halcyon]
++0.12; deal heat −0.09 + S[halcyon] +0.04; applied effect = base ×
+(voice/6), voice = satisfied-criteria count (2–6) — the whitelist
+stays S-per-lab + heat with the standard ±0.15 per-effect clamp,
+ledgered through the standard chokepoint (at voice 6 this is the
+loudest row the ledger will ever carry, by design). Saying nothing
+sets `room_declined`; every path sets `sat_in_the_room`; both are
+endings-visible flags. Below-gate runs get NO beat — the ending
+arrives as weather. (2) *Blackout*: implementation is bridge-side
+regime routing — under `controlRegime === 'classified'`, public
+detection shells are replaced by classified-brief shells (separate
+shells, prose coordinator's) with NO impulses and NO B folds;
+belief fold suppression covers incident detections of severity ≤ 3
+(S4 is undeniable and unchanged, and still self-discloses
+same-tick); the insider-tip Bernoulli rises 0.3 → 0.5 under
+classified. Releases and wonders still print. (3) *Treasury
+backchannel* (the fund-as-actor wager): a oneShot 'policy' event
+gated on the fund being live (the P6-2 gates — credibility > 0.65
+∧ F > 60, read from the fund's own latch, never recomputed);
+accepting sets `treasury_backchannel` (the room's sixth criterion)
+and costs regulatoryExposure +6 — a standing wire into Treasury is
+a wire; declining sets `declined_treasury`. (4) *chinaTrue intel
+beats*: 'china'-category shells whose intel read is a pure
+race-side helper — bucket `chinaTrue.velocity` at 0.90/1.10 into
+behind / matched / quietly-faster — with per-beat reliability
+drawn from `createRng(deriveSeed(seed, 'intel'))` OUTSIDE
+`race.streams` (trajectories bit-identical with intel on or off):
+p = 0.7 the read is true, else it reports one bucket off (noise,
+never inverted two notches). Intel is NARRATIVE-ONLY — no B fold,
+no race mutation, no faction shift baked into the read itself; the
+player's China posterior is theirs to trade. The thief-field
+discipline applies: `chinaTrue.velocity` itself is never printed —
+only the bucketed read.
+
+**P7-3 implementation rulings (2026-07-24):** (1) *The room latch
+burns on the FIRST day the predicate holds, gate or no gate* — the
+decision happens when it happens, and the standing accumulated at
+that moment buys the seat or doesn't; a later standing gain never
+retroactively opens a room. Below-gate runs get their weather
+ending permanently. (2) `_checkRoom` runs AFTER `checkResolution`
+— a resolving tick never convenes a room; pre-terminal by
+construction, not by discard. (3) *The trigger reads the LEADER
+(any lab); the advice binds Halcyon* — the room is the American
+decision point, convened whether it is Halcyon about to cross or
+Beijing (the panic room is still Washington's room); the fired
+meta carries `leaderLab`, and the shell selects context + headline
+from per-leader pools (deterministic per-(shell, leader) counters,
+the headlinesByAttribution precedent) so the coordinator can write
+the two rooms as the different rooms they are. (4)
+`sat_in_the_room` is set at the choice chokepoint keyed on
+`category === 'room'` — a room discarded by the terminal filter
+leaves no flag claiming a meeting nobody saw. (5) *The room
+carries no impulse and empty params* — a private meeting the world
+has not been told about; the tape does not print it. (6) *S4 keeps
+its public catastrophe shell under classified*; severity ≤ 3
+INCLUDING persuasion routes to briefs — one severity split for
+shells and folds alike. (7) *The classified briefs are toast-weight
+and do not ask* — the public S3 shell is a decision popup; the
+blackout's content is that the desk is no longer consulted. (8)
+*Blackout suppresses DETECTION folds only* — insider-tip folds and
+the player's leak fold still land (the surviving channel must
+still move B, or the raised tip rate would be decorative); a
+suppressed detection leaves its `det_${id}` unclaimed, so a leak
+can still claim it. (9) `controlRegime` is read directly inside
+`stepBelief`/`bridgeIncidents` — it is public state on
+`buildPublicView`, so the corruption-invariance contract is
+untouched; the orchestrator-input precedent binds race DYNAMICS
+steps only. (10) *The fund latch is born here and is MONOTONE* —
+`_fundLive` latches once over belief.js's own `canActAsFund`
+(0.65/60 never re-derived), mirrors to `world.ai.fundLive`
+(excluded from `WORLD_STATE_RANGES`); Treasury's interest does not
+retract on a one-quarter dip. (11) *The intel read resolves inside
+`_fireEvent`* (`intel: true` + per-read pools) — the only place a
+Poisson-drawn shell can take a per-fire race read; EXACTLY two
+draws per beat unconditionally, so the intel stream advances
+identically on every path. (12) Bucket edges belong to the upper
+bucket (≥ 0.90 matched, ≥ 1.10 faster). (13) A matched-truth noise
+read splits 50/50 between behind and faster. (14) Three intel
+shells, rung guards 2/2/3, likelihoods code-local per the arc-file
+convention. (15) An unresolvable intel read falls back to the
+matched pool — defensive, unreachable in current wiring. (16) *The
+leader side is coarse*: `RIVAL_LABS = {tianxia}`, everything else
+(Halcyon, Polaris, unknown) is `home` — Polaris is the Halcyon
+schism, an American lab; if a second non-US lab ever exists, that
+default is the line to revisit. Measured at the trigger: Halcyon
+73.7% / Tianxia 26.3% / Polaris 0.0% (Polaris spawns 0.6 behind
+and never leads organically — the home pool may be written as
+Halcyon without hedging). (17) *Room presentation rotation
+counters are run-scoped* (`resetRoomRotation` in `_resetCore`, the
+resetRaceBridge convention) — same-seed playback is deterministic;
+the room fires once per run, so cross-run pool variety is
+deliberately traded for reproducibility.
+
 **Sub-round split**: P7-1 systemic (driver + substep lane + latency
 + degradation + VXHCN staleness + audio wiring), P7-2 standing
 orders (rules engine + ui.js panel), P7-3 the room + blackout +

@@ -241,7 +241,15 @@ function bridgeCertifications(tr, emit) {
 
 // ---- Incidents (DETECTED only; occurrence stays silent) ------------------
 
-function bridgeIncidents(tr, emit) {
+// CLASSIFICATION BLACKOUT (P7-3, 02a): under `controlRegime === 'classified'` the
+// PUBLIC detection shells are not fired at all -- a classified-brief shell fires
+// instead (impulses ABSENT, so the bridge's impulse dispatch never runs for them,
+// and `B` suppresses the matching fold in stepBelief). Severity 4 is the one
+// exception, in both places: it is undeniable, self-discloses in its own tick, and
+// keeps its public superevent. Releases, certifications and wonders still print --
+// products ship; it is the incident ledger that goes dark.
+function bridgeIncidents(tr, emit, race) {
+    const blackout = !!(race && race.controlRegime === 'classified');
     for (const det of tr.incidents.detected) {
         const meta = { source: det.source, severity: det.severity, cls: det.cls, lag: det.lag };
         let id;
@@ -249,6 +257,7 @@ function bridgeIncidents(tr, emit) {
         // class label -- the absolute S4 self-disclosure rule (02a). (The generator
         // also never produces a persuasion S4; this is the belt to that suspenders.)
         if (det.severity >= 4) id = 'incident_catastrophe';
+        else if (blackout) id = (det.severity === 3) ? 'incident_brief_classified_grave' : 'incident_brief_classified';
         else if (det.cls === 'persuasion') id = 'incident_persuasion';
         else if (det.severity === 3) id = 'incident_grave';
         else if (det.severity === 2) id = 'incident_moderate';
@@ -431,7 +440,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
 
     bridgeReleases(tr, emit);
     bridgeCertifications(tr, emit);
-    bridgeIncidents(tr, emit);
+    bridgeIncidents(tr, emit, race);
     bridgeStrait(tr, emit);
     bridgeRegime(tr, emit);
     bridgeSpawn(tr, emit);

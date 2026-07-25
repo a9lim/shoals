@@ -163,6 +163,57 @@ function racingPaceFor(cap, id, culture, heat, regime) {
     return pace;
 }
 
+// ---- The room (P7-3): the endgame branch-point predicate -----------------
+// 02a Act III "The room": trigger = leader lab `C_internal >= R5_threshold - 0.15`
+// at day-complete. The predicate lives HERE (race-side, pure) so main.js's
+// day-complete latch never pokes latents itself -- the _checkFirmConversion
+// precedent, where the orchestrator owns the latch and the model owns the fact.
+
+/** Rung R5 (takeoff) in capability units. */
+export const ROOM_RUNG = 5;
+/** Margin below R5 at which the leader's final scaling decision is live (02a). */
+export const ROOM_MARGIN = 0.15;
+/** The trigger level itself (4.85). */
+export const ROOM_TRIGGER_C = ROOM_RUNG - ROOM_MARGIN;
+
+/** Lab-id iteration order for the leader resolution. A tie is decided by this
+ *  order (halcyon first) -- the same order `frontierInternal` walks, so the
+ *  trigger level and the leader id can never disagree about who the max is. */
+const ROOM_LAB_ORDER = ['halcyon', 'tianxia', 'polaris'];
+
+/**
+ * THE room helper (02a P7-3 ruling 3): one traversal, both facts.
+ *   { ready, leaderLab }
+ * `ready` is the trigger predicate -- has the leading ACTIVE lab's INTERNAL
+ * track come within ROOM_MARGIN of R5? `leaderLab` is WHO leads (null if no lab
+ * is active), which the room needs because the two rooms are different rooms:
+ * Halcyon about to cross is a triumph with a conscience problem, Beijing about to
+ * cross is a panic. Exposed from HERE rather than recomputed by the orchestrator.
+ *
+ * This is deliberately a latent read -- the room is a real meeting about a real
+ * decision, not a public claim -- but the orchestrator is handed a BOOLEAN and an
+ * ID, never a level. Draws nothing, mutates nothing; safe on a null race (Classic).
+ */
+export function roomTrigger(race) {
+    if (!race || !race.capability) return { ready: false, leaderLab: null };
+    const cap = race.capability;
+    let leaderLab = null, best = -Infinity;
+    for (const id of ROOM_LAB_ORDER) {
+        const lab = cap.labs[id];
+        if (!lab.active) continue;
+        if (lab.C_internal > best) { best = lab.C_internal; leaderLab = id; }   // strict: ties keep the earlier lab
+    }
+    return { ready: best >= ROOM_TRIGGER_C, leaderLab };
+}
+
+/** The boolean half of `roomTrigger`, kept as its own export: it is the guard
+ *  expression main.js and the harness both state (`!race.resolution &&
+ *  roomTriggerReady(race)`). Agrees with `frontierInternal(cap) >= ROOM_TRIGGER_C`
+ *  by construction -- same set, same max. */
+export function roomTriggerReady(race) {
+    return roomTrigger(race).ready;
+}
+
 /** Total heat = clamp(transient + floor + strait, 0, 1). The floor is a ratchet;
  *  `strait` is a REVERSIBLE blockade overlay (strait.js sets it to BLOCKADE_HEAT
  *  while a Taiwan blockade is active, back to 0 when it lifts). */

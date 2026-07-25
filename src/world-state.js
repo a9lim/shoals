@@ -80,6 +80,10 @@ export function createWorldState() {
             fixedpointPublic:   false,       // the codename belongs to the world (halcyon-arc one-shot sets it)
             summitLive:         false,       // the treaty window is open (set ONLY by the Act-III summit
                                              // machinery, P6/P7 -- never by an event effect; gates treaty_window)
+            fundLive:           false,       // MIRROR of main.js's fund-as-actor latch (P7-3): belief.js's own
+                                             // canActAsFund gate (credibility > 0.65 AND F > 60), latched once
+                                             // for the run. Read-only for guards (gates treasury_backchannel);
+                                             // NOT in WORLD_STATE_RANGES -- no event effect can forge it.
         },
     };
 }

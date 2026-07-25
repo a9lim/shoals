@@ -17,11 +17,14 @@
       Cangjie constituency, Cambria allocation politics,
       and the guards-vs-GPUs budget fight.
 
-   DEFERRED to the theft-disclosure machinery round (the
-   bridge's theft stub is a deliberate no-op until then):
-   the post-theft "why slow down if it can be stolen"
-   margin burn, and sampled-reliability chinaTrue
-   intelligence beats. Their prose lands with their
+   3. chinaTrue INTEL BEATS (P7-3): `intel: true` shells
+      whose headline pool is selected by a sampled-
+      reliability read of the hidden Tianxia velocity
+      (src/race/intel.js). Narrative-only; the velocity
+      itself is never rendered.
+
+   STILL DEFERRED: the post-theft "why slow down if it can
+   be stolen" margin burn. Its prose lands with its
    machinery -- a dangling followupOnly would trip the
    index validator today.
 
@@ -169,6 +172,66 @@ export const CHINA_EVENTS = [
         ],
         params: {},
         impulse: { xi: 0.008 },   // decaying (P4): the chokepoint reminds everyone it chooses
+    },
+
+    // ---- chinaTrue INTEL beats (P7-3; PROSE: coordinator) -----------------
+    // 04's "China posterior as tradeable as the timeline". Each of these shells
+    // declares `intel: true`: at fire time the canonical `_fireEvent` path resolves
+    // ONE read from src/race/intel.js -- the hidden Tianxia velocity bucketed
+    // behind / matched / faster, reported truthfully with p = 0.7 and otherwise
+    // ONE bucket off (never inverted) -- and selects the matching `headlinesByRead`
+    // pool. The reliability draw comes from intel.js's own module stream, OUTSIDE
+    // race.streams, so these beats cannot perturb the race.
+    //
+    // NARRATIVE-ONLY by rule (02a): no `impulse`, no `params`, no raceEffects, no
+    // factionShifts -- the read is information, and what the player does with it is
+    // the trade. The velocity number itself is NEVER rendered; only the bucket, and
+    // only through these pools. An assessment is not a fact: two beats in one run
+    // can disagree, and that is the mechanic, not a bug.
+    //
+    // Category 'china' is Poisson-LIVE (left the exclusion at content round 2), so
+    // these draw normally under the existing frontierRung guards.
+    {
+        id: 'china_intel_estimate',
+        category: 'china',
+        likelihood: 1.2,
+        magnitude: 'moderate',
+        intel: true,
+        when: (sim, world) => world.ai.frontierRung >= 2,
+        headlinesByRead: {
+            behind: ['PROSE: coordinator — the interagency estimate reads Beijing as genuinely behind (bucket: behind). The estimate is an estimate.'],
+            matched: ['PROSE: coordinator — the interagency estimate reads the two programs as effectively level (bucket: matched).'],
+            faster: ['PROSE: coordinator — the interagency estimate reads Beijing as quietly faster than the public line (bucket: faster).'],
+        },
+        params: {},
+    },
+    {
+        id: 'china_intel_human_source',
+        category: 'china',
+        likelihood: 1,
+        magnitude: 'moderate',
+        intel: true,
+        when: (sim, world) => world.ai.frontierRung >= 2,
+        headlinesByRead: {
+            behind: ['PROSE: coordinator — a human-source read out of the Zhaowei program: slower than advertised (bucket: behind). Sourcing thin, conviction high, which is the usual arrangement.'],
+            matched: ['PROSE: coordinator — a human-source read: the two programs are closer than either capital says (bucket: matched).'],
+            faster: ['PROSE: coordinator — a human-source read: the program is ahead of its own announcements (bucket: faster).'],
+        },
+        params: {},
+    },
+    {
+        id: 'china_intel_buildout',
+        category: 'china',
+        likelihood: 1,
+        magnitude: 'minor',
+        intel: true,
+        when: (sim, world) => world.ai.frontierRung >= 3,
+        headlinesByRead: {
+            behind: ['PROSE: coordinator — commercial imagery of the compute build-out, read as a program running below its own plan (bucket: behind).'],
+            matched: ['PROSE: coordinator — commercial imagery of the compute build-out, read as tracking the frontier (bucket: matched).'],
+            faster: ['PROSE: coordinator — commercial imagery of the compute build-out, read as outpacing every published estimate (bucket: faster).'],
+        },
+        params: {},
     },
 
     // ---- Guards vs GPUs (the budget fight before the theft) ---------------

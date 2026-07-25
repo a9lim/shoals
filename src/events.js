@@ -21,6 +21,7 @@ import { firmCooldownMult, shiftFaction } from './faction-standing.js';
 import { getRegulationPipeline } from './regulations.js';
 import { addEventImpulse } from './race/impulse.js';
 import { applyRaceEffects } from './race/ledger.js';
+import { intelRead } from './race/intel.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './events/index.js';
@@ -56,6 +57,12 @@ const _PULSE_CATEGORIES = new Set([
     // bridge on the window-open ledger transition, never Poisson (the Poisson
     // `when: summitLive` gating surfaced at p ~ 0.003/window, effectively dead).
     'summit',
+    // 'room' (P7-3): the endgame branch point fires from main.js's `_checkRoom`
+    // latch on the race-side threshold predicate, ONCE per run. Excluded by
+    // DESIGN, not dormancy -- a Poisson-drawn room would be a meeting the model
+    // never called. It is also NOT terminal-safe (endings.js): its effects require
+    // a live world, so the terminal queue filter discards it.
+    'room',
 ]);
 
 // -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------
@@ -505,6 +512,32 @@ export class EventEngine {
     }
 
     _fireEvent(event, sim, day, depth, netDelta = 0) {
+        // P7-3 chinaTrue INTEL read: a shell declaring `intel: true` carries
+        // `headlinesByRead` (behind / matched / faster) instead of a headline pool.
+        // Resolve ONE read here -- the canonical fire path, so a Poisson draw, a
+        // followup and a bridge fire all get exactly one read per fired beat -- and
+        // hand the selected pool to the RNG-free collapse below. The read is
+        // NARRATIVE-ONLY (no B fold, no race mutation, no faction shift) and comes
+        // from intel.js's own module stream, OUTSIDE race.streams, so it cannot
+        // perturb the model. Guarded on `this.race` (null outside Dynamic modes) and
+        // on the channel being live; unresolved, the shell falls through with no
+        // headline and its pool untouched.
+        if (event.intel && event.headlinesByRead) {
+            // EVERY intel shell resolves here -- attached race or not (sol-gate P2).
+            // The read is attempted only when there IS a race; an unresolvable read
+            // (no race, inactive channel, missing hidden state) falls back to the
+            // least-informative bucket rather than leaving the shell headline-less.
+            // These shells carry NO scalar `headline` by construction, because a
+            // scalar would pre-empt the pool selection below -- so the fallback is
+            // what makes the "always renders" guarantee true rather than incidental.
+            const read = this.race ? intelRead(this.race) : null;
+            const bucket = read ? read.bucket : 'matched';
+            const pool = event.headlinesByRead[bucket];
+            if (pool && pool.length) {
+                event = { ...event, headlines: pool, raceMeta: { ...(event.raceMeta || {}), intelRead: bucket } };
+            }
+        }
+
         // Variant-pool collapse: a shell may carry `headlines: [...]` instead of a
         // scalar `headline` (race followup shells, and -- phase-5 -- variant pools
         // on followup chains generally). Collapse to one variant here so BOTH the
