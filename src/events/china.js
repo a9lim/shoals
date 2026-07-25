@@ -174,7 +174,7 @@ export const CHINA_EVENTS = [
         impulse: { xi: 0.008 },   // decaying (P4): the chokepoint reminds everyone it chooses
     },
 
-    // ---- chinaTrue INTEL beats (P7-3; PROSE: coordinator) -----------------
+    // ---- chinaTrue INTEL beats (P7-3; prose landed 2026-07-24) -----------------
     // 04's "China posterior as tradeable as the timeline". Each of these shells
     // declares `intel: true`: at fire time the canonical `_fireEvent` path resolves
     // ONE read from src/race/intel.js -- the hidden Tianxia velocity bucketed
@@ -199,9 +199,9 @@ export const CHINA_EVENTS = [
         intel: true,
         when: (sim, world) => world.ai.frontierRung >= 2,
         headlinesByRead: {
-            behind: ['PROSE: coordinator — the interagency estimate reads Beijing as genuinely behind (bucket: behind). The estimate is an estimate.'],
-            matched: ['PROSE: coordinator — the interagency estimate reads the two programs as effectively level (bucket: matched).'],
-            faster: ['PROSE: coordinator — the interagency estimate reads Beijing as quietly faster than the public line (bucket: faster).'],
+            behind: ['An interagency estimate circulates: the Zhaowei program is behind its own announcements, and the gap is real. The estimate is an estimate.'],
+            matched: ['An interagency estimate circulates: effectively level. The word “effectively” is carrying a classified annex.'],
+            faster: ['An interagency estimate circulates, tighter-held than usual: the Zhaowei program may be ahead of the public line. Ahead. The word does not appear in the summary paragraph.'],
         },
         params: {},
     },
@@ -213,9 +213,9 @@ export const CHINA_EVENTS = [
         intel: true,
         when: (sim, world) => world.ai.frontierRung >= 2,
         headlinesByRead: {
-            behind: ['PROSE: coordinator — a human-source read out of the Zhaowei program: slower than advertised (bucket: behind). Sourcing thin, conviction high, which is the usual arrangement.'],
-            matched: ['PROSE: coordinator — a human-source read: the two programs are closer than either capital says (bucket: matched).'],
-            faster: ['PROSE: coordinator — a human-source read: the program is ahead of its own announcements (bucket: faster).'],
+            behind: ['A human-source read out of the Zhaowei program: slower than advertised, the demos curated, the fear real. Sourcing thin, conviction high — the usual arrangement.'],
+            matched: ['A human-source read out of the Zhaowei program: closer than either capital says. One line survives the redactions: “they think they are behind, and so do we.”'],
+            faster: ['A human-source read out of the Zhaowei program: ahead of its own announcements, and quiet about it on purpose. The source was not paid. That is what worries the people who read it.'],
         },
         params: {},
     },
@@ -227,9 +227,9 @@ export const CHINA_EVENTS = [
         intel: true,
         when: (sim, world) => world.ai.frontierRung >= 3,
         headlinesByRead: {
-            behind: ['PROSE: coordinator — commercial imagery of the compute build-out, read as a program running below its own plan (bucket: behind).'],
-            matched: ['PROSE: coordinator — commercial imagery of the compute build-out, read as tracking the frontier (bucket: matched).'],
-            faster: ['PROSE: coordinator — commercial imagery of the compute build-out, read as outpacing every published estimate (bucket: faster).'],
+            behind: ['Commercial imagery of the Zhaowei compute build-out: pads poured, halls empty. A program running below its own plan — or staging somewhere the satellites are not looking.'],
+            matched: ['A read on commercial imagery of the Zhaowei compute build-out: the analysts call it tracking the frontier almost exactly. If they are right, somebody is reading somebody’s planning documents — and it may be mutual.'],
+            faster: ['An imagery shop reads the Zhaowei build-out as outpacing every published estimate — transformer yards, their note argues, being the one thing you cannot classify. The yards are real. What they power is the analysts’ guess.'],
         },
         params: {},
     },

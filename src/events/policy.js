@@ -149,7 +149,7 @@ export const POLICY_EVENTS = [
         ],
     },
 
-    // ---- Treasury backchannel (P7-3: fund-as-actor; PROSE: coordinator) -----
+    // ---- Treasury backchannel (P7-3: fund-as-actor) -----
     // 02a P7-3 semantics item 3, the fund-as-actor wager. Gated on the fund being
     // LIVE -- `world.ai.fundLive`, the read-only mirror of main.js's monotone latch
     // over belief.js's OWN gate predicate `canActAsFund` (credibility > 0.65 AND
@@ -165,21 +165,21 @@ export const POLICY_EVENTS = [
         popup: true,
         magnitude: 'moderate',
         when: (sim, world) => !!world.ai.fundLive,
-        headline: 'PROSE: coordinator — Treasury opens a standing backchannel to the desk: the fund is now large enough, and right enough, to be asked.',
-        context: 'PROSE: coordinator — what the wire buys (a seat at the table when the decision comes) and what it costs (a wire runs both ways, and the exposure is permanent).',
+        headline: 'A call from Treasury',
+        context: 'The voice is polite and does not introduce itself twice. Treasury has been reading the fund’s letters — your letters, the ones with the forecasts in them — and has questions the interagency process is too slow to ask. They would like to keep reading. Informally. The word “informally” is doing a lot of work, and both of you can hear it.',
         choices: [
             {
-                label: 'PROSE: coordinator — take the call',
-                desc: 'PROSE: coordinator — the access is real and so is the record of it.',
+                label: 'Open the line',
+                desc: 'Useful, unlogged, and it runs in both directions. Wires do.',
                 playerFlag: 'treasury_backchannel',
                 factionShifts: [{ faction: 'regulatoryExposure', value: 6 }],
-                resultToast: 'PROSE: coordinator — the backchannel opens.',
+                resultToast: 'The line is open. Lines like this are never only one-way.',
             },
             {
-                label: 'PROSE: coordinator — stay a market participant',
-                desc: 'PROSE: coordinator — decline the wire; keep the distance that makes the book defensible.',
+                label: 'Decline, politely',
+                desc: 'The fund writes public letters. Treasury can read them like everyone else.',
                 playerFlag: 'declined_treasury',
-                resultToast: 'PROSE: coordinator — the offer lapses.',
+                resultToast: 'You declined. The voice was exactly as polite about that.',
             },
         ],
     },

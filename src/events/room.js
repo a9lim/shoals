@@ -58,9 +58,8 @@
      about a decision the world has not been told about. The
      tape does not print it.
 
-   ALL PROSE IS PLACEHOLDER (`PROSE: coordinator`). This is
-   the game's climax; the coordinator writes every word.
-   Data + the pure gate/scale helpers only.
+   All prose is coordinator-written (2026-07-24 prose round).
+   This is the game's climax; the coordinator writes every word.
    =================================================== */
 
 /** Minimum satisfied criteria for a seat (02a: >= 2 of six). */
@@ -111,45 +110,45 @@ export const ROOM_EVENTS = [
         // shells carry the same discipline for the same reason).
         headlinesByLeader: {
             home: [
-                'PROSE: coordinator — THE ROOM, home-side: an American lab is about to cross, the desk is in the room for the decision, and the meeting is a triumph with a conscience problem.',
-                'PROSE: coordinator — THE ROOM, home-side (variant 2): the same meeting, a different way in.',
+                'The final scaling review',
+                'A car comes at six',
             ],
             rival: [
-                'PROSE: coordinator — THE ROOM, rival-side: Beijing is about to cross, and the room the desk is in is the panic room — still Washington\'s room, convened about somebody else\'s clock.',
-                'PROSE: coordinator — THE ROOM, rival-side (variant 2): the same panic, a different way in.',
+                'The intelligence is credible',
+                'Not our decision to make. Except it is.',
             ],
         },
         contextsByLeader: {
             home: [
-                'PROSE: coordinator — home-side context: one voice among several, never a control knob; hidden state still resolves the world. What the seat cost, what the advice is worth, and what it means that the invitation came at all.',
-                'PROSE: coordinator — home-side context (variant 2).',
+                'The room is smaller than the thing it decides. Upstairs — three floors, a badge reader, a hallway with the lights on motion sensors — a training run is holding at the edge of the last threshold anyone bothered to name. Dirks has the head of the table. There is a man from the NSC who does not give a title, a lawyer who has not spoken, a speakerphone with Treasury on it. And there is you, because enough of the right people learned to take the desk’s read seriously, one at a time, for reasons you could list. Nobody in this room can see the whole model. Everyone has a number they trust. The question is whether the lead gets spent or banked, and yours is one voice among several — which is more voice than the market gets, and less than you are about to want.',
+                'There is no agenda. There is a printed sheet turned face-down at each chair, and Dirks, who has already read it, watching people decide whether to turn it over. The run upstairs is close — close enough that the word “pause” has stopped being a policy position and become a number somebody would have to own. You recognize most of the faces — from hearings, from launch events, from the news; the ones you don’t recognize are the ones who decide things. When your turn comes it will come without ceremony: Meridian sees the whole tape — what does the tape think? You have been answering that question with money the whole way here. This is the last room that will ask it.',
             ],
             rival: [
-                'PROSE: coordinator — rival-side context: the decision on the table is a response, not a choice; the margin argument sounds different when the schedule is being set abroad.',
-                'PROSE: coordinator — rival-side context (variant 2).',
+                'The briefing is short because the margin is short. The intelligence people believe Beijing is close — close enough that this meeting exists, close enough that nobody performs skepticism about the sourcing. Dirks looks like she has not slept. The man from the NSC gives his title freely now, which is worse. The options have been narrowed to the ones that can be said aloud, and everyone at the table has already counted them. Nobody uses the word “first” out loud. You are here because enough of the right people learned to take the desk’s read seriously — and because when the question is what a rival does with a lead, someone who prices other people’s intentions for a living is suddenly load-bearing. One voice among several. The world is not waiting for the minutes.',
+                'You always assumed the panic room would be louder. Instead: coffee nobody drinks, a map nobody needs, and a sentence being passed around the table like a stone — they may get there before we do. Halcyon’s number is what it is; theirs, the briefers believe, is closer. Every option left is a trade someone in this room spent years calling unthinkable, and the person who has to say so out loud keeps not being anyone. Then the chair turns to you — the desk that priced this race while Washington was still calling it a product cycle — and asks what the market would do. The market is not in the room. You are.',
             ],
         },
         params: {},              // the room is not a market event: no deltas, no impulse
         choices: [
             {
-                label: 'PROSE: coordinator — advise speed',
-                desc: 'PROSE: coordinator — ship; the margin is a luxury the position no longer affords.',
+                label: 'Advise speed',
+                desc: 'Tell the room to go. Whatever margin is worth, second is worth less.',
                 _roomVerb: 'speed',
                 // Full-voice magnitude (02a): S[halcyon] -0.12. Scaled by
                 // voice/ROOM_MAX_VOICE in roomChoices before it is ever fired.
                 raceEffects: [{ dial: 'S', lab: 'halcyon', amount: -0.12 }],
-                resultToast: 'PROSE: coordinator — the speed advice, received.',
+                resultToast: 'You advised speed. The room heard you.',
             },
             {
-                label: 'PROSE: coordinator — advise margin',
-                desc: 'PROSE: coordinator — hold; buy the safety margin with time nobody thinks they have.',
+                label: 'Advise margin',
+                desc: 'Tell the room to hold the line on the checks. Arriving first matters less than arriving intact.',
                 _roomVerb: 'margin',
                 raceEffects: [{ dial: 'S', lab: 'halcyon', amount: 0.12 }],
-                resultToast: 'PROSE: coordinator — the margin advice, received.',
+                resultToast: 'You advised margin. The room heard you.',
             },
             {
-                label: 'PROSE: coordinator — advise the deal',
-                desc: 'PROSE: coordinator — the window is open; spend the room on the treaty instead of the schedule.',
+                label: 'Advise the deal',
+                desc: 'Tell the room to take the deal while there is a deal to take.',
                 _roomVerb: 'deal',
                 // Present ONLY while the summit window is live (02a); roomChoices
                 // filters on this at fire time.
@@ -158,16 +157,16 @@ export const ROOM_EVENTS = [
                     { dial: 'heat', amount: -0.09 },
                     { dial: 'S', lab: 'halcyon', amount: 0.04 },
                 ],
-                resultToast: 'PROSE: coordinator — the deal advice, received.',
+                resultToast: 'You advised the deal. The room heard you.',
             },
             {
-                label: 'PROSE: coordinator — say nothing',
-                desc: 'PROSE: coordinator — you are in the room and you do not use it.',
+                label: 'Say nothing',
+                desc: 'You bought the seat. Nothing says you must spend the voice.',
                 _roomVerb: 'silence',
                 // No raceEffects: declining is a real option with a real absence
                 // where the effect would be. The flag is the whole consequence.
                 playerFlag: 'room_declined',   // == ROOM_FLAGS.declined
-                resultToast: 'PROSE: coordinator — the silence, noted.',
+                resultToast: 'You said nothing. It is in the minutes that you were there.',
             },
         ],
     },

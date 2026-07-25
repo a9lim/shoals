@@ -229,7 +229,7 @@ export const RACE_EVENTS = [
             },
         ],
     },
-    // ---- Classified-brief shells (P7-3 blackout; PROSE: coordinator) ----------
+    // ---- Classified-brief shells (P7-3 blackout) ----------
     // Under `controlRegime === 'classified'` the bridge routes every detected
     // incident of severity <= 3 HERE instead of to the public ladder above (S4 is
     // undeniable and keeps its superevent). What reaches the desk is not a story
@@ -250,14 +250,14 @@ export const RACE_EVENTS = [
         id: 'incident_brief_classified',
         category: 'incident',
         magnitude: 'minor',
-        headline: 'PROSE: coordinator — classified incident brief, ordinary severity (S0-S2 and persuasion class under blackout): the notice exists, the facts are sealed, the market cannot price what it is not told.',
+        headline: 'Word of a numbered brief: an anomaly at {lab}, characterized as contained. You are not cleared for the characterization.',
         params: {},                            // no permanent delta (03 incident-coupling rule)
     },
     {
         id: 'incident_brief_classified_grave',
         category: 'incident',
         magnitude: 'moderate',
-        headline: 'PROSE: coordinator — classified incident brief, GRAVE (S3 under blackout): the public ladder would have asked the desk for a decision here; the blackout version does not ask.',
+        headline: 'A folder with a signature log makes the rounds upstairs: something at {lab}, worded so it could be anything. The wording is the point.',
         params: {},                            // no permanent delta (03 incident-coupling rule)
     },
 
