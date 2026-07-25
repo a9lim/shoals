@@ -483,9 +483,13 @@ function _bidAskTip(mid, vol) {
 
 /**
  * @param {Array} skeleton - chain skeleton (has .day, .dte per entry)
+ * @param {number} [vPublished] - P7-1 VXHCN PUBLICATION variance for the VXHCN
+ *        futures cells (display only; main.js owns the latch). Omitted => the
+ *        true `market.v`, which is what every fill / mark / settlement uses.
  */
-export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap) {
+export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap, vPublished) {
     const dash = '\u2014';
+    const vDisp = vPublished != null ? vPublished : market.v;
     const displaySpot = spot != null ? spot + getStockImpact(sigma) : null;
     const stockTxt = displaySpot != null ? displaySpot.toFixed(2) : dash;
     const stockTip = _bidAskTip(displaySpot, sigma);
@@ -505,7 +509,7 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
 
     // Trade tab VXHCN futures: from trade expiry dropdown
     const tradeVxhcnMid = tradeExp
-        ? computeVXHCNFuturePrice(market.v, market.kappa, market.theta, market.xi, tradeExp.dte / 252)
+        ? computeVXHCNFuturePrice(vDisp, market.kappa, market.theta, market.xi, tradeExp.dte / 252)
         : null;
     const tradeVxhcnDisplay = tradeVxhcnMid != null ? tradeVxhcnMid + getVxhcnImpact(market.xi) : null;
     const tradeVxhcn = tradeVxhcnDisplay != null ? tradeVxhcnDisplay.toFixed(2) : dash;
@@ -539,7 +543,7 @@ export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, st
 
     // Strategy tab VXHCN futures: from strategy expiry dropdown
     const stratVxhcnMid = stratExp
-        ? computeVXHCNFuturePrice(market.v, market.kappa, market.theta, market.xi, stratExp.dte / 252)
+        ? computeVXHCNFuturePrice(vDisp, market.kappa, market.theta, market.xi, stratExp.dte / 252)
         : null;
     const stratVxhcnDisplay = stratVxhcnMid != null ? stratVxhcnMid + getVxhcnImpact(market.xi) : null;
     const stratVxhcn = stratVxhcnDisplay != null ? stratVxhcnDisplay.toFixed(2) : dash;

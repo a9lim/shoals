@@ -11,7 +11,7 @@ import {
     MIDTERM_DAY, CAMPAIGN_START_DAY, NON_FED_POISSON_RATE,
     NON_FED_COOLDOWN_MIN, NON_FED_COOLDOWN_MAX, FED_MEETING_JITTER,
     BOREDOM_THRESHOLD, TERM_END_DAY,
-    ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY,
+    ADV, EVENT_COUPLING_CAP, HISTORY_CAPACITY, INTRADAY_STEPS,
 } from './config.js';
 
 import { createWorldState, congressHelpers, applyStructuredEffects, validateCongress } from './world-state.js';
@@ -66,11 +66,16 @@ const _PULSE_CATEGORIES = new Set([
 // it rises toward BASE_RATE_MAX_MULT as capability compounds, compressing the
 // discretionary event cadence per 04's tempo principle (ratified, 02a phase-5a).
 //
-// P7 SEAM: substep-resolution events (04 engine note 2) are NOT built here -- the
-// day stays the atomic narrative unit. When P7 lands, the same released-rung
-// driver gates an intraday firing pass; this day-level scale is its precursor.
+// The substep LANE (04 engine note 2) landed in P7-1 and rides this SAME driver:
+// past released R4 the day stops being the atomic narrative unit -- see
+// `setSubstepLane` below. The day-level accept/cooldown arithmetic here is
+// unchanged by the lane (that invariance is the harness contract).
 // RATIFIED (02a phase-5a block): the ceiling and the linear-in-released-rung shape.
 export const BASE_RATE_MAX_MULT = 2.5;   // late-game (R5) event-cadence ceiling
+
+/** Released frontier rung at which the discretionary pass moves to substep
+ *  granularity (02a Act III machinery). */
+export const SUBSTEP_LANE_RUNG = 4;
 
 /** Day-level base-rate multiplier from the public released frontier rung (1..5).
  *  1.0 at R1 (Act-I match), rising linearly to BASE_RATE_MAX_MULT at R5 -- the
@@ -121,6 +126,13 @@ export class EventEngine {
         // (Act I / Classic); main.js raises it with the released frontier rung.
         this._baseRateScale = 1;
 
+        // P7-1 substep lane. When on, the DISCRETIONARY pass keeps its day-level
+        // accept/cooldown arithmetic but the drawn beat arrives at a uniform
+        // substep instead of at the day boundary (see setSubstepLane). Off in
+        // Classic and through released R3.
+        this._substepLane = false;
+        this._substepArrival = null;    // { event, day, substep }
+
         // Epilogue
         this._epilogueFired = false;
 
@@ -159,6 +171,10 @@ export class EventEngine {
     maybeFire(sim, day, netDelta = 0) {
         this._currentDay = day;
         const empty = { fired: [], popups: [] };
+
+        // P7-1: drop a lane arrival whose day never traded its substeps (a mid-day
+        // preset switch / reset). Normal days always consume or expire theirs.
+        if (this._substepArrival && this._substepArrival.day < day) this._substepArrival = null;
 
         // Epilogue already fired -- no more events
         if (this._epilogueFired) return empty;
@@ -214,32 +230,106 @@ export class EventEngine {
         const firedFollowups = this._checkFollowups(sim, day, netDelta);
         if (firedFollowups.length > 0) return _partition(firedFollowups);
 
-        // 3. Random draw with cooldown. The base rate + cooldown both scale with
-        //    the released frontier (phase 5a): higher accept probability and
-        //    shorter cooldown late-game compress the discretionary cadence. At
-        //    scale 1 (Act I / Classic) this is bit-identical to the old constant
-        //    rate. The accept probability is capped so it can never certainty-fire.
-        if (this._randomCooldown > 0) {
-            this._randomCooldown--;
+        // 3/4. The DISCRETIONARY pass: cooldown, accept roll, draw, cooldown set.
+        //      Identical arithmetic whether or not the substep lane is live -- that
+        //      rate invariance is the P7-1 harness contract.
+        const event = this._discretionaryDraw(sim);
+        if (!event) return empty;
+
+        // P7-1 substep lane: past released R4 the beat still ARRIVES today (`day`
+        // is already the day about to be traded -- finalizeDay incremented it
+        // before _onDayComplete), but at a uniformly drawn substep rather than at
+        // the boundary. The day stops being the atomic unit of history exactly
+        // when it stops being one in-fiction.
+        if (this._substepLane) {
+            this._substepArrival = {
+                event, day,
+                substep: Math.floor(Math.random() * INTRADAY_STEPS),
+            };
             return empty;
         }
 
-        const scale = this._baseRateScale || 1;
-        if (Math.random() >= Math.min(0.95, NON_FED_POISSON_RATE * scale)) return empty;
+        return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
+    }
 
-        // 4. Draw from appropriate source
+    /**
+     * The discretionary (Poisson) decision, extracted verbatim from maybeFire's
+     * steps 3-4 so the day lane and the substep lane share ONE cadence. The base
+     * rate + cooldown both scale with the released frontier (phase 5a): higher
+     * accept probability and shorter cooldown late-game compress the discretionary
+     * cadence. At scale 1 (Act I / Classic) this is bit-identical to the old
+     * constant rate. The accept probability is capped so it can never
+     * certainty-fire. Returns the drawn event, or null.
+     */
+    _discretionaryDraw(sim) {
+        if (this._randomCooldown > 0) {
+            this._randomCooldown--;
+            return null;
+        }
+
+        const scale = this._baseRateScale || 1;
+        if (Math.random() >= Math.min(0.95, NON_FED_POISSON_RATE * scale)) return null;
+
         const event = this.source === 'llm'
             ? this._drawLLM(sim)
             : this._drawRandom(sim);
 
-        if (!event) return empty;
+        if (!event) return null;
 
         // Set cooldown after successful random draw (compressed by the base-rate scale)
         const cd = NON_FED_COOLDOWN_MIN +
             Math.floor(Math.random() * (NON_FED_COOLDOWN_MAX - NON_FED_COOLDOWN_MIN + 1));
         this._randomCooldown = Math.max(1, Math.round(cd / scale));
 
-        return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
+        return event;
+    }
+
+    /**
+     * Turn the substep lane on/off (P7-1). main.js sets it each completed day from
+     * the PUBLIC released-frontier mirror -- the same driver the base-rate scale
+     * reads -- so the lane opens at released R4 and is off in Classic. Only the
+     * DISCRETIONARY pass moves: pulses, one-shots, followups, portfolio triggers,
+     * and every bridge/ledger-fired race beat stay at day-complete, because
+     * transitions are computed at day boundaries and firing them mid-day would
+     * misstate when the model moved.
+     */
+    setSubstepLane(on) {
+        this._substepLane = !!on;
+        if (!this._substepLane) this._substepArrival = null;
+    }
+
+    /** True while the lane is live. */
+    substepLaneLive() { return this._substepLane; }
+
+    /** The pending lane arrival ({ event, day, substep }), or null. */
+    pendingArrival() { return this._substepArrival; }
+
+    /**
+     * Claim the lane arrival scheduled for (day, substepIndex), or null. Consumes
+     * it, so a beat can never double-fire; a stale arrival (its day already past)
+     * is dropped rather than fired late.
+     */
+    takeSubstepArrival(day, substepIndex) {
+        const a = this._substepArrival;
+        if (!a) return null;
+        if (a.day !== day) {
+            if (a.day < day) this._substepArrival = null;
+            return null;
+        }
+        if (a.substep !== substepIndex) return null;
+        this._substepArrival = null;
+        return a.event;
+    }
+
+    /**
+     * Fire a lane arrival through the CANONICAL `_fireEvent` path (impulse
+     * dispatch, deltas, effects, logging, followups -- all identical to the day
+     * lane). Returns { fired, popups } like maybeFire.
+     */
+    fireArrival(event, sim, day, netDelta = 0) {
+        const r = this._fireEvent(event, sim, day, 0, netDelta);
+        if (!r) return { fired: [], popups: [] };
+        return r.queued ? { fired: [], popups: [r.event] } : { fired: [r], popups: [] };
     }
 
     /** Kick off initial LLM batch fetch. */
@@ -324,6 +414,8 @@ export class EventEngine {
         this._firedOneShot.clear();
         this._triggerCooldowns = {};
         this._baseRateScale = 1;
+        this._substepLane = false;
+        this._substepArrival = null;
 
         // Reset all pulse states
         for (const pulse of this._pulses) {

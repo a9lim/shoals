@@ -16,6 +16,7 @@ import {
     liquidateAll, placePendingOrder, cancelOrder, cancelAllOrders,
     computeNetDelta, computeGrossNotional, portfolioValue,
     executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows, applyCloseoutRows,
+    isExpiredForTrading,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -33,7 +34,7 @@ import {
     showPopupEvent,
 } from './src/ui.js';
 import { initTheme, toggleTheme } from './src/theme.js';
-import { EventEngine, eventBaseRateScale } from './src/events.js';
+import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
 import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
@@ -70,7 +71,18 @@ import {
     getRegulationEffect, resetRegulations, getRegulationPipeline,
 } from './src/regulations.js';
 import { TIP_REAL_PROBABILITY } from './src/config.js';
-import { initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio } from './src/audio.js';
+import {
+    initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio,
+    setMachineIntensity, glitchAudio, silenceDesk,
+} from './src/audio.js';
+import {
+    stepAct3Driver, resetAct3,
+    tickSubstepClock, substepClock, orderLatency,
+    deferOrder, dueOrders, clearDeferredOrders, workingOrderCount,
+    publishedChain, advanceVxhcnPublication, publishedVxhcn, publishedVariance,
+    rollCandleRepaint, skipSparklineFrame, noteDegradationIncident, takeGlitchSeverity,
+    setReducedMotion,
+} from './src/act3.js';
 import { getAvailableActions, executeLobbyAction, resetLobbying, getLastLobbyDay } from './src/lobbying.js';
 import { createRaceState, advanceRace, resetRaceState, stepControlRegime } from './src/race/race-state.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
@@ -282,7 +294,10 @@ function _clampRate() {
     if (ceil !== null && sim.r > ceil) sim.r = ceil;
     if (flr  !== null && sim.r < flr)  sim.r = flr;
 }
-/** Run one substep + impact decay + market sync + MM rehedge + order check. */
+/** Run one substep + impact decay + market sync + MM rehedge + order check, then
+ *  the Act III substep boundary (P7-1): deferred manual fills, the substep event
+ *  lane, and -- while the lane is live -- a popup-queue drain. All three are inert
+ *  outside Dynamic modes and below released R4. */
 function _runSubstep() {
     sim.substep();
     _clampRate();
@@ -290,6 +305,257 @@ function _runSubstep() {
     _syncAll();
     rehedgeMM(portfolio.positions);
     _onSubstepTick();
+    // ---- Act III substep boundary ----
+    tickSubstepClock();
+    _drainDeferredFills();      // manual-order latency ladder: fills due at THIS substep
+    _fireSubstepArrival();      // the discretionary beat that landed intraday
+    if (_laneLive() && !_gameOver) _processPopupQueue();
+}
+
+// ---------------------------------------------------------------------------
+// Act III systemic layer (P7-1) -- driver, substep lane, latency ladder
+// ---------------------------------------------------------------------------
+
+/** The PUBLIC released frontier rung (world.ai mirror; 0 outside Dynamic modes).
+ *  The same public act proxy `eta`, the base-rate scale, and the arc guards read
+ *  -- never latent capability. */
+function _frontierRung() {
+    return eventEngine ? (eventEngine.world.ai.frontierRung || 0) : 0;
+}
+/** The PUBLIC controlRegime (world.ai mirror; 'private' outside Dynamic modes). */
+function _regime() {
+    return eventEngine ? (eventEngine.world.ai.controlRegime || 'private') : 'private';
+}
+/** Substep lag + spread multiplier for a MANUAL desk order right now. */
+function _latency() {
+    return raceState ? orderLatency(_frontierRung(), _regime()) : { lag: 0, spreadMult: 1 };
+}
+/** True while the substep event lane is open (Dynamic ∧ released R4+). */
+function _laneLive() {
+    return !!(eventEngine && eventEngine.substepLaneLive());
+}
+
+/**
+ * Step the Act III driver one completed trading day and hand `x` to the audio
+ * machine register. Reads the PUBLIC mirrors only. Dynamic modes only: in Classic
+ * the driver is never stepped, x stays 0, and audio is never told anything.
+ */
+function _stepAct3() {
+    const x = stepAct3Driver(_frontierRung(), _regime());
+    setMachineIntensity(x);
+    // The lane opens on the same public driver (02a: at released R4 the
+    // discretionary pass moves to substep granularity).
+    eventEngine.setSubstepLane(_frontierRung() >= SUBSTEP_LANE_RUNG);
+}
+
+/**
+ * Run `fn` against the TRUE BASELINE sim params when a trading day is in progress.
+ * The day's Layer-3 + impulse overlays are unwound LIFO first and re-derived
+ * after, so an INTRADAY event delta (substep lane, or a mid-day popup choice)
+ * mutates the baseline instead of being erased by the overlay restore at day
+ * close. This is the phase-4 overlay-gate rule (AGENTS: overlays are removed
+ * before events mutate params) applied at a substep boundary. No-op when no day
+ * is open, so every day-boundary path is unchanged.
+ */
+function _midDayBaseline(fn) {
+    if (!dayInProgress) return fn();
+    removeEventImpulseOverlay(sim, _savedImpulse);   // LIFO: impulse (innermost) first
+    removeParamOverlays(sim, _savedOverlays);
+    _savedImpulse = {};
+    _savedOverlays = {};
+    try {
+        return fn();
+    } finally {
+        _savedOverlays = applyParamOverlays(sim);
+        _savedImpulse = applyEventImpulseOverlay(sim);
+        _syncAll();
+    }
+}
+
+/** Fire the substep lane's arrival if one lands at this substep (P7-1). */
+function _fireSubstepArrival() {
+    if (!eventEngine || _gameOver) return;
+    const idx = sim.substepsDone - 1;
+    if (idx < 0) return;
+    const ev = eventEngine.takeSubstepArrival(sim.day, idx);
+    if (!ev) return;
+    const netDelta = computeNetDelta();
+    const { fired, popups } = _midDayBaseline(() => {
+        const r = eventEngine.fireArrival(ev, sim, sim.day, netDelta);
+        if (r.fired.length > 0 || r.popups.length > 0) sim.recomputeK();
+        return r;
+    });
+    for (const p of popups) _popupQueue.push(p);
+    for (const f of fired) {
+        if (f.interjection) { _showInterjection(f.headline); continue; }
+        let headline = f.headline;
+        if (getTraitEffect('eventHintArrows', false) && f.params) {
+            const _hintMu = f.params.mu || 0;
+            if (_hintMu > 0) headline += ' \u2191';
+            else if (_hintMu < 0) headline += ' \u2193';
+        }
+        const duration = f.magnitude === 'major' ? 8000 : f.magnitude === 'moderate' ? 5000 : 3000;
+        _toast(headline, duration);
+        const _mu = f.params?.mu || 0;
+        if (_mu > 0.02) playStinger('positive');
+        else if (_mu < -0.02) playStinger('negative');
+        else playStinger('alert');
+    }
+    if (fired.length > 0 || popups.length > 0) {
+        syncSettingsUI($, _simSettingsObj());
+        updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+        updateCongressDiagrams($, eventEngine.world);
+        updateStandings($, eventEngine.world, factions, getFactionDescriptor);
+        chainDirty = true;
+        dirty = true;
+    }
+}
+
+/**
+ * Execute the manual orders whose latency has elapsed (P7-1 agency migration).
+ * The fill price is the price AT THIS SUBSTEP -- that is the point of the ladder.
+ * Terminal / restriction state is re-checked HERE, at execution time: an order
+ * placed before a freeze that lands after it is REJECTED with cash untouched --
+ * including a working CLOSE, which `closePosition` itself would happily fill
+ * (restriction is not one of its chokepoints), so the drop has to live here. The
+ * MACHINERY's own liquidation of a restricted book is untouched: it never enters
+ * this queue.
+ */
+function _drainDeferredFills() {
+    if (workingOrderCount() === 0) return;
+    const due = dueOrders();
+    if (due.length === 0) return;
+    if (_gameOver || portfolio.restricted) {
+        _toast(due.length + ' working order' + (due.length > 1 ? 's' : '') + ' cancelled — the book is closed.', 4000);
+        return;
+    }
+    for (const entry of due) _executeDeferred(entry);
+    chainDirty = true;
+    updateUI();
+    dirty = true;
+}
+
+/**
+ * Close one position at market -- the PLAYER's row button. Shared by the immediate
+ * path and the deferred executor so the ladder can never change what a close
+ * DOES, only when it prints. `spreadMult` omitted = the pre-P7 fill exactly.
+ */
+function _closePositionAction(id, spreadMult) {
+    const ok = closePosition(sim, id, sim.S, market.sigma, sim.r, sim.day, sim.q, spreadMult);
+    if (ok) _toast('Position closed.');
+    chainDirty = true;
+    updateUI();
+    dirty = true;
+    return ok;
+}
+
+/** Unwind every leg of a named strategy -- the PLAYER's unwind button. Shared by
+ *  the immediate path and the deferred executor (one unit, one execution substep). */
+function _unwindStrategyAction(name, spreadMult) {
+    const positions = portfolio.positions.filter(p => p.strategyName === name);
+    let closed = 0;
+    for (const pos of [...positions]) {
+        if (closePosition(sim, pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q, spreadMult)) closed++;
+    }
+    if (closed > 0) {
+        _toast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
+        chainDirty = true;
+        updateUI();
+        dirty = true;
+    }
+    return closed;
+}
+
+/** Execute one deferred manual order at the current substep's prices. Every toast
+ *  below is final (coordinator, P7-1 copy pass) -- the fill
+ *  reports reuse the immediate path's wording so nothing reads as a new mechanic
+ *  the player was not told about. */
+function _executeDeferred(entry) {
+    const p = entry.payload;
+    const mult = entry.spreadMult;
+    if (entry.kind === 'market') {
+        // Two distinct failures, reported as two (P7-1 fix round, finding 6). The
+        // CONTRACT can expire inside the latency window -- an order placed while
+        // tomorrow's expiry was still listed, landing after the rollover -- which is
+        // nothing like a rejected fill. Checked here, before the call; the
+        // `isExpiredForTrading` reject inside executeMarketOrder is the backstop.
+        if (isExpiredForTrading(p.type, p.expiryDay, sim.day)) {
+            _toast('Working order outlived its contract — dropped, nothing filled.', 2500);
+            _haptic('error');
+            return;
+        }
+        const pos = executeMarketOrder(
+            sim, p.type, p.side, p.qty, sim.S, market.sigma, sim.r, sim.day,
+            p.strike, p.expiryDay, undefined, sim.q, mult
+        );
+        if (pos) {
+            const label = p.side === 'short' ? 'Shorted' : 'Bought';
+            _toast(label + ' ' + p.qty + 'k ' + p.type + ' at $' + pos.fillPrice.toFixed(2), 3000);
+            _haptic('success');
+            if (p.type === 'stock') _recordImpact(sim.day, p.side === 'long' ? 1 : -1, p.qty, 'Stock trade');
+        } else {
+            // Margin, a short-sale ban that landed inside the window, any other
+            // chokepoint: the order died at the fill and does not name a cause it
+            // cannot know.
+            _toast('Order died at the fill — margin or the rulebook moved inside the window.', 2500);
+            _haptic('error');
+        }
+    } else if (entry.kind === 'compute') {
+        const pos = executeMarketOrder(
+            sim, 'computefuture', p.side, p.qty, sim.S, market.sigma, sim.r, sim.day,
+            p.key, p.key, undefined, sim.q, mult
+        );
+        if (pos) {
+            _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k Compute Q@' + p.key, 2500);
+            _haptic('success');
+        } else {
+            _toast('Compute order rejected at the fill — margin or book frozen.', 4000);
+            _haptic('error');
+        }
+    } else if (entry.kind === 'binary') {
+        const pos = executeBinaryTrade(p.key, p.side, p.qty, mult);
+        if (pos) {
+            _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k YES', 2500);
+            _haptic('success');
+        } else {
+            _toast('Binary order rejected at the fill — cash or contract closed.', 4000);
+            _haptic('error');
+        }
+    } else if (entry.kind === 'strategy') {
+        executeWithRollback(p.legs, p.name, p.mult, mult);
+    } else if (entry.kind === 'close') {
+        // The position may have expired / settled / been flattened by machinery
+        // while the close was working -- report it, never fabricate a fill.
+        if (!_closePositionAction(p.id, mult)) {
+            _toast('Working close expired — the position closed without you.', 4000);
+        }
+    } else if (entry.kind === 'unwind') {
+        if (_unwindStrategyAction(p.name, mult) === 0) {
+            _toast('Working unwind expired — no legs left in "' + p.name + '".', 4000);
+        }
+    }
+}
+
+/**
+ * Route a manual desk action through the latency ladder: immediate at lag 0 (the
+ * pre-P7 path, bit-identical), otherwise queued for `lag` substeps with the
+ * ladder's spread multiplier applied at the fill. Returns true when the action
+ * was deferred (the caller should not also execute it).
+ */
+function _deferManual(kind, payload) {
+    const { lag, spreadMult } = _latency();
+    if (lag <= 0) return false;
+    deferOrder(kind, payload, lag, spreadMult);
+    // Two registers (coordinator): the ordinary ladder is a queue you are no
+    // longer at the front of; the advisory tier (mobilized+) is a queue you are
+    // no longer certain to be IN.
+    if (lag >= 6) {
+        _toast('Routed for review — ' + lag + ' ticks, if nothing outranks it.', 2500);
+    } else {
+        _toast('Routed — ' + lag + ' tick' + (lag > 1 ? 's' : '') + ' to the front of the queue.', 2500);
+    }
+    _haptic('medium');
+    return true;
 }
 /** Common tail after modifying strategyLegs: reprice, rebuild UI, mark dirty. */
 function _refreshStrategyView() {
@@ -630,11 +896,12 @@ function init() {
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            const ok = closePosition(sim, id, sim.S, market.sigma, sim.r, sim.day, sim.q);
-            if (ok) _toast('Position closed.');
-            chainDirty = true;
-            updateUI();
-            dirty = true;
+            // P7-1 ladder (02a ruling 2): a PLAYER exit takes the same lag as an
+            // entry -- exits are not faster than entries in a market made of
+            // machines. Machinery-initiated closes (expiry, margin trims, popup
+            // trades, terminal liquidation) never route through here.
+            if (_deferManual('close', { id })) { updateUI(); dirty = true; return; }
+            _closePositionAction(id);
         }
     });
 
@@ -699,17 +966,11 @@ function init() {
     document.addEventListener('shoals:unwindStrategy', (e) => {
         const name = e.detail && e.detail.name;
         if (!name) return;
-        const positions = portfolio.positions.filter(p => p.strategyName === name);
-        let closed = 0;
-        for (const pos of [...positions]) {
-            if (closePosition(sim, pos.id, sim.S, market.sigma, sim.r, sim.day, sim.q)) closed++;
-        }
-        if (closed > 0) {
-            _toast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
-            chainDirty = true;
-            updateUI();
-            dirty = true;
-        }
+        // P7-1 ladder: the strategy-unwind button is a player exit too, and it
+        // defers as ONE unit (all legs at the execution substep) exactly like the
+        // strategy ENTRY does.
+        if (_deferManual('unwind', { name })) { updateUI(); dirty = true; return; }
+        _unwindStrategyAction(name);
     });
 
     // 11. Init audio on first user interaction (Web Audio API requires gesture)
@@ -721,6 +982,19 @@ function init() {
     }
     document.addEventListener('click', _initAudioOnce, { once: true });
     document.addEventListener('keydown', _initAudioOnce, { once: true });
+
+    // 11b. Reduced motion (P7-1): the Act III degradation keeps its STALENESS
+    //      (information the player is meant to feel) and drops the STUTTER (the
+    //      transient wrong print, the sparkline frame-skip) for anyone who asked
+    //      the platform for less motion. Live-updating, so a mid-session change
+    //      to the OS preference takes effect.
+    if (typeof matchMedia === 'function') {
+        const _rm = matchMedia('(prefers-reduced-motion: reduce)');
+        setReducedMotion(_rm.matches);
+        if (typeof _rm.addEventListener === 'function') {
+            _rm.addEventListener('change', (e) => setReducedMotion(e.matches));
+        }
+    }
 
     // 12. Wire info tips for slider labels
     wireInfoTips();
@@ -1004,6 +1278,66 @@ function _closeTradingDay() {
     _syncAll();
 }
 
+/**
+ * The POPUP BARRIER (02a P7-1 ruling 2): true while a decision is on screen or
+ * still waiting. While it holds, `_closeTradingDay` / `_onDayComplete` may NOT run
+ * on ANY path (frame / tick / step) -- the day stays open, overlays installed,
+ * until the player has answered. Without it a substep-lane arrival at substep 15
+ * would let the world advance race / treaty / belief / settlements underneath the
+ * open decision, landing the choice's deltas and `raceEffects` one race tick late.
+ *
+ * Two halves, both required: an event already SHOWN has been shifted OFF the queue
+ * (so the overlay is the only evidence), and an event still QUEUED may be waiting
+ * behind the trade dialog (so the overlay is hidden). A pending terminal epilogue
+ * bars the close outright -- nothing ticks after the latch.
+ */
+function _popupBarrier() {
+    if (_popupQueue.length > 0 || _pendingEpilogue) return true;
+    const ov = $.popupOverlay;
+    return !!(ov && !ov.classList.contains('hidden'));
+}
+
+/**
+ * Close a day whose substeps finished while the barrier held, SYNCHRONOUSLY from
+ * the drain (02a P7-1 ruling 2): the player never presses play to collect a day
+ * the world already finished. Called from the popup-dismissal callback, after its
+ * own `_processPopupQueue` has had the chance to show the next queued beat.
+ *
+ * `dayInProgress` is the idempotency predicate, not `sim.dayComplete`:
+ * `_closeTradingDay` clears the flag BEFORE `_onDayComplete` runs, so the
+ * re-entrant `_processPopupQueue()` at the tail of `_onDayComplete` -- and every
+ * dismissal callback downstream of it -- finds the day already closed.
+ */
+function _closeCompletedDayIfPending() {
+    if (_gameOver || !dayInProgress || !sim.dayComplete) return;
+    if (_popupBarrier()) return;
+    _closeTradingDay();
+    _onDayComplete();
+}
+
+/**
+ * Terminal partial-day ABORT (02a P7-1 ruling 3). A terminal entered mid-day --
+ * an intraday compliance choice, a rogue-trading latch off a substep-lane popup --
+ * unwinds the day's overlays LIFO (same discipline as `_closeTradingDay`'s
+ * restore), re-syncs to baseline, and marks the day closed WITHOUT running
+ * `_onDayComplete`: no race advance, no settlements, no day-boundary events. The
+ * world does not tick after the latch, and the closeout / epilogue never price or
+ * render through a transient overlay or a half-open day.
+ *
+ * The sim clock is deliberately NOT advanced (`finalizeDay` would increment
+ * `sim.day` and misdate every closeout mark): the day's partial bar is already in
+ * history and stands as the honest record of the desk's last, unfinished day.
+ */
+function _abortPartialDay() {
+    if (!dayInProgress) return;
+    dayInProgress = false;
+    removeEventImpulseOverlay(sim, _savedImpulse);   // LIFO: impulse (innermost) first
+    removeParamOverlays(sim, _savedOverlays);
+    _savedImpulse = {};
+    _savedOverlays = {};
+    _syncAll();
+}
+
 function frame(now) {
     if (playing) {
         const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
@@ -1034,6 +1368,10 @@ function frame(now) {
                 _runSubstep();
                 chart.setLiveCandle(sim._partial);
                 stepped = true;
+                // P7-1: a substep-lane popup (or a deferred fill's margin call)
+                // pauses the game mid-batch -- stop stepping, don't run the rest of
+                // the day underneath an open decision.
+                if (!playing) break;
             }
             // UI update once per frame (repricing chain/sidebar is expensive)
             if (stepped) {
@@ -1041,10 +1379,17 @@ function frame(now) {
                 if (!strategyMode) dirty = true;
             }
             // All sub-steps done — close the day (overlays removed) then run
-            // day-complete bookkeeping against baseline params.
+            // day-complete bookkeeping against baseline params. UNLESS the popup
+            // barrier holds (02a P7-1 ruling 2): a decision on screen or waiting
+            // keeps the day OPEN. Retry the drain first, so a beat parked behind
+            // the trade dialog reaches the player the moment the dialog closes and
+            // the day is never stranded.
             if (sim.dayComplete) {
-                _closeTradingDay();
-                _onDayComplete();
+                if (_popupBarrier()) _processPopupQueue();
+                if (!_popupBarrier()) {
+                    _closeTradingDay();
+                    _onDayComplete();
+                }
             }
         }
     }
@@ -1053,6 +1398,12 @@ function frame(now) {
     chart.update(now);
     // Lerp always causes a redraw while targets differ from display
     if (chart.isLerpActive() && !strategyMode) dirty = true;
+    // P7-1: a wrong print was drawn last frame — force the corrective redraw even
+    // if nothing else is animating (the terminal always catches up).
+    if (chart._repaintDirty) {
+        chart._repaintDirty = false;
+        if (!strategyMode) dirty = true;
+    }
 
     // Check if strategy renderer flagged dirty from wheel zoom
     if (strategy._dirty) {
@@ -1087,12 +1438,35 @@ function _onSubstepTick() {
             if (dd > portfolio.maxDrawdown) portfolio.maxDrawdown = dd;
         }
     }
+
+    // P7-1 presentation degradation: the terminal transiently prints a wrong tick
+    // (display only -- the lerp, the partial bar, and the printed history are
+    // untouched). Rolls no RNG at d = 0, so Classic is byte-identical.
+    const repaint = rollCandleRepaint(sim.S);
+    if (repaint !== 0) {
+        chart.setTransientRepaint(repaint);
+        noteDegradationIncident();
+        dirty = true;
+    }
+    // Eyes and ears fail together: a degradation CLUSTER reaches the audio glitch
+    // chain, wall-clock rate-limited (UX, not simulation).
+    const sev = takeGlitchSeverity(Date.now());
+    if (sev > 0) glitchAudio(sev);
 }
 
 /** Called once per frame after substep batch — reprices chain/sidebar. */
 function _onSubstepUI() {
     const substepMargin = checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
     updateSubstepUI(substepMargin);
+}
+
+/** The DISPLAY value of the VXHCN index: its last publication while the index is
+ *  stale (P7-1), the true computed spot otherwise. `unitPrice`, margin, expiry,
+ *  and VXHCN futures cash-settlement ALWAYS use the true value -- the latch lives
+ *  strictly at this boundary and never touches `market.vxhcn`. */
+function _publishVxhcn() {
+    advanceVxhcnPublication(market.vxhcn, market.v, substepClock());
+    return publishedVxhcn(market.vxhcn);
 }
 
 function _updateLobbyPills() {
@@ -1176,7 +1550,11 @@ function _processPopupQueue() {
         if (isSuperevent) stopMusic(2000);
         const choice = event.choices[idx];
         if (choice.deltas && eventEngine) {
-            eventEngine.applyDeltas(sim, choice.deltas);
+            // P7-1: a substep-lane popup can be answered MID-DAY, with the day's
+            // overlays still installed -- apply the deltas against the true
+            // baseline so the overlay restore at day close cannot erase them.
+            // No-op wrapper at a day boundary (every pre-P7 path).
+            _midDayBaseline(() => eventEngine.applyDeltas(sim, choice.deltas));
         }
         // P6-2 treaty-channel ledger: capture treatyStage across the choice's
         // structured effects so a player-advanced treaty step is attributed to the
@@ -1413,6 +1791,10 @@ function _processPopupQueue() {
         // pending terminal epilogue (P6-3: the beat shows, THEN the desk closes over the
         // player). A game-over choice already triggered its own drain; this is a no-op then.
         _processPopupQueue();
+        // P7-1 ruling 2: with the queue drained and nothing left on screen, a day that
+        // finished its substeps behind the barrier closes HERE, synchronously -- the
+        // player does not press play to collect a day the world already finished.
+        _closeCompletedDayIfPending();
     }, popupCat, event.magnitude, isSuperevent);
 }
 
@@ -1457,11 +1839,25 @@ function _showComplianceTermination() {
  */
 function _triggerGameOver(endingId) {
     if (_gameOver) return;
+    // 0. The band stops mid-note (P7-1 terminal latch, 02a ruling 6): immediately
+    //    after the idempotency guard, BEFORE the game-over latch, the play mutation,
+    //    the UI update, and the resolution-day beat. The desk goes quiet; the hum
+    //    and the machines do not notice. Dynamic modes only -- Classic never enters
+    //    the machine register at all.
+    if (raceState) silenceDesk();
     _gameOver = true;
     playing = false;
     updatePlayBtn($, playing);
-    // 1. Lock the desk: cancel pending orders, restrict (the durable lock is _gameOver).
+    // 0b. Partial-day abort (02a P7-1 ruling 3): a terminal reached MID-DAY -- an
+    //     intraday compliance choice, a rogue latch off a substep-lane popup --
+    //     unwinds the day's overlays and closes the day WITHOUT running
+    //     _onDayComplete. The world does not tick after the latch, and the closeout
+    //     below never prices through a transient overlay or a half-open day.
+    _abortPartialDay();
+    // 1. Lock the desk: cancel pending orders AND every working (deferred) manual
+    //    order, restrict (the durable lock is _gameOver).
     cancelAllOrders();
+    clearDeferredOrders();
     portfolio.restricted = true;
 
     // TERMINAL QUEUE DISCIPLINE (02a P6-3): the world's resolution supersedes the day's
@@ -1930,6 +2326,12 @@ function _onDayComplete() {
         // discretionary Poisson cadence scales with the PUBLIC released frontier
         // rung (1.0 at R1 = Act-I match, rising late-game). Set before maybeFire.
         eventEngine.setBaseRateScale(eventBaseRateScale(buildPublicView(raceState).releasedFrontierRung));
+        // Act III driver (P7-1): the ONE smoothed public parameter behind the
+        // machine register, the substep lane, the latency ladder, and the
+        // presentation degradation. Reads the SAME public mirrors as the base-rate
+        // scale above (released rung + regime); never race internals. Also hands x
+        // to the audio layer and opens/closes the substep lane.
+        _stepAct3();
         // Market belief B (overhaul phase 4): fold this completed day's LEGIBLE
         // ledger (releases, certifications, detected incidents, published/leaked
         // evidence) into B before anything reads a quote. Consumes ONLY
@@ -2243,13 +2645,20 @@ function _onDayComplete() {
  *  day's substeps and removed before `_onDayComplete` via the shared helpers, so
  *  the step button now applies impulses (previously it never did). */
 function tick() {
+    // The popup barrier binds here too (02a P7-1 ruling 2): a substep-lane arrival
+    // stops the batch and holds the day OPEN, exactly as in frame(). The day
+    // resumes from `sim.substepsDone` once the decision is answered.
     if (dayInProgress) {
         // Day already opened by frame() (overlays installed) -- finish substeps.
-        while (!sim.dayComplete) _runSubstep();
+        while (!sim.dayComplete && !_popupBarrier()) _runSubstep();
     } else {
         _beginTradingDay();
-        for (let i = 0; i < INTRADAY_STEPS; i++) _runSubstep();
+        for (let i = 0; i < INTRADAY_STEPS; i++) {
+            _runSubstep();
+            if (_popupBarrier()) break;
+        }
     }
+    if (!sim.dayComplete || _popupBarrier()) return;
     _closeTradingDay();   // finalize + remove overlays LIFO + re-sync to baseline
     // Snap the lerp to the final state (no animation for step)
     const last = sim.history.last();
@@ -2276,11 +2685,12 @@ function updateUI(precomputedMargin) {
     const margin = precomputedMargin || checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     const pMap = _buildPosMap();
     const sMap = strategyMode ? _buildStrategyPosMap() : null;
+    const vxhcnShown = _publishVxhcn();
     if (chainDirty) {
         rebuildTradeDropdown($, chainSkeleton);
         const tradePriced = _priceExpiry(_tradeExpiryIdx());
-        updateChainDisplay($, tradePriced, pMap);
-        updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
+        updateChainDisplay($, publishedChain(tradePriced, substepClock()), pMap);
+        updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap, publishedVariance(market.v));
         if (strategyMode) {
             rebuildStrategyDropdown($, chainSkeleton);
             const stratPriced = _priceExpiry(_strategyExpiryIdx());
@@ -2291,7 +2701,7 @@ function updateUI(precomputedMargin) {
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, portfolioHistory);
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     updateRateDisplay($, sim.r, rateHistory);
-    updateVxhcnDisplay($, market.vxhcn, vxhcnHistory);
+    updateVxhcnDisplay($, vxhcnShown, vxhcnHistory);
     if (raceState && consensus.active) updateConsensusPanel($, consensus, portfolio, raceState.day);
     if (raceState && computeMarket.active) updateComputePanel($, computeMarket, portfolio, raceState.day);
     refreshTooltip();
@@ -2308,11 +2718,15 @@ function updateSubstepUI(marginInfo) {
     const vol = market.sigma;
     const pMap = _buildPosMap();
     const sMap = strategyMode ? _buildStrategyPosMap() : null;
+    // P7-1 display latches: the underlying reprice below still runs every substep;
+    // only what reaches the DOM is held. Sparklines skip frames at high d.
+    const vxhcnShown = _publishVxhcn();
+    const skipSpark = skipSparklineFrame();
 
     // Reprice the visible trade chain expiry (no dropdown rebuild)
     const tradePriced = _priceExpiry(_tradeExpiryIdx());
-    updateChainDisplay($, tradePriced, pMap);
-    updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap);
+    updateChainDisplay($, publishedChain(tradePriced, substepClock()), pMap);
+    updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap, publishedVariance(market.v));
 
     updateTriggerPriceSlider($, sim.S);
 
@@ -2322,12 +2736,13 @@ function updateSubstepUI(marginInfo) {
     }
 
     // Portfolio mark-to-market
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, marginInfo, sim.q, portfolioHistory);
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, marginInfo, sim.q,
+        skipSpark ? null : portfolioHistory);
     if (activeTab === 'portfolio') {
         updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
     }
-    updateRateDisplay($, sim.r, rateHistory);
-    updateVxhcnDisplay($, market.vxhcn, vxhcnHistory);
+    updateRateDisplay($, sim.r, skipSpark ? null : rateHistory);
+    updateVxhcnDisplay($, vxhcnShown, skipSpark ? null : vxhcnHistory);
 
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
@@ -2407,19 +2822,38 @@ function updateTimeSliderRange() {
 // ---------------------------------------------------------------------------
 
 function togglePlay() {
+    // The desk is closed (P7-1 ruling 3 abort): a terminal reached mid-day left the
+    // day marked closed with its partial bar standing in history and the sim clock
+    // deliberately un-advanced. Resuming would open a SECOND bar on that same day.
+    if (_gameOver) return;
     playing = !playing;
     if (playing) {
-        lastTickTime = performance.now();
-        // If no day in progress, the first tick will start immediately
-        // (lastTickTime - now >= tickInterval is false, but we want immediate start)
-        if (!dayInProgress) lastTickTime -= 2000; // force immediate beginDay
+        lastTickTime = _resumeClockOrigin();
     }
     updatePlayBtn($, playing);
     _haptic(playing ? 'medium' : 'light');
 }
 
+/**
+ * The in-day clock origin for a resume (02a P7-1 ruling 4). `frame()` derives an
+ * ABSOLUTE in-day `targetSteps` from `lastTickTime`, so resuming a partially-run
+ * day from a bare `performance.now()` would make the desk wait out every substep
+ * the day had already traded -- after a lane popup at substep 15, about fifteen
+ * substep intervals of nothing. Rebasing from `sim.substepsDone` puts the completed
+ * substeps behind the origin, so the next substep is due immediately. Clock
+ * bookkeeping only: working orders still sleep across a pause (ruling 3 stands).
+ */
+function _resumeClockOrigin() {
+    const now = performance.now();
+    const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
+    // No day open: the first frame should begin one immediately.
+    if (!dayInProgress) return now - Math.max(2000, tickInterval);
+    return now - sim.substepsDone * (tickInterval / INTRADAY_STEPS);
+}
+
 function step() {
     if (playing) return;
+    if (_gameOver) return;   // same reason as togglePlay: never reopen an aborted day
 
     // Start a new day if none in progress (installs overlays via the shared helper).
     if (!dayInProgress) {
@@ -2427,15 +2861,23 @@ function step() {
         chart.setLiveCandle(sim._partial);
     }
 
-    // Advance one substep
-    _runSubstep();
-    chart.setLiveCandle(sim._partial);
-    _onSubstepUI();
+    // Advance one substep. A day whose substeps already finished behind the popup
+    // barrier is NOT re-stepped -- it is waiting to be closed, not to be traded.
+    if (!sim.dayComplete) {
+        _runSubstep();
+        chart.setLiveCandle(sim._partial);
+        _onSubstepUI();
+    }
 
-    // If all substeps done, close the day (overlays removed) then bookkeeping.
+    // If all substeps done, close the day (overlays removed) then bookkeeping --
+    // unless the popup barrier holds (02a P7-1 ruling 2). Retry the drain first so
+    // a beat waiting behind the trade dialog is never stranded.
     if (sim.dayComplete) {
-        _closeTradingDay();
-        _onDayComplete();
+        if (_popupBarrier()) _processPopupQueue();
+        if (!_popupBarrier()) {
+            _closeTradingDay();
+            _onDayComplete();
+        }
     }
 
     dirty = true;
@@ -2480,6 +2922,7 @@ function _resetCore(index) {
     resetRegulations();
     resetLobbying();
     resetAudio();
+    resetAct3();   // P7-1: x -> 0, substep clock zeroed, working orders dropped, latches cleared
     // Reset the race->narrative bridge's variant-rotation counter so same-seed
     // playback doesn't depend on process history. Guarded on raceState so Classic
     // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
@@ -2499,7 +2942,7 @@ function _resetCore(index) {
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
-    Object.assign(chart._lerp, { day: -1, close: 0, high: 0, low: 0, _from: 0, _targetClose: 0, _targetHigh: 0, _targetLow: 0, _t: 1 });
+    chart.resetTransients();   // P7-1 ruling 5: lerp AND the pending one-frame wrong print
     expiryMgr.init(sim.day);
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
@@ -2634,6 +3077,15 @@ function _executeOrPlace(type, side, qty, strike, expiryDay) {
     const vol = market.sigma;
     const orderType = _getOrderType();
     if (orderType === 'market') {
+        // P7-1 latency ladder: past released R4 a manual market order WORKS for a
+        // few substeps and fills at the price it finds there. Resting limit/stop
+        // orders below are untouched -- precommitments are the fast path.
+        if (_deferManual('market', { type, side, qty, strike, expiryDay })) {
+            chainDirty = true;
+            updateUI();
+            dirty = true;
+            return;
+        }
         const pos = executeMarketOrder(sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
         if (pos) {
             const label = side === 'short' ? 'Shorted' : 'Bought';
@@ -2696,6 +3148,8 @@ function handleBinaryTrade(key, side) {
     if (!raceState || !consensus.active) return;
     if (_blockedByRestriction()) return;
     const qty = _getTradeQty();
+    // P7-1 latency ladder: a binary is a manual desk action like any other.
+    if (_deferManual('binary', { key, side, qty })) { updateUI(); dirty = true; return; }
     const pos = executeBinaryTrade(key, side, qty);
     if (pos) {
         _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k YES', 2500);
@@ -2718,6 +3172,8 @@ function handleComputeTrade(key, side) {
     if (_blockedByRestriction()) return;
     const qty = _getTradeQty();
     const vol = market.sigma;
+    // P7-1 latency ladder (manual desk action; same queue as every other).
+    if (_deferManual('compute', { key, side, qty })) { updateUI(); dirty = true; return; }
     const pos = executeMarketOrder(sim, 'computefuture', side, qty, sim.S, vol, sim.r, sim.day, key, key, undefined, sim.q);
     if (pos) {
         _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k Compute Q@' + key, 2500);
@@ -2737,6 +3193,13 @@ function handleTradeSubmit(data) {
     const { type, side, qty, strike, expiryDay, orderType, limitPrice } = data;
 
     if (orderType === 'market') {
+        // P7-1 latency ladder (the trade-dialog path shares the desk's hands).
+        if (_deferManual('market', { type, side, qty, strike, expiryDay })) {
+            chainDirty = true;
+            updateUI();
+            dirty = true;
+            return;
+        }
         const pos = executeMarketOrder(
             sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
         );
@@ -2841,7 +3304,29 @@ function handleSaveStrategy() {
     updateStrategyBuilder();
 }
 
-function executeWithRollback(resolvedLegs, strategyName, execMult) {
+/** Execute a resolved multi-leg strategy atomically. `spreadMult` is the P7-1
+ *  latency-ladder widening applied to every leg's fill (1 / omitted = none): the
+ *  strategy defers as ONE unit, so all legs fill at the SAME execution substep or
+ *  the whole thing rolls back.
+ *
+ *  Returns false when the bundle was DROPPED before any leg touched the book.
+ */
+function executeWithRollback(resolvedLegs, strategyName, execMult, spreadMult) {
+    // BUNDLE PREFLIGHT (P7-1 fix round). A per-leg reject inside the fill loop below
+    // cannot keep a bundle atomic: by the time leg 2 is refused, leg 1 has already
+    // run `_fillPrice` and recorded price impact, and the rollback restores cash,
+    // positions and counters but NOT the impact pools -- cumulative traded volume is
+    // append-only, so a stock-first strategy (covered call, protective put) would
+    // leak a permanent stock-pool footprint while reporting "all legs unwound". The
+    // expiry check therefore runs over EVERY leg first, before anything can move.
+    // The chain never resolves a leg to an expiry at or before today (resolveLegs ->
+    // _resolveExpiry draws from ExpiryManager, which drops every expiry <=
+    // currentDay), so this is reachable only through the P7-1 latency window.
+    if (resolvedLegs.some(l => isExpiredForTrading(l.type, l.expiryDay, sim.day))) {
+        _toast('Strategy outlived one of its contracts — dropped, nothing filled.', 2500);
+        _haptic('error');
+        return false;
+    }
     const savedCash = portfolio.cash;
     const savedPositions = portfolio.positions.map(p => ({ ...p }));
     const savedClosedBorrowCost = portfolio.closedBorrowCost;
@@ -2856,7 +3341,7 @@ function executeWithRollback(resolvedLegs, strategyName, execMult) {
         const absQty = Math.abs(leg.qty);
         const pos = executeMarketOrder(
             sim, leg.type, side, absQty, sim.S, market.sigma, sim.r, sim.day,
-            leg.strike, leg.expiryDay, strategyName, sim.q
+            leg.strike, leg.expiryDay, strategyName, sim.q, spreadMult
         );
         if (pos) {
             if (!pos.strategyBaseQty) pos.strategyBaseQty = leg._baseQty || absQty;
@@ -2890,6 +3375,7 @@ function executeWithRollback(resolvedLegs, strategyName, execMult) {
     chainDirty = true;
     updateUI();
     dirty = true;
+    return !failed;
 }
 
 function handleLoadStrategy(id) {
@@ -2944,6 +3430,14 @@ function handleTradeExecStrategy() {
 
     const orderType = _getOrderType();
     if (orderType === 'market') {
+        // P7-1: the whole strategy defers as one unit (all legs at the execution
+        // substep, or rollback) -- legs never straddle the latency window.
+        if (_deferManual('strategy', { legs: scaled, name: strat.name, mult })) {
+            chainDirty = true;
+            updateUI();
+            dirty = true;
+            return;
+        }
         executeWithRollback(scaled, strat.name, mult);
     } else {
         const triggerPrice = _getTriggerPrice();

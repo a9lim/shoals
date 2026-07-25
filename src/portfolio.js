@@ -107,12 +107,17 @@ export function cancelAllOrders() {
  * Impact is recorded as cumulative volume (decays with half-life).
  * No sim.S mutation — impact is an overlay. Delta hedging by MMs is
  * handled dynamically by rehedgeMM() each substep.
+ *
+ * `spreadMult` (P7-1 latency ladder) widens the quoted spread for a LATE-ACT
+ * manual desk fill. It composes with the regulatory spread multiplier; omitted /
+ * 1 is an exact no-op (multiplication by 1.0), so every pre-P7 path and every
+ * resting-order fill stays bit-identical.
  */
-function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay) {
+function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol, expiryDay, currentDay, spreadMult) {
     const ba = (type === 'call' || type === 'put')
         ? computeOptionBidAsk(mid, currentPrice, strike, currentVol)
         : computeBidAsk(mid, currentVol);
-    const sMult = getRegulationEffect('spreadMult', 1);
+    const sMult = getRegulationEffect('spreadMult', 1) * (spreadMult || 1);
     ba.ask = mid + (ba.ask - mid) * sMult;
     ba.bid = mid - (mid - ba.bid) * sMult;
     const spreadFill = side === 'long' ? ba.ask : ba.bid;
@@ -347,6 +352,29 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
 // executeMarketOrder
 // ---------------------------------------------------------------------------
 
+/** Position types carrying a SIM-DAY `expiryDay` that `processExpiry` settles at
+ *  the day boundary. `binary` (deadline day) and `computefuture` (race-day
+ *  quarterly maturity) carry their own settlement clocks and are deliberately NOT
+ *  in this set -- they never route through the sim-day expiry pass. */
+const TIME_BOUND_TYPES = new Set(['call', 'put', 'bond', 'vxhcnfuture']);
+
+/**
+ * True when a time-bound instrument's expiry has already been settled, or is being
+ * settled at today's boundary (02a P7-1 ruling 1). `processExpiry` matches the
+ * boundary day EXACTLY, so a position opened at or past its own expiry would never
+ * expire -- it would sit in the book, permanently live, forever.
+ *
+ * The live chain never offers such a contract (`ExpiryManager.update` drops every
+ * expiry `<= currentDay` before the skeleton is built), so the reject in
+ * `executeMarketOrder` is DEFENSE IN DEPTH. It is reachable exactly through the
+ * P7-1 latency window -- an order placed while tomorrow's expiry is still listed
+ * and filled after the rollover -- and through a resting order that triggers past
+ * its own expiry; the deferred drain in main.js reports the drop.
+ */
+export function isExpiredForTrading(type, expiryDay, currentDay) {
+    return TIME_BOUND_TYPES.has(type) && expiryDay != null && expiryDay <= currentDay;
+}
+
 /**
  * Execute a market order immediately at current prices.
  * Uses signed qty internally: positive = long, negative = short.
@@ -364,17 +392,23 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
  * @param {number}  [strike]     - For options/bonds
  * @param {number}  [expiryDay]  - Simulation day of expiry
  * @param {string}  [strategyName]
+ * @param {number}  [q]
+ * @param {number}  [spreadMult] - P7-1 latency-ladder spread widening (1 = none)
  * @returns {Object|null} The position object (new or updated), or null if insufficient cash.
  */
 export function executeMarketOrder(
     sim, type, side, qty,
     currentPrice, currentVol, currentRate, currentDay,
-    strike, expiryDay, strategyName, q
+    strike, expiryDay, strategyName, q, spreadMult
 ) {
     if (portfolio.restricted) return null;   // account restricted -> no order entry
     // Compute-future lifecycle gate: only an active/listed/open/unfrozen/unsettled
     // contract is tradeable (rejects fabricated + settled keys and a frozen book).
     if (type === 'computefuture' && !isComputeTradeable(strike)) return null;
+    // Expiry re-checked at EXECUTION (02a P7-1 ruling 1), centrally and BEFORE the
+    // trade is counted: a time-bound contract at or past its own expiry day can
+    // never be opened, because the expiry pass would never match it again.
+    if (isExpiredForTrading(type, expiryDay, currentDay)) return null;
     if (side === 'short' && type === 'stock' && getRegulationEffect('shortStockDisabled', false)) {
         if (typeof showToast !== 'undefined') showToast('Short stock sales currently banned by regulation.', 3000);
         return null;
@@ -388,7 +422,7 @@ export function executeMarketOrder(
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
     const spreadVol = type === 'bond' ? market.sigmaR : type === 'vxhcnfuture' ? market.xi
         : type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
-    const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, spreadVol, expiryDay || 0, currentDay);
+    const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, spreadVol, expiryDay || 0, currentDay, spreadMult);
 
     // Find existing position of same type+strike+expiry+strategy for netting
     const existingIdx = portfolio.positions.findIndex(p =>
@@ -664,6 +698,19 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
 
         if (triggered) {
             if (order.legs) {
+                // BUNDLE PREFLIGHT (P7-1 fix round). The per-leg reject in
+                // executeMarketOrder cannot keep a bundle ATOMIC: a stock-first
+                // strategy (covered call, protective put) records price impact on its
+                // first leg, and the rollback below restores cash / positions /
+                // counters but NOT the impact pools -- cumulative traded volume is
+                // append-only (see the NOTE there). So the expiry check runs over
+                // EVERY leg BEFORE any `_fillPrice` can move a pool. The order is
+                // consumed rather than left resting: its contract is gone, so
+                // retrying could only re-fail.
+                if (order.legs.some(l => isExpiredForTrading(l.type, l.expiryDay, currentDay))) {
+                    if (typeof showToast !== 'undefined') showToast('Strategy outlived one of its contracts — dropped, nothing filled.', 2500);
+                    continue;
+                }
                 // Strategy order -- execute all legs with rollback
                 const savedCash = portfolio.cash;
                 const savedPositions = portfolio.positions.map(p => ({ ...p }));
@@ -727,9 +774,16 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
  * Cash is credited/debited accordingly.
  * qty > 0 = long position, qty < 0 = short position.
  *
+ * `spreadMult` (P7-1 latency ladder, 02a ruling 2) widens the exit spread for a
+ * PLAYER-initiated close, exactly as it widens an entry -- exits are not faster
+ * or cheaper than entries in a market made of machines. Omitted / 1 is an exact
+ * no-op, which is what every MACHINERY caller passes (processExpiry,
+ * liquidateAll, margin trims, popup trades): the ladder binds the player's hand,
+ * never the machinery's.
+ *
  * @returns {boolean} true if position was found and closed.
  */
-export function closePosition(sim, positionId, currentPrice, currentVol, currentRate, currentDay, q) {
+export function closePosition(sim, positionId, currentPrice, currentVol, currentRate, currentDay, q, spreadMult) {
     const idx = portfolio.positions.findIndex(p => p.id === positionId);
     if (idx === -1) return false;
 
@@ -740,7 +794,7 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
     // frozen/settled/pending and cannot be flattened (reported by liquidateAll).
     if (pos.type === 'binary') {
         const side = pos.qty > 0 ? 'short' : 'long';   // close = opposite side, full size
-        return executeBinaryTrade(pos.strike, side, Math.abs(pos.qty)) != null;
+        return executeBinaryTrade(pos.strike, side, Math.abs(pos.qty), spreadMult) != null;
     }
 
     // A frozen/settled compute future cannot be flattened (mobilized decree
@@ -756,10 +810,10 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
         : pos.type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
 
     if (pos.qty > 0) {
-        const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay);
+        const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
         portfolio.cash += fill * absQty;
     } else {
-        const fill = _fillPrice(sim, pos.type, 'long', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay);
+        const fill = _fillPrice(sim, pos.type, 'long', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
         const returnedMargin = pos._reservedMargin ?? _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay
@@ -1287,10 +1341,14 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
  * @param {number} key   contract key (consensus.js)
  * @param {string} side  'long' (buy YES) | 'short' (sell YES)
  * @param {number} qty   units, positive
+ * @param {number} [spreadMult] P7-1 latency-ladder spread widening (1 = none).
+ *                 Widens symmetrically about the quote MID, clamped to [0,1]
+ *                 (the quote is a probability). Exactly 1 short-circuits to the
+ *                 raw bid/ask, so pre-P7 fills stay bit-identical.
  * @returns {Object|null} the position (new/updated), or null if not tradeable /
  *                        unaffordable.
  */
-export function executeBinaryTrade(key, side, qty) {
+export function executeBinaryTrade(key, side, qty, spreadMult) {
     if (!(qty > 0)) return null;
     if (portfolio.restricted) return null;                      // account restricted -> no order entry
     if (consensus.frozen) return null;                          // book frozen (mobilized+) -> orders barred
@@ -1299,7 +1357,13 @@ export function executeBinaryTrade(key, side, qty) {
     const quote = getBinaryQuote(key);
     if (!quote || quote.settled || quote.frozen || quote.pending || quote.disputed) return null;   // settled/frozen/pending/disputed -> not tradeable
 
-    const fill = (side === 'long' ? quote.ask : quote.bid) * BINARY_NOTIONAL;   // per-unit $, [0, notional]
+    const raw = side === 'long' ? quote.ask : quote.bid;
+    const mult = spreadMult > 1 ? spreadMult : 1;
+    const px = mult === 1 ? raw
+        : Math.max(0, Math.min(1, side === 'long'
+            ? quote.mid + (raw - quote.mid) * mult
+            : quote.mid - (quote.mid - raw) * mult));
+    const fill = px * BINARY_NOTIONAL;   // per-unit $, [0, notional]
     const signedQty = side === 'long' ? qty : -qty;
     const notionalQty = BINARY_NOTIONAL;
 

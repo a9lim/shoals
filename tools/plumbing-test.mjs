@@ -31,6 +31,32 @@
       public attribution 0.55/0.30/0.15, complete ledger rows,
       and on/off trajectory bit-identity.
 
+   ...and the ACT III SYSTEMIC LAYER (P7-1, 2026-07-24):
+
+   J. The driver + substep event lane: driver shape (targets,
+      smoothing, the d projection), lane RATE INVARIANCE at the
+      R5 ceiling, uniform arrival over the 16 substeps, and the
+      categories the lane may not move (bridge / ledger / pulse
+      fired stay at day-complete).
+   K. Manual latency ladder: 0/1/3/6 substeps with x1.25/x1.5
+      spread, queue arithmetic (fill substep = order substep +
+      lag), strategies deferring as ONE unit, the exact-no-op
+      unit multiplier (R<=3 bit-identity), execution-time
+      restriction / freeze rejection with cash untouched, and
+      (02a P7-1 ruling 2) PLAYER EXITS on the same ladder while
+      every MACHINERY path -- forced liquidation, expiry trims,
+      popup trades -- and `exerciseOption` stay instant. Plus
+      the P7-1 fix round: the EXPIRY ROLLOVER reject (ruling 1 --
+      a fill at or past its own expiry is barred before the
+      trade is counted, so nothing survives its expiry pass) and
+      run-scoped reset state (ruling 5 -- the renderer's
+      transient repaint fields, the queue's ticket counter).
+   L. Presentation degradation: hold arithmetic, and the
+      invariant that every headless number (portfolio value,
+      marks, the VXHCN index) is BITWISE unchanged with the
+      display latches forced on -- plus Classic inertness (no
+      RNG drawn at rest) and the reduced-motion split.
+
    All numeric bands are DESIGN bands; the tuning is RATIFIED in
    02a's "Content plumbing (phase-5a ratifications, 2026-07-23)"
    and "Evidence machinery (pre-P7 ratifications, 2026-07-24)"
@@ -63,8 +89,24 @@ import {
 } from '../src/race/compute-market.js';
 import {
     portfolio, resetPortfolio, executeBinaryTrade, executeMarketOrder,
-    settleComputeFutures, portfolioValue, applyBinarySettlementRows,
+    settleComputeFutures, portfolioValue, applyBinarySettlementRows, computeBidAsk,
+    closePosition, liquidateAll, exerciseOption, processExpiry, isExpiredForTrading,
+    placePendingOrder, checkPendingOrders,
 } from '../src/portfolio.js';
+import { ChartRenderer } from '../src/chart.js';
+import {
+    ACT3_TUNING, act3Target, stepAct3Driver, machineIntensity, degradation, setMachineParam,
+    resetAct3, tickSubstepClock, substepClock, orderLatency,
+    deferOrder, dueOrders, clearDeferredOrders, workingOrderCount,
+    publishedChain, chainHoldSubsteps, advanceVxhcnPublication, publishedVxhcn, publishedVariance,
+    vxhcnPublicationStale, rollCandleRepaint, skipSparklineFrame,
+    noteDegradationIncident, takeGlitchSeverity, setReducedMotion,
+} from '../src/act3.js';
+import { unitPrice } from '../src/position-value.js';
+import { computeVXHCNSpot } from '../src/pricing.js';
+import {
+    resetImpactState, getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact,
+} from '../src/price-impact.js';
 import {
     belief, initBelief, deactivateBelief, lockForecast, credibility,
     stepBelief, foldPlayerLeak, beliefCauses, beliefProcessed,
@@ -881,6 +923,548 @@ let discRows = 0, discEligible = 0, discThefts = 0;
         frontierIsSuperevent && tokensClean && victimTokenOK);
 }
 
+// =====================================================================
+// J. Act III driver + substep event lane (P7-1)
+// =====================================================================
+let laneOffRate = 0, laneOnRate = 0, laneArrivalSpread = 0;
+{
+    // -- J1. The driver: shape, smoothing, and the two projections -------
+    resetAct3();
+    check('J1: driver starts at rest (x = 0, d = 0)',
+        machineIntensity() === 0 && degradation() === 0);
+    check('J1: target 0 through R3, 0.6 at R4, 1.0 at R5 (public state only)',
+        act3Target(1, 'private') === 0 && act3Target(3, 'private') === 0
+        && act3Target(4, 'private') === ACT3_TUNING.targetR4
+        && act3Target(5, 'private') === ACT3_TUNING.targetR5);
+    check('J1: mobilized+ adds the bump, capped at 1',
+        Math.abs(act3Target(4, 'mobilized') - (ACT3_TUNING.targetR4 + ACT3_TUNING.regimeBump)) < 1e-12
+        && act3Target(5, 'mobilized') === 1 && act3Target(5, 'nationalized') === 1);
+    // Smoothed, monotone, ~three trading weeks of crossfade.
+    let prevX = 0, mono = true;
+    for (let d = 0; d < 15; d++) {
+        const x = stepAct3Driver(4, 'private');
+        if (x < prevX - 1e-12) mono = false;
+        prevX = x;
+    }
+    check('J1: x crossfades monotonically to ~90% of target in 15 trading days',
+        mono && prevX > 0.9 * ACT3_TUNING.targetR4 && prevX < ACT3_TUNING.targetR4,
+        `x=${prevX.toFixed(3)} target=${ACT3_TUNING.targetR4}`);
+    // Degradation is a pure projection with the knee at 0.5.
+    setMachineParam(0.5);
+    const dAtKnee = degradation();
+    setMachineParam(0.75);
+    const dMid = degradation();
+    setMachineParam(1);
+    const dTop = degradation();
+    check('J1: d = max(0, (x - 0.5)/0.5) -- 0 at the knee, 0.5 midway, 1 at x = 1',
+        dAtKnee === 0 && Math.abs(dMid - 0.5) < 1e-12 && dTop === 1);
+    resetAct3();
+
+    // -- J2. Lane rate invariance ----------------------------------------
+    // The lane must NOT change the discretionary cadence: same accept/cooldown
+    // arithmetic, arrival moved inside the day. Stubbed draw + no pulses isolates
+    // the discretionary pass; the DAY-level scale is forced to the R5 ceiling
+    // (2.5), the regime the lane actually runs in.
+    const PROBE = { id: 'p71_probe', category: 'neutral', headline: 'probe', params: {}, magnitude: 'minor' };
+    const STUB_SIM = {};
+    function laneRun(lane, days, scale) {
+        const eng = new EventEngine('offline');
+        eng._pulses = [];                 // silence pulses (they preempt the discretionary pass)
+        eng._pools.random = [];           // silence the one-shot pre-pass
+        eng._drawRandom = () => PROBE;    // deterministic draw
+        eng.setBaseRateScale(scale);
+        eng.setSubstepLane(lane);
+        const buckets = new Array(16).fill(0);
+        let fires = 0;
+        for (let d = 1; d <= days; d++) {
+            const r = eng.maybeFire(STUB_SIM, d, 0);
+            fires += r.fired.length + r.popups.length;
+            const a = eng.pendingArrival();
+            if (a) {
+                buckets[a.substep]++;
+                // Consume it exactly as _runSubstep does, at its substep.
+                const ev = eng.takeSubstepArrival(d, a.substep);
+                if (ev) {
+                    const rr = eng.fireArrival(ev, STUB_SIM, d, 0);
+                    fires += rr.fired.length + rr.popups.length;
+                }
+            }
+        }
+        return { fires, buckets };
+    }
+    const DAYS = 400000;
+    const scaleR5 = eventBaseRateScale(5);
+    const off = laneRun(false, DAYS, scaleR5);
+    const on = laneRun(true, DAYS, scaleR5);
+    laneOffRate = off.fires / DAYS;
+    laneOnRate = on.fires / DAYS;
+    const rateGap = Math.abs(laneOnRate - laneOffRate) / laneOffRate;
+    check('J2: lane ON matches lane OFF discretionary rate (same expectation, band 5%)',
+        rateGap < 0.05, `off ${laneOffRate.toFixed(5)}/d vs on ${laneOnRate.toFixed(5)}/d (${pct(rateGap)} gap)`);
+    check('J2: lane OFF schedules no arrivals at all (day granularity preserved)',
+        off.buckets.every(b => b === 0));
+    const arrivals = on.buckets.reduce((a, b) => a + b, 0);
+    const meanBucket = arrivals / 16;
+    let worst = 0;
+    for (const b of on.buckets) worst = Math.max(worst, Math.abs(b - meanBucket) / meanBucket);
+    laneArrivalSpread = worst;
+    check('J2: arrivals uniform over the 16 substeps (worst bucket within 15%)',
+        arrivals > 10000 && worst < 0.15, `${arrivals} arrivals, worst deviation ${pct(worst)}`);
+    check('J2: every arrival is consumed exactly once (no stale carry, no double-fire)',
+        on.fires === arrivals, `${on.fires} fires vs ${arrivals} arrivals`);
+
+    // -- J3. What the lane may NOT move ----------------------------------
+    // The lane draws from `_pools.random` alone -- so every Poisson-excluded
+    // category (bridge / ledger / latch / pulse fired) stays at day-complete by
+    // construction. Asserted through the ENGINE's real pool, not a copy of the set.
+    const EXCLUDED = ['fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
+        'strait', 'regime', 'dispute', 'theft', 'polaris', 'insider', 'conversion', 'summit'];
+    const realPool = new EventEngine('offline')._pools.random;
+    check('J3: the lane\'s source pool carries no bridge/ledger/pulse-fired category',
+        realPool.length > 0 && realPool.every(e => !EXCLUDED.includes(e.category)),
+        `${realPool.length} discretionary events`);
+    // A pulse still fires AT the day boundary with the lane live.
+    {
+        const eng = new EventEngine('offline');
+        eng._pools.random = [];
+        eng._pools.fed = [{ id: 'p71_fomc', category: 'fed', headline: 'fomc probe', params: {}, magnitude: 'moderate' }];
+        eng._pulses = [{ type: 'recurring', id: 'fomc', interval: 5, jitter: 0, nextDay: -1, poolKey: 'fed' }];
+        eng.setSubstepLane(true);
+        let dayFired = 0;
+        for (let d = 1; d <= 60; d++) dayFired += eng.maybeFire(STUB_SIM, d, 0).fired.length;
+        check('J3: pulses still fire at day-complete while the lane is live',
+            dayFired > 0 && eng.pendingArrival() === null, `${dayFired} pulse fires`);
+    }
+    check('J3: a fresh engine has the lane closed (Classic / Act I default)',
+        new EventEngine('offline').substepLaneLive() === false);
+}
+
+// =====================================================================
+// K. Manual latency ladder (P7-1 agency migration)
+// =====================================================================
+let ladderRows = '';
+{
+    // -- K1. Ladder arithmetic (02a: 0 / 1 / 3 / 6 substeps) --------------
+    const L3 = orderLatency(3, 'private'), L4 = orderLatency(4, 'private');
+    const L5 = orderLatency(5, 'private'), L5m = orderLatency(5, 'mobilized');
+    const L5n = orderLatency(5, 'nationalized'), L4m = orderLatency(4, 'mobilized');
+    ladderRows = `R<=3 ${L3.lag}/${L3.spreadMult} R4 ${L4.lag}/${L4.spreadMult} `
+        + `R5 ${L5.lag}/${L5.spreadMult} R5+mob ${L5m.lag}/${L5m.spreadMult}`;
+    check('K1: ladder is 0 through R3, 1 at R4, 3 x1.25 at R5, 6 x1.5 at R5 + mobilized',
+        L3.lag === 0 && L3.spreadMult === 1
+        && L4.lag === 1 && L4.spreadMult === 1
+        && L5.lag === 3 && L5.spreadMult === 1.25
+        && L5m.lag === 6 && L5m.spreadMult === 1.5, ladderRows);
+    check('K1: the mobilized escalation is R5-only; terminal regimes count as mobilized+',
+        L4m.lag === 1 && L4m.spreadMult === 1 && L5n.lag === 6 && L5n.spreadMult === 1.5);
+    check('K1: rung 0 (nothing released yet) is the pre-P7 path',
+        orderLatency(0, 'private').lag === 0);
+
+    // -- K2. Queue arithmetic: fill substep = order substep + lag ---------
+    resetAct3();
+    const placedAt = substepClock();
+    const t = deferOrder('market', { type: 'stock', side: 'long', qty: 1 }, 3, 1.25);
+    check('K2: due clock = placement clock + lag', t.dueClock === placedAt + 3 && t.placedClock === placedAt);
+    let earlyDrain = 0;
+    for (let i = 0; i < 2; i++) { tickSubstepClock(); earlyDrain += dueOrders().length; }
+    const atLag = (tickSubstepClock(), dueOrders());
+    check('K2: nothing fills early; the order fills at exactly substep + lag',
+        earlyDrain === 0 && atLag.length === 1 && atLag[0].ticket === t.ticket
+        && atLag[0].spreadMult === 1.25 && workingOrderCount() === 0);
+    // Multi-leg strategies defer as ONE unit -> one due clock -> one price set.
+    resetAct3();
+    deferOrder('strategy', { legs: [{}, {}, {}], name: 'probe', mult: 2 }, 6, 1.5);
+    tickSubstepClock(); tickSubstepClock(); tickSubstepClock();
+    tickSubstepClock(); tickSubstepClock(); tickSubstepClock();
+    const stratDue = dueOrders();
+    check('K2: a strategy defers as ONE queue entry (all legs share the execution substep)',
+        stratDue.length === 1 && stratDue[0].payload.legs.length === 3 && stratDue[0].spreadMult === 1.5);
+    // The desk lock (terminal latch / restriction) drops working orders.
+    resetAct3();
+    deferOrder('market', { type: 'stock', side: 'long', qty: 1 }, 6, 1.5);
+    deferOrder('binary', { key: 1, side: 'long', qty: 1 }, 6, 1.5);
+    const dropped = clearDeferredOrders();
+    check('K2: the desk lock drops every working order', dropped === 2 && workingOrderCount() === 0);
+    resetAct3();
+
+    // -- K3. The spread multiplier lands on the fill ----------------------
+    // Impact state is reset before each fill so the ONLY difference is the ladder
+    // multiplier: fill(m) - mid = (fill(1) - mid) * m, exactly.
+    const S0 = 100, vol = 0.2;
+    syncFixed(0);
+    function stockFill(mult) {
+        resetPortfolio();
+        resetImpactState();
+        const pos = executeMarketOrder(null, 'stock', 'long', 1, S0, vol, 0.03, 0, undefined, undefined, undefined, 0, mult);
+        return pos ? pos.fillPrice : NaN;
+    }
+    const f1 = stockFill(1), fU = stockFill(undefined), f125 = stockFill(1.25), f15 = stockFill(1.5);
+    const half = computeBidAsk(S0, vol).ask - S0;
+    check('K3: omitted / unit multiplier is an EXACT no-op (R<=3 fills bit-identical)',
+        fU === f1, `${fU} vs ${f1}`);
+    check('K3: x1.25 and x1.5 widen the half-spread exactly',
+        Math.abs((f125 - f1) - 0.25 * half) < 1e-12 && Math.abs((f15 - f1) - 0.5 * half) < 1e-12,
+        `half ${half.toFixed(6)}, +${(f125 - f1).toFixed(6)} / +${(f15 - f1).toFixed(6)}`);
+    // Shorts pay the widening on the bid side (worse, not better).
+    resetPortfolio(); resetImpactState();
+    const sh1 = executeMarketOrder(null, 'stock', 'short', 1, S0, vol, 0.03, 0, undefined, undefined, undefined, 0, 1).fillPrice;
+    resetPortfolio(); resetImpactState();
+    const sh15 = executeMarketOrder(null, 'stock', 'short', 1, S0, vol, 0.03, 0, undefined, undefined, undefined, 0, 1.5).fillPrice;
+    check('K3: a widened short fills LOWER (the ladder never pays the desk)',
+        sh15 < sh1 && Math.abs((sh1 - sh15) - 0.5 * half) < 1e-12);
+    resetPortfolio(); resetImpactState();
+
+    // -- K4. Execution-time state wins (the order-crosses-freeze case) ----
+    // The queue holds an order; by the time it lands the desk is restricted /
+    // the book is frozen. The fill must be REJECTED with cash untouched.
+    resetPortfolio();
+    const cash0 = portfolio.cash;
+    portfolio.restricted = true;
+    const blocked = executeMarketOrder(null, 'stock', 'long', 1, S0, vol, 0.03, 0, undefined, undefined, undefined, 0, 1.5);
+    check('K4: a deferred fill landing after a restriction is rejected, cash untouched',
+        blocked === null && portfolio.cash === cash0 && portfolio.positions.length === 0);
+    portfolio.restricted = false;
+    // Frozen Consensus: same story on the binary route.
+    const race = createRaceState(7);
+    initConsensus(race); initBelief(race);
+    refreshBinaryQuotes(race);
+    const bKey = consensus.contracts[0].key;
+    consensus.frozen = true;
+    const bBlocked = executeBinaryTrade(bKey, 'long', 1, 1.5);
+    check('K4: a deferred binary landing after the freeze is rejected, cash untouched',
+        bBlocked === null && portfolio.cash === cash0);
+    consensus.frozen = false;
+    // ...and the widened binary fill is symmetric about the quote mid.
+    const q = consensus.quotes[bKey];
+    const bLong = executeBinaryTrade(bKey, 'long', 1, 1.5);
+    const perUnit = bLong ? bLong.fillPrice / 100 : NaN;    // BINARY_NOTIONAL = 100
+    check('K4: binary widening is symmetric about the quote mid, clamped to [0,1]',
+        bLong != null && perUnit >= q.ask - 1e-9 && perUnit <= 1
+        && Math.abs(perUnit - Math.min(1, q.mid + (q.ask - q.mid) * 1.5)) < 1e-9,
+        `mid ${q.mid.toFixed(4)} ask ${q.ask.toFixed(4)} fill ${perUnit.toFixed(4)}`);
+    resetPortfolio();
+    deactivateConsensus(); deactivateBelief();
+
+    // -- K5. PLAYER EXITS take the same ladder (02a P7-1 ruling 2) --------
+    // Exits are not faster -- or cheaper -- than entries in a market made of
+    // machines. The queue treats a close / unwind exactly like an entry...
+    resetAct3();
+    const cT = deferOrder('close', { id: 4242 }, 3, 1.25);
+    const uT = deferOrder('unwind', { name: 'probe' }, 3, 1.25);
+    let exitEarly = 0;
+    for (let i = 0; i < 2; i++) { tickSubstepClock(); exitEarly += dueOrders().length; }
+    tickSubstepClock();
+    const exitsDue = dueOrders();
+    check('K5: a player close / unwind defers on the SAME queue, lag and multiplier as an entry',
+        exitEarly === 0 && exitsDue.length === 2
+        && exitsDue[0].ticket === cT.ticket && exitsDue[1].ticket === uT.ticket
+        && exitsDue.every(e => e.spreadMult === 1.25 && e.dueClock === e.placedClock + 3)
+        && workingOrderCount() === 0);
+    resetAct3();
+
+    // ...and the widening is PAID on the exit, in both directions: a widened
+    // close returns less cash, never more.
+    function closeProceeds(signedQty, mult) {
+        resetPortfolio();
+        resetImpactState();
+        const pos = executeMarketOrder(null, 'stock', signedQty > 0 ? 'long' : 'short',
+            Math.abs(signedQty), S0, vol, 0.03, 0, undefined, undefined, undefined, 0);
+        resetImpactState();                       // isolate the CLOSE's own impact
+        const cashBefore = portfolio.cash;
+        const ok = closePosition(null, pos.id, S0, vol, 0.03, 0, 0, mult);
+        return ok ? portfolio.cash - cashBefore : NaN;
+    }
+    const cl1 = closeProceeds(1, 1), clU = closeProceeds(1, undefined), cl15 = closeProceeds(1, 1.5);
+    const cs1 = closeProceeds(-1, 1), cs15 = closeProceeds(-1, 1.5);
+    check('K5: an omitted multiplier closes at the pre-P7 fill EXACTLY (machinery path)',
+        clU === cl1, `${clU} vs ${cl1}`);
+    check('K5: a widened close returns less cash, by exactly the half-spread step, both directions',
+        Math.abs((cl1 - cl15) - 0.5 * half) < 1e-12 && Math.abs((cs1 - cs15) - 0.5 * half) < 1e-12,
+        `long -${(cl1 - cl15).toFixed(6)} / short -${(cs1 - cs15).toFixed(6)} (half ${half.toFixed(6)})`);
+
+    // -- K6. MACHINERY paths stay instant --------------------------------
+    // The ladder binds the player's hand, never the machinery's: a forced
+    // liquidation of a RESTRICTED book still flattens, immediately.
+    resetPortfolio(); resetImpactState();
+    executeMarketOrder(null, 'stock', 'long', 2, S0, vol, 0.03, 0, undefined, undefined, undefined, 0);
+    executeMarketOrder(null, 'bond', 'long', 1, S0, vol, 0.03, 0, undefined, 42, undefined, 0);
+    portfolio.restricted = true;
+    const liq = liquidateAll(null, S0, vol, 0.03, 0, 0);
+    check('K6: machinery liquidation of a RESTRICTED book is instant and unaffected by the ladder',
+        liq.stuck.length === 0 && portfolio.positions.length === 0);
+    // ...and closePosition is NOT restriction-gated, which is exactly why the
+    // working-close drop has to live in the drain (main.js), not in portfolio.js.
+    resetPortfolio(); resetImpactState();
+    const rPos = executeMarketOrder(null, 'stock', 'long', 1, S0, vol, 0.03, 0, undefined, undefined, undefined, 0);
+    portfolio.restricted = true;
+    const closedWhileRestricted = closePosition(null, rPos.id, S0, vol, 0.03, 0, 0);
+    check('K6: closePosition is not restriction-gated -> the due-close DROP must be the drain\'s job',
+        closedWhileRestricted === true && portfolio.positions.length === 0);
+    portfolio.restricted = false;
+    // Exercise stays instant AND spread-free: a rights execution crosses nothing.
+    resetPortfolio(); resetImpactState();
+    const exCall = executeMarketOrder(null, 'call', 'long', 1, S0, vol, 0.03, 0, 90, 42, undefined, 0);
+    const cashBeforeEx = portfolio.cash;
+    const exd = exerciseOption(exCall.id, S0, 0, vol, 0.03, 0);
+    const exStock = portfolio.positions.find(pp => pp.type === 'stock');
+    check('K6: exercise is a rights execution -- delivered at the STRIKE, no spread, no ladder param',
+        exd != null && exStock != null && exStock.entryPrice === 90
+        && Math.abs((portfolio.cash - cashBeforeEx) + 90) < 1e-12,
+        `entry ${exStock ? exStock.entryPrice : '--'}, cash ${(portfolio.cash - cashBeforeEx).toFixed(4)}`);
+    resetPortfolio(); resetImpactState();
+
+    // -- K7. EXPIRY RE-CHECKED AT EXECUTION (02a P7-1 ruling 1) -----------
+    // The rollover case the ladder makes reachable: the live chain lists
+    // tomorrow's expiry until the day rolls, so an order placed late with lag 3/6
+    // can land AFTER that expiry has been processed. `processExpiry` matches the
+    // boundary day EXACTLY, so a position filled at or past its own expiry would
+    // never expire again -- permanently live, unsettleable. The reject lives in
+    // executeMarketOrder, BEFORE the trade is counted.
+    resetPortfolio(); resetImpactState();
+    const preTrades = portfolio.totalTrades;
+    const late = executeMarketOrder(null, 'call', 'long', 1, S0, vol, 0.03, 11, 90, 10, undefined, 0);
+    check('K7: a time-bound fill PAST its expiry is rejected, uncounted, cash untouched',
+        late === null && portfolio.positions.length === 0
+        && portfolio.totalTrades === preTrades && portfolio.cash === 10000,
+        `trades ${portfolio.totalTrades - preTrades}, cash ${portfolio.cash}`);
+    // The boundary is expiryDay <= currentDay: an expiry being settled TODAY is
+    // already gone (processExpiry ran at this day's close), so it is barred too.
+    check('K7: the boundary is <=, not < -- today\'s expiry is already settled',
+        executeMarketOrder(null, 'put', 'long', 1, S0, vol, 0.03, 11, 90, 11, undefined, 0) === null
+        && executeMarketOrder(null, 'call', 'long', 1, S0, vol, 0.03, 11, 90, 12, undefined, 0) != null);
+    // ...and the predicate agrees for every time-bound type, while the types that
+    // carry their OWN settlement clock are untouched (binaries: deadline day;
+    // compute futures: race-day maturity -- compute-test trades keys <= race.day).
+    resetPortfolio(); resetImpactState();
+    check('K7: predicate covers call/put/bond/vxhcnfuture and NOTHING else',
+        ['call', 'put', 'bond', 'vxhcnfuture'].every(t => isExpiredForTrading(t, 10, 11))
+        && ['stock', 'binary', 'computefuture'].every(t => !isExpiredForTrading(t, 10, 11))
+        && !isExpiredForTrading('call', 12, 11) && !isExpiredForTrading('stock', undefined, 11));
+    check('K7: stock (no expiry at all) is unaffected',
+        executeMarketOrder(null, 'stock', 'long', 1, S0, vol, 0.03, 11, undefined, undefined, undefined, 0) != null);
+    // The invariant the reject exists to protect: NO position can survive its own
+    // expiry pass. Open every time-bound type legitimately, roll the clock past
+    // each expiry, and assert the book is empty -- then assert the only way one
+    // COULD have survived (a post-expiry fill) is closed.
+    resetPortfolio(); resetImpactState();
+    syncFixed(0);
+    executeMarketOrder(null, 'call', 'long', 1, S0, vol, 0.03, 9, 90, 10, undefined, 0);
+    executeMarketOrder(null, 'put', 'long', 1, S0, vol, 0.03, 9, 110, 10, undefined, 0);
+    executeMarketOrder(null, 'bond', 'long', 1, S0, vol, 0.03, 9, undefined, 10, undefined, 0);
+    executeMarketOrder(null, 'vxhcnfuture', 'long', 1, S0, vol, 0.03, 9, undefined, 10, undefined, 0);
+    const opened = portfolio.positions.length;
+    const survivor = executeMarketOrder(null, 'call', 'long', 1, S0, vol, 0.03, 11, 95, 10, undefined, 0);
+    syncFixed(10);
+    processExpiry(null, 10, S0, 10, vol, 0.03, 0);
+    check('K7: no time-bound position survives its own expiry pass',
+        opened === 4 && survivor === null && portfolio.positions.length === 0,
+        `opened ${opened}, left ${portfolio.positions.length}`);
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+
+    // -- K8. Reset restores an honest display (02a P7-1 ruling 5) ---------
+    // The renderer's transient fields are cleared through ONE method, so a repaint
+    // generated while the strategy view was up (draw() never consumed it) cannot
+    // survive a Dynamic->Classic reset and print an Act-III wrong tick at rest.
+    // ChartRenderer needs a canvas, so the method is exercised on the prototype.
+    const fakeChart = {
+        _lerp: { day: 7, close: 101, high: 102, low: 99, _from: 100, _targetClose: 101, _targetHigh: 102, _targetLow: 99, _t: 0.4 },
+        _repaint: 0.37,
+        _repaintDirty: true,
+    };
+    ChartRenderer.prototype.resetTransients.call(fakeChart);
+    check('K8: resetTransients clears the lerp AND both repaint fields',
+        fakeChart._repaint === 0 && fakeChart._repaintDirty === false
+        && fakeChart._lerp.day === -1 && fakeChart._lerp.close === 0
+        && fakeChart._lerp._t === 1 && fakeChart._lerp._targetClose === 0);
+    // ...and resetAct3 makes the queue fully run-scoped: tickets restart at 1.
+    resetAct3();
+    const t1 = deferOrder('market', { type: 'stock', side: 'long', qty: 1 }, 3, 1.25).ticket;
+    deferOrder('market', { type: 'stock', side: 'long', qty: 1 }, 3, 1.25);
+    resetAct3();
+    const t2 = deferOrder('market', { type: 'stock', side: 'long', qty: 1 }, 3, 1.25).ticket;
+    check('K8: resetAct3 resets the ticket counter -- queue state is run-scoped',
+        t1 === 1 && t2 === 1, `first ${t1}, after reset ${t2}`);
+    resetAct3();
+
+    // -- K9. BUNDLE ATOMICITY across rollover (P7-1 fix round) ------------
+    // A per-leg expiry reject is NOT enough for a multi-leg bundle: a STOCK-FIRST
+    // strategy (covered call) runs `_fillPrice` on leg 1 and records price impact
+    // before leg 2's expired option is refused, and the rollback restores cash /
+    // positions / counters but NOT the impact pools -- cumulative traded volume is
+    // append-only. The preflight must drop the whole bundle before ANY leg moves.
+    // Driven through the REAL pending-strategy path (checkPendingOrders), which is
+    // where the leak was reproduced.
+    const coveredCall = (expiry) => ([
+        { type: 'stock', qty: 1, strike: null, expiryDay: null },   // stock FIRST
+        { type: 'call', qty: -1, strike: 100, expiryDay: expiry },
+    ]);
+    const poolSnapshot = () => [
+        getStockImpact(vol), getBondImpact(market.sigmaR), getVxhcnImpact(market.xi),
+        getOptionImpact('call', 100, 10, vol, 0, 1 / 252),
+        getOptionImpact('call', 100, 12, vol, 0, 3 / 252),
+    ];
+    resetPortfolio(); resetImpactState(); syncFixed(11);
+    const k9Cash = portfolio.cash, k9Trades = portfolio.totalTrades;
+    const poolsBefore = poolSnapshot();
+    // Expiry 10 with currentDay 11: the option outlived its contract inside the
+    // latency window. Trigger price 200 >= spot, so the limit order fires.
+    placePendingOrder(null, null, null, 'limit', 200, null, null, 'Covered Call', coveredCall(10), 1);
+    const k9Filled = checkPendingOrders(null, S0, vol, 0.03, 11, 0);
+    const poolsAfter = poolSnapshot();
+    check('K9: a rollover-expired bundle is DROPPED whole -- cash, positions and trade count untouched',
+        k9Filled.length === 0 && portfolio.positions.length === 0
+        && portfolio.cash === k9Cash && portfolio.totalTrades === k9Trades
+        && portfolio.orders.length === 0,
+        `filled ${k9Filled.length}, pos ${portfolio.positions.length}, cashDelta ${portfolio.cash - k9Cash}, trades ${portfolio.totalTrades - k9Trades}`);
+    check('K9: EVERY impact pool is bitwise unmoved -- the stock leg never fills',
+        poolsAfter.every((p, i) => p === poolsBefore[i]),
+        `before [${poolsBefore.join(', ')}] after [${poolsAfter.join(', ')}]`);
+    // Positive control: the SAME bundle on a LIVE expiry still fills both legs and
+    // does move the stock pool -- the preflight rejects contracts, not strategies.
+    resetPortfolio(); resetImpactState(); syncFixed(11);
+    placePendingOrder(null, null, null, 'limit', 200, null, null, 'Covered Call', coveredCall(12), 1);
+    const k9Live = checkPendingOrders(null, S0, vol, 0.03, 11, 0);
+    check('K9: the same bundle on a live expiry fills both legs (the gate is the contract, not the bundle)',
+        k9Live.length === 2 && portfolio.positions.length === 2
+        && getStockImpact(vol) !== 0,
+        `filled ${k9Live.length}, stock pool ${getStockImpact(vol)}`);
+    resetPortfolio(); resetImpactState(); syncFixed(0);
+}
+
+// =====================================================================
+// L. Presentation degradation is INVISIBLE to every headless number
+// =====================================================================
+let latchTrajOK = false, latchHeldSubsteps = 0;
+{
+    // -- L1. Hold arithmetic ---------------------------------------------
+    resetAct3();
+    setMachineParam(1);
+    check('L1: chain hold = floor(d * 6) substeps', chainHoldSubsteps() === 6);
+    setMachineParam(0.75);
+    check('L1: chain hold scales with d (d = 0.5 -> 3 substeps)', chainHoldSubsteps() === 3);
+    setMachineParam(0.5);
+    check('L1: no hold at or below the knee', chainHoldSubsteps() === 0);
+    // VXHCN publication: truth below the gate, held above it.
+    setMachineParam(0.5);
+    advanceVxhcnPublication(20, 0.04, substepClock());
+    check('L1: below the staleness gate the index publishes truth',
+        publishedVxhcn(21) === 21 && publishedVariance(0.05) === 0.05 && !vxhcnPublicationStale());
+    setMachineParam(1);
+    resetAct3(); setMachineParam(1);
+    advanceVxhcnPublication(20, 0.04, substepClock());     // first print
+    let held = 0;
+    for (let i = 0; i < 12; i++) {
+        tickSubstepClock();
+        if (advanceVxhcnPublication(20 + i + 1, 0.05 + i, substepClock())) held++;
+    }
+    latchHeldSubsteps = held;
+    check('L1: the index holds its print for 2-6 substeps at a time (never forever)',
+        held > 0 && held < 12, `${held} of 12 substeps stale`);
+    check('L1: a stale publication reports the LAST print, not the live value',
+        publishedVxhcn(999) !== 999 || !vxhcnPublicationStale());
+    // Idempotent within a substep: the display path may run twice.
+    const before = publishedVxhcn(0);
+    advanceVxhcnPublication(1234, 0.99, substepClock());
+    check('L1: the latch is idempotent per substep clock', publishedVxhcn(0) === before);
+
+    // -- L2. The latch never reaches a valuation --------------------------
+    // A fixed book walked down a deterministic path, twice: once with the
+    // degradation latches forced ON and exercised every step, once at rest. Every
+    // headless number -- unitPrice, portfolioValue, the VXHCN spot -- must agree
+    // BITWISE. (The latches live in the display path; this is the regression
+    // guard against anyone ever wiring one into a price.)
+    function trajectory(forceD) {
+        resetAct3();
+        resetPortfolio();
+        resetImpactState();
+        if (forceD) setMachineParam(1);
+        syncFixed(0);
+        executeMarketOrder(null, 'stock', 'long', 5, 100, 0.2, 0.03, 0, undefined, undefined, undefined, 0);
+        executeMarketOrder(null, 'call', 'long', 2, 100, 0.2, 0.03, 0, 100, 42, undefined, 0);
+        executeMarketOrder(null, 'vxhcnfuture', 'short', 1, 100, 0.2, 0.03, 0, undefined, 42, undefined, 0);
+        executeMarketOrder(null, 'bond', 'long', 3, 100, 0.2, 0.03, 0, undefined, 42, undefined, 0);
+        const out = [];
+        for (let step = 1; step <= 64; step++) {
+            const S = 100 * Math.exp(Math.sin(step / 7) * 0.05);
+            const v = 0.04 + 0.01 * Math.cos(step / 5);
+            const day = Math.floor(step / 16);
+            syncMarket({ ...FIXED_MARKET, S, v, day });
+            market.day = day;
+            if (forceD) {
+                // Exercise the display boundary exactly as main.js does.
+                tickSubstepClock();
+                advanceVxhcnPublication(computeVXHCNSpot(v, market.kappa, market.theta, market.xi), v, substepClock());
+                publishedVariance(v);
+                publishedChain({ day: 42, dte: 42 - day, options: [{ strike: 100, call: { bid: 1, ask: 2 }, put: { bid: 3, ask: 4 } }] }, substepClock());
+            }
+            out.push(portfolioValue(S, Math.sqrt(v), FIXED_MARKET.r, day, 0));
+            out.push(unitPrice('vxhcnfuture', S, Math.sqrt(v), FIXED_MARKET.r, day, undefined, 42, 0));
+            out.push(computeVXHCNSpot(v, market.kappa, market.theta, market.xi));
+        }
+        return out;
+    }
+    const trajRest = trajectory(false);
+    const trajStale = trajectory(true);
+    latchTrajOK = trajRest.length === trajStale.length
+        && trajRest.every((x, i) => x === trajStale[i]);
+    check('L2: portfolio / mark / index trajectories are BITWISE identical with degradation forced on',
+        latchTrajOK, `${trajRest.length} sampled numbers`);
+    resetAct3(); resetPortfolio(); resetImpactState();
+
+    // -- L3. Classic inertness: the whole surface is dead code ------------
+    resetAct3();
+    let randomCalls = 0;
+    const realRandom = Math.random;
+    Math.random = () => { randomCalls++; return realRandom(); };
+    let repaintNonzero = 0, skipped = 0;
+    for (let i = 0; i < 2000; i++) {
+        if (rollCandleRepaint(100) !== 0) repaintNonzero++;
+        if (skipSparklineFrame()) skipped++;
+    }
+    check('L3: at rest the degradation produces NO effect at all',
+        repaintNonzero === 0 && skipped === 0
+        && chainHoldSubsteps() === 0 && publishedVxhcn(7) === 7 && publishedVariance(9) === 9);
+    // ...and even at FULL degradation it never touches the shared Math.random the
+    // price path and the event cadence draw from: the display failing may not move
+    // the market. (act3.js owns a fixed-seed display substream.)
+    setMachineParam(1);
+    for (let i = 0; i < 2000; i++) { rollCandleRepaint(100); skipSparklineFrame(); }
+    Math.random = realRandom;
+    check('L3: the degradation NEVER draws from the shared Math.random stream',
+        randomCalls === 0, `${randomCalls} Math.random calls over 4000 rolls`);
+    resetAct3();
+    check('L3: at rest the ladder is the pre-P7 path and nothing is working',
+        orderLatency(0, 'private').lag === 0 && workingOrderCount() === 0);
+    // Reduced motion silences the STUTTER and keeps the STALENESS.
+    setMachineParam(1);
+    setReducedMotion(true);
+    let rmRepaint = 0, rmSkip = 0;
+    for (let i = 0; i < 2000; i++) {
+        if (rollCandleRepaint(100) !== 0) rmRepaint++;
+        if (skipSparklineFrame()) rmSkip++;
+    }
+    check('L3: reduced motion drops the repaint + frame-skip, keeps the hold latches',
+        rmRepaint === 0 && rmSkip === 0 && chainHoldSubsteps() === 6);
+    setReducedMotion(false);
+    // ...and at full degradation the stutter is actually live (the effect exists).
+    let liveRepaint = 0;
+    for (let i = 0; i < 20000; i++) if (rollCandleRepaint(100) !== 0) liveRepaint++;
+    check('L3: at d = 1 the transient repaint fires at ~p = 0.04/substep',
+        liveRepaint > 500 && liveRepaint < 1200, `${liveRepaint}/20000`);
+    // Glitch severity: cluster-scaled and wall-clock rate limited.
+    resetAct3();
+    check('L4: a lone incident never reaches the audio chain',
+        (noteDegradationIncident(), takeGlitchSeverity(1e9)) === 0);
+    noteDegradationIncident();
+    const sev1 = takeGlitchSeverity(1e9);
+    for (let i = 0; i < 6; i++) noteDegradationIncident();
+    const sevBlocked = takeGlitchSeverity(1e9 + 1000);      // inside the 15s limit
+    const sev3 = takeGlitchSeverity(1e9 + 20000);
+    check('L4: cluster size sets severity 1..3, wall-clock rate limit >= 15s holds',
+        sev1 === 1 && sevBlocked === 0 && sev3 === 3, `${sev1} / ${sevBlocked} / ${sev3}`);
+    resetAct3();
+}
+
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
 line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
@@ -894,6 +1478,14 @@ line(`  export-control dampener [${EXPORT_CONTROL_GROWTH.join(', ')}]x/yr`);
 line(`    stage 0: TianxiaC@504 ${damp0.c504.toFixed(4)}  Tianxia leads ${pct(damp0.txLeads)}  family-4 ${pct(damp0.fam4)}`);
 line(`    stage 3: TianxiaC@504 ${damp3.c504.toFixed(4)}  Tianxia leads ${pct(damp3.txLeads)}  family-4 ${pct(damp3.fam4)}`);
 line(`  theft disclosure: ${discRows} disclosures / ${discEligible} eligible / ${discThefts} thefts`);
+line('\nAct III systemic layer (P7-1):');
+line(`  driver: smoothing ${ACT3_TUNING.smoothing}/day, targets 0 / ${ACT3_TUNING.targetR4} / ${ACT3_TUNING.targetR5}`
+    + ` (+${ACT3_TUNING.regimeBump} mobilized+), knee ${ACT3_TUNING.knee}`);
+line(`  substep lane: ${laneOffRate.toFixed(5)} events/day day-lane vs ${laneOnRate.toFixed(5)} substep-lane`
+    + `  (worst arrival bucket deviation ${pct(laneArrivalSpread)})`);
+line(`  latency ladder: ${ladderRows}`);
+line(`  display latches: index stale ${latchHeldSubsteps}/12 substeps at d = 1;`
+    + ` headless trajectory identity ${latchTrajOK ? 'BITWISE' : 'VIOLATED'}`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

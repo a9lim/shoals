@@ -37,6 +37,14 @@ export class ChartRenderer {
         this._segmentDur = 0.25; // seconds per substep (updated by setSubstepInterval)
         this._lastFrameTime = 0;
 
+        // P7-1 presentation degradation: a DISPLAY-ONLY offset applied to the live
+        // candle's close for exactly one drawn frame -- the terminal printing a
+        // wrong tick, then correcting. It never touches _lerp (so no high/low
+        // water mark is polluted) and never touches history: the printed record is
+        // immutable. `_repaintDirty` asks main.js for the corrective redraw.
+        this._repaint = 0;
+        this._repaintDirty = false;
+
         // Axis gutter sizes (CSS px) — from config.js
         this.Y_AXIS_W  = CHART_Y_AXIS_W;
         this.Y_LABEL_W = CHART_Y_LABEL_W;
@@ -108,6 +116,26 @@ export class ChartRenderer {
     }
 
     /* -----------------------------------------------
+       resetTransients()
+       Clear every PER-RUN transient display field: the
+       live-candle lerp animation and the P7-1 one-frame
+       wrong print (02a P7-1 ruling 5). Called by
+       `_resetCore` -- a pending repaint generated while
+       the strategy view was up is never consumed by
+       draw(), so without this it could survive a
+       Dynamic->Classic reset and print one Act-III wrong
+       tick on a world that has no Act III.
+    ----------------------------------------------- */
+    resetTransients() {
+        Object.assign(this._lerp, {
+            day: -1, close: 0, high: 0, low: 0,
+            _from: 0, _targetClose: 0, _targetHigh: 0, _targetLow: 0, _t: 1,
+        });
+        this._repaint = 0;
+        this._repaintDirty = false;
+    }
+
+    /* -----------------------------------------------
        update(now)
        Advance cubic interpolation toward the live
        candle's target. Call once per frame before draw().
@@ -167,6 +195,19 @@ export class ChartRenderer {
         L._targetClose = bar.close;
         L._targetHigh = bar.high;
         L._targetLow  = bar.low;
+    }
+
+    /* -----------------------------------------------
+       setTransientRepaint(delta)
+       P7-1 presentation degradation: draw the live
+       candle's close `delta` off for ONE frame, then
+       correct. Display only -- the lerp state, the
+       partial bar, and the printed history are all
+       untouched.
+       @param {number} delta  signed price offset
+    ----------------------------------------------- */
+    setTransientRepaint(delta) {
+        this._repaint = delta || 0;
     }
 
     /* -----------------------------------------------
@@ -356,13 +397,17 @@ export class ChartRenderer {
 
         const upWicks = [], downWicks = [], upBodies = [], downBodies = [];
         const liveDay = this._lerp.day;
+        // One-frame wrong print (P7-1). Consumed below, after the price line.
+        const repaint = this._repaint;
 
         for (let i = firstDay; i <= lastDay; i++) {
             const bar = _get(i);
             if (!bar) continue;
             let bHigh, bLow, bClose;
             if (i === liveDay && liveDay >= 0) {
-                bHigh = this._lerp.high; bLow = this._lerp.low; bClose = this._lerp.close;
+                bClose = this._lerp.close + repaint;
+                bHigh = Math.max(this._lerp.high, bClose);
+                bLow  = Math.min(this._lerp.low, bClose);
             } else {
                 bHigh = bar.high; bLow = bar.low; bClose = bar.close;
             }
@@ -404,7 +449,7 @@ export class ChartRenderer {
         if (lastBar) {
             // Use lerped close for the live candle's price line
             const priceLineClose = (liveDay >= 0 && lastBar.day === liveDay)
-                ? this._lerp.close
+                ? this._lerp.close + repaint
                 : lastBar.close;
             const yLast = priceToY(priceLineClose);
             if (yLast >= plotY && yLast <= plotY + plotH) {
@@ -639,6 +684,13 @@ export class ChartRenderer {
             ctx.restore();
         }
 
+        // ── 11. Consume the one-frame wrong print (P7-1) ──────────
+        // Drawn exactly once; `_repaintDirty` makes main.js schedule the
+        // corrective redraw even if nothing else is animating.
+        if (this._repaint !== 0) {
+            this._repaint = 0;
+            this._repaintDirty = true;
+        }
     }
 }
 

@@ -1116,7 +1116,8 @@ surfaced; prose keeps the accused unnamed and direction-neutral
 everything, per the standing rule (η, the released frontier).
 
 **The driver.** A smoothed machine parameter `x ∈ [0,1]`, owned by
-main.js (not race state — it is presentation pacing): daily
+act3.js and stepped by main.js (not race state — it is presentation
+pacing): daily
 `x += (target − x)·0.15`, with `target` = 0 through R3 released,
 **0.6** at R4, **1.0** at R5, **+0.1** (capped) under mobilized+.
 ~Three trading weeks of crossfade after each step — the world
@@ -1199,6 +1200,107 @@ folds for incident detections are SUPPRESSED except severity 4
 channel is the only feed left, exactly as 04's ratchet wiring
 promises. Releases and wonders still print (products ship);
 Consensus and compute are already frozen by the regime machinery.
+
+**P7-1 implementation rulings (2026-07-24):** (1) *Mobilized bump
+is unconditional* — mobilization at R≤3 sets the driver target to
+0.1: a faint machine tint in the audio while `d` stays 0. The
+state's grip IS the machine arriving early; ratified as landed.
+(2) *Close latency*: player-initiated `closePosition` and
+`liquidateAll` take the SAME ladder lag as entries — in a market
+made of machines, exits are not faster than entries, and an
+instant-exit asymmetry is exploitable. `exerciseOption` stays
+instant (a rights execution — nothing crosses a spread), and ALL
+machinery-initiated paths stay instant: popup `choice.trades`,
+margin liquidation, forced trims, rogue/terminal actions — the
+ladder binds the player's hand, never the machinery's. (3)
+*Working orders sleep across pause* — the latency clock is
+game-time by design; a paused world fills nothing. (4) *Feel
+numbers ratified rev-1* (ACT3_TUNING): chain-hold max 6 substeps,
+VXHCN publication hold 2–6, repaint size 0.6% of spot, sparkline
+skip gate 0.6 / max 0.75, glitch cluster sizes 4 and 6, glitch
+wall-clock limit 15 s. (5) *Reduced motion drops stutter, keeps
+staleness* — repaint/frame-flicker are motion; a stale quote is
+information pacing, not motion, and hiding the degradation
+entirely from reduced-motion players would change the game they
+are playing. (6) `_midDayBaseline` (the overlay-gate trap): ANY
+intraday sim-param mutation must run through it — the LIFO
+overlay unwind/re-derive is the only correct write path while a
+day is open; it is a no-op at day boundaries. (7) *Close-ladder
+scope as landed*: the strategy unwind button is the player's hand
+and defers as one unit like the entry; `liquidateAll` has no
+player entry point in the current UI (all callers machinery), so
+no dead route is pre-wired — a future player flatten control
+takes the ladder mechanically. A working close whose position the
+machinery flattens inside the latency window expires with a
+report, never a fabricated fill; a restriction landing inside the
+window cancels working closes (correct, and flagged for the feel
+pass — it is the one place the ladder can read as a bug).
+
+**P7-1 gate rulings (2026-07-24, sol round):** (1) *Expiry
+re-checked at execution, centrally* — `executeMarketOrder` rejects
+any time-bound instrument with `expiryDay <= currentDay` before
+counting the trade; a deferred order whose instrument expired
+inside the latency window dies at the fill like a
+restriction-dropped order (cash untouched, reported). The chain
+never legitimately offers `expiryDay <= currentDay`, so the
+chokepoint reject is pure defense in depth. (2) *The popup queue is
+a barrier to day close* — `finalizeDay`/`_closeTradingDay`/
+`_onDayComplete` may NOT run while a popup is open or queued, on
+ANY path (frame/tick/step). The day stays open (overlays applied)
+until the queue drains; lane-popup choices resolving in that window
+already write through `_midDayBaseline`, so correctness follows
+from the existing machinery. On drain-to-empty with a
+completed-but-unclosed day, the close pipeline runs synchronously —
+the player never has to press play to collect a day the world
+already finished. The close is idempotent-guarded on
+day-in-progress state (`_closeTradingDay` clears it before
+`_onDayComplete`, which is what makes the re-entrant drain at its
+tail safe; `sim.dayComplete` alone is NOT the predicate — as
+implemented, `finalizeDay` resets it, but the guard must not lean
+on that). The reject in ruling 1 also closes a pre-existing
+prototype hole: resting pending orders route through
+`executeMarketOrder` and were never pruned at expiry, so a
+limit/stop triggering past its contract's expiry minted the same
+immortal position. (3) *Intraday terminal aborts the partial day* —
+`_triggerGameOver` entered while a day is open runs an abort (LIFO
+overlay unwind, `dayInProgress` cleared, NO `_onDayComplete`: no
+race advance, no settlements, no day-boundary events) before the
+latch proceeds. The abort does NOT `finalizeDay` — advancing the
+sim clock would misdate every closeout mark; the partial bar stays
+in history as the desk's last unfinished day, and play/step
+early-return on `_gameOver` so no second bar can ever print (there
+is no legitimate post-terminal resume — the epilogue is always
+terminal). The world does not
+tick after the terminal latch, and closeout/epilogue never price or
+render through a transient overlay or a half-open day. (4) *Resume
+rebases the substep clock* — `togglePlay` derives `lastTickTime`
+from `sim.substepsDone` so pausing mid-day never stalls the
+remaining substeps; working orders still sleep across pause
+(ruling 3 above stands — this is clock bookkeeping, not fills).
+(5) *Reset is display-honest end-to-end* — chart transient repaint
+state (`_repaint`/`_repaintDirty`) clears through a renderer reset
+method called by `_resetCore`, and `resetAct3` clears `_nextTicket`
+with the rest of the queue state — no Act-III artifact survives
+into a fresh run. (6) *silenceDesk placement* — immediately after
+`_triggerGameOver`'s idempotency guard, before queue filtering and
+resolution; the doc claim and the code now say the same thing.
+
+**P7-2 semantics (ratified 2026-07-24, pre-dispatch):** the six
+rules bind as follows — (a) severity-≥3 DETECTION → proportional
+50% gross cut across open non-frozen positions; (b) blockade onset
+→ halve the HCN stock position; (c) margin utilization > 80% →
+bonds liquidate FIRST (a standing preference consumed by the
+existing margin path, not a firing action); (d) any certification
+settlement → sell all ITM long binaries at quote; (e) armed
+auto-sit INTERCEPTS the insider_tip popup and applies the sit
+choice's full declarative consequence through the manual-sit code
+path, exactly once; (f) |HCN move vs day open| > 8% at any substep
+→ machinery-instant stock trade to net delta ±20. Standing
+executions are MACHINERY (zero ladder lag, restriction/terminal
+respected); one fire per trigger episode; unlock at released R3,
+EDITABLE until R5 then LOCKED for the run; run-scoped state
+cleared by reset (precommitments are authored per run — never
+localStorage); parameters fixed in v1, arming is the choice.
 
 **Sub-round split**: P7-1 systemic (driver + substep lane + latency
 + degradation + VXHCN staleness + audio wiring), P7-2 standing
