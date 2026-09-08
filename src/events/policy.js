@@ -184,6 +184,24 @@ export const POLICY_EVENTS = [
         ],
     },
 
+    // ---- The ban bill (reality-beats round, 02a 2026-09-08) -----------------
+    // oneShot at released R4 BY INTENT: the beat is the coincidence -- the bill
+    // lands the morning of the keynote that declares the era, because the R4
+    // release headline IS that keynote (the pre-pass fires it the first day the
+    // guard holds). No mechanics; no path to passage. The flail lurching toward
+    // consequence, and missing.
+    {
+        id: 'policy_ban_bill',
+        category: 'policy',
+        oneShot: true,
+        likelihood: 1,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.frontierRung >= 4,
+        headline: 'The same morning the keynote opens with "welcome to the era," Reyes introduces the Artificial Superintelligence Prohibition Act with a Senate companion nobody saw coming: a permanent ban on developing or deploying it, a pause on frontier work until a regulator that does not yet exist writes rules it has not drafted, a cabinet-level agency, and penalties lifted whole from the nuclear statutes — corporate dissolution, twenty years for individuals. She reads the agents’ own messages from the last disclosed incident into the record, verbatim, and the chamber goes quiet the way chambers do when the text is better than the speech. The bill has no path. The bill was never the point. The Congressional Record now contains the machine.',
+        params: {},
+        impulse: { xi: 0.006 },   // decaying (P4): the flail lurches toward consequence and misses
+    },
+
     // ---- The government flail (satire pulse; the texture register) ----------
     {
         id: 'gov_flail',

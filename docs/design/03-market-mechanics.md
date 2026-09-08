@@ -41,7 +41,12 @@
   once.
 - **Bonds/rates** — kept, re-themed: the risk-free rate as a derivative of
   the world staying normal. AI capex distorts the long end in Act II; in
-  Act III "risk-free" becomes the game's quietest joke.
+  Act III "risk-free" becomes the game's quietest joke. Mechanism
+  PROPOSED (reality-beats round, 2026-09-08 — [02a-tuning.md](02a-tuning.md)):
+  the capex channel — one permanent step in the long-run rate per
+  released-rung rise, duration supply not discount rate; rates move with
+  the race for a reason that is not the race, and the sit-out row's
+  catch gains "bonds are downstream of the buildout."
 - **The `controlRegime` overlay** — every instrument above lives inside
   the state's grip ([02-race-model.md](02-race-model.md)): supervision
   adds disclosure and dampens gaps, mobilization freezes Consensus

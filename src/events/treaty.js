@@ -69,6 +69,22 @@ export const TREATY_EVENTS = [
             },
         ],
     },
+    // ---- The pacing letter (reality-beats round, 02a 2026-09-08) -------------
+    // The racers ask Washington for the tools to stop LATER. oneShot on TWO
+    // guards -- treatyStage (itself Poisson-timed by talks_farce) and released
+    // R3 -- so the pre-pass cannot cluster it onto the R3 week. No mechanics:
+    // nobody stops, and that nobody stops is the beat.
+    {
+        id: 'treaty_pacing_letter',
+        category: 'treaty',
+        oneShot: true,
+        likelihood: 1,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.treatyStage >= 1 && world.ai.frontierRung >= 3,
+        headline: 'Eleven hundred signatures, most of them from inside the labs: an open letter asks Washington to "support an international effort to develop the technical and governance tools needed to deliberately pace the frontier." Reinholt signs. Sato signs. The heads of alignment at every lab that has one sign. Halcyon endorses it as a corporation; Dirks does not sign personally, and says so, in a sentence that is also a policy. The letter asks for the ability to stop later, on purpose, together. It does not ask anyone to stop now. Nobody does. The cadence does not move; Consensus does not move; the desk reads the whole thing twice and finds the operative verb is "develop."',
+        params: {},
+        impulse: { xi: 0.004 },   // decaying (P4): a request for brakes, priced as a request
+    },
     {
         id: 'treaty_window',
         category: 'summit',   // P6: bridge-fired on the window-open ledger transition, Poisson-excluded

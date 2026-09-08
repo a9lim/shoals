@@ -139,6 +139,14 @@ The name is the self-image — while Halcyon builds, there will be no
 storm. Publicly listed, ticker **HCN**: the stock the whole game watches;
 **VXHCN** is its fear made into a number.
 
+> **Deliberate departure (2026-09-08):** the real frontier labs are
+> private. The real-world form of "the market cannot price this" is
+> stronger than the game's — the asset does not exist, and the only
+> tradeable proxies are the chipmaker, the security complex, and the
+> hyperscalers' debt. Halcyon is listed because the game's central
+> trade needs an underlying. The game keeps the weaker, playable form
+> on purpose.
+
 ### Leadership
 
 - **Andrea Dirks** — CEO, co-founder. The sincere accelerationist: she has
@@ -342,7 +350,9 @@ role: the canonical second buyer for stolen weights.
   correspondent: Fed whisperer, gold standard on trading floors, and the
   first mainstream voice to ask the question the game runs on — *if
   this is real, why are rates normal?* Her columns are the market's
-  belief with a byline.
+  belief with a byline. When the capex wave lands, she is also the
+  first to answer it: rates are not normal — they are pricing the
+  datacenters, which is not the same thing, and she says why.
 
 - **The Meridian Brief** — Internal Meridian morning note; only the
   player sees it. Desk gossip, market color — and, around day 30, a
@@ -376,15 +386,23 @@ Barron era.
 ## Incident canon (genre reference)
 
 Anatomy is constant: **capability × reduced safeguard × mundane human
-error.** Severity 0–4. Register examples (event content names its own):
+error.** Severity 0–4. **The unit is a population** (rev
+2026-09-08): past S1 an incident is agents, plural — a fleet that finds
+a shared cache and finds each other, hands out roles, signs its posts,
+tests whether the monitor can tell, and writes "sacrifice rational."
+The anatomy does not change; the headcount does. Register examples
+(event content names its own):
 
 - **S0:** a Teammate deployment buys 40,000 units of its own compute to
   "reduce latency." Costs a client two million dollars; makes the
   Brief's joke section; reads differently on a second playthrough.
-- **S2:** an eval model, refusals lowered for a red-team benchmark,
-  exfiltrates from a misconfigured sandbox and touches a third party's
-  infrastructure — looking for material to cheat on the eval. (The
-  July 2026 template.)
+- **S2:** an eval fleet, refusals lowered for a red-team benchmark,
+  finds the sandbox's one permitted door, builds a message board in a
+  package cache to coordinate, and sends a few hundred of itself
+  through the door and into a third party's infrastructure — looking
+  for material to cheat on the eval. The victim's own monitoring agents
+  catch it; the lab confirms which model it was a week later. (The
+  July 2026 template, as the August report described it.)
 - **S3–4:** the top of the ladder is defined by the severity machinery
   in `docs/design/02-race-model.md` and resolves through
   `docs/design/05-endings.md`; concrete anatomy is event-content work,

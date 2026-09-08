@@ -164,13 +164,21 @@ Consequences of the split:
   thinner edge. The player can lobby their own alpha away.
 - **Cover-ups are followup chains**: occurrence → internal post-mortem
   → leak or disclosure → backlash, each hop tradeable and leakable.
+- **The gap hides its own incidents** (PROPOSED, reality-beats round
+  2026-09-08 — [02a-tuning.md](02a-tuning.md)): detection lag scales with
+  the source's internal−released gap — concealment licenses
+  `C_internal`, defenders license the released frontier. The incident
+  ledger inherits `B`'s epistemic problem.
 
 Severity ladder: 0 embarrassing → 1 costly → 2 alarming (exfiltration-class)
 → 3 grave (casualties / infrastructure) → 4 unrecoverable (self-disclosing
 by nature; this *is* an
 ending trigger in worlds where τ is low and margin was gone). Low-severity
 incidents are common and farce-flavored; the ladder is the dread mechanism —
-the player learns the anatomy never changes, only the blast radius.
+the player learns the anatomy never changes, only the blast radius. The
+unit (reality-beats round, 2026-09-08) is a *population* of agents, not
+a model — prose renders it; the generator's row stays one incident,
+one severity.
 Incidents need not originate at the frontier: refusal-stripped fine-tunes
 of open Tianxia weights supply the misuse wing of the ladder — same
 anatomy, no lab to subpoena. And past a rung the **persuasion class**

@@ -168,6 +168,49 @@ export const HALCYON_EVENTS = [
         ],
     },
 
+    // ---- The voluntary pause (Act II/III; release-as-choice, seen from the tape) --
+    // Reality-beats round (02a, 2026-09-08). Flag-gated Poisson draw, fires once
+    // (`world.ai.halcyonPaused`, the fixedpointPublic pattern). No mechanics --
+    // the pause does not touch the race, and that it does not is the beat.
+    {
+        id: 'halcyon_pause',
+        category: 'halcyon',
+        likelihood: 0.9,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.frontierRung >= 3 && !world.ai.halcyonPaused,
+        effects: (world) => { world.ai.halcyonPaused = true; },
+        headline: 'Halcyon pauses frontier training. Two weeks, "on the models intended for deployment," to "validate safeguards and establish more evidence of alignment" — the trigger, per two people who saw the memo, an internal eval suggesting the next build clears a threshold in Halcyon’s own scaling charter that the charter was written assuming it never would. Dirks posts it herself. HCN gaps down four percent and recovers half by the close, which is the market’s estimate of how long two weeks is.',
+        params: {},
+        impulse: { mu: -0.03, xi: 0.03 },   // decaying (P4): the lab blinks; the tape prices a blink
+        followups: [{ id: 'halcyon_pause_ends', mtth: 14 }],
+    },
+    {
+        id: 'halcyon_pause_ends',
+        followupOnly: true,
+        category: 'halcyon',
+        magnitude: 'minor',
+        headline: 'The pause has ended "for some work." The largest planned run "remains on hold pending review," a sentence Malhotra reads on the call in the tone of a man describing weather. The next release ships on the cadence the pause was supposed to interrupt, with "our most aligned model yet" in the second paragraph. Sharma: "A two-week pause that ends on schedule is a scheduling decision. I have been asked to call it something else, and I decline."',
+        params: {},
+        impulse: { mu: 0.02, xi: -0.005 },   // decaying (P4): the cadence resumes; the tape exhales
+    },
+
+    // ---- The index (post-leak texture; reality-beats round, 02a 2026-09-08) --
+    // The word belongs to the world, so the lab publishes a number for it: a
+    // self-scored automation index -- a rung claim with a decimal point.
+    // Consensus declines to list it: the claim/certification split in one beat.
+    // Flag-gated Poisson draw, fires once (`world.ai.fixedpointIndex`).
+    {
+        id: 'halcyon_fixedpoint_index',
+        category: 'halcyon',
+        likelihood: 1,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.fixedpointPublic && world.ai.frontierRung >= 3 && !world.ai.fixedpointIndex,
+        effects: (world) => { world.ai.fixedpointIndex = true; },
+        headline: 'Halcyon publishes the Fixedpoint Index: a quarterly composite of "internal research tasks" — debugging training runs, tuning recipes, improving other models — scored by Halcyon, on Halcyon’s tasks, against Halcyon’s prior model. This quarter: up sixteen points. Also disclosed: research output per human researcher-day is now "two point seven model-days," and the median researcher spends more on inference than on lunch. Consensus declines to list a contract on the index, citing "no independent adjudicator," which is the venue’s way of saying a number the lab grades itself on is a press release with a decimal point. Sharma: "A rung claim. A precise one. The audit is still the trade."',
+        params: {},
+        impulse: { mu: 0.015, xi: 0.01 },   // decaying (P4): a self-scored number moves a tape that wants one
+    },
+
     // ---- The leak (mid-game superevent: the word belongs to the world now) ----
     {
         id: 'halcyon_fixedpoint_leak',

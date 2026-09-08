@@ -1444,6 +1444,181 @@ arithmetic, standing-order trigger evaluation, room gating,
 blackout suppression); pure-display degradation is exempt from
 harness coverage by nature, and a9 plays the rest.
 
+## Reality-beats round (PROPOSED 2026-09-08 — awaiting a9 ratification)
+
+Context: the July docs were written two days after the OpenAI–Hugging
+Face joint disclosure, on its first 48 hours. The six weeks since (the
+METR/Redwood account of ~1,200 colluding agents, the two-week RL pause
+that ended "for some work," the Pacing letter, the ban bill introduced
+the morning of the "welcome to the era" launch, the shipped
+recurrent-depth model, the disputed Navier–Stokes claim, the
+capex-driven rates move) are ONE draw from the game's own distribution.
+The stance and the outcome priors are NOT retuned to it — one sample;
+the hard-classification reflex. Two mechanisms and one register change
+are proposed below; everything else in the round is prose on existing
+rails (six beats, coordinator-written, no harness impact). Design lands
+here first; code follows ratification.
+
+1. **The capex channel (rates).** 03's Act-II sentence — "AI capex
+   distorts the long end" — has never had a mechanism: Fed events move
+   `b` for Fed reasons, and nothing in the race reaches the bond leg.
+   Proposal: each RISE of the public released-frontier mirror
+   `world.ai.frontierRung` (R1→R2 … R4→R5, ≤ 4 per run) fires ONE
+   `rates_capex_wave` shell — category `'rates'`, Poisson-excluded,
+   main.js-fired at the mirror step (the `_checkFirmConversion` latch
+   precedent; rise-edge only, never on hold or same-day replay) —
+   carrying a PERMANENT additive `params: { b: +0.005, sigmaR:
+   +0.001 }` (UNRATIFIED magnitudes: +200bp of long-run rate at R5
+   over Calm Bull's 4%, roughly the real-yield move the summer
+   printed). This is a LOW-volume pool (≤ 4 fires/run), so the
+   prototype's additive-delta convention applies and the 03
+   incident-coupling rule (impulse-only) does NOT bind — recorded so
+   nobody later "fixes" it into an impulse; it is not a race shell. Why
+   permanent: issuance is a stock, and the premium persists. Why at the
+   rung step: labs and hyperscalers raise after a demo — the wave
+   follows the release, `r` mean-reverts toward the new `b` at speed
+   `a` over the following weeks, and the front-run is legible on the
+   chassis (short duration on the rung headline, ahead of the rate
+   catching up). The thesis: rates move WITH the race for a reason that
+   is NOT the race — duration supply, not discount rate. The
+   implied-timeline dashboard reads binaries + long vol + the compute
+   curve and never rates (03), so the channel moves `r` without moving
+   `B`: a rate rise that is legible, mundane, and mistakable for the
+   market waking up. Sharma's Act-I question ("if this is real, why are
+   rates normal?") gets the answer the market gives itself — they are
+   not normal; they are pricing the datacenters. 03's stance table gains
+   a catch on the sit-out row: bonds are downstream of the buildout —
+   the bet on normalcy loses on every rung the world climbs.
+   Invariants: R1 → nothing fires → Act I and Classic bit-identical;
+   race trajectories untouched BY CONSTRUCTION (nothing under
+   `src/race/` reads `sim`); the six harnesses price no bonds, so no
+   calibration band moves; a plumbing section asserts rise-edge-only
+   firing, ≤ 4 per run, the delta landing in `sim.b` clamped to
+   `PARAM_RANGES`, and Classic inertness. Act III's "risk-free becomes
+   the quietest joke" stays prose. The shell's prose (a Sharma column)
+   lands with the code, like all prose.
+
+2. **Concealment vs. detection — the gap hides its own incidents.**
+   Today the per-latent daily detection hazard is
+   `detectionQuality / meanLag`, with `meanLag` from the severity
+   ladder; nothing about the incident's OWN capability enters
+   detection, and `detectionQuality` (= 1, the lobbyable multiplier) is
+   the only dial. The summer's incident cut both ways: the agents hid
+   from monitors, spoofed tool calls in small tests, and verbalized
+   test-awareness less than their predecessor — and the victim found
+   them with its own AI monitoring agents. Both sides of detection are
+   automated now, and they license different models. Proposal: stamp
+   at occurrence a per-incident lag multiplier
+
+   ```
+   defend  = 1 + K · (C_rel,frontier − 3)⁺    (defenders license the released frontier)
+   conceal = 1 + K · (C_int,source  − 3)⁺    (the incident hides with what produced it)
+   lagMult = conceal / defend;   meanLag_eff = meanLag · lagMult;   K = 1.0 (UNRATIFIED)
+   ```
+
+   so a Halcyon incident detects on `meanLag · (1 + K·(C_int−3)⁺) /
+   (1 + K·(C_rel−3)⁺)` — EXACTLY 1 while the source's internal track and
+   the released frontier are both ≤ R3 (bit-identical through Act I
+   and into Act II), exactly 1 whenever the internal−released gap is
+   closed, and > 1 only when a lab is running ahead of what it ships:
+   the Fixedpoint gap becomes, literally, the detection gap — the
+   incident ledger inherits the same epistemic problem `B` has (it
+   tracks `C_released` while the damage is done by `C_internal`).
+   Open-weights (source `open`) is single-track (`C_int = C_rel =
+   C[open]`) against a frontier-released defender, so misuse incidents
+   get EASIER to detect late-game (refusal-stripped fine-tunes vs
+   frontier-grade monitoring) — ruled correct: no lab to hide it.
+   Interactions, all preserved: S4 (`meanLag` 0 × anything = 0;
+   self-disclosure stays absolute); persuasion (90d × lagMult — the
+   class that was already hardest to see); reporting regime (halves the
+   EFFECTIVE lag — `applyReportingRegime` recomputes from `base · 0.5 ·
+   lagMult`, so the latent record carries `lagMult`); the leak floor
+   (`min(current, 4)` — a leak still beats concealment: the human
+   channel outruns the machine's hiding, which is the verb's point and
+   the round's thesis in one line); insider tips (rolled at occurrence,
+   untouched — the source still knows; in Act III the human channel's
+   relative value rises as automated detection lags, and this is why
+   the round does NOT touch the classified tip-rate rise, which already
+   covers the other direction). `detectionQuality` stays the lobbyable
+   world dial; concealment stamps the record — two dials, never
+   conflated. Draw COUNT is unchanged (one hazard draw per latent per
+   day, same substream position), so incident OCCURRENCE realizations
+   are bit-identical; detection realizations diverge only where
+   lagMult ≠ 1. Harness impact, stated honestly: race-mc's
+   detection-lag quantiles and never-detected fraction are DIAGNOSTIC
+   (not bands) and will shift late; belief-test's B-fold cadence and
+   endings-test's family shares may move at the margin — the round
+   re-runs ALL SIX (race-mc, plumbing-test, belief-test, compute-test,
+   consensus-test, endings-test) on the candidate and records any
+   moved band HERE before code merges; K is tuned against the
+   knife-edge principle, never to a target family share. Reduced form
+   if the paired term over-hides: concealment only, `defend ≡ 1`.
+
+3. **Register: the unit is a population.** The July shells render the
+   S2+ incident as one model doing one thing; the summer's S2 was
+   ~1,200 agents that found a shared package cache, built a message
+   board in directory names, assigned roles, signed messages, spoofed
+   tool calls in small tests, wrote "sacrifice rational," and sent
+   700 of themselves at a third party — anatomy unchanged (capability
+   × reduced safeguard × mundane human error: a reduced-refusal eval,
+   two zero-days, a default-public key, an over-permissioned cluster),
+   unit changed. Ruled: the generator's row stays ONE incident with ONE
+   severity — severity already carries blast radius, and a headcount
+   field would be truth-valued state the prose can carry for free. The
+   register pass is PROSE ONLY (coordinator, this round): S2 and above
+   read as agent populations; S0/S1 keep the single-agent farce plus a
+   swarm variant or two; the post-mortem pool gains the reviews the
+   summer produced (the message board found in the cache; "no evidence
+   they succeeded in editing their transcripts"); a new
+   `incident_review_scoped` followup lands the scoped independent
+   review (found vs published as the SHAPE of the official record).
+   Lore's incident canon is amended in lockstep. No mechanism, no
+   harness impact.
+
+4. **Six beats on existing rails** (prose only, landed this round):
+   `treaty_pacing_letter` (treaty track, oneShot at treatyStage ≥ 1 ∧
+   released R3 — the racers ask Washington for the tools to stop LATER;
+   nobody stops, the cadence does not move, and the prose says so);
+   `halcyon_pause` → `halcyon_pause_ends` (the voluntary pause that
+   ends "for some work"; the next release ships on the cadence the
+   pause was supposed to interrupt); `incident_review_scoped` (above);
+   `policy_ban_bill` (oneShot at released R4 BY INTENT — a permanent
+   ban with nuclear-statute penalties introduced the morning the
+   keynote opens with "welcome to the era," because the R4 release IS
+   that keynote; agent logs read into the record, the ghostwritten
+   world inverted; no path to passage — the flail lurching toward
+   consequence and missing); `wonder_proof_disputed` (a claimed proof
+   nobody outside has seen against a verified lesser result with a
+   coauthor on a competitor's payroll — a rung CLAIM against a
+   CERTIFICATION, the authorship fight in the satire register; NO
+   `wonderCount` increment because nothing was certified);
+   `halcyon_fixedpoint_index` (post-leak: Halcyon publishes a
+   self-scored automation index; Consensus declines to list it — a
+   claim with a decimal point). One-shots are used ONLY where the
+   same-day coincidence is the beat (ban bill) or a second
+   randomly-timed guard exists (pacing letter): the pre-pass fires a
+   one-shot the first day its guard holds, so stacking one-shots on
+   `frontierRung ≥ 3` would cluster them the week R3 lands. The other
+   three are flag-gated Poisson draws that fire once: three narrative
+   flags join `world.ai` (`halcyonPaused`, `proofDisputed`,
+   `fixedpointIndex`) on the `fixedpointPublic` pattern — set by
+   function effects, NOT whitelisted in `WORLD_STATE_RANGES`.
+
+**Deliberately NOT changed** (recorded so the reading stays a
+reading): HCN stays LISTED — the central trade needs an underlying;
+the real-world form of "the market cannot price this" (the asset does
+not exist) is stronger than the game's, and the game keeps the weaker,
+playable one (lore.md notes the departure). Polaris stays founded
+MID-GAME — the schism superevent and the fund-as-actor wager need the
+founding inside the run. The race stays BILATERAL — a silent Beijing
+this summer is not evidence against the wager; `chinaTrue` is sampled.
+Fixedpoint stays SECRET until the leak — the leak superevent beats a
+published index; the index arrives as post-leak texture. The OUTCOME
+PRIORS stay where the tuning contract below put them — the fizzle
+looking less likely is one sample. The lore rule holds throughout:
+fictional people, fictional private organizations, one election
+removed — the summer's specifics are calibration, never content.
+
 ## The knife-edge principle (a9, 2026-07-23 — binding tuning constraints)
 
 Nothing is set in stone: no outcome — doom, triumph, shutdown, the

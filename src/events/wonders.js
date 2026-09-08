@@ -79,6 +79,25 @@ export const WONDER_EVENTS = [
         impulse: { mu: 0.02, xi: 0.015 },   // decaying (P4): the melt-up and the vertigo, one candle
     },
 
+    // ---- The disputed proof (reality-beats round, 02a 2026-09-08) -----------
+    // A rung CLAIM against a CERTIFICATION: the claimed result nobody outside
+    // has seen, the verified lesser result with a coauthor on a competitor's
+    // payroll, and the authorship fight (the human world stays satire; the
+    // mathematics stays straight). NO wonderCount increment -- nothing was
+    // certified. Flag-gated Poisson draw, fires once (`world.ai.proofDisputed`,
+    // the fixedpointPublic pattern).
+    {
+        id: 'wonder_proof_disputed',
+        category: 'wonder',
+        likelihood: 1,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.frontierRung >= 3 && !world.ai.proofDisputed,
+        effects: (world) => { world.ai.proofDisputed = true; },
+        headline: 'Halcyon says an internal Aleph has proved one of the century’s open problems — a hundred pages, a few days, "under review." Nobody outside has seen it. What everybody has seen is the other paper: an analyst at Chicago and a coauthor at a competing lab, a verified result on the same equations under a stronger assumption, machine-checked, posted. Then the calls. The analyst says Halcyon learned of the work, pursued the path, and proposed a joint announcement from which his coauthor would be excluded, on grounds of employer. Halcyon says the proof is the proof. Consensus lists a contract on the full result and it goes disputed inside the week. Mathematicians, asked whether the problem is solved, give the only honest answer: not in any way anyone can check yet. The desk trades the dispute, because the dispute is the only thing with a price.',
+        params: {},
+        impulse: { mu: 0.01, xi: 0.012 },   // decaying (P4): a wonder that is also a claim -- upside, unverified
+    },
+
     // ---- Act III: the cascade (wonders at incident tempo) ------------------
     {
         id: 'wonder_cascade',

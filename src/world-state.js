@@ -84,6 +84,12 @@ export function createWorldState() {
                                              // canActAsFund gate (credibility > 0.65 AND F > 60), latched once
                                              // for the run. Read-only for guards (gates treasury_backchannel);
                                              // NOT in WORLD_STATE_RANGES -- no event effect can forge it.
+            // Reality-beats round (02a, 2026-09-08): three narrative flags on the
+            // fixedpointPublic pattern -- set by function effects on their beats so
+            // a flag-gated Poisson draw fires exactly once; never whitelisted.
+            halcyonPaused:      false,       // halcyon_pause fired (the voluntary pause that ends)
+            proofDisputed:      false,       // wonder_proof_disputed fired (the claimed proof, contested)
+            fixedpointIndex:    false,       // halcyon_fixedpoint_index fired (the self-scored index)
         },
     };
 }
