@@ -1623,7 +1623,14 @@ followed (implementation rulings appended at the end of the block).
    `wonderCount` increment because nothing was certified);
    `halcyon_fixedpoint_index` (post-leak: Halcyon publishes a
    self-scored automation index; Consensus declines to list it — a
-   claim with a decimal point). One-shots are used ONLY where the
+   claim with a decimal point). Same evening, after OpenAI published its
+   Navier–Stokes paper and Lean formalization two days after the calls:
+   `wonder_proof_disputed` gained its second hop `wonder_proof_verified`
+   (claim → certification; the certified hop increments `wonderCount`,
+   the claim never did; the dispute survives and changes subject to
+   priority and statement fidelity), and the wonders shells took the
+   population register — the same fleets, headcount growing with the
+   rung, the same monitoring-and-isolation paragraph on both tracks. One-shots are used ONLY where the
    same-day coincidence is the beat (ban bill) or a second
    randomly-timed guard exists (pacing letter): the pre-pass fires a
    one-shot the first day its guard holds, so stacking one-shots on

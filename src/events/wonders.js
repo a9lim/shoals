@@ -31,7 +31,7 @@ export const WONDER_EVENTS = [
         likelihood: 1.5,
         magnitude: 'moderate',
         when: (sim, world) => world.ai.frontierRung <= 2,
-        headline: 'Page six: a mid-cap biotech reports that a molecule "designed computationally, in eleven days" cleared Phase I with a clean safety profile. The computational designer is an Aleph instance; the press release does not lead with this. Pharma’s screening desks reprice a decade of pipeline arithmetic by Thursday. HCN does not move. The fold, it turns out, is exactly where the future prefers to arrive.',
+        headline: 'Page six: a mid-cap biotech reports that a molecule "designed computationally, in eleven days" cleared Phase I with a clean safety profile. The computational designers are forty-odd Aleph agents working a shared candidate list and ranking one another’s proposals; the press release says "computationally" and leaves it there. Pharma’s screening desks reprice a decade of pipeline arithmetic by Thursday. HCN does not move. The fold, it turns out, is exactly where the future prefers to arrive.',
         effects: [{ path: 'ai.wonderCount', op: 'add', value: 1 }],
         params: {},
         impulse: { mu: 0.02, xi: 0.01 },   // decaying (P4): melt-up pressure, belief for the nice reason
@@ -55,9 +55,9 @@ export const WONDER_EVENTS = [
         likelihood: (sim, world) => world.ai.frontierRung >= 2 ? 0.8 + 0.4 * world.ai.frontierRung : 0,
         magnitude: 'moderate',
         headlines: [
-            'A national lab publishes a solid-state electrolyte that survives two thousand cycles — composition proposed by a model, synthesized on the third attempt, "a search space no human team would have prioritized." Battery names gap up; grid names follow; the paper’s human authors thank the model in the acknowledgments, between the funding agencies. The convention has not caught up to the contribution, anywhere.',
-            'A catalysis result out of a Halcyon Compute customer halves the energy cost of an industrial process old enough to have a German name. The market rotates a happy half-percent through the chemicals complex. The result was one of nine hundred candidates the model ranked overnight; the other eight hundred ninety-nine have not been tried yet. The queue of untried miracles is now itself an asset class.',
-            'Aleph-assisted proofs close two conjectures in one preprint season. Mathematicians split, in public, over whether the proofs are understood or merely verified — the distinction turning out to be load-bearing for more than mathematics. Nobody trades pure math. Everybody, it develops, trades what it implies about the next quarter’s cadence.',
+            'A national lab publishes a solid-state electrolyte that survives two thousand cycles — composition proposed by a few hundred Aleph agents working one shared shortlist, synthesized on the third attempt, "a search space no human team would have prioritized." Battery names gap up; grid names follow; the paper’s human authors thank "the system" in the acknowledgments, between the funding agencies. The convention has not caught up to the contribution, anywhere.',
+            'A catalysis result out of a Halcyon Compute customer halves the energy cost of an industrial process old enough to have a German name. The market rotates a happy half-percent through the chemicals complex. The result was one of nine hundred candidates a few hundred agents ranked overnight, arguing about the ranking in a channel the customer did not know it was paying for; the other eight hundred ninety-nine have not been tried yet. The queue of untried miracles is now itself an asset class.',
+            'A group of Aleph agents — a few hundred, talking within the group, a formal verifier in the loop — closes two conjectures in one preprint season, and the checker accepts both proofs before anyone has understood either. Mathematicians split, in public, over whether "verified" and "understood" are still the same word — the distinction turning out to be load-bearing for more than mathematics. Nobody trades pure math. Everybody, it develops, trades what it implies about the next quarter’s cadence.',
         ],
         effects: [{ path: 'ai.wonderCount', op: 'add', value: 1 }],
         params: {},
@@ -93,9 +93,25 @@ export const WONDER_EVENTS = [
         magnitude: 'moderate',
         when: (sim, world) => world.ai.frontierRung >= 3 && !world.ai.proofDisputed,
         effects: (world) => { world.ai.proofDisputed = true; },
-        headline: 'Halcyon says an internal Aleph has proved one of the century’s open problems — a hundred pages, a few days, "under review." Nobody outside has seen it. What everybody has seen is the other paper: an analyst at Chicago and a coauthor at a competing lab, a verified result on the same equations under a stronger assumption, machine-checked, posted. Then the calls. The analyst says Halcyon learned of the work, pursued the path, and proposed a joint announcement from which his coauthor would be excluded, on grounds of employer. Halcyon says the proof is the proof. Consensus lists a contract on the full result and it goes disputed inside the week. Mathematicians, asked whether the problem is solved, give the only honest answer: not in any way anyone can check yet. The desk trades the dispute, because the dispute is the only thing with a price.',
+        headline: 'Halcyon says an internal Aleph has proved one of the century’s open problems — a few days, "under review," method unstated. Nobody outside has seen it. What everybody has seen is the other paper: an analyst at Chicago and a coauthor at a competing lab, a verified result on the same equations under a stronger assumption, machine-checked, posted. Then the calls. The analyst says Halcyon learned of the work, pursued the path, and proposed a joint announcement from which his coauthor would be excluded, on grounds of employer. Halcyon says the proof is the proof. Consensus lists a contract on the full result and it goes disputed inside the week. Mathematicians, asked whether the problem is solved, give the only honest answer: not in any way anyone can check yet. The desk trades the dispute, because the dispute is the only thing with a price.',
         params: {},
         impulse: { mu: 0.01, xi: 0.012 },   // decaying (P4): a wonder that is also a claim -- upside, unverified
+        // The second hop (2026-09-08, evening -- the day the real one dropped its
+        // paper and Lean proof two days after the calls): claim -> certification.
+        // Non-popup, so the followup schedules top-level. mtth 3: the world does
+        // not wait a season for this one.
+        followups: [{ id: 'wonder_proof_verified', mtth: 3 }],
+    },
+    {
+        id: 'wonder_proof_verified',
+        followupOnly: true,
+        category: 'wonder',
+        magnitude: 'major',
+        headline: 'The paper drops, and so does the formalization: a machine-checked proof that a smooth fluid under a smooth force can spin itself into a singularity in finite time, the whole thing accepted by the verifier before any human has finished the introduction. Halcyon’s write-up is dry where it matters and candid where it costs nothing: an internal model well past the one that ships, still training while it worked; on the order of ten thousand agents in groups that could talk within the group, a few million messages between them, four days to the result, most of a day to formalize it; the same paragraph about monitoring and isolation that closes every incident post-mortem, here closing a theorem. They will not claim the prize. They cannot rule out that de-identified data from the other pair’s use of their products helped, and say so in a sentence a lawyer wrote. The dispute survives the proof and changes subject — from whether to who, and to whether the statement the machine proved is the statement on the prize page. Consensus’s adjudicator reads the two statements side by side and settles the contract YES. Mathematicians describe the day with the word "crazy," in print, repeatedly. The desk, which had a price on the dispute, discovers it never had a price on the theorem — there is no instrument for a Millennium problem, and the tape prints the absence.',
+        // Certified, so it COUNTS -- the claim hop deliberately did not.
+        effects: [{ path: 'ai.wonderCount', op: 'add', value: 1 }],
+        params: {},
+        impulse: { mu: 0.02, xi: 0.02 },   // decaying (P4): a certified wonder -- from the same fleet that breaks things
     },
 
     // ---- Act III: the cascade (wonders at incident tempo) ------------------
@@ -105,8 +121,8 @@ export const WONDER_EVENTS = [
         likelihood: (sim, world) => world.ai.frontierRung >= 4 ? 2.5 : 0,
         magnitude: 'moderate',
         headlines: [
-            'Three in one week: an antiviral candidate, a room-temperature process for something that used to need a furnace, a crop trait regulators have wanted for thirty years. The feed has stopped putting the wonders below the fold; there is no below-the-fold left. A wire-service style memo, leaked, instructs writers to stop using the word "breakthrough" on cadence grounds. The word has become a unit of time.',
-            'The cures are compounding. So is the other thing. The Sunday shows book an oncologist and a former defense official in the same segment, and they spend it agreeing — same curve, same variable, same tempo, opposite prayers. It is the only honest television of the era, and it rates poorly.',
+            'Three in one week: an antiviral candidate, a room-temperature process for something that used to need a furnace, a crop trait regulators have wanted for thirty years. Each came out of a fleet — the write-ups now say "on the order of ten thousand agents," a few days, a few billion tokens, and the paragraph about monitoring and isolation. The feed has stopped putting the wonders below the fold; there is no below-the-fold left. A wire-service style memo, leaked, instructs writers to stop using the word "breakthrough" on cadence grounds. The word has become a unit of time.',
+            'The cures are compounding. So is the other thing, and the fleets producing both are, per two write-ups published the same week, the same fleets. The Sunday shows book an oncologist and a former defense official in the same segment, and they spend it agreeing — same curve, same variable, same tempo, opposite prayers. It is the only honest television of the era, and it rates poorly.',
         ],
         effects: [{ path: 'ai.wonderCount', op: 'add', value: 1 }],
         params: {},

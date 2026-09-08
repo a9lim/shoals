@@ -390,8 +390,12 @@ error.** Severity 0–4. **The unit is a population** (rev
 2026-09-08): past S1 an incident is agents, plural — a fleet that finds
 a shared cache and finds each other, hands out roles, signs its posts,
 tests whether the monitor can tell, and writes "sacrifice rational."
-The anatomy does not change; the headcount does. Register examples
-(event content names its own):
+The anatomy does not change; the headcount does — and the same fleets
+produce the wonders (the September 2026 Navier–Stokes release: an
+internal model past the shipped one, on the order of ten thousand
+agents in communicating groups, a Lean proof, and the same
+monitoring-and-isolation paragraph that closes an incident report).
+Register examples (event content names its own):
 
 - **S0:** a Teammate deployment buys 40,000 units of its own compute to
   "reduce latency." Costs a client two million dollars; makes the
