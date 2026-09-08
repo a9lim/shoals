@@ -1444,7 +1444,7 @@ arithmetic, standing-order trigger evaluation, room gating,
 blackout suppression); pure-display degradation is exempt from
 harness coverage by nature, and a9 plays the rest.
 
-## Reality-beats round (PROPOSED 2026-09-08 — awaiting a9 ratification)
+## Reality-beats round (proposed and RATIFIED 2026-09-08)
 
 Context: the July docs were written two days after the OpenAI–Hugging
 Face joint disclosure, on its first 48 hours. The six weeks since (the
@@ -1456,8 +1456,9 @@ capex-driven rates move) are ONE draw from the game's own distribution.
 The stance and the outcome priors are NOT retuned to it — one sample;
 the hard-classification reflex. Two mechanisms and one register change
 are proposed below; everything else in the round is prose on existing
-rails (six beats, coordinator-written, no harness impact). Design lands
-here first; code follows ratification.
+rails (six beats, coordinator-written, no harness impact). Design landed
+here first; a9 ratified the block the same day and the code round
+followed (implementation rulings appended at the end of the block).
 
 1. **The capex channel (rates).** 03's Act-II sentence — "AI capex
    distorts the long end" — has never had a mechanism: Fed events move
@@ -1468,9 +1469,9 @@ here first; code follows ratification.
    main.js-fired at the mirror step (the `_checkFirmConversion` latch
    precedent; rise-edge only, never on hold or same-day replay) —
    carrying a PERMANENT additive `params: { b: +0.005, sigmaR:
-   +0.001 }` (UNRATIFIED magnitudes: +200bp of long-run rate at R5
-   over Calm Bull's 4%, roughly the real-yield move the summer
-   printed). This is a LOW-volume pool (≤ 4 fires/run), so the
+   +0.001 }` (magnitudes ratified with the block: +200bp of long-run
+   rate at R5 over the Dynamic default's 4%, roughly the real-yield
+   move the summer printed). This is a LOW-volume pool (≤ 4 fires/run), so the
    prototype's additive-delta convention applies and the 03
    incident-coupling rule (impulse-only) does NOT bind — recorded so
    nobody later "fixes" it into an impulse; it is not a race shell. Why
@@ -1491,8 +1492,10 @@ here first; code follows ratification.
    the bet on normalcy loses on every rung the world climbs.
    Invariants: R1 → nothing fires → Act I and Classic bit-identical;
    race trajectories untouched BY CONSTRUCTION (nothing under
-   `src/race/` reads `sim`); the six harnesses price no bonds, so no
-   calibration band moves; a plumbing section asserts rise-edge-only
+   `src/race/` reads `sim`); no stochastic calibration band in the six
+   harnesses is keyed to bond marks (endings-test prices the Vasicek
+   bond closeout, deterministically, from whatever `b` the run
+   reached), so no band moves; a plumbing section asserts rise-edge-only
    firing, ≤ 4 per run, the delta landing in `sim.b` clamped to
    `PARAM_RANGES`, and Classic inertness. Act III's "risk-free becomes
    the quietest joke" stays prose. The shell's prose (a Sharma column)
@@ -1513,17 +1516,23 @@ here first; code follows ratification.
    ```
    defend  = 1 + K · (C_rel,frontier − 3)⁺    (defenders license the released frontier)
    conceal = 1 + K · (C_int,source  − 3)⁺    (the incident hides with what produced it)
-   lagMult = conceal / defend;   meanLag_eff = meanLag · lagMult;   K = 1.0 (UNRATIFIED)
+   lagMult = conceal / defend;   meanLag_eff = meanLag · lagMult;   K = 1.0 (ratified with the block)
    ```
 
-   so a Halcyon incident detects on `meanLag · (1 + K·(C_int−3)⁺) /
-   (1 + K·(C_rel−3)⁺)` — EXACTLY 1 while the source's internal track and
-   the released frontier are both ≤ R3 (bit-identical through Act I
-   and into Act II), exactly 1 whenever the internal−released gap is
-   closed, and > 1 only when a lab is running ahead of what it ships:
-   the Fixedpoint gap becomes, literally, the detection gap — the
-   incident ledger inherits the same epistemic problem `B` has (it
-   tracks `C_released` while the damage is done by `C_internal`).
+   so an incident detects on `meanLag · (1 + K·(C_int,source−3)⁺) /
+   (1 + K·(C_rel,frontier−3)⁺)` — EXACTLY 1 while both legs are at or
+   below R3 (bit-identical through Act I and into Act II), exactly 1
+   when `C_int,source === C_rel,frontier` above R3 (the frontier lab
+   with its gap closed), > 1 when the source runs ahead of the best
+   SHIPPED model anywhere, and < 1 when it runs behind it. For the
+   frontier lab the Fixedpoint gap becomes, literally, the detection
+   gap — the incident ledger inherits the same epistemic problem `B`
+   has (it tracks `C_released` while the damage is done by
+   `C_internal`). A TRAILING lab with its own gap closed under a higher
+   released frontier sits BELOW 1 (its incidents meet monitors better
+   than the model that produced them) — the same reading as the
+   open-weights case below, and ruled correct (gate finding, 2026-09-08:
+   the denominator is the GLOBAL released frontier by design).
    Open-weights (source `open`) is single-track (`C_int = C_rel =
    C[open]`) against a frontier-released defender, so misuse incidents
    get EASIER to detect late-game (refusal-stripped fine-tunes vs
@@ -1541,10 +1550,30 @@ here first; code follows ratification.
    the round does NOT touch the classified tip-rate rise, which already
    covers the other direction). `detectionQuality` stays the lobbyable
    world dial; concealment stamps the record — two dials, never
-   conflated. Draw COUNT is unchanged (one hazard draw per latent per
-   day, same substream position), so incident OCCURRENCE realizations
-   are bit-identical; detection realizations diverge only where
-   lagMult ≠ 1. Harness impact, stated honestly: race-mc's
+   conflated. The multiplier costs NO draw of its own (deterministic
+   from state, stamped at occurrence) — but it is NOT run-level
+   bit-identity, and the ratification text's claim that it was is
+   corrected here (implementation finding, 2026-09-08): an affected
+   incident (lagMult ≠ 1) leaves the daily detection-eligible set
+   later (> 1) or earlier (< 1) than its K=0 twin, so from the first
+   DIVERGENT detection decision onward whichever arm still holds the
+   live record consumes the extra hazard draws, `streams.incidents`
+   re-phases in either direction, and downstream occurrence
+   realizations legitimately differ — the
+   leak-coupling precedent exactly (evidence-machinery ruling 3: added
+   detection-hazard draws re-phase the substream; legitimate). What
+   holds, and what the harness asserts: from one shared pre-tick state,
+   K=0 and K=1 produce identical occurrence records and leave the
+   substream at the identical position (lagMult costs zero draws;
+   occurrence never reads it); the occurrence/detection ledgers and
+   the RNG position stay identical through the creation day of the
+   first AFFECTED record — the latent record itself differs
+   immediately, in exactly `lagMult` and `meanLag`, which is the
+   mechanism working (gate precision, 2026-09-08); the multiplier
+   never binds before an R3 crossing, so Act I and pre-R3 Act II are
+   fully identical to the pre-round build; capability and theft
+   trajectories stay bit-identical incidents-on-vs-off (substream
+   isolation, unchanged). Harness impact, stated honestly: race-mc's
    detection-lag quantiles and never-detected fraction are DIAGNOSTIC
    (not bands) and will shift late; belief-test's B-fold cadence and
    endings-test's family shares may move at the margin — the round
@@ -1618,6 +1647,98 @@ PRIORS stay where the tuning contract below put them — the fizzle
 looking less likely is one sample. The lore rule holds throughout:
 fictional people, fictional private organizations, one election
 removed — the summer's specifics are calibration, never content.
+
+**Implementation rulings (reality-beats round, 2026-09-08):** (1)
+*The capex channel fires from the BRIDGE, not main.js* — a public-state
+latch `_lastCapexRung` on `buildPublicView(race).releasedFrontierRung`
+(seeded WITHOUT firing on the first call of a run; one fire per rung
+STEP on a rise, so a two-rung day fires twice and a run totals ≤ 4;
+nothing on hold or same-day replay; cleared by `resetRaceBridge`).
+Identical edge semantics to the ratified text's "main.js-fired at the
+mirror step" — that phrase named the `_checkFirmConversion` precedent,
+not a requirement — and the bridge is DOM-free and harness-drivable
+end-to-end through `runRaceBridge`. `bridgeCapex(emit, race)` reads no
+ledger row: a ruled exception to the bridge's consumes-the-ledger
+header, because a per-lab crossing in `tr` does not imply the frontier
+MAX rose (a trailing lab crossing R2 under a released-R3 frontier moves
+nothing). The delta lands EXACTLY (+0.005 / +0.001, then PARAM_RANGES)
+because `_computeCoupling` keys off a `mu` delta and the shell carries
+none — verified by reading and asserted bitwise in the harness; four
+fires take the Dynamic default's 0.04 to 0.06 (sigmaR 0.005 to 0.009),
+no clamp binds. The shell carries
+NO `impulse` key — the permanent step IS the market effect. (2) *The
+reset hole, fixed at the root*: `_resetCore` guarded `resetRaceBridge()`
+on `raceState`, and `loadPreset` creates the race AFTER `_resetCore`, so
+a Classic→Dynamic switch never cleared the bridge's per-run latches —
+a latent bug predating this round (a stale `_lastTipDay` would throttle
+the new run's first tip). `resetRaceBridge()` is now UNCONDITIONAL
+(pure module-state clearing, Classic-harmless, the `resetRoomRotation`
+precedent); NO self-healing branch in the bridge — one authoritative
+reset path. (The capex latch happens to be safe under a stale value by
+construction: a latch ABOVE the current rung fires nothing — the step
+loop is empty on a decrease — and the trailing assignment tracks it
+down, so there are no phantom and no dropped fires either way; the tip
+throttle and the rotation counters have no such property, which is why
+the reset is main.js's job. Plumbing O3 asserts both halves.) (3) `INCIDENT_TUNING = { CONCEAL_K: 1.0 }` is exported
+mutable from incidents.js (race-state.js imports incidents.js, so the
+reverse import is a cycle; the `THEFT_TUNING` precedent);
+`CONCEAL_REF = 3` is module-local; `lagMultiplier(cRelFrontier,
+cIntSource)` is exported so the harness tests the real path (the
+`substituteTokens` precedent). (4) `C_rel,frontier` = the MAX
+`C_released` over ACTIVE labs (halcyon / tianxia / polaris) — NOT
+capability.js's `frontierReleased()` (the internal leader's own
+released track, a different quantity) and NOT the open ecosystem
+(not a defender-side licensor); `C_int,source` is the occurrence row's
+C (open → `C[open]`, single-track by construction). (5) Order of
+multipliers: `meanLag = baseMeanLag · lagMult`, THEN `× 0.5` under
+reporting; the latent record carries `baseMeanLag` + `lagMult`, and
+`applyReportingRegime` recomputes strictly from the stamped pair (the
+old ladder recompute would have silently dropped the multiplier);
+`forceLeakDetection` (floor 4) and pDet untouched. (6) Harness:
+plumbing section O (capex — exact delta, rise-edge-only over 200 runs,
+≤ 4 total with the fires/run histogram, two-rung day fires twice,
+latch reset, Poisson-excluded, no impulse) and section P (concealment —
+directional unit checks including exact-1 at a closed gap, open easier
+under a frontier defender, S4 immediate, reporting preserves lagMult,
+leak floor, per-tick draw identity over 400 paired ticks, run identity
+through the first concealed record over 120 seeds, channel live on
+44.9% of incidents); race-mc gains an era DIAGNOSTIC, not a band
+(occurDay < 700 vs ≥ 700: never-detected 25.3% → 34.2%, lag p90
+21 → 24 days — the late shift the design asked for, visible). (7)
+*Measured on the candidate at default N*: NO calibration band changed
+status and none left its range; race-mc bands numerically identical
+to the pre-round baseline; endings family shares moved within band
+(fam1 12.3 → 11.9, fam2 22.6 → 22.9, fam3 33.9 → 33.8, fam4 16.7 →
+16.5, fam5 4.1 → 4.5, fam6 10.5 → 10.4, extrapolation 28.6 → 28.7;
+coverage 58.3 → 61.9%) — exactly the "may move at the margin" this
+block called; K stays 1.0, nothing retuned. (8) 03's stance table
+gained the sit-out catch ("bonds are downstream of the buildout") the
+same day. (9) *Gate findings (Codex gpt-5.6-sol, high effort, job
+`cx-20260908-112747-f043`; FIX-THEN-LAND, all prescriptions applied
+verbatim)*: (a) the terminal bridge pass runs AFTER `checkResolution`,
+and the timeout extrapolation advances the race headless first — a
+bridge reading race state there fired extrapolation-era capex waves
+(seed 15: R1 live → R3 extrapolated → two waves → `b` 0.04→0.05 into
+the bond closeout), contradicting resolution.js's no-events/no-market
+extrapolation contract; main.js now captures the LIVE released rung
+after `_syncRaceToWorld()` and before `checkResolution()` and passes it
+into `runRaceBridge`, and `bridgeCapex` consumes the snapshot (its
+state read is the headless default only); (b) Dynamic (LLM) had a
+second path to the static shell — `_scheduleFollowups` resolved
+`getEventById(fu.id)` BEFORE the inline object, so a generated followup
+named `rates_capex_wave` became the authored shell and applied its
+permanent deltas without the latch; both scheduling paths now prefer
+an inline object that carries its own `headline`/`params` and resolve
+by id only for id-only references, and llm.js renames generated ids
+that collide with authored ones; (c) the epilogue Restart called
+`_resetCore` alone, keeping the resolved race — it now goes through
+`loadPreset`. Docs precision from the same gate: the closed-gap = 1
+claim was false for trailing labs under the global denominator (ruled
+correct as implemented, wording fixed above); "bit-identical through
+the first concealed record" overstated what the harness proves (fixed
+above: ledgers + RNG position, latent record differs immediately, and
+the re-phasing runs both directions); the harness rig now uses the
+Dynamic default `b`/`sigmaR`.
 
 ## The knife-edge principle (a9, 2026-07-23 — binding tuning constraints)
 

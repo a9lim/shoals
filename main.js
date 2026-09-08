@@ -2503,6 +2503,15 @@ function _onDayComplete() {
         if (trait) _toast(`${trait.permanent ? 'Conviction unlocked' : 'Reputation earned'}: ${trait.name}`, 4000);
     }
 
+    // The PUBLIC released-frontier rung as of the LIVE trading day, captured for
+    // the bridge pass below (review fix, 2026-09-08). `checkResolution` runs inside
+    // this block and its day-1008 timeout path EXTRAPOLATES the race forward in
+    // place -- thousands of headless days with no events, market, or player. The
+    // capex latch keys on the public rung, so a bridge pass that read the rung AFTER
+    // that would print capex waves for releases the desk never traded through and
+    // walk `sim.b` / `sim.sigmaR` into the bond closeout. The live snapshot is the
+    // rung the desk actually lived to see. Null in Classic (no bridge pass either).
+    let _liveRung = null;
     // Advance the hidden AI-race state machine one completed day (overhaul
     // phase 1). Neutral inputs; the bridge (phase 2) + Consensus binaries
     // (phase 3a) read the ledger it produces.
@@ -2550,6 +2559,9 @@ function _onDayComplete() {
         // is a pacing accelerator only. summitOpen is mirrored below to summitLive.
         stepTreaty(raceState, { treatyStage: eventEngine.world.ai.treatyStage });
         _syncRaceToWorld();
+        // Live-day public rung snapshot -- taken here, BEFORE checkResolution's
+        // extrapolation can move it (see the declaration above).
+        _liveRung = buildPublicView(raceState).releasedFrontierRung;
         // Event base-rate scaling (overhaul phase 5a; 04 engine note 1): the
         // discretionary Poisson cadence scales with the PUBLIC released frontier
         // rung (1.0 at R1 = Act-I match, rising late-game). Set before maybeFire.
@@ -2694,7 +2706,7 @@ function _onDayComplete() {
         // modes only (raceState is null in Classic); may add toasts/popups but
         // must not crash. Runs right after advanceRace's ledger was produced.
         if (raceState) {
-            const bridged = runRaceBridge(eventEngine, raceState, sim, sim.day, netDelta);
+            const bridged = runRaceBridge(eventEngine, raceState, sim, sim.day, netDelta, _liveRung);
             for (const f of bridged.fired) fired.push(f);
             for (const p of bridged.popups) popups.push(p);
         }
@@ -3172,11 +3184,16 @@ function _resetCore(index) {
     resetAudio();
     resetAct3();   // P7-1: x -> 0, substep clock zeroed, working orders dropped, latches cleared
     resetStandingOrders();   // P7-2: precommitments are authored per RUN -- nothing armed, nothing locked, no episode remembered
-    // Reset the race->narrative bridge's variant-rotation counter so same-seed
-    // playback doesn't depend on process history. Guarded on raceState so Classic
-    // reset does zero race/bridge work; a Dynamic->Classic switch still clears,
-    // since _resetCore runs before loadPreset nulls raceState.
-    if (raceState) resetRaceBridge();
+    // Reset the race->narrative bridge's per-run latches (variant-rotation
+    // counters, the tip throttle, the capex-wave rung latch) so same-seed
+    // playback doesn't depend on process history. UNCONDITIONAL (02a
+    // reality-beats ruling 2): this is pure module state and clearing it is
+    // Classic-harmless, like resetRoomRotation below. The old `if (raceState)`
+    // guard left every latch stale across a Classic->Dynamic switch, because
+    // loadPreset creates the race AFTER _resetCore runs -- a stale _lastTipDay
+    // would have throttled the new run's first tip. One reset path, no
+    // self-healing in the bridge.
+    resetRaceBridge();
     resetRoomRotation();   // P7-3: per-leader pool rotation is run-scoped (the resetRaceBridge precedent)
     _firmMemoFired = false;
     _firmVerdictFired = false;
@@ -3806,9 +3823,17 @@ function _showEpilogue(pages, terminal = false) {
     restartBtn.onclick = () => {
         overlay.classList.add('hidden');
         _cleanupEpilogue();
-        // Find the Dynamic (Offline) preset index
+        // Find the Dynamic (Offline) preset index. Restart goes through the FULL
+        // preset load, not the bare `_resetCore` (review fix, 2026-09-08):
+        // `_resetCore` resets the chassis but leaves the OLD raceState -- already
+        // resolved and (on the timeout path) extrapolated to day ~2800 -- plus the
+        // old eventEngine, Consensus book and compute book in place. The next bridge
+        // pass would then seed the capex latch at the dead run's late rung, and the
+        // retained `race.resolution` would terminate the new desk on its first
+        // day-complete. `loadPreset` calls `_resetCore` first and then builds the
+        // fresh race, engine and instrument books -- one authoritative new-run path.
         const offlineIdx = PRESETS.findIndex(p => p.name.includes('Offline'));
-        if (offlineIdx >= 0) _resetCore(offlineIdx);
+        if (offlineIdx >= 0) loadPreset(offlineIdx);
     };
     keepBtn.onclick = () => {
         overlay.classList.add('hidden');

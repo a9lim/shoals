@@ -96,6 +96,13 @@ const incLate = [];       // occurrences in the last LATE_W days
 const s4PerRun = [];      // S4 occurrences per run
 const detLags = [];       // pooled detection lags (detectDay − occurDay)
 const neverDetFrac = [];  // per-run never-detected fraction (by horizon)
+// Reality-beats round (02a 2026-09-08 item 2): concealment scales the detection
+// lag with the source's internal−released gap, which only opens late. Split the
+// detection diagnostics by OCCURRENCE ERA so the late shift is visible. These are
+// DIAGNOSTICS, never bands (02a says so explicitly for this round).
+const ERA_SPLIT = 700;
+const detLagsEarly = [], detLagsLate = [];
+let ndEarly = 0, occEarlyEra = 0, ndLate = 0, occLateEra = 0;
 const evFound = [];       // evidence beats found (occurred) per run
 const evPublished = [];   // evidence beats made public per run
 let s4Checked = 0, s4Violations = 0;   // S4 generation invariant: immediacy + never-persuasion (hard FAIL)
@@ -127,8 +134,12 @@ for (let i = 0; i < N; i++) {
     let nd = 0;
     for (const inc of race.latentIncidents) {
         const immediate = inc.detected && inc.detectDay === inc.occurDay;   // self-disclosed in occ tick
-        if (inc.detected) detLags.push(inc.detectDay - inc.occurDay);
-        else nd++;
+        const early = inc.occurDay < ERA_SPLIT;
+        if (early) occEarlyEra++; else occLateEra++;
+        if (inc.detected) {
+            detLags.push(inc.detectDay - inc.occurDay);
+            (early ? detLagsEarly : detLagsLate).push(inc.detectDay - inc.occurDay);
+        } else { nd++; if (early) ndEarly++; else ndLate++; }
         // S4 invariant: every S4 must self-disclose in its occurrence tick and
         // never be persuasion-class (the absolute S4 rule, 02a).
         if (inc.severity === 4) {
@@ -314,6 +325,14 @@ line('\nDetection (per-latent-incident daily process; genuine never-detected tai
 line(`  detection lag days   p10 ${d0(quantile(detLags, 0.10))}   p50 ${d0(quantile(detLags, 0.50))}   p90 ${d0(quantile(detLags, 0.90))}   (diagnostic; mixed severities)`);
 line(`  never-detected fraction (by horizon)   mean ${f3(mean(neverDetFrac))}   p10 ${f3(quantile(neverDetFrac, 0.10))}   p90 ${f3(quantile(neverDetFrac, 0.90))}   (diagnostic)`);
 line(`  insider-tip rate over non-immediate occurrences   ${f3(tipCount / Math.max(1, nonImmediate))}   (02a intent ~0.30; diagnostic; n=${nonImmediate})`);
+line(`  by occurrence era (reality-beats concealment channel -- DIAGNOSTIC, not a band):`);
+for (const [label, lags, nd, occ] of [
+    [`occurDay <  ${ERA_SPLIT}`, detLagsEarly, ndEarly, occEarlyEra],
+    [`occurDay >= ${ERA_SPLIT}`, detLagsLate, ndLate, occLateEra],
+]) {
+    line(`    ${label}   lag p50 ${d0(quantile(lags, 0.50))}  p90 ${d0(quantile(lags, 0.90))}`
+        + `   never-detected ${pct(occ ? nd / occ : 0)}   (n=${occ})`);
+}
 
 line('\nEvidence beats (alignment twin; found vs published)');
 line(`  found/run     mean ${f2(mean(evFound))}   p10 ${d0(quantile(evFound, 0.10))}   p90 ${d0(quantile(evFound, 0.90))}`);

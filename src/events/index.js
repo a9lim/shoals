@@ -29,6 +29,10 @@ import { INSIDER_EVENTS } from './insider.js';
 // P7-3: the room (the endgame branch point). Category 'room' is Poisson-excluded
 // and latch-fired by main.js's _checkRoom -- merged here for getEventById.
 import { ROOM_EVENTS } from './room.js';
+// Reality-beats round (02a 2026-09-08, item 1): the capex channel. Category
+// 'rates' is Poisson-excluded and fired from the race bridge on the released-
+// frontier rung RISE edge -- merged here for getEventById + chain validation.
+import { RATES_EVENTS } from './rates.js';
 
 export const ALL_EVENTS = [
     ...FED_EVENTS,
@@ -50,6 +54,7 @@ export const ALL_EVENTS = [
     ...TREATY_EVENTS,
     ...INSIDER_EVENTS,
     ...ROOM_EVENTS,
+    ...RATES_EVENTS,
 ];
 
 // -- Event-by-id lookup --

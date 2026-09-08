@@ -42,7 +42,7 @@
 - **Bonds/rates** — kept, re-themed: the risk-free rate as a derivative of
   the world staying normal. AI capex distorts the long end in Act II; in
   Act III "risk-free" becomes the game's quietest joke. Mechanism
-  PROPOSED (reality-beats round, 2026-09-08 — [02a-tuning.md](02a-tuning.md)):
+  ratified (reality-beats round, 2026-09-08 — [02a-tuning.md](02a-tuning.md)):
   the capex channel — one permanent step in the long-run rate per
   released-rung rise, duration supply not discount rate; rates move with
   the race for a reason that is not the race, and the sit-out row's
@@ -81,7 +81,7 @@ thesis as an interface.
 |---|---|---|---|
 | Long + accelerate | Full | `C[halcyon]` ↑, `heat` ↑ | The ledger remembers; endings price it |
 | Long + restraint (activist) | Haircut | small `S[halcyon]` ↑ | CEO hostility, board-fight exposure, drift vs. benchmark |
-| Sit out (bonds, long vol, binaries) | Real — vol and binaries pay conviction | none, by construction | Financially live, existentially empty: expressive positions finance nothing and move nothing. The ledger stays blank, the room stays shut, and rates are still a bet on normalcy |
+| Sit out (bonds, long vol, binaries) | Real — vol and binaries pay conviction | none, by construction | Financially live, existentially empty: expressive positions finance nothing and move nothing. The ledger stays blank, the room stays shut, rates are still a bet on normalcy — and bonds are downstream of the buildout: the capex channel steps the long-run rate on every released rung (02a reality-beats block) |
 | Short | Negative carry, occasional vindication | volume slows `C[halcyon]` marginally | A losing battle vs. the trend — and the true doom-short never settles; no counterparty survives to pay |
 
 Sit-out is deliberately *better than the prototype's bonds-only version* —

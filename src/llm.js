@@ -6,6 +6,7 @@
    =================================================== */
 
 import { PARAM_RANGES } from './events.js';
+import { getEventById } from './events/index.js';
 
 const LS_KEY_API  = 'shoals_llm_key';
 const LS_KEY_MODEL = 'shoals_llm_model';
@@ -246,6 +247,24 @@ Six factions (0-100): firmStanding, regulatoryExposure, federalistSupport, farme
 - Keep effects proportional: minor events move 1-2 fields slightly, major events shift 2-4 fields significantly.
 - Cross-domain connections matter: geopolitical crises reprice risk, investigations affect media trust, election results reshape legislative likelihood.`;
 
+/* ---- Generated-id namespace guard ------------------------------------------
+   The model picks its own snake_case ids and has no view of the authored pool,
+   so nothing stops it from emitting `rates_capex_wave` (or any other authored
+   id). Suffix `_llm` until the id is free; repeat in case the suffixed form
+   collides too. An id-less generated event stays id-less (the top-level schema
+   does not require one; the engine falls back to a synthetic chain id). */
+export function _deconflictId(id) {   // exported for the harness (the `lagMultiplier` precedent)
+    if (typeof id !== 'string' || !id) return id;
+    let out = id;
+    while (getEventById(out)) out += '_llm';
+    return out;
+}
+
+function _deconflictFollowupIds(followups) {
+    if (!Array.isArray(followups)) return;
+    for (const fu of followups) if (fu && typeof fu === 'object') fu.id = _deconflictId(fu.id);
+}
+
 export class LLMEventSource {
     constructor() {
         this.apiKey = localStorage.getItem(LS_KEY_API) || '';
@@ -420,6 +439,19 @@ export class LLMEventSource {
 
         const events = toolBlock.input.events;
         if (!Array.isArray(events) || events.length === 0) throw new Error('Empty events array');
+
+        // Namespace guard: a model-chosen id that collides with an AUTHORED event id
+        // is renamed before anything downstream can look it up. Generated followups
+        // are complete inline events (the engine no longer resolves them by id), so
+        // the rename is purely defensive -- but it also keeps the log, the one-shot
+        // set and the chain ids from conflating a generated beat with the authored
+        // event that owns the name. Applied to the top-level id and to every nested
+        // followup id (top-level and per-choice).
+        for (const ev of events) {
+            ev.id = _deconflictId(ev.id);
+            _deconflictFollowupIds(ev.followups);
+            if (Array.isArray(ev.choices)) for (const c of ev.choices) _deconflictFollowupIds(c.followups);
+        }
 
         return events.map(ev => ({
             id: ev.id,

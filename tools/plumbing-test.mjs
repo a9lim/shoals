@@ -62,6 +62,30 @@
       auto-sit rule depends on, and full inertness while
       restricted / past the terminal latch / with nothing armed.
 
+   ...and the REALITY-BEATS ROUND (02a 2026-09-08):
+
+   O. The capex channel: shell shape (permanent additive
+      params, no impulse, Poisson-excluded), rise-edge-only
+      firing with the exact +0.005 b / +0.001 sigmaR delta,
+      hold / same-day-replay / two-rung-jump semantics, the
+      <= 4-per-run ceiling over a seed sweep, and latch reset.
+      Plus the two review fixes (2026-09-08): the day-1008
+      TIMEOUT EXTRAPOLATION prints no waves once the bridge is
+      handed the live-day rung (O5, seed 15: R1 at the horizon,
+      day 2864 / R3 after), and an INLINE generated followup
+      that reuses an authored id no longer resolves to the
+      authored shell (O6, both scheduling paths + the llm.js
+      namespace guard).
+   P. Concealment vs. detection: the lagMult algebra and its
+      exact-1 identities, the constructed hide/expose cases,
+      the GLOBAL-frontier denominator over a multi-lab state
+      (P2b), S4 immediacy under any ratio, the reporting-regime
+      and leak-floor interactions, ledger + RNG-position
+      identity vs a K = 0 arm through the first affected
+      record's creation day, the record's own immediate
+      lagMult/meanLag difference (P8), and per-tick occurrence
+      + draw-count purity.
+
    L. Presentation degradation: hold arithmetic, and the
       invariant that every headless number (portfolio value,
       marks, the VXHCN index) is BITWISE unchanged with the
@@ -88,8 +112,9 @@ import {
     deterministicDrift, EXPORT_CONTROL_GROWTH, normalizeExportStage, frontierInternal,
 } from '../src/race/capability.js';
 import {
-    forceLeakDetection, LEAK_FORCED_MEAN_LAG, stepIncidents,
+    forceLeakDetection, LEAK_FORCED_MEAN_LAG, stepIncidents, applyReportingRegime,
     INSIDER_TIP_PROB, INSIDER_TIP_PROB_CLASSIFIED,
+    INCIDENT_TUNING, lagMultiplier, releasedFrontierC,
 } from '../src/race/incidents.js';
 import {
     initIntel, deactivateIntel, intelActive, intelRead, velocityBucket,
@@ -112,7 +137,7 @@ import {
 import {
     consensus, initConsensus, deactivateConsensus, refreshBinaryQuotes,
     computeBinarySettlements, openDispute, ruleDispute, disputeAdjudicator,
-    getDispute, getBinaryQuote, contractByKey,
+    getDispute, getBinaryQuote, contractByKey, buildPublicView,
 } from '../src/race/consensus.js';
 import {
     computeMarket, initComputeMarket, deactivateComputeMarket,
@@ -152,7 +177,8 @@ import { market, syncMarket } from '../src/market.js';
 import { eventBaseRateScale, BASE_RATE_MAX_MULT, EventEngine } from '../src/events.js';
 import { runRaceBridge, resetRaceBridge } from '../src/events/race-bridge.js';
 import { getEventById } from '../src/events/index.js';
-import { NON_FED_POISSON_RATE } from '../src/config.js';
+import { _deconflictId } from '../src/llm.js';
+import { NON_FED_POISSON_RATE, PRESETS } from '../src/config.js';
 import { createWorldState, applyStructuredEffects } from '../src/world-state.js';
 
 const argv = process.argv.slice(2);
@@ -2518,6 +2544,571 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
     }
 }
 
+// =====================================================================
+// O. The capex channel (reality-beats round, 02a 2026-09-08 item 1)
+// =====================================================================
+let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMaxFires = 0;
+{
+    const CAPEX_ID = 'rates_capex_wave';
+    const shellDef = getEventById(CAPEX_ID);
+    const probeEngine = new EventEngine('offline');
+
+    // -- O1. Shell shape: the params are PERMANENT and additive, there is no
+    //        impulse (the step IS the market effect, not a decaying reaction),
+    //        and the ONLY route in is the bridge.
+    check('O1: rates_capex_wave exists, category rates',
+        !!shellDef && shellDef.category === 'rates', shellDef ? shellDef.category : 'missing');
+    check('O1: category rates is Poisson-EXCLUDED (not in the random pool, not a trigger)',
+        !probeEngine._pools.random.some(e => e.category === 'rates')
+        && !probeEngine._triggerPool.some(e => e.id === CAPEX_ID));
+    check('O1: params EXACTLY { b: 0.005, sigmaR: 0.001 }',
+        !!shellDef && Object.keys(shellDef.params).sort().join(',') === 'b,sigmaR'
+        && shellDef.params.b === 0.005 && shellDef.params.sigmaR === 0.001,
+        shellDef ? JSON.stringify(shellDef.params) : 'missing');
+    check('O1: NO impulse key (permanent step, never a decaying overlay); toast, 4 variants',
+        !!shellDef && !('impulse' in shellDef) && !shellDef.popup
+        && Array.isArray(shellDef.headlines) && shellDef.headlines.length === 4);
+    check('O1: the player-net-delta coupling is EXACTLY 1 (no `mu` in params)',
+        probeEngine._computeCoupling(1e9, shellDef.params) === 1.0
+        && probeEngine._computeCoupling(-1e9, shellDef.params) === 1.0);
+
+    // -- Rig: a race whose PUBLIC released-frontier rung we drive by hand, a real
+    //         EventEngine and a sim stand-in carrying only the two params. The
+    //         stand-in starts at the LIVE Dynamic (Offline) preset's Vasicek
+    //         parameters (Calm Bull b = 0.04 / sigmaR = 0.005), not invented ones --
+    //         the whole point of an exact-delta check is that it prices the curve the
+    //         player actually gets, so four waves land on 0.06 / 0.009 here exactly
+    //         as they would in a run.
+    const OFFLINE = PRESETS.find(p => p.name.includes('Offline'));
+    const B0 = OFFLINE.b, SR0 = OFFLINE.sigmaR;
+    const mkSim = () => ({ b: B0, sigmaR: SR0, _recomputeRhoDerived() {} });
+    function capexRig(seed) {
+        const race = createRaceState(seed >>> 0);
+        const cap = race.capability;
+        for (const id of ['halcyon', 'tianxia', 'polaris']) {
+            cap.labs[id].rungReleased = { 1: 0, 2: null, 3: null, 4: null, 5: null };
+        }
+        cap.open.rungInternal = { 1: 0, 2: null, 3: null, 4: null, 5: null };
+        race.lastTransitions = freshTransitions();
+        return { race, engine: new EventEngine('offline'), sim: mkSim() };
+    }
+    const setPublicRung = (race, r) => {
+        const m = race.capability.labs.halcyon.rungReleased;
+        for (let k = 1; k <= 5; k++) m[k] = (k <= r) ? 0 : null;
+    };
+    const fireCount = (engine, race, sim, day) =>
+        runRaceBridge(engine, race, sim, day, 0).fired.filter(f => f.category === 'rates').length;
+
+    // -- O2. Edge semantics: seed / hold / rise / same-day replay / two-rung jump.
+    {
+        resetRaceBridge();
+        const { race, engine, sim } = capexRig(20260908);
+        const b0 = sim.b, sr0 = sim.sigmaR;
+        const step = (day) => fireCount(engine, race, sim, day);
+
+        const seedFire = step(1);                       // first call of the run: seed, no fire
+        const holdFire = step(2);                       // hold at R1
+        setPublicRung(race, 2); const riseFire = step(3);
+        const bAfterOne = sim.b, srAfterOne = sim.sigmaR;
+        const replayFire = step(3);                     // same day again
+        const bAfterReplay = sim.b, srAfterReplay = sim.sigmaR;
+        setPublicRung(race, 4); const jumpFire = step(4);   // two rungs in one day
+        const holdFire2 = step(5);
+        setPublicRung(race, 5); const lastFire = step(6);
+        const total = seedFire + holdFire + riseFire + replayFire + jumpFire + holdFire2 + lastFire;
+
+        check('O2: the R1 seed call fires nothing (Act I is bit-identical)', seedFire === 0);
+        check('O2: a HOLD fires nothing', holdFire === 0 && holdFire2 === 0);
+        check('O2: one rung RISE fires exactly one wave', riseFire === 1);
+        check('O2: the delta is EXACT (+0.005 b, +0.001 sigmaR) after one wave',
+            bAfterOne === b0 + 0.005 && srAfterOne === sr0 + 0.001,
+            `b ${bAfterOne} sigmaR ${srAfterOne}`);
+        check('O2: a same-day replay fires nothing and moves nothing (the latch already moved)',
+            replayFire === 0 && bAfterReplay === bAfterOne && srAfterReplay === srAfterOne);
+        check('O2: a TWO-rung jump in one day fires twice', jumpFire === 2);
+        check('O2: R1 -> R5 totals exactly 4 fires and 4 permanent steps',
+            total === 4 && Math.abs(sim.b - (b0 + 4 * 0.005)) < 1e-15
+            && Math.abs(sim.sigmaR - (sr0 + 4 * 0.001)) < 1e-15,
+            `${total} fires, b ${sim.b.toFixed(6)}, sigmaR ${sim.sigmaR.toFixed(6)}`);
+    }
+
+    // -- O3. Latch reset. resetRaceBridge() is the ONE path that clears the latch
+    //        between runs (02a reality-beats ruling 2: main.js calls it
+    //        UNCONDITIONALLY in _resetCore; the bridge has no self-healing branch).
+    {
+        // explicit reset -- the latch is at 5 from O2.
+        resetRaceBridge();
+        const r1 = capexRig(11);
+        const seedAfterReset = fireCount(r1.engine, r1.race, r1.sim, 1);
+        setPublicRung(r1.race, 2);
+        const riseAfterReset = fireCount(r1.engine, r1.race, r1.sim, 2);
+        check('O3: after resetRaceBridge a new run at R1 seeds silently, then fires on the rise',
+            seedAfterReset === 0 && riseAfterReset === 1 && r1.sim.b === B0 + 0.005);
+        // WITHOUT a reset, a fresh world at R1 under the stale latch of 2: the
+        // seed call fires NOTHING (the step loop is empty on a decrease) and the
+        // trailing assignment tracks the latch down to 1, so the rise to R3 fires
+        // exactly the new world's two steps. No phantom fires, no dropped fires --
+        // by construction, not by a branch. The reset is still main.js's job and
+        // unconditional, because the tip throttle and the rotation counters have
+        // no such property.
+        const r2 = capexRig(12);
+        const seedNoReset = fireCount(r2.engine, r2.race, r2.sim, 1);
+        setPublicRung(r2.race, 3);
+        const riseNoReset = fireCount(r2.engine, r2.race, r2.sim, 2);
+        check('O3: a stale latch above the rung fires nothing and tracks down (no phantom, no dropped fires)',
+            seedNoReset === 0 && riseNoReset === 2,
+            `seed ${seedNoReset}, rise ${riseNoReset}`);
+        resetRaceBridge();
+    }
+
+    // -- O4. Endogenous sweep: every fire sits on a rise edge of the PUBLIC rung,
+    //        the run total never exceeds 4, and `sim.b` tracks the fire count.
+    {
+        const CAPEX_N = Math.max(60, Math.min(N, 200));
+        let bTrackOK = true;
+        for (let i = 0; i < CAPEX_N; i++) {
+            resetRaceBridge();
+            const race = createRaceState((BASE_SEED + 4400 + i) >>> 0);
+            const engine = new EventEngine('offline');
+            const sim = mkSim();
+            initConsensus(race); initBelief(race);
+            let fires = 0, prevRung = 0, seeded = false;
+            for (let d = 0; d < HORIZON; d++) {
+                advanceRace(race);
+                const rung = buildPublicView(race).releasedFrontierRung;
+                const n = fireCount(engine, race, sim, race.day);
+                const want = seeded ? Math.max(0, rung - prevRung) : 0;
+                if (n !== want) capexEdgeViolations++;
+                fires += n; prevRung = rung; seeded = true;
+            }
+            deactivateConsensus(); deactivateBelief();
+            if (Math.abs(sim.b - (B0 + fires * 0.005)) > 1e-12) bTrackOK = false;
+            capexHist.set(fires, (capexHist.get(fires) || 0) + 1);
+            if (fires > capexMaxFires) capexMaxFires = fires;
+            capexRunsProbed++;
+        }
+        check(`O4: every fire is a rise edge of the PUBLIC released rung (${capexRunsProbed} runs)`,
+            capexEdgeViolations === 0, `${capexEdgeViolations} off-edge day(s)`);
+        check('O4: run total never exceeds 4 (R1->R2 ... R4->R5)', capexMaxFires <= 4,
+            `max ${capexMaxFires}`);
+        check('O4: sim.b carries exactly 0.005 per fire, permanently', bTrackOK);
+        resetRaceBridge();
+    }
+
+    // -- O5. The TIMEOUT EXTRAPOLATION must not print capex waves (review fix,
+    //        2026-09-08). main.js runs `checkResolution` BEFORE the bridge pass, and
+    //        its day-1008 timeout path extrapolates the race forward IN PLACE --
+    //        seed 15 lives its whole run at R1 and the extrapolation carries it to
+    //        day 2864 / R3. A bridge pass that read the rung off state afterwards
+    //        would print two waves out of the epilogue's own extrapolation and walk
+    //        `sim.b` / `sim.sigmaR` into the bond closeout. The orchestrator captures
+    //        the LIVE-day rung and passes it in; the state read survives only as the
+    //        headless default. Both halves are asserted, so the check is non-vacuous.
+    {
+        resetRaceBridge();
+        const race = createRaceState(15);
+        const engine = new EventEngine('offline');
+        const sim = mkSim();
+        initConsensus(race); initBelief(race);
+        let fires = 0, liveRungAtTimeout = null, rec = null, extrapDays = 0;
+        for (let d = 0; d < HORIZON; d++) {
+            advanceRace(race);
+            // main.js order: mirror the public rung, THEN checkResolution, THEN bridge.
+            const liveRung = buildPublicView(race).releasedFrontierRung;
+            const r = checkResolution(race, null);
+            fires += runRaceBridge(engine, race, sim, race.day, 0, liveRung)
+                .fired.filter(f => f.category === 'rates').length;
+            if (r) { rec = r; liveRungAtTimeout = liveRung; extrapDays = race.day - HORIZON; break; }
+        }
+        const postRung = buildPublicView(race).releasedFrontierRung;
+        check('O5: seed 15 reaches the horizon at R1 and TIMES OUT into a multi-rung extrapolation',
+            !!rec && rec.extrapolated && liveRungAtTimeout === 1 && postRung > 1,
+            rec ? `live R${liveRungAtTimeout} -> day ${rec.day} (+${extrapDays}d) R${postRung}` : 'no resolution');
+        check('O5: the live-rung snapshot fires ZERO waves across the run and leaves b / sigmaR untouched',
+            fires === 0 && sim.b === B0 && sim.sigmaR === SR0,
+            `${fires} fires, b ${sim.b}, sigmaR ${sim.sigmaR}`);
+        // Non-vacuity: the SAME post-extrapolation state, bridged WITHOUT the
+        // snapshot, is exactly the bug -- the extrapolated rung fires its steps.
+        const simNoSnap = mkSim();
+        const firesNoSnap = runRaceBridge(engine, race, simNoSnap, race.day, 0)
+            .fired.filter(f => f.category === 'rates').length;
+        check('O5: WITHOUT the snapshot the same state DOES fire (the regression is real)',
+            firesNoSnap === postRung - liveRungAtTimeout && firesNoSnap > 0
+            && Math.abs(simNoSnap.b - (B0 + firesNoSnap * 0.005)) < 1e-12,
+            `${firesNoSnap} spurious wave(s), b ${simNoSnap.b.toFixed(6)}, sigmaR ${simNoSnap.sigmaR.toFixed(6)}`);
+        deactivateConsensus(); deactivateBelief();
+        resetRaceBridge();
+    }
+
+    // -- O6. The SECOND route into the static shell (review fix, 2026-09-08).
+    //        Dynamic (LLM) generates followups INLINE (FOLLOWUP_SCHEMA requires
+    //        id + headline + params) with a model-chosen id. Both scheduling paths
+    //        used to resolve `getEventById(fu.id)` FIRST, so a generated followup
+    //        that happened to pick an authored id became the AUTHORED shell and
+    //        applied its deltas -- for `rates_capex_wave` that is a permanent b /
+    //        sigmaR step with no rung behind it and the latch untouched. The rule
+    //        now: an inline object (own headline AND params) IS the event; only an
+    //        ID-ONLY reference is looked up. Plus the llm.js namespace guard, which
+    //        renames a colliding generated id before it reaches any of this.
+    {
+        const inlineFu = {
+            id: CAPEX_ID, headline: 'A generated followup that happens to pick an authored id.',
+            params: { mu: 0.01 }, magnitude: 'minor', mtth: 12, weight: 1,
+        };
+        // Path 1: the engine-internal chain scheduler (top-level + superevent path).
+        const e1 = new EventEngine('offline');
+        e1._scheduleFollowups({ id: 'generated_parent', followups: [inlineFu] }, 10, 0);
+        const got1 = e1._pendingFollowups[0] && e1._pendingFollowups[0].event;
+        check('O6: an INLINE generated followup named rates_capex_wave does NOT resolve to the static shell (_scheduleFollowups)',
+            !!got1 && got1 === inlineFu && got1.category !== 'rates'
+            && got1.params.mu === 0.01 && got1.params.b === undefined,
+            got1 ? `category ${got1.category}, params ${JSON.stringify(got1.params)}` : 'nothing scheduled');
+        // Path 2: the public choice-followup entry point.
+        const e2 = new EventEngine('offline');
+        e2.scheduleFollowup(inlineFu, 10);
+        const got2 = e2._pendingFollowups[0] && e2._pendingFollowups[0].event;
+        check('O6: same for the public scheduleFollowup (choice followups)',
+            !!got2 && got2 === inlineFu && got2.category !== 'rates'
+            && got2.params.mu === 0.01 && got2.params.b === undefined,
+            got2 ? `category ${got2.category}, params ${JSON.stringify(got2.params)}` : 'nothing scheduled');
+        // An ID-ONLY reference still resolves -- the 108 authored followups are all
+        // this shape, so the fix must not have moved them.
+        const e3 = new EventEngine('offline');
+        e3._scheduleFollowups({ id: 'authored_parent', followups: [{ id: CAPEX_ID, mtth: 12 }] }, 10, 0);
+        const got3 = e3._pendingFollowups[0] && e3._pendingFollowups[0].event;
+        check('O6: an ID-ONLY reference still resolves to the authored shell (authored chains unmoved)',
+            got3 === shellDef);
+        // llm.js namespace guard: a generated id colliding with ANY authored id is
+        // renamed before it can be scheduled or logged.
+        check('O6: llm.js renames a generated id that collides with an authored one',
+            _deconflictId(CAPEX_ID) === CAPEX_ID + '_llm'
+            && getEventById(_deconflictId(CAPEX_ID)) === null
+            && _deconflictId('llm_unique_beat') === 'llm_unique_beat',
+            _deconflictId(CAPEX_ID));
+    }
+}
+
+// =====================================================================
+// P. Concealment vs. detection (reality-beats round, 02a 2026-09-08 item 2)
+// =====================================================================
+let concealFrac = 0, concealPrefixRecords = 0, concealFullyIdentical = 0, concealProbeTicks = 0;
+let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;
+{
+    const K1 = () => { INCIDENT_TUNING.CONCEAL_K = 1.0; };
+
+    // -- P1. The algebra. defend = 1 + K(C_rel,frontier - 3)+, conceal = 1 +
+    //        K(C_int,source - 3)+, lagMult = conceal / defend. The two "exactly 1"
+    //        identities are FLOATING-POINT exact, which is what buys bit-identity.
+    K1();
+    check('P1: a source at C_int 5.0 under a released frontier of 3.0 -> lagMult 3',
+        lagMultiplier(3.0, 5.0) === 3, String(lagMultiplier(3.0, 5.0)));
+    check('P1: a source at C_int 3.0 under a released frontier of 5.0 -> lagMult 1/3',
+        lagMultiplier(5.0, 3.0) === 1 / 3, String(lagMultiplier(5.0, 3.0)));
+    check('P1: a CLOSED gap (4.5 vs 4.5) -> EXACTLY 1',
+        lagMultiplier(4.5, 4.5) === 1);
+    check('P1: both legs at or below R3 -> EXACTLY 1 (Act I bit-identity)',
+        lagMultiplier(2.0, 2.9) === 1 && lagMultiplier(3, 3) === 1 && lagMultiplier(1.55, 1.75) === 1);
+    {
+        INCIDENT_TUNING.CONCEAL_K = 0;
+        const off = lagMultiplier(3.0, 5.5) === 1 && lagMultiplier(5.5, 3.0) === 1;
+        K1();
+        check('P1: K = 0 disables the channel entirely (the pre-round build)', off);
+    }
+
+    // -- P2. Constructed state, end to end: one rig gives BOTH directions --
+    //        Halcyon hiding behind its own internal lead, and open-weights misuse
+    //        exposed by a frontier-grade defender.
+    function forcedRig(seed, halcyonInt, halcyonRel, openC, days, heat) {
+        const race = createRaceState(seed >>> 0);
+        const cap = race.capability;
+        cap.labs.halcyon.C_internal = halcyonInt;
+        cap.labs.halcyon.C_released = halcyonRel;
+        cap.labs.tianxia.active = false;
+        cap.labs.polaris.active = false;
+        cap.open.C = openC;
+        race.safety.halcyon = 0;
+        for (let d = 0; d < days; d++) stepIncidents(race, d, d + 1, heat);
+        return race;
+    }
+    {
+        // Defender at 3.0 (defend = 1), Halcyon internal at 5.0 (conceal = 3).
+        const hide = forcedRig(31337, 5.0, 3.0, 0.3, 4000, 0.3);
+        let n = 0, ok = true;
+        for (const inc of hide.latentIncidents) {
+            if (inc.source !== 'halcyon') continue;
+            n++;
+            if (inc.lagMult !== 3 || inc.meanLag !== inc.baseMeanLag * 3) ok = false;
+        }
+        check('P2: the gap hides its own incidents -- C_int 5.0 vs released 3.0 detects 3x slower',
+            ok && n > 0, `${n} Halcyon incidents`);
+
+        // Defender at 5.0 (defend = 3): open-weights (single-track at 3.0) is
+        // EXPOSED at 1/3, while Halcyon's own closed gap sits at exactly 1.
+        const expose = forcedRig(31338, 5.0, 5.0, 3.0, 8000, 1.0);
+        let nOpen = 0, nHal = 0, openOK = true, halOK = true, s4 = 0, s4OK = true;
+        for (const inc of expose.latentIncidents) {
+            if (inc.source === 'open') {
+                nOpen++;
+                if (inc.lagMult !== 1 / 3 || inc.meanLag !== inc.baseMeanLag * (1 / 3)) openOK = false;
+            } else if (inc.source === 'halcyon') {
+                nHal++;
+                if (inc.lagMult !== 1) halOK = false;
+            }
+            if (inc.severity === 4) {
+                s4++;
+                if (inc.meanLag !== 0 || !inc.detected || inc.detectDay !== inc.occurDay) s4OK = false;
+            }
+        }
+        check('P2: open-weights misuse is EASIER to see under a frontier defender (1/3)',
+            openOK && nOpen > 0, `${nOpen} open incidents`);
+        check('P2: a CLOSED internal-released gap is exactly 1 (no self-concealment)',
+            halOK && nHal > 0, `${nHal} Halcyon incidents at C_int == C_rel`);
+        check('P3: S4 stays immediate under any ratio (0 x lagMult = 0, self-disclosure absolute)',
+            s4OK && s4 > 0, `${s4} S4s checked`);
+    }
+
+    // -- P2b. The denominator is the GLOBAL released frontier, not the source's own
+    //         release (review fix, 2026-09-08): a lab whose OWN internal-released gap
+    //         is closed is still EXPOSED while a rival ships higher. Constructed
+    //         multi-lab state -- an active R5-released Tianxia wins the frontier over
+    //         a locally-closed R4 Halcyon (lagMult 2/3), while a HIGHER but INACTIVE
+    //         Polaris and a higher open-ecosystem C are both excluded from the max.
+    //         Gated on the real exported `releasedFrontierC`, then end-to-end on the
+    //         generator's own stamp.
+    {
+        const race = createRaceState(31339);
+        const cap = race.capability;
+        cap.labs.halcyon.active = true;  cap.labs.halcyon.C_internal = 4;   cap.labs.halcyon.C_released = 4;
+        cap.labs.tianxia.active = true;  cap.labs.tianxia.C_internal = 5;   cap.labs.tianxia.C_released = 5;
+        cap.labs.polaris.active = false; cap.labs.polaris.C_internal = 5.9; cap.labs.polaris.C_released = 5.9;
+        cap.open.C = 6.5;
+        const frontier = releasedFrontierC(cap);
+        check('P2b: C_rel,frontier is the max over ACTIVE labs (a higher INACTIVE lab and the open ecosystem are excluded)',
+            frontier === 5, `frontier ${frontier} (inactive 5.9, open 6.5 present)`);
+        check('P2b: a LOCALLY CLOSED gap is NOT exactly 1 under a higher-released rival (C_int = C_rel = 4 vs frontier 5 -> 2/3)',
+            lagMultiplier(frontier, 4) === 2 / 3, String(lagMultiplier(frontier, 4)));
+        race.safety.halcyon = 0;
+        for (let d = 0; d < 2000; d++) stepIncidents(race, d, d + 1, 0.5);
+        let nHal = 0, stampOK = true;
+        for (const inc of race.latentIncidents) {
+            if (inc.source !== 'halcyon') continue;
+            nHal++;
+            if (inc.lagMult !== 2 / 3 || inc.meanLag !== inc.baseMeanLag * (2 / 3)) stampOK = false;
+        }
+        check('P2b: the generator stamps 2/3 on the locally-closed source end to end',
+            stampOK && nHal > 0, `${nHal} Halcyon incidents`);
+    }
+
+    // -- P4. The reporting regime recomputes from the record's OWN stamped pair.
+    {
+        const race = createRaceState(4242);
+        race.latentIncidents = [{
+            id: 'synthetic', source: 'halcyon', severity: 2, cls: 'accident', occurDay: 10,
+            detectable: true, meanLag: 12, baseMeanLag: 6, lagMult: 2, sBurn: null,
+            insiderTip: false, detected: false, detectDay: null,
+        }];
+        applyReportingRegime(race);
+        const got = race.latentIncidents[0].meanLag;
+        check('P4: applyReportingRegime PRESERVES lagMult (6 x 0.5 x 2 = 6, never the bare 3)',
+            got === 6, `meanLag ${got}`);
+    }
+
+    // -- P5. The leak floor still beats concealment: the human channel outruns the
+    //        machine's hiding, which is the verb's point.
+    {
+        const race = createRaceState(4243);
+        race.latentIncidents = [{
+            id: 'concealed', source: 'halcyon', severity: 2, cls: 'accident', occurDay: 10,
+            detectable: false, meanLag: 12, baseMeanLag: 6, lagMult: 2, sBurn: null,
+            insiderTip: true, detected: false, detectDay: null,
+        }];
+        const res = forceLeakDetection(race, 'concealed');
+        check('P5: forceLeakDetection floors a CONCEALED incident at 4d (leak beats concealment)',
+            !!res && res.forced && race.latentIncidents[0].detectable
+            && race.latentIncidents[0].meanLag === LEAK_FORCED_MEAN_LAG,
+            `meanLag ${race.latentIncidents[0].meanLag}`);
+    }
+
+    // -- P6. Full-run arms, K = 0 (the pre-round build BY CONSTRUCTION) vs K = 1.
+    //        Both arms are in exact lockstep through the end of the first day a
+    //        lagMult != 1 incident is created; after that the shared hazard stream
+    //        legitimately re-phases (a concealed incident stays in the eligible set
+    //        longer, which is one extra draw a day -- 02a's "one hazard draw per
+    //        latent per day" rule holds, the run-level COUNT does not, see report).
+    {
+        const CN = Math.max(100, Math.min(N, 120));
+        let prefixOK = true, fullOK = true, preR3OK = true;
+        let concealed = 0, totalInc = 0;
+        const runArm = (seed, K) => {
+            INCIDENT_TUNING.CONCEAL_K = K;
+            const race = createRaceState(seed >>> 0);
+            for (let d = 0; d < HORIZON; d++) advanceRace(race);
+            const probe = [];
+            for (let k = 0; k < 5; k++) probe.push(race.streams.incidents.next());
+            return { race, probe };
+        };
+        for (let i = 0; i < CN; i++) {
+            const seed = (BASE_SEED + 5500 + i) >>> 0;
+            const a = runArm(seed, 0);
+            const b = runArm(seed, 1);
+            K1();
+
+            let T = Infinity;
+            for (const inc of b.race.latentIncidents) {
+                totalInc++;
+                if (inc.lagMult !== 1) { concealed++; if (inc.occurDay < T) T = inc.occurDay; }
+                if (inc.occurDay < 700) concealLagEarly++; else concealLagLate++;
+            }
+
+            // Concealment cannot bind before SOME entity crosses R3 -- internal for
+            // the conceal leg, released for the defend leg.
+            const cap = b.race.capability;
+            let earliestR3 = Infinity;
+            for (const id of ['halcyon', 'tianxia', 'polaris']) {
+                const lab = cap.labs[id];
+                if (lab.rungInternal[3] != null) earliestR3 = Math.min(earliestR3, lab.rungInternal[3]);
+                if (lab.rungReleased[3] != null) earliestR3 = Math.min(earliestR3, lab.rungReleased[3]);
+            }
+            if (cap.open.rungInternal[3] != null) earliestR3 = Math.min(earliestR3, cap.open.rungInternal[3]);
+            if (T < earliestR3) preR3OK = false;
+
+            const A = a.race.latentIncidents, B = b.race.latentIncidents;
+            if (T === Infinity) {
+                concealFullyIdentical++;
+                if (A.length !== B.length) fullOK = false;
+                else for (let k = 0; k < A.length; k++) {
+                    const x = A[k], y = B[k];
+                    if (x.id !== y.id || x.source !== y.source || x.severity !== y.severity
+                        || x.cls !== y.cls || x.occurDay !== y.occurDay || x.insiderTip !== y.insiderTip
+                        || x.detectable !== y.detectable || x.meanLag !== y.meanLag
+                        || x.detected !== y.detected || x.detectDay !== y.detectDay) fullOK = false;
+                }
+                for (let k = 0; k < 5; k++) if (a.probe[k] !== b.probe[k]) fullOK = false;
+            }
+            // Prefix identity: everything created or detected through the end of day T.
+            const n = Math.min(A.length, B.length);
+            for (let k = 0; k < n; k++) {
+                const x = A[k], y = B[k];
+                if (x.occurDay > T) break;
+                concealPrefixRecords++;
+                if (x.id !== y.id || x.source !== y.source || x.severity !== y.severity
+                    || x.cls !== y.cls || x.occurDay !== y.occurDay
+                    || x.insiderTip !== y.insiderTip || x.detectable !== y.detectable) prefixOK = false;
+                const dx = x.detectDay, dy = y.detectDay;
+                if ((dx != null && dx <= T) || (dy != null && dy <= T)) { if (dx !== dy) prefixOK = false; }
+            }
+        }
+        concealFrac = totalInc ? concealed / totalInc : 0;
+        check(`P6: occurrence/detection ledgers and RNG position identical through the first affected`
+            + ` record's creation day (the latent record differs immediately in lagMult and meanLag)`
+            + ` -- ${concealPrefixRecords} records over ${CN} seeds`,
+            prefixOK && concealPrefixRecords > 0);
+        check('P6: runs where NO record is affected are FULLY identical to the K=0 arm (records + stream)',
+            fullOK, `${concealFullyIdentical}/${CN} such runs`);
+        check('P6: no record is affected before an R3 crossing (Act I / early Act II untouched)',
+            preR3OK);
+        check('P6: the channel is LIVE (some incidents carry lagMult != 1)', concealed > 0,
+            `${pct(concealFrac)} of ${totalInc} incidents`);
+        K1();
+    }
+
+    // -- P7. Per-tick purity: from ONE shared pre-tick state, K = 0 and K = 1 must
+    //        produce identical OCCURRENCE records and leave the substream at the
+    //        identical position (lagMult is arithmetic on state, never a draw; and
+    //        it can never turn a positive meanLag into the <= 0 the detection pass
+    //        skips, so the pass consumes the same number of draws either way).
+    {
+        const PN = Math.max(80, Math.min(N, 100));
+        let occPureOK = true, drawIdentOK = true, occSeen = 0, concealSeen = 0;
+        for (let i = 0; i < PN; i++) {
+            const seed = (BASE_SEED + 6600 + i) >>> 0;
+            for (const D of [300, 500, 700, 850]) {
+                const arm = (K) => {
+                    K1();                                   // identical prefix in BOTH arms
+                    const race = createRaceState(seed);
+                    for (let d = 0; d < D; d++) advanceRace(race);
+                    INCIDENT_TUNING.CONCEAL_K = K;          // the ONE difference
+                    const res = stepIncidents(race, race.day, race.day + 1, 0.3);
+                    const probe = [];
+                    for (let k = 0; k < 5; k++) probe.push(race.streams.incidents.next());
+                    return { res, probe, made: race.latentIncidents.slice(-res.occurred.length) };
+                };
+                const a = arm(0), b = arm(1);
+                concealProbeTicks++;
+                if (JSON.stringify(a.res.occurred) !== JSON.stringify(b.res.occurred)) occPureOK = false;
+                if (a.made.length !== b.made.length) occPureOK = false;
+                else for (let k = 0; k < a.made.length; k++) {
+                    if (a.made[k].detectable !== b.made[k].detectable) occPureOK = false;
+                }
+                for (let k = 0; k < 5; k++) if (a.probe[k] !== b.probe[k]) drawIdentOK = false;
+                occSeen += b.res.occurred.length;
+                if (b.made.some(x => x.lagMult !== 1)) concealSeen++;
+            }
+        }
+        K1();
+        check(`P7: occurrence/detection ledgers and RNG position identical through the first affected`
+            + ` record's creation day (the latent record differs immediately in lagMult and meanLag)`
+            + ` -- LEDGERS, ${occSeen} records over ${concealProbeTicks} paired ticks`,
+            occPureOK && occSeen > 0);
+        check(`P7: occurrence/detection ledgers and RNG position identical through the first affected`
+            + ` record's creation day (the latent record differs immediately in lagMult and meanLag)`
+            + ` -- RNG POSITION, lagMult costs zero draws`,
+            drawIdentOK);
+        check('P7: the paired-tick probe is non-vacuous (affected records were produced)',
+            concealSeen > 0, `${concealSeen}/${concealProbeTicks} ticks made an affected record`);
+    }
+
+    // -- P8. What identity does NOT mean (review fix, 2026-09-08): the LATENT
+    //        record differs the moment it is created. P6/P7 assert that the
+    //        occurrence/detection LEDGERS and the RNG position match through that
+    //        day -- the record itself carries the multiplier immediately. Assert the
+    //        difference is EXACTLY {lagMult, meanLag} and nothing else, on the first
+    //        record the channel actually moves (lagMult != 1 AND baseMeanLag > 0 --
+    //        an S4 carries a multiplier but 0 x anything is still 0, so its meanLag
+    //        is unmoved by construction). NOTE the difference is two-directional:
+    //        `lagMult < 1` (a source exposed by a higher-released rival) is
+    //        "affected" exactly as much as `lagMult > 1` is.
+    {
+        const SN = 20;
+        let diffOK = true, sawUp = false, sawDown = false, detail = '';
+        for (let i = 0; i < SN; i++) {
+            const seed = (BASE_SEED + 5500 + i) >>> 0;   // the P6 seed block
+            const affected = (x) => x.lagMult !== 1 && x.baseMeanLag > 0;
+            // K = 1 arm, one day at a time, until the channel first moves a record.
+            INCIDENT_TUNING.CONCEAL_K = 1;
+            const b = createRaceState(seed);
+            let T = -1;
+            for (let d = 0; d < HORIZON; d++) {
+                advanceRace(b);
+                if (b.latentIncidents.some(affected)) { T = d; break; }
+            }
+            K1();
+            if (T < 0) continue;
+            // K = 0 arm to the SAME number of days -- the pre-round build.
+            INCIDENT_TUNING.CONCEAL_K = 0;
+            const a = createRaceState(seed);
+            for (let d = 0; d <= T; d++) advanceRace(a);
+            K1();
+            const idx = b.latentIncidents.findIndex(affected);
+            const y = b.latentIncidents[idx], x = a.latentIncidents[idx];
+            if (!x || !y) { diffOK = false; detail = detail || `seed ${seed}: no K=0 counterpart at index ${idx}`; continue; }
+            const keys = new Set([...Object.keys(x), ...Object.keys(y)]);
+            const differing = [...keys].filter(k => x[k] !== y[k]).sort();
+            if (differing.join(',') !== 'lagMult,meanLag') {
+                diffOK = false;
+                detail = detail || `seed ${seed}: differing [${differing.join(', ')}]`;
+            }
+            if (y.lagMult > 1) sawUp = true; else sawDown = true;
+            concealDiffPairs++;
+        }
+        check('P8: the first AFFECTED latent differs from its K=0 counterpart in EXACTLY lagMult + meanLag',
+            diffOK && concealDiffPairs > 0, detail || `${concealDiffPairs}/${SN} seeds probed`);
+        check('P8: "affected" is two-directional -- both lagMult > 1 (hidden) and lagMult < 1 (exposed) occur',
+            sawUp && sawDown, `up ${sawUp}, down ${sawDown} over ${concealDiffPairs} seeds`);
+    }
+    K1();
+}
+
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
 line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
@@ -2559,6 +3150,26 @@ line(`  blackout: tip rate ${pct(tipPrivateRate)} private -> ${pct(tipClassified
 line(`  intel: reliability ${pct(intelTruthRate)} (target ${pct(INTEL_TRUTH_PROB)}),`
     + ` adjacency ${intelAdjacencyOK ? 'ONE bucket' : 'VIOLATED'},`
     + ` trajectory identity ${intelIdentOK ? 'BITWISE' : 'VIOLATED'}`);
+line('\nReality-beats round (02a 2026-09-08):');
+{
+    const bins = [...capexHist.entries()].sort((a, b) => a[0] - b[0])
+        .map(([k, v]) => `${k}x:${v}`).join('  ');
+    line(`  capex channel: +0.005 b / +0.001 sigmaR per released-rung RISE;`
+        + ` ${capexRunsProbed} runs, max ${capexMaxFires} fires, off-edge days ${capexEdgeViolations}`);
+    line(`    fires/run histogram  ${bins}`);
+}
+line(`  concealment: K=${INCIDENT_TUNING.CONCEAL_K}; ${pct(concealFrac)} of incidents carry lagMult != 1;`
+    + ` ${concealFullyIdentical} run(s) never conceal (fully identical to K=0)`);
+line(`    prefix identity over ${concealPrefixRecords} records; ${concealProbeTicks} paired-tick draw probes;`
+    + ` ${concealDiffPairs} first-affected record diffs`);
+line('    NOTE (02a wording): the "one hazard draw per latent per day" RULE holds and');
+line('      lagMult itself costs no draw -- but a run-level draw COUNT is NOT invariant,');
+line('      and what is identical is the occurrence/detection LEDGERS and the RNG');
+line('      position through the first affected record\'s creation day: the latent');
+line('      record itself differs immediately in lagMult and meanLag (P8). Re-phasing');
+line('      is TWO-DIRECTIONAL -- a lagMult > 1 record stays detection-eligible longer,');
+line('      a lagMult < 1 record detects sooner and leaves the K=0 arm consuming the');
+line('      extra future draws. Either way the arms diverge after the first one.');
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

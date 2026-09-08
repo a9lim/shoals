@@ -63,6 +63,11 @@ const _PULSE_CATEGORIES = new Set([
     // never called. It is also NOT terminal-safe (endings.js): its effects require
     // a live world, so the terminal queue filter discards it.
     'room',
+    // 'rates' (reality-beats round, 02a 2026-09-08 item 1): the capex channel is
+    // bridge-fired on the released-frontier rung RISE edge (<= 4 fires/run), never
+    // Poisson -- a capex wave with no rung behind it is a rate move with no
+    // issuance behind it. Excluded by DESIGN, not dormancy.
+    'rates',
 ]);
 
 // -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------
@@ -103,6 +108,22 @@ function _hashId(s) {
         h = Math.imul(h, 0x01000193) >>> 0;
     }
     return h >>> 0;
+}
+
+// -- Inline followup vs. authored ID reference ---------------------------
+// Authored followups are ID REFERENCES: `{ id, mtth, weight }`, resolved against
+// the authored pool (all 108 in `src/events/` are this shape). A generated
+// (Dynamic-LLM) followup is a COMPLETE INLINE EVENT: FOLLOWUP_SCHEMA requires
+// `id` + `headline` + `params`, and the id is model-chosen, so an id that happens
+// to match an authored event's must NOT resolve to that event -- doing so would
+// swap the generated prose for an authored shell and apply the authored shell's
+// deltas out of nowhere (the `rates_capex_wave` case: a permanent b / sigmaR step
+// landing with no rung behind it and no latch touched). One rule for both
+// scheduling paths: if it carries its own headline AND params, it IS the event.
+function _isInlineFollowup(fu) {
+    return !!fu && typeof fu === 'object'
+        && typeof fu.headline === 'string'
+        && !!fu.params && typeof fu.params === 'object';
 }
 
 // -- EventEngine --------------------------------------------------------
@@ -502,7 +523,10 @@ export class EventEngine {
         for (const fu of event.followups) {
             const delay = this._followupDelay(fu.mtth);
             this._pendingFollowups.push({
-                event: getEventById(fu.id) || fu,
+                // An INLINE followup is the event; only an ID REFERENCE is looked up
+                // (see _isInlineFollowup). The `|| fu` tail keeps the pre-existing
+                // fallback for an ID reference whose target no longer exists.
+                event: _isInlineFollowup(fu) ? fu : (getEventById(fu.id) || fu),
                 chainId,
                 targetDay: day + Math.max(1, delay),
                 weight: fu.weight ?? 1,
@@ -895,7 +919,11 @@ export class EventEngine {
         const id = typeof followup === 'string' ? followup : followup.id;
         const mtth = typeof followup === 'object' ? (followup.mtth ?? 20) : 20;
         const delay = Math.max(1, Math.round(mtth + (Math.random() - 0.5) * mtth * 0.3));
-        const event = getEventById(id);
+        // Same rule as _scheduleFollowups: an INLINE followup object IS the event and
+        // is never looked up, so a generated followup that happens to reuse an
+        // authored id can no longer become the authored shell and apply its deltas.
+        // An ID reference with no target is still dropped (pre-existing behaviour).
+        const event = _isInlineFollowup(followup) ? followup : getEventById(id);
         if (!event) return;
         this._pendingFollowups.push({
             event,

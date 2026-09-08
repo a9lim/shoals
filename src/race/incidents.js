@@ -101,6 +101,71 @@ const PERSUASION_DET_LAG_MEAN = 90;
 const REPORTING_P_BONUS = 0.12;
 const REPORTING_LAG_MULT = 0.5;
 
+// ---- Concealment vs. detection (reality-beats round, 02a 2026-09-08 item 2) --
+// Both sides of detection are automated, and they license different models:
+//
+//   defend  = 1 + K * (C_rel,frontier - 3)+     (defenders license the released frontier)
+//   conceal = 1 + K * (C_int,source   - 3)+     (the incident hides with what produced it)
+//   lagMult = conceal / defend ;  meanLag_eff = meanLag * lagMult
+//
+// Stamped at OCCURRENCE, deterministic from state -- NO new RNG draw of its own,
+// and occurrence never reads it (per-tick identity from shared state). This is
+// NOT run-level bit-identity, though, and the divergence is TWO-DIRECTIONAL: a
+// lagMult > 1 record stays in the daily detection-eligible set longer (the K=1
+// arm then takes more hazard draws per day), while a lagMult < 1 record detects
+// SOONER and leaves the K=0 arm consuming the extra future draws. Either way
+// `streams.incidents` re-phases from the first affected record's detection
+// onward and downstream realizations legitimately differ -- the leak-coupling
+// precedent (02a evidence-machinery ruling 3). What IS identical: the
+// occurrence/detection ledgers and the RNG position through the first affected
+// record's CREATION day (the latent record itself differs immediately, in
+// lagMult and meanLag), and everything before any R3 crossing (plumbing P).
+// lagMult is EXACTLY 1 when both legs are at/below R3 (Act I and into Act II),
+// or when C_int,source === C_rel,frontier above R3. NOTE the denominator is the
+// GLOBAL released frontier, not the source's own release: a lab whose own gap is
+// closed still gets lagMult < 1 while a RIVAL ships higher (C_int = C_rel = 4
+// under a released-5 frontier is 2/3 -- exposed by someone else's defenders).
+// lagMult > 1 requires the source's internal track to run ahead of the released
+// frontier, which implies it runs ahead of its own release -- the Fixedpoint gap
+// becomes, literally, the detection gap.
+// Open-weights is single-track (C_int = C_rel = C[open]) against
+// a frontier-released defender, so misuse gets EASIER to see late: no lab to hide it.
+// `detectionQuality` stays the separate, lobbyable WORLD dial -- two dials, never
+// conflated. Exported mutable for harness sweeps (the THEFT_TUNING / RACE_TUNING
+// pattern); incidents.js keeps its own object rather than importing race-state.js,
+// which imports THIS module (a cycle).
+export const INCIDENT_TUNING = { CONCEAL_K: 1.0 };
+
+/** The rung at which hiding and finding both stop being human work. */
+const CONCEAL_REF = 3;
+
+/**
+ * C_rel,frontier: the MAX released capability over ACTIVE labs -- the best model
+ * anyone has SHIPPED, which is what a defender can license. Deliberately NOT
+ * capability.js's frontier-released helpers, which answer a different question
+ * (the internal leader's own released track). The open ecosystem is not a
+ * defender-side licensor, so it is not in the max.
+ *
+ * Exported for the harness (the `lagMultiplier` precedent) so the multi-lab
+ * denominator is gated on the real function, not a re-derivation.
+ */
+export function releasedFrontierC(cap) {
+    let m = -Infinity;
+    for (const id of ['halcyon', 'tianxia', 'polaris']) {
+        const lab = cap.labs[id];
+        if (lab.active && lab.C_released > m) m = lab.C_released;
+    }
+    return m;
+}
+
+/** Per-incident detection-lag multiplier. Exactly 1 when conceal === defend. */
+export function lagMultiplier(cRelFrontier, cIntSource) {
+    const K = INCIDENT_TUNING.CONCEAL_K;
+    const defend = 1 + K * Math.max(0, cRelFrontier - CONCEAL_REF);
+    const conceal = 1 + K * Math.max(0, cIntSource - CONCEAL_REF);
+    return conceal / defend;
+}
+
 // Insider tip: one Bernoulli(0.3) at occurrence for every incident NOT detected
 // in its occurrence tick (02a, ratified 2026-07-23) -- "undetected" is the
 // occurrence-tick sense, independent of eventual public detectability. Standing-
@@ -188,6 +253,9 @@ export function stepIncidents(race, day, endDay, heat) {
 
     // 2. Occurrence: Λ_world Poisson daily, source ∝ w_i.
     const tipProb = insiderTipProb(race);   // regime-dependent at roll time (P7-3 blackout)
+    // Defender side of the concealment ratio: constant across this tick's
+    // occurrences (capability does not move inside the call). Deterministic.
+    const cRelFrontier = releasedFrontierC(race.capability);
     const rows = occurrenceEntities(race);
     const heatTerm = OCC_HEAT_BASE + heat;
     let sumW = 0;
@@ -221,10 +289,16 @@ export function stepIncidents(race, day, endDay, heat) {
         let cls = baseClass(src.id);
         if (src.C >= PERSUASION_RUNG && rng.next() < PERSUASION_SHARE && severity < 4) cls = 'persuasion';
 
-        // Detection parameters for this incident.
-        let pDet, meanLag;
-        if (cls === 'persuasion') { pDet = PERSUASION_DET_PROB; meanLag = PERSUASION_DET_LAG_MEAN; }
-        else { pDet = DET_PROB[severity]; meanLag = DET_LAG_MEAN[severity]; }
+        // Detection parameters for this incident. `baseMeanLag` is the raw ladder
+        // value; the concealment ratio multiplies it BEFORE the reporting regime
+        // halves it, and both factors are kept on the record so a later regime
+        // activation can recompute the effective lag without losing either.
+        // pDet is UNTOUCHED by concealment: hiding changes WHEN, never WHETHER.
+        let pDet, baseMeanLag;
+        if (cls === 'persuasion') { pDet = PERSUASION_DET_PROB; baseMeanLag = PERSUASION_DET_LAG_MEAN; }
+        else { pDet = DET_PROB[severity]; baseMeanLag = DET_LAG_MEAN[severity]; }
+        const lagMult = lagMultiplier(cRelFrontier, src.C);
+        let meanLag = baseMeanLag * lagMult;   // S4's 0 stays 0: still immediate under any ratio
         if (reporting) { pDet = Math.min(1, pDet + REPORTING_P_BONUS); meanLag *= REPORTING_LAG_MULT; }
         const detectable = rng.next() < pDet;
         const immediate = detectable && meanLag <= 0;   // S4 self-discloses in its occurrence tick
@@ -248,6 +322,8 @@ export function stepIncidents(race, day, endDay, heat) {
             occurDay: endDay,
             detectable,
             meanLag,
+            baseMeanLag,
+            lagMult,
             sBurn,
             insiderTip,
             detected: false,
@@ -307,7 +383,6 @@ export function applyReportingRegime(race) {
         if (inc.detected) continue;   // already public -- nothing to re-roll
         const persuasion = inc.cls === 'persuasion';
         const basePDet = persuasion ? PERSUASION_DET_PROB : DET_PROB[inc.severity];
-        const baseMeanLag = persuasion ? PERSUASION_DET_LAG_MEAN : DET_LAG_MEAN[inc.severity];
         const newPDet = Math.min(1, basePDet + REPORTING_P_BONUS);
         // Rescue currently-undetectable latents with the incremental detection
         // probability P(detectable now | not before) = (new − base)/(1 − base).
@@ -316,8 +391,11 @@ export function applyReportingRegime(race) {
             if (rng.next() < rescueProb) { inc.detectable = true; rescued++; }
         }
         // Remaining lag shortens: the daily detection hazard is memoryless, so
-        // halving meanLag doubles the hazard from here forward.
-        const newMeanLag = baseMeanLag * REPORTING_LAG_MULT;
+        // halving meanLag doubles the hazard from here forward. Recomputed from the
+        // record's OWN stamped pair (baseMeanLag x lagMult), never the bare ladder --
+        // recomputing from the ladder would silently discard this incident's
+        // concealment and hand a mandate the power to un-hide what is still hidden.
+        const newMeanLag = inc.baseMeanLag * REPORTING_LAG_MULT * inc.lagMult;
         if (newMeanLag < inc.meanLag) { inc.meanLag = newMeanLag; shortened++; }
     }
     return { rescued, shortened };

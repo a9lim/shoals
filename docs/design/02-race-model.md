@@ -164,7 +164,7 @@ Consequences of the split:
   thinner edge. The player can lobby their own alpha away.
 - **Cover-ups are followup chains**: occurrence → internal post-mortem
   → leak or disclosure → backlash, each hop tradeable and leakable.
-- **The gap hides its own incidents** (PROPOSED, reality-beats round
+- **The gap hides its own incidents** (ratified, reality-beats round
   2026-09-08 — [02a-tuning.md](02a-tuning.md)): detection lag scales with
   the source's internal−released gap — concealment licenses
   `C_internal`, defenders license the released frontier. The incident

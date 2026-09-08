@@ -25,6 +25,8 @@
      thefts        -> DISCLOSED thefts only (tr.theftDisclosures); the
                       occurrence track (tr.thefts) stays silent. Frontier
                       victim -> superevent, otherwise the ordinary shell
+     capex         -> ONE rates_capex_wave per RISE of the public released-
+                      frontier rung (a public-state latch, not a ledger row)
      evidence      -> NOT bridged this slice (generated + laddered in the race
                       state; surfaced through belief / the insider channel later)
 
@@ -201,6 +203,7 @@ export function finalize(ev) {
 export function resetRaceBridge() {
     _fireCount.clear();
     _lastTipDay = -Infinity;
+    _lastCapexRung = null;
 }
 
 // ---- Releases ------------------------------------------------------------
@@ -221,6 +224,51 @@ function bridgeReleases(tr, emit) {
         }
         emit(shell(id, overrides, { entity, rung: topRung, openCrossed, C_released: rel.C_released }));
     }
+}
+
+// ---- Capex channel (reality-beats round, 02a 2026-09-08 item 1) -----------
+// 03's "AI capex distorts the long end", given its mechanism: every RISE of the
+// PUBLIC released-frontier rung fires ONE `rates_capex_wave` carrying a PERMANENT
+// additive delta to the Vasicek long-run rate. Labs and hyperscalers raise AFTER
+// a demo, so the wave follows the release and `r` mean-reverts toward the new `b`
+// over the following weeks.
+//
+// This is a LATCH, not a ledger read (the `_checkFirmConversion` precedent 02a
+// cites): a released-rung crossing in `tr` does not imply the FRONTIER max rose
+// (a trailing lab crossing R2 under a released-R3 frontier moves nothing), and
+// the frontier max is exactly what the design keys on. The latch reads the same
+// public quantity `eta` and the base-rate scale read -- `releasedFrontierRung`
+// off `buildPublicView` -- never a latent C.
+//
+// Edge semantics: the first call of a run seeds the latch WITHOUT firing (R1 is
+// crossed at t=0 on every track, so Act I fires nothing and stays bit-identical);
+// after that, one fire per rung STEP (a two-rung jump in a day fires twice), so a
+// run's total is at most 4 (R1->R2 ... R4->R5). A hold fires nothing; a same-day
+// replay fires nothing (the latch already moved). Classic mode never calls the
+// bridge, so the channel is inert there by construction.
+//
+// LIVE-SNAPSHOT ARGUMENT (review fix, 2026-09-08): `checkResolution` runs BEFORE
+// this pass in main.js and its day-1008 timeout path EXTRAPOLATES the race
+// thousands of headless days forward ("no events, market, or player") in place.
+// Reading the rung off the mutated state here would let a run that spent its whole
+// life at R1 print two capex waves out of the epilogue's own extrapolation and walk
+// `sim.b` / `sim.sigmaR` into the bond closeout. So the orchestrator captures the
+// rung at the LIVE day and passes it in; the state read survives only as the
+// default for headless callers who have no extrapolation to step over.
+let _lastCapexRung = null;
+
+function bridgeCapex(emit, race, liveRung) {   // reads no ledger row: this edge is public state
+    const rung = (liveRung == null) ? buildPublicView(race).releasedFrontierRung : liveRung;
+    // Seed without firing on the first call of a run. `resetRaceBridge()` (now
+    // UNCONDITIONAL in main.js's _resetCore -- 02a reality-beats ruling 2) is the
+    // ONE path that clears the latch between runs; no self-healing branch here.
+    // (A stale latch ABOVE the rung would fire nothing -- the step loop is empty
+    // on a decrease -- and the trailing assignment tracks it down, so there are
+    // no phantom fires either way; the tip throttle and rotation counters have
+    // no such property, which is why the reset is main.js's job.)
+    if (_lastCapexRung === null) { _lastCapexRung = rung; return; }
+    for (let r = _lastCapexRung; r < rung; r++) emit(shell('rates_capex_wave', {}, {}));
+    _lastCapexRung = rung;
 }
 
 // ---- Certifications ------------------------------------------------------
@@ -416,8 +464,12 @@ function bridgeThefts(tr, emit, race) {
  * @param {object} sim           simulation (param deltas apply here)
  * @param {number} day           current day
  * @param {number} netDelta      player net delta (for event coupling)
+ * @param {number|null} liveRung public released-frontier rung captured at the LIVE
+ *                               day, BEFORE `checkResolution` may have extrapolated
+ *                               the race forward. Omit (null) headless: `bridgeCapex`
+ *                               then reads the rung off current state as before.
  */
-export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
+export function runRaceBridge(engine, race, sim, day, netDelta = 0, liveRung = null) {
     const tr = race.lastTransitions;
     if (!tr) return { fired: [], popups: [] };
     const fired = [], popups = [];
@@ -439,6 +491,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0) {
     };
 
     bridgeReleases(tr, emit);
+    bridgeCapex(emit, race, liveRung);
     bridgeCertifications(tr, emit);
     bridgeIncidents(tr, emit, race);
     bridgeStrait(tr, emit);
