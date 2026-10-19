@@ -1307,10 +1307,8 @@ function init() {
     requestAnimationFrame(frame);
 
     // 21. Canvas text is rasterized with whatever face is ready; redraw the
-    // active view once Newsreader has loaded so no fallback-serif labels linger.
-    if (document.fonts && document.fonts.load) {
-        document.fonts.load(`12px ${_FONT.text}`).then(() => { dirty = true; }, () => {});
-    }
+    // active view once the shared text faces have loaded so no fallback labels linger.
+    window._loadTextFonts().then(() => { dirty = true; });
 }
 
 // ---------------------------------------------------------------------------
