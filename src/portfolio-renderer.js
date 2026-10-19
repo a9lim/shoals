@@ -15,9 +15,9 @@ import { fmtDollar, fmtQty, pnlClass, fmtDte, posTypeLabel } from './format-help
 
 function _computeMarginDisplay(equity, required) {
     if (required <= 0) return { label: 'OK', cls: 'margin-ok' };
-    if (equity < required) return { label: 'MARGIN CALL', cls: 'margin-alert' };
+    if (equity < required) return { label: 'Margin call', cls: 'margin-alert' };
     const pct = Math.min((equity / required) * 100, 999);
-    if (equity < required * 1.2) return { label: 'LOW (' + pct.toFixed(0) + '%)', cls: 'margin-warn' };
+    if (equity < required * 1.2) return { label: 'Low (' + pct.toFixed(0) + '%)', cls: 'margin-warn' };
     return { label: 'OK (' + pct.toFixed(0) + '%)', cls: 'margin-ok' };
 }
 
@@ -76,8 +76,9 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
 
     const closeBtn = document.createElement('button');
     closeBtn.className = 'ghost-btn pos-close-btn';
-    closeBtn.textContent = 'X';
+    closeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
     closeBtn.title = 'Close position';
+    closeBtn.setAttribute('aria-label', 'Close position');
     closeBtn.addEventListener('click', () => {
         closeBtn.dispatchEvent(new CustomEvent('shoals:closePosition', { detail: { id: pos.id }, bubbles: true }));
         if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
@@ -137,8 +138,9 @@ function _buildOrderRow(order) {
 
         const cancelBtn = document.createElement('button');
         cancelBtn.className = 'ghost-btn pos-close-btn';
-        cancelBtn.textContent = 'X';
+        cancelBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
         cancelBtn.title = 'Cancel order';
+        cancelBtn.setAttribute('aria-label', 'Cancel order');
         cancelBtn.addEventListener('click', () => {
             cancelBtn.dispatchEvent(new CustomEvent('shoals:cancelOrder', { detail: { id: order.id }, bubbles: true }));
             if (typeof _haptics !== 'undefined') _haptics.trigger('light');
@@ -171,8 +173,9 @@ function _buildOrderRow(order) {
 
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'ghost-btn order-cancel-btn';
-    cancelBtn.textContent = 'X';
+    cancelBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
     cancelBtn.title = 'Cancel order';
+    cancelBtn.setAttribute('aria-label', 'Cancel order');
     cancelBtn.addEventListener('click', () => {
         cancelBtn.dispatchEvent(new CustomEvent('shoals:cancelOrder', { detail: { id: order.id }, bubbles: true }));
         if (typeof _haptics !== 'undefined') _haptics.trigger('light');
@@ -421,8 +424,9 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 
                 const closeBtn = document.createElement('button');
                 closeBtn.className = 'ghost-btn pos-close-btn';
-                closeBtn.textContent = 'X';
+                closeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
                 closeBtn.title = 'Unwind strategy';
+                closeBtn.setAttribute('aria-label', 'Unwind strategy');
                 closeBtn.addEventListener('click', () => {
                     closeBtn.dispatchEvent(new CustomEvent('shoals:unwindStrategy', { detail: { name }, bubbles: true }));
                     if (typeof _haptics !== 'undefined') _haptics.trigger('medium');

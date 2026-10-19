@@ -92,9 +92,22 @@ Internal values use original scale ($10,000 starting capital). `fmtDollar()` app
 - P&L: `pnl-down` (red) / no class (neutral) / `pnl-up` (green)
 - Portfolio value: colored vs buy-and-hold benchmark, not absolute
 - Greeks: per-Greek CSS vars (`--delta`/`--gamma`/`--theta`/`--vega`/`--rho`), NOT `pnl-up`/`pnl-down`
-- VXHCN cells: `--vxhcn` (purple) — `#vxhcn-price-cell`, `#strategy-vxhcn-cell`, `.vxhcn-overlay-cell`
+- VXHCN cells: `--vxhcn` (purple) — `#vxhcn-price-cell`, `#strategy-vxhcn-cell`
 - VXHCN sparkline: `--vxhcn` CSS var color
 - Sparklines: rate/portfolio use `--text` CSS var color
+
+### Type and Layout
+
+The root design system applies (Newsreader, neutral ground, per-theme oxblood accent). Project specifics:
+
+- **No monospace UI.** Every readout, table, position label and canvas label is `--font-text` / `_FONT.text`; columns align on Newsreader's default lining tabular figures. `--font-code` is used only for the API-key input (a literal token).
+- **Canvas text** (`chart.js`, `strategy.js`): `LABEL_FONT()` = `12px ${_FONT.text}` (the chart's empty-state line is 14px). Theme colors, including the accent, come from `_themePalette()` and are cached per `data-theme` value, so a theme toggle refreshes them on the next draw. `main.js` redraws once `document.fonts.load()` resolves so labels never stay in a fallback face.
+- **Crosshair tags** (chart price/day labels): accent fill with the theme's `elevated` color as text (`--text-on-accent`): white on oxblood in light, near-black on the lighter red in dark.
+- **Chart gutters** (`config.js`): `CHART_Y_AXIS_W` 64px holds right-aligned 12px price labels (widest, `$100.0`, measures 39px) and the 60px crosshair tag. The strategy view's left gutter is fitted per draw to the widest measured Y label plus the rotated "P&L" column (`_fitLeftMargin`, never below `STRATEGY_MARGIN.left`); its legend box is sized from measured label widths; X tick labels skip any tick that would collide with the accent spot label and clamp inside the canvas at the right edge.
+- **Tables**: numeric columns are right-aligned so decimals stack. The three-column tables (stock/bond/VXHCN and call/strike/put) use `--chain-pad-r: calc(100% / 6 - 1.25em)` — cell padding percentages resolve against the table width — which centres the widest figure in each column at any sidebar width. The Consensus and compute books keep a left-aligned label column. Headers are italic `--text-muted` over a hairline rule.
+- **Popup kicker** (`.popup-tag`): an italic muted label with a category-colored dot; `showPopupEvent` sets `--tag-color` per category, so the label text keeps full contrast.
+- **Sentence case in source** for every UI label, info-tip title, reference heading, preset, built-in strategy, trait and epilogue label; proper nouns, tickers (HCN, BND, VXHCN, CMP) and acronyms keep their capitals. Code that finds a preset by name matches `/\(offline\)/i`, not a display string's casing.
+- Motion is color and opacity only: chain-cell and popup-choice hover change background or a hairline inset rule; superevent and choice entrances are opacity fades.
 
 ### Pricing
 

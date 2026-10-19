@@ -537,7 +537,7 @@ function _executeDeferred(entry) {
     } else if (entry.kind === 'binary') {
         const pos = executeBinaryTrade(p.key, p.side, p.qty, mult);
         if (pos) {
-            _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k YES', 2500);
+            _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k Yes', 2500);
             _haptic('success');
         } else {
             _toast('Binary order rejected at the fill — cash or contract closed.', 4000);
@@ -813,7 +813,9 @@ function init() {
     // 8. Init keyboard shortcuts
 
     var _shortcuts = [
-        { key: ' ',  label: 'Play / Pause',      group: 'Simulation', action: () => togglePlay() },
+        // Space on a focused button (e.g. a popup choice) keeps its native activation
+        { key: 'space', label: 'Play / pause',   group: 'Simulation', action: () => togglePlay(),
+          when: () => !(document.activeElement && document.activeElement.tagName === 'BUTTON') },
         { key: '.', label: 'Speed up',            group: 'Simulation', action: () => cycleSpeed() },
         { key: ',', label: 'Slow down',            group: 'Simulation', action: () => decycleSpeed() },
         { key: '/', label: 'Step forward one day', group: 'Simulation', action: () => step() },
@@ -840,7 +842,7 @@ function init() {
     ];
 
     if (typeof initShortcuts !== 'undefined') {
-        initShortcuts(_shortcuts, { helpTitle: 'Shoals Keyboard Shortcuts' });
+        initShortcuts(_shortcuts, { helpTitle: 'Shoals keyboard shortcuts' });
     }
 
     if (typeof initAboutPanel === 'function') {
@@ -849,15 +851,15 @@ function init() {
             lastUpdated: '2026-07-17',
             description: 'Trade stock, bonds, VXHCN volatility futures, and American options in a stochastic market simulator. Build multi-leg strategies, manage a margin portfolio, and navigate branching institutional events during a volatile political term.',
             controls: [
-                { label: 'Buy / sell stock', value: 'Click Buy button or press B' },
-                { label: 'Buy / sell bond', value: 'Click Bond button or press N' },
-                { label: 'Trade options', value: 'Open chain (O) from Trade tab' },
-                { label: 'Execute strategy', value: 'Enter key or Execute button' },
-                { label: 'Build strategy', value: 'Add legs in Strategy tab' },
+                { label: 'Buy / sell stock', value: 'Click the HCN price or press B' },
+                { label: 'Buy / sell bond', value: 'Click the bond price or press N' },
+                { label: 'Trade options', value: 'Click a chain price in the Trade tab' },
+                { label: 'Execute strategy', value: 'Enter key or Execute strategy button' },
+                { label: 'Build strategy', value: 'Add legs in the Strategy tab' },
                 { label: 'Pan / zoom chart', value: 'Drag to pan, = / - / 0 to zoom' },
                 { label: 'Cycle tabs', value: '[ previous, ] next' },
                 { label: 'Speed', value: '. faster, , slower, / step' },
-                { label: 'Load preset', value: 'Settings tab or keys 1\u20137' },
+                { label: 'Load preset', value: 'Info tab or keys 1\u20137' },
             ],
             shortcuts: _shortcuts,
             repo: 'https://github.com/a9lim/shoals',
@@ -1303,6 +1305,12 @@ function init() {
 
     // 20. Start animation loop
     requestAnimationFrame(frame);
+
+    // 21. Canvas text is rasterized with whatever face is ready; redraw the
+    // active view once Newsreader has loaded so no fallback-serif labels linger.
+    if (document.fonts && document.fonts.load) {
+        document.fonts.load(`12px ${_FONT.text}`).then(() => { dirty = true; }, () => {});
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -1889,7 +1897,7 @@ function _applyPopupChoice(event, choice) {
                 _showGameOver('Forced liquidation left your account in deficit by '
                     + fmtDollar(Math.abs(_portfolioEquity()))
                     + '. Regulators have flagged the account for review.',
-                    'margin_call_liquidation', 'Account Liquidation');
+                    'margin_call_liquidation', 'Account liquidation');
             }
         } else if (choice.playerFlag === 'margin_partial') {
             // Close stock positions only
@@ -1911,7 +1919,7 @@ function _applyPopupChoice(event, choice) {
                 updateUI();
                 if (stuck.length === 0 && _portfolioEquity() < 0) {
                     _showGameOver('Forced liquidation left your account in deficit.',
-                        'margin_call_liquidation', 'Account Liquidation');
+                        'margin_call_liquidation', 'Account liquidation');
                 }
             }
         }
@@ -1959,7 +1967,7 @@ function _applyPopupChoice(event, choice) {
     }
 }
 
-function _showGameOver(contextText, endingId = 'forced_resignation', headline = 'Rogue Trading Investigation') {
+function _showGameOver(contextText, endingId = 'forced_resignation', headline = 'Rogue trading investigation') {
     _queuePopup({
         category: 'gameover',
         magnitude: 'major',
@@ -2244,7 +2252,7 @@ function _promptForecastLock() {
     _queuePopup({
         category: 'desk',
         magnitude: 'moderate',
-        headline: 'Quarterly Forecast Lock',
+        headline: 'Quarterly forecast lock',
         context: 'The desk logs your timeline call for the record — no retroactive edits, and it scores '
             + 'against every milestone that matures, traded or not. The market\'s implied timeline reads '
             + `R3 ~ day ${tl[3]}, R4 ~ day ${tl[4]} (implied pilledness ${mkt}%). Where do you stand?`,
@@ -2444,10 +2452,10 @@ function _onDayComplete() {
         onQuarterlyReview(_portfolioEquity(), sim.day);
 
         const texts = {
-            strong: 'Quarterly Desk Review: Meridian\'s risk committee notes exceptional returns.',
-            solid: 'Quarterly Desk Review: Solid quarter. Book within risk parameters.',
-            underperform: 'Quarterly Desk Review: Returns lag benchmark. Risk committee requests position summary.',
-            poor: 'Quarterly Desk Review: Managing Director Vasquez wants a meeting about your book.',
+            strong: 'Quarterly desk review: Meridian\'s risk committee notes exceptional returns.',
+            solid: 'Quarterly desk review: Solid quarter. Book within risk parameters.',
+            underperform: 'Quarterly desk review: Returns lag benchmark. Risk committee requests position summary.',
+            poor: 'Quarterly desk review: Managing Director Vasquez wants a meeting about your book.',
         };
         let text = texts[rating];
         if (playerChoices.cooperated_sec || playerChoices.silent_sec || playerChoices.accepted_insider_tip) {
@@ -2840,7 +2848,7 @@ function _onDayComplete() {
         _queuePopup({
             category: 'margin',
             magnitude: 'major',
-            headline: 'Margin Call',
+            headline: 'Margin call',
             context: `Portfolio equity ${fmtDollar(margin.equity)} is below the maintenance requirement of ${fmtDollar(margin.required)}. Shortfall: ${fmtDollar(shortfall)}. The risk desk is on the line.`,
             choices: [
                 {
@@ -3424,7 +3432,7 @@ function handleBinaryTrade(key, side) {
     if (_deferManual('binary', { key, side, qty })) { updateUI(); dirty = true; return; }
     const pos = executeBinaryTrade(key, side, qty);
     if (pos) {
-        _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k YES', 2500);
+        _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k Yes', 2500);
         _haptic('success');
     } else {
         _toast('Binary trade rejected — insufficient cash or contract closed.');
@@ -3823,7 +3831,7 @@ function _showEpilogue(pages, terminal = false) {
     restartBtn.onclick = () => {
         overlay.classList.add('hidden');
         _cleanupEpilogue();
-        // Find the Dynamic (Offline) preset index. Restart goes through the FULL
+        // Find the Dynamic (offline) preset index. Restart goes through the FULL
         // preset load, not the bare `_resetCore` (review fix, 2026-09-08):
         // `_resetCore` resets the chassis but leaves the OLD raceState -- already
         // resolved and (on the timeout path) extrapolated to day ~2800 -- plus the
@@ -3832,7 +3840,7 @@ function _showEpilogue(pages, terminal = false) {
         // retained `race.resolution` would terminate the new desk on its first
         // day-complete. `loadPreset` calls `_resetCore` first and then builds the
         // fresh race, engine and instrument books -- one authoritative new-run path.
-        const offlineIdx = PRESETS.findIndex(p => p.name.includes('Offline'));
+        const offlineIdx = PRESETS.findIndex(p => /\(offline\)/i.test(p.name));
         if (offlineIdx >= 0) loadPreset(offlineIdx);
     };
     keepBtn.onclick = () => {

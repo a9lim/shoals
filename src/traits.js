@@ -16,7 +16,7 @@ const TRAITS = [
     // ── Permanent convictions (gameplay modifiers) ─────────────
     {
         id: 'information_edge',
-        name: 'Information Is Everything',
+        name: 'Information is everything',
         permanent: true,
         description: 'Event toasts show parameter direction hints. Compliance watches more closely.',
         condition: (ctx) => {
@@ -31,7 +31,7 @@ const TRAITS = [
     },
     {
         id: 'market_always_right',
-        name: 'The Market Is Always Right',
+        name: 'The market is always right',
         permanent: true,
         description: 'Compliance treats you well. Event coupling is dampened.',
         condition: (ctx) => {
@@ -48,7 +48,7 @@ const TRAITS = [
     },
     {
         id: 'contrarian_instinct',
-        name: 'Contrarian Instinct',
+        name: 'Contrarian instinct',
         permanent: true,
         description: 'You thrive in chaos. Layer 3 thresholds raised. Boredom boost disabled.',
         condition: (ctx) => ctx.impactHistory.length >= 8,
@@ -56,7 +56,7 @@ const TRAITS = [
     },
     {
         id: 'desk_protects',
-        name: 'The Desk Protects Its Own',
+        name: 'The desk protects its own',
         permanent: true,
         description: 'Compliance popup frequency reduced. Insider tip events stop firing.',
         condition: (ctx) => {
@@ -68,7 +68,7 @@ const TRAITS = [
     },
     {
         id: 'master_of_leverage',
-        name: 'Master of Leverage',
+        name: 'Master of leverage',
         permanent: true,
         description: 'Event coupling amplified. Scrutiny builds faster.',
         condition: (ctx) => {
@@ -79,7 +79,7 @@ const TRAITS = [
     },
     {
         id: 'political_operator',
-        name: 'Political Operator',
+        name: 'Political operator',
         permanent: true,
         description: 'Lobbying costs reduced. Regulatory events reference you by name.',
         condition: (ctx) => {
@@ -96,7 +96,7 @@ const TRAITS = [
     },
     {
         id: 'ghost_protocol',
-        name: 'Ghost Protocol',
+        name: 'Ghost protocol',
         permanent: true,
         description: 'Scrutiny gain halved. Compliance rarely triggers. You are invisible.',
         condition: (ctx) => {
@@ -108,7 +108,7 @@ const TRAITS = [
     },
     {
         id: 'volatility_addict',
-        name: 'Volatility Addict',
+        name: 'Volatility addict',
         permanent: true,
         description: 'You see the vol surface more clearly. Straddle/strangle strategies highlighted.',
         condition: (ctx) => {
@@ -119,7 +119,7 @@ const TRAITS = [
     },
     {
         id: 'media_darling',
-        name: 'Media Darling',
+        name: 'Media darling',
         permanent: true,
         description: 'Your name appears in The Continental, The Sentinel, and MarketWire — sometimes all on the same day.',
         condition: (ctx) => {
@@ -135,7 +135,7 @@ const TRAITS = [
     },
     {
         id: 'washington_insider',
-        name: 'Washington Insider',
+        name: 'Washington insider',
         permanent: true,
         description: 'You know which senators answer their phones and which lobbyists return calls. Meridian Capital has a seat at the table.',
         condition: (ctx) => {
@@ -151,7 +151,7 @@ const TRAITS = [
     },
     {
         id: 'risk_manager',
-        name: 'Risk Manager',
+        name: 'Risk manager',
         permanent: true,
         description: 'You file your reports on time, hedge your positions, and cooperate with compliance. The desk trusts you.',
         condition: (ctx) => {
@@ -169,7 +169,7 @@ const TRAITS = [
     },
     {
         id: 'crisis_profiteer',
-        name: 'Crisis Profiteer',
+        name: 'Crisis profiteer',
         permanent: true,
         description: 'Every catastrophe is a trade. When the Strait closes, when the border falls, when the hearings begin — you\'re already positioned.',
         condition: (ctx) => {
@@ -194,7 +194,7 @@ const TRAITS = [
     // false, beliefPilled defaults), so Classic behavior is untouched.
     {
         id: 'agi_pilled',
-        name: 'AGI-Pilled',
+        name: 'AGI-pilled',
         permanent: true,
         description: 'You called the short timeline early and put the book on it.',
         // Own locked posterior on the recursion rungs is consistently high.
@@ -222,7 +222,7 @@ const TRAITS = [
     },
     {
         id: 'deal_believer',
-        name: 'Deal-Believer',
+        name: 'Deal-believer',
         permanent: true,
         description: 'You spent capital on the one lever that makes the treaty thinkable: compute reporting.',
         condition: (ctx) => ctx.playerChoices.lobbied_compute_reporting || ctx.playerChoices.lobbied_verification,
@@ -257,42 +257,42 @@ const TRAITS = [
     // ── Reputation tags (dynamic, narrative gating) ────────────
     {
         id: 'market_mover',
-        name: 'Market Mover',
+        name: 'Market mover',
         permanent: false,
         condition: (ctx) => (ctx.flags.largeImpactTrades || 0) >= 3,
         effects: {},
     },
     {
         id: 'political_player',
-        name: 'Political Player',
+        name: 'Political player',
         permanent: false,
         condition: () => getFaction('federalistSupport') > 50 || getFaction('farmerLaborSupport') > 50,
         effects: {},
     },
     {
         id: 'media_figure',
-        name: 'Media Figure',
+        name: 'Media figure',
         permanent: false,
         condition: (ctx) => getFaction('mediaTrust') > 60 || (ctx.flags.continentalMentions || 0) >= 2,
         effects: {},
     },
     {
         id: 'under_scrutiny',
-        name: 'Under Scrutiny',
+        name: 'Under scrutiny',
         permanent: false,
         condition: () => getFaction('regulatoryExposure') > 50,
         effects: {},
     },
     {
         id: 'meridian_star',
-        name: 'Meridian Star',
+        name: 'Meridian star',
         permanent: false,
         condition: () => getFaction('firmStanding') > 80,
         effects: {},
     },
     {
         id: 'quiet_money',
-        name: 'Quiet Money',
+        name: 'Quiet money',
         permanent: false,
         loseForever: true,
         condition: () =>

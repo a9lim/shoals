@@ -96,12 +96,12 @@ export function checkEndings(sim, portfolio, world, playerChoices = {}) {
 // =============================================================================
 
 const FAMILY_NAMES = {
-    1: 'Won with Margin', 2: 'The Knife-Edge', 3: 'Misaligned Takeoff',
-    4: 'China First', 5: 'The Deal', 6: 'The Fizzle',
+    1: 'Won with margin', 2: 'The knife-edge', 3: 'Misaligned takeoff',
+    4: 'China first', 5: 'The deal', 6: 'The fizzle',
 };
 const OVERLAY_NAMES = {
-    margin_called: 'Margin-Called', convicted: 'Convicted',
-    whistleblower_exile: 'Whistleblower', gray_eminence: 'Gray Eminence',
+    margin_called: 'Margin-called', convicted: 'Convicted',
+    whistleblower_exile: 'Whistleblower', gray_eminence: 'Gray eminence',
     bystander: 'Bystander',
 };
 
@@ -318,7 +318,7 @@ const EPILOGUE_SLOTS = {
     },
 };
 
-const PAGE_TITLES = ['The Resolution', 'The Race', 'The Reckoning', 'The Desk', 'The Ledger'];
+const PAGE_TITLES = ['The resolution', 'The race', 'The reckoning', 'The desk', 'The ledger'];
 
 /** Resolve the (family, overlay, page) prose slot with graceful fallback. */
 function slot(family, overlay, page) {
@@ -375,7 +375,7 @@ function _pageResolution(family, overlay, resolution) {
     let body = slot(family, overlay, 1);
     if (resolution) {
         const ax = resolution.axes || {};
-        body += _statSection('World Outcome', [
+        body += _statSection('World outcome', [
             ['Outcome', FAMILY_NAMES[family] || '-'],
             ['Terminal cause', _label(resolution.terminalCause)],
             ['Resolved (day)', String(resolution.day)],
@@ -391,7 +391,7 @@ function _pageRace(family, overlay, resolution) {
     let body = slot(family, overlay, 2);
     if (resolution) {
         const ax = resolution.axes || {};
-        body += _statSection('The Sampled World', [
+        body += _statSection('The sampled world', [
             ['Frontier leader', _label(ax.leader)],
             ['Crossing entity', ax.crossingEntity ? _label(ax.crossingEntity) : 'none (no takeoff)'],
             ['Alignment', _label(ax.alignmentResult)],
@@ -405,7 +405,7 @@ function _pageRace(family, overlay, resolution) {
 
 function _pageReckoning(family, overlay, endingId, factionState) {
     let body = slot(family, overlay, 3);
-    body += _statSection('Personal Standing', [
+    body += _statSection('Personal standing', [
         ['Outcome', OVERLAY_NAMES[overlay] || '-'],
         ['Desk ended by', _label(endingId)],
         ['Meridian standing', `${Math.round(factionState.firmStanding || 0)}/100`],
@@ -433,7 +433,7 @@ function _pageDesk(family, overlay, closeout, sim, portfolio) {
         bond: 'Bonds', binary: 'Consensus binaries', compute: 'Compute futures' };
     const ORDER = ['stock', 'option', 'vxhcn', 'bond', 'binary', 'compute'];
     const rows = ORDER.filter(k => k in agg).map(k => [LABELS[k], `${_dollar(agg[k])} P&L`]);
-    body += _statSection('Terminal Closeout', rows.length ? rows : [['Open positions at term', 'none']]);
+    body += _statSection('Terminal closeout', rows.length ? rows : [['Open positions at term', 'none']]);
     if (closeout && closeout.ctx && closeout.ctx.hcnConverted) {
         body += _statSection('Nationalization', [['HCN conversion price', _dollar(closeout.ctx.hcnMark)]]);
     }
@@ -464,7 +464,7 @@ function _pageLedger(family, overlay, ctx, factionState, traitIds) {
     // family, no gate. A quantity, never a verdict; the reader does the classifying.
     const m = ctx.resolution && ctx.resolution.movability;
     if (m) ledgerRows.push(['Of the margin that decided it, yours', _pctAbs(m.realizedShare || 0)]);
-    body += _statSection('The Complicity Ledger', ledgerRows);
+    body += _statSection('The complicity ledger', ledgerRows);
 
     // Final scorecard (structural).
     body += _financialScorecard(ctx.sim, ctx.portfolio, ctx.closeout);
@@ -482,25 +482,28 @@ function _financialScorecard(sim, portfolio, closeout) {
     const pnlPct = totalPnl / INITIAL_CAPITAL;
     const peakValue = portfolio.peakValue || equity;
     const maxDrawdown = portfolio.maxDrawdown || 0;
-    let html = _statSection('Portfolio Performance', [
-        ['Final Value', _dollar(equity)],
+    let html = _statSection('Portfolio performance', [
+        ['Final value', _dollar(equity)],
         ['Total P&L', `${_dollar(totalPnl)} (${_pct(pnlPct)})`],
-        ['Peak Value', _dollar(peakValue)],
-        ['Max Drawdown', _pctAbs(maxDrawdown)],
+        ['Peak value', _dollar(peakValue)],
+        ['Max drawdown', _pctAbs(maxDrawdown)],
     ]);
-    html += _statSection('Trading Activity', [
-        ['Trades Executed', (portfolio.totalTrades || 0).toLocaleString()],
-        ['Options Exercised', (portfolio.totalExercises || 0).toLocaleString()],
-        ['Margin Calls', (portfolio.marginCallCount || 0).toLocaleString()],
+    html += _statSection('Trading activity', [
+        ['Trades executed', (portfolio.totalTrades || 0).toLocaleString()],
+        ['Options exercised', (portfolio.totalExercises || 0).toLocaleString()],
+        ['Margin calls', (portfolio.marginCallCount || 0).toLocaleString()],
     ]);
     return html;
 }
 
-// -- Small label prettifier (data enums -> Title Case; NOT prose) ------------
+// -- Small label prettifier (data enums -> sentence case; NOT prose) ---------
+
+const _PROPER = /\b(halcyon|tianxia|polaris|meridian|barron|china|beijing|washington)\b/g;
 
 function _label(s) {
     if (s == null) return '-';
-    return String(s)
+    const t = String(s)
         .replace(/[_-]+/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
+        .replace(_PROPER, w => w.charAt(0).toUpperCase() + w.slice(1));
+    return t.charAt(0).toUpperCase() + t.slice(1);
 }

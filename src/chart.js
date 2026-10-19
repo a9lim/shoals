@@ -14,6 +14,9 @@ import {
     CHART_SLOT_PX, CHART_BODY_RATIO,
 } from './config.js';
 
+// Canvas type: Newsreader at 12px for every label (lining tabular figures by default).
+const LABEL_FONT = () => `12px ${_FONT.text}`;
+
 export class ChartRenderer {
     /**
      * @param {HTMLCanvasElement} canvas
@@ -57,10 +60,11 @@ export class ChartRenderer {
 
         // Theme color cache — invalidated when data-theme changes
         this._cachedTheme = null;
-        this._isDark = false;
         this._gridColor = '';
         this._textMuted = '';
         this._textSec = '';
+        this._accent = '';
+        this._onAccent = '';
 
         this.resize();
     }
@@ -229,13 +233,15 @@ export class ChartRenderer {
         const currentTheme = document.documentElement.dataset.theme || 'light';
         if (currentTheme !== this._cachedTheme) {
             this._cachedTheme = currentTheme;
-            this._isDark = currentTheme === 'dark';
-            const p = _PALETTE;
-            this._textMuted = this._isDark ? p.dark.textMuted : p.light.textMuted;
-            this._textSec   = this._isDark ? p.dark.textSecondary : p.light.textSecondary;
-            this._gridColor = this._isDark ? _r(p.dark.text, 0.06) : _r(p.light.text, 0.06);
+            const t = _themePalette();
+            this._textMuted = t.textMuted;
+            this._textSec   = t.textSecondary;
+            this._gridColor = _r(t.text, 0.06);
+            // Crosshair tags: accent fill with --text-on-accent (the theme's
+            // elevated surface) — white on oxblood, near-black on the dark red.
+            this._accent    = t.accent;
+            this._onAccent  = t.elevated;
         }
-        const isDark = this._isDark;
         const textMuted = this._textMuted;
         const textSec = this._textSec;
         const palette   = _PALETTE;
@@ -258,7 +264,7 @@ export class ChartRenderer {
 
         if (!history || history.length === 0 || history.size === 0) {
             ctx.fillStyle = textMuted;
-            ctx.font      = `13px ${_FONT.sans}`;
+            ctx.font      = `14px ${_FONT.text}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText('Awaiting market data\u2026', W / 2, H / 2);
@@ -454,7 +460,7 @@ export class ChartRenderer {
             const yLast = priceToY(priceLineClose);
             if (yLast >= plotY && yLast <= plotY + plotH) {
                 ctx.save();
-                ctx.strokeStyle = palette.accent;
+                ctx.strokeStyle = this._accent;
                 ctx.lineWidth   = 1;
                 ctx.setLineDash([4, 4]);
                 ctx.beginPath();
@@ -518,7 +524,7 @@ export class ChartRenderer {
 
             const strikeDash = [6, 3];
             ctx.lineWidth   = 1;
-            ctx.font        = `11px ${_FONT.mono}`;
+            ctx.font        = LABEL_FONT();
             ctx.textBaseline = 'bottom';
 
             // Collect colors per strike: track whether green/rose appear
@@ -563,7 +569,7 @@ export class ChartRenderer {
 
         // ── 8. Y-axis labels ──────────────────────────────────────
         ctx.save();
-        ctx.font        = `11px ${_FONT.mono}`;
+        ctx.font        = LABEL_FONT();
         ctx.fillStyle   = textSec;
         ctx.textAlign   = 'right';
         ctx.textBaseline = 'middle';
@@ -580,7 +586,7 @@ export class ChartRenderer {
         // ── 8b. Y-axis rotated label "Price ($)" ────────────────
         ctx.save();
         ctx.fillStyle    = textMuted;
-        ctx.font         = `11px ${_FONT.mono}`;
+        ctx.font         = LABEL_FONT();
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
         ctx.translate(10, plotY + plotH / 2);
@@ -590,7 +596,7 @@ export class ChartRenderer {
 
         // ── 9. X-axis labels ──────────────────────────────────────
         ctx.save();
-        ctx.font        = `11px ${_FONT.mono}`;
+        ctx.font        = LABEL_FONT();
         ctx.fillStyle   = textMuted;
         ctx.textAlign   = 'center';
         ctx.textBaseline = 'top';
@@ -613,9 +619,7 @@ export class ChartRenderer {
             && mouseY >= plotY && mouseY <= plotY + plotH;
 
         if (mouseX >= 0 && inPlot) {
-            const crossColor = isDark
-                ? _r(palette.dark.text,  0.25)
-                : _r(palette.light.text, 0.25);
+            const crossColor = _r(_themePalette().text, 0.25);
 
             ctx.save();
             ctx.strokeStyle = crossColor;
@@ -646,10 +650,10 @@ export class ChartRenderer {
             const priceLabelX = plotX + plotW;
             const priceLabelY = Math.round(mouseY) - priceLabelH / 2;
 
-            ctx.fillStyle = palette.accent;
+            ctx.fillStyle = this._accent;
             ctx.fillRect(priceLabelX, priceLabelY, priceLabelW, priceLabelH);
-            ctx.fillStyle = palette.light.canvas;
-            ctx.font        = `11px ${_FONT.mono}`;
+            ctx.fillStyle = this._onAccent;
+            ctx.font        = LABEL_FONT();
             ctx.textAlign   = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(
@@ -667,15 +671,15 @@ export class ChartRenderer {
             if (hoverDay >= hMinDay && hoverDay <= hMaxDay) {
                 const dayText = fmtRelDay(hoverDay, this.dayOrigin);
 
-                ctx.font        = `11px ${_FONT.mono}`;
+                ctx.font        = LABEL_FONT();
                 const dayLabelW = ctx.measureText(dayText).width + 10;
                 const dayLabelH = 18;
                 const dayLabelX = Math.round(mouseX) - dayLabelW / 2;
                 const dayLabelY = plotY + plotH;
 
-                ctx.fillStyle = palette.accent;
+                ctx.fillStyle = this._accent;
                 ctx.fillRect(dayLabelX, dayLabelY, dayLabelW, dayLabelH);
-                ctx.fillStyle = palette.light.canvas;
+                ctx.fillStyle = this._onAccent;
                 ctx.textAlign   = 'center';
                 ctx.textBaseline = 'middle';
                 ctx.fillText(dayText, dayLabelX + dayLabelW / 2, dayLabelY + dayLabelH / 2);

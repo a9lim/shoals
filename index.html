@@ -14,8 +14,8 @@
     <meta property="og:url" content="https://a9l.im/shoals">
     <meta property="og:site_name" content="a9l.im">
     <meta name="twitter:card" content="summary_large_image">
-    <meta property="og:image" content="https://a9l.im/shoals/og-image.webp?v=20260725f">
-    <meta name="twitter:image" content="https://a9l.im/shoals/og-image.webp?v=20260725f">
+    <meta property="og:image" content="https://a9l.im/shoals/og-image.webp?v=20261019">
+    <meta name="twitter:image" content="https://a9l.im/shoals/og-image.webp?v=20261019">
     <meta name="twitter:image:alt" content="Shoals — options trading and politics simulator by a9l.im">
     <meta property="og:image:width" content="1200">
     <meta property="og:image:height" content="630">
@@ -28,7 +28,7 @@
     <meta name="twitter:description" content="Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.">
     <meta name="author" content="a9lim">
     <link rel="icon" href="/favicon.ico">
-    <meta name="theme-color" content="#E11107">
+    <meta name="theme-color" content="#FCFCFB">
     <link rel="canonical" href="https://a9l.im/shoals">
     <link rel="alternate" hreflang="en" href="https://a9l.im/shoals">
     <meta name="mobile-web-app-capable" content="yes">
@@ -232,7 +232,7 @@
       "@type": "HowTo",
       "name": "How to price options with Shoals",
       "step": [
-        {"@type": "HowToStep", "position": 1, "name": "Choose a market preset", "text": "Select one of five fixed regimes, Dynamic (Offline), or Dynamic (LLM), then adjust the exposed stock, volatility, jump, rate, and dividend parameters if desired."},
+        {"@type": "HowToStep", "position": 1, "name": "Choose a market preset", "text": "Select one of five fixed regimes, Dynamic (offline), or Dynamic (LLM), then adjust the exposed stock, volatility, jump, rate, and dividend parameters if desired."},
         {"@type": "HowToStep", "position": 2, "name": "Open the live market", "text": "Run or single-step the 16-substep trading day while the Heston/Merton stock process, Vasicek rate process, VXHCN index, and rolling expiries update."},
         {"@type": "HowToStep", "position": 3, "name": "Build and execute a strategy", "text": "Trade stock, bonds, VXHCN futures, or individual options, or use the multi-leg builder for a saved or custom strategy with payoff and Greek overlays."},
         {"@type": "HowToStep", "position": 4, "name": "Manage orders and margin", "text": "Use market, limit, or stop orders; monitor cash, buying power, margin, borrow costs, price impact, and pending orders."},
@@ -255,7 +255,7 @@
         <div class="toolbar-actions sim-toolbar-actions">
             <button id="mode-btn" class="tool-btn" aria-label="Buy mode" aria-pressed="false" title="Buy mode (X)" data-icon="modeShoals"></button>
             <div class="tool-sep"></div>
-            <button id="play-btn" class="tool-btn" aria-label="Play/Pause simulation" title="Play"></button>
+            <button id="play-btn" class="tool-btn" aria-label="Play/pause simulation" title="Play"></button>
             <button id="speed-btn" class="tool-btn speed-btn" aria-label="Simulation speed" title="Speed: 0.25x">
                 <span class="speed-label">0.25x</span>
             </button>
@@ -284,7 +284,7 @@
         </div>
         <div id="time-slider-bar" class="time-slider-bar hidden">
             <label class="time-slider-row">
-                <span class="time-slider-label">Time to Expiry</span>
+                <span class="time-slider-label">Time to expiry</span>
                 <input type="range" id="time-slider" min="0" max="100" step="1" value="100">
                 <span class="slider-value" id="time-slider-label">0 DTE</span>
             </label>
@@ -312,7 +312,7 @@
                 <!-- Trade Tab -->
                 <div class="tab-panel active" id="tab-trade" role="tabpanel" aria-labelledby="tab-btn-trade">
                     <div class="stat-group">
-                        <div class="group-label">Quick Trade</div>
+                        <div class="group-label">Quick trade</div>
                         <div class="control-group">
                             <label for="trade-qty">
                                 <span>Quantity</span>
@@ -321,7 +321,7 @@
                             <input type="range" id="trade-qty" min="1" max="100" step="1" value="1">
                         </div>
                         <div class="control-group">
-                            <span class="ctrl-label">Order Type <button class="info-trigger" type="button" data-info="orderTypes" aria-label="Info: Order Types">?</button></span>
+                            <span class="ctrl-label">Order type <button class="info-trigger" type="button" data-info="orderTypes" aria-label="Info: Order types">?</button></span>
                             <div class="mode-toggles" id="order-type-toggles">
                                 <button class="mode-btn active" data-ordertype="market">Market</button>
                                 <button class="mode-btn" data-ordertype="limit">Limit</button>
@@ -330,7 +330,7 @@
                         </div>
                         <div class="control-group hidden" id="trigger-price-group">
                             <label>
-                                <span>Trigger Price</span>
+                                <span>Trigger price</span>
                                 <span class="slider-value" id="trigger-price-val">$100</span>
                             </label>
                             <input type="range" id="trigger-price" min="40" max="160" step="5" value="100">
@@ -355,19 +355,19 @@
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
                         <div class="stat-group saved-strategies-section" id="saved-strategies-section">
-                            <div class="group-label">Saved Strategies</div>
+                            <div class="group-label">Saved strategies</div>
                             <select id="trade-strategy-select" class="sim-select" aria-label="Saved strategy">
                                 <option value="">Select a strategy&hellip;</option>
                             </select>
                             <div class="stat-row" id="strategy-credit-debit">
-                                <span class="stat-label">Net Cost</span>
+                                <span class="stat-label">Net cost</span>
                                 <span class="stat-value" id="strategy-net-cost">&mdash;</span>
                             </div>
-                            <button id="trade-exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute Strategy</button>
+                            <button id="trade-exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute strategy</button>
                         </div>
-                        <p class="panel-hint trade-hint" id="trade-hint">Left-click: buy &middot; Right-click: sell/short &middot; Hover: bid/ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-Ask Spreads">?</button></p>
+                        <p class="panel-hint trade-hint" id="trade-hint">Left-click: buy &middot; Right-click: sell/short &middot; Hover: bid/ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-ask spreads">?</button></p>
                         <div id="consensus-section" class="stat-group hidden">
-                            <div class="group-label">Consensus Markets</div>
+                            <div class="group-label">Consensus markets</div>
                             <table class="chain-tbl" id="consensus-table">
                                 <thead><tr>
                                     <th class="chain-th">Milestone</th>
@@ -377,10 +377,10 @@
                                 </tr></thead>
                                 <tbody id="consensus-tbody"></tbody>
                             </table>
-                            <p class="panel-hint">Left-click: buy YES &middot; Right-click: sell YES</p>
+                            <p class="panel-hint">Left-click: buy Yes &middot; Right-click: sell Yes</p>
                         </div>
                         <div id="compute-section" class="stat-group hidden">
-                            <div class="group-label">Compute Futures</div>
+                            <div class="group-label">Compute futures</div>
                             <table class="chain-tbl" id="compute-table">
                                 <thead><tr>
                                     <th class="chain-th">Maturity</th>
@@ -407,23 +407,23 @@
                         </div>
                         <div class="stat-row">
                             <span class="stat-label-wrap">
-                                <span class="stat-label">Portfolio Value</span>
-                                <button class="info-trigger" type="button" data-info="portfolioValue" aria-label="Info: Portfolio Value">?</button>
+                                <span class="stat-label">Portfolio value</span>
+                                <button class="info-trigger" type="button" data-info="portfolioValue" aria-label="Info: Portfolio value">?</button>
                             </span>
                             <span class="stat-value" id="portfolio-value">$10,000</span>
                         </div>
                         <canvas class="sparkline rate-sparkline" id="portfolio-sparkline" width="280" height="40"></canvas>
                         <div class="stat-row">
                             <span class="stat-label-wrap" id="margin-label-wrap">
-                                <span class="stat-label">Margin Status</span>
-                                <button class="info-trigger" type="button" data-info="margin" aria-label="Info: Margin Status">?</button>
+                                <span class="stat-label">Margin status</span>
+                                <button class="info-trigger" type="button" data-info="margin" aria-label="Info: Margin status">?</button>
                             </span>
                             <span class="stat-value margin-ok" id="margin-status">OK</span>
                         </div>
                         <div class="stat-row">
                             <span class="stat-label-wrap">
-                                <span class="stat-label">Borrow Cost</span>
-                                <button class="info-trigger" type="button" data-info="borrowCost" aria-label="Info: Borrow Cost">?</button>
+                                <span class="stat-label">Borrow cost</span>
+                                <button class="info-trigger" type="button" data-info="borrowCost" aria-label="Info: Borrow cost">?</button>
                             </span>
                             <span class="stat-value" id="borrow-cost">$0.00</span>
                         </div>
@@ -442,13 +442,13 @@
                         </div>
                     </div>
                     <div class="stat-group">
-                        <div class="group-label">Strategy Positions</div>
+                        <div class="group-label">Strategy positions</div>
                         <div id="strategy-positions">
                             <p class="panel-hint">No strategy positions.</p>
                         </div>
                     </div>
                     <div class="stat-group">
-                        <div class="group-label">Pending Orders</div>
+                        <div class="group-label">Pending orders</div>
                         <div id="pending-orders">
                             <p class="panel-hint">No pending orders.</p>
                         </div>
@@ -471,7 +471,7 @@
                 <!-- Strategy Tab -->
                 <div class="tab-panel" id="tab-strategy" role="tabpanel" aria-labelledby="tab-btn-strategy">
                     <div class="stat-group" id="strategy-builder">
-                        <div class="group-label">Build Strategy <button class="info-trigger" type="button" data-info="strategies" aria-label="Info: Strategy Builder">?</button></div>
+                        <div class="group-label">Build strategy <button class="info-trigger" type="button" data-info="strategies" aria-label="Info: Strategy builder">?</button></div>
                         <div class="control-group">
                             <label for="strategy-qty">Quantity <span class="slider-value" id="strategy-qty-val">1</span></label>
                             <input type="range" id="strategy-qty" min="1" max="100" step="1" value="1">
@@ -509,7 +509,7 @@
                             <div class="stat-row"><span class="stat-label greek-label-vega">Vega</span><span class="stat-value" id="strat-greek-vega">0.00</span></div>
                             <div class="stat-row"><span class="stat-label greek-label-rho">Rho</span><span class="stat-value" id="strat-greek-rho">0.00</span></div>
                         </div>
-                        <div class="group-label">Save Strategy</div>
+                        <div class="group-label">Save strategy</div>
                         <div class="control-group">
                             <label for="strategy-load-select">Strategy</label>
                             <select id="strategy-load-select" class="sim-select" aria-label="Load saved strategy">
@@ -521,7 +521,7 @@
                                 <label for="strategy-name">Name</label>
                                 <input type="text" id="strategy-name" class="sim-input" placeholder="Strategy 1" maxlength="40">
                             </div>
-                            <label class="checkbox-label" style="padding:0.3rem 0"><span>Shared Expiry <button class="info-trigger" type="button" data-info="sharedExpiry" aria-label="Info: Shared Expiry">?</button></span> <input type="checkbox" id="selectable-expiry-toggle" checked></label>
+                            <label class="checkbox-label" style="padding:0.3rem 0"><span>Shared expiry <button class="info-trigger" type="button" data-info="sharedExpiry" aria-label="Info: Shared expiry">?</button></span> <input type="checkbox" id="selectable-expiry-toggle" checked></label>
                         </div>
                         <div class="quick-trade-row" style="margin-top:6px">
                             <button id="save-strategy-btn" class="ghost-btn trade-btn up" disabled>Save</button>
@@ -532,20 +532,20 @@
                 <!-- Settings Tab -->
                 <div class="tab-panel" id="tab-settings" role="tabpanel" aria-labelledby="tab-btn-settings">
                     <div class="stat-group">
-                        <div class="group-label">Market Regime <button class="info-trigger" type="button" data-info="regime" aria-label="Info: Market Regime">?</button></div>
+                        <div class="group-label">Market regime <button class="info-trigger" type="button" data-info="regime" aria-label="Info: Market regime">?</button></div>
                         <select id="preset-select" class="sim-select" aria-label="Market preset">
-                            <option value="0">Calm Bull</option>
+                            <option value="0">Calm bull</option>
                             <option value="1">Sideways</option>
                             <option value="2">Volatile</option>
                             <option value="3">Crisis</option>
-                            <option value="4">Rate Hike</option>
-                            <option value="5" selected>Dynamic (Offline)</option>
+                            <option value="4">Rate hike</option>
+                            <option value="5" selected>Dynamic (offline)</option>
                             <option value="6">Dynamic (LLM)</option>
                         </select>
                         <div class="stat-row">
                             <span class="stat-label-wrap">
-                                <span class="stat-label">Risk-Free Rate</span>
-                                <button class="info-trigger" type="button" data-info="riskFreeRate" aria-label="Info: Risk-Free Rate">?</button>
+                                <span class="stat-label">Risk-free rate</span>
+                                <button class="info-trigger" type="button" data-info="riskFreeRate" aria-label="Info: Risk-free rate">?</button>
                             </span>
                             <span class="stat-value" id="rate-display">0.00%</span>
                         </div>
@@ -560,7 +560,7 @@
                         <canvas class="sparkline rate-sparkline" id="vxhcn-sparkline" width="280" height="40"></canvas>
                     </div>
                     <div id="llm-settings-section" class="stat-group hidden">
-                        <div class="group-label">LLM Settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM Integration">?</button></div>
+                        <div class="group-label">LLM settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM integration">?</button></div>
                         <div class="ctrl-row">
                             <label class="stat-label" for="llm-provider">Provider</label>
                             <select id="llm-provider" class="sim-select" disabled>
@@ -568,7 +568,7 @@
                             </select>
                         </div>
                         <div class="ctrl-row">
-                            <label class="stat-label" for="llm-api-key">API Key</label>
+                            <label class="stat-label" for="llm-api-key">API key</label>
                             <div class="key-input-wrap">
                                 <input type="password" id="llm-api-key" class="sim-input" placeholder="sk-ant-...">
                                 <button type="button" id="llm-key-toggle" class="tool-btn key-toggle" aria-label="Toggle key visibility" data-icon="eye" data-icon-size="14"></button>
@@ -583,7 +583,7 @@
                         </div>
                     </div>
                     <div id="event-log-section" class="stat-group hidden">
-                        <div class="group-label">Event Log <button class="info-trigger" type="button" data-info="events" aria-label="Info: Event Engine">?</button></div>
+                        <div class="group-label">Event log <button class="info-trigger" type="button" data-info="events" aria-label="Info: Event engine">?</button></div>
                         <div id="event-log" class="event-log"></div>
                     </div>
                     <div id="congress-section" class="stat-group hidden">
@@ -602,20 +602,20 @@
                         </div>
                     </div>
                     <div id="regulations-section" class="regulations-section">
-                        <div class="group-label">Active Regulations</div>
+                        <div class="group-label">Active regulations</div>
                         <div id="regulations-list" class="regulations-list">
                             <span class="text-muted" style="font-size:0.78rem">None</span>
                         </div>
                     </div>
                     <div id="standings-section" class="stat-group hidden">
-                        <div class="group-label">World State</div>
+                        <div class="group-label">World state</div>
                         <div id="standings-world"></div>
-                        <div class="group-label" style="margin-top:8px">Your Standing</div>
+                        <div class="group-label" style="margin-top:8px">Your standing</div>
                         <div id="standings-factions"></div>
                     </div>
                     <div class="stat-group">
                         <div class="group-label">Settings</div>
-                        <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced Parameters <span class="info-trigger" role="button" tabindex="0" data-info="gbm" aria-label="Info: Pricing Models">?</span></button>
+                        <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced parameters <span class="info-trigger" role="button" tabindex="0" data-info="gbm" aria-label="Info: Pricing models">?</span></button>
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
                                 <label class="stat-label" for="slider-mu">Drift (mu)</label><button class="info-trigger" type="button" data-info="mu" aria-label="Info: Drift">?</button>
@@ -623,17 +623,17 @@
                                 <span class="slider-value" id="slider-mu-val">0.08</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-theta">Vol Mean (theta)</label><button class="info-trigger" type="button" data-info="theta" aria-label="Info: Vol Mean">?</button>
+                                <label class="stat-label" for="slider-theta">Vol mean (theta)</label><button class="info-trigger" type="button" data-info="theta" aria-label="Info: Vol mean">?</button>
                                 <input type="range" id="slider-theta" min="0.005" max="1.00" step="0.005" value="0.04">
                                 <span class="slider-value" id="slider-theta-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-kappa">Mean Rev (kappa)</label><button class="info-trigger" type="button" data-info="kappa" aria-label="Info: Mean Reversion">?</button>
+                                <label class="stat-label" for="slider-kappa">Mean rev (kappa)</label><button class="info-trigger" type="button" data-info="kappa" aria-label="Info: Mean reversion">?</button>
                                 <input type="range" id="slider-kappa" min="0.05" max="10.0" step="0.05" value="3.0">
                                 <span class="slider-value" id="slider-kappa-val">3.0</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-xi">Vol of Vol (xi)</label><button class="info-trigger" type="button" data-info="xi" aria-label="Info: Vol of Vol">?</button>
+                                <label class="stat-label" for="slider-xi">Vol of vol (xi)</label><button class="info-trigger" type="button" data-info="xi" aria-label="Info: Vol of vol">?</button>
                                 <input type="range" id="slider-xi" min="0.05" max="1.50" step="0.05" value="0.3">
                                 <span class="slider-value" id="slider-xi-val">0.3</span>
                             </div>
@@ -643,42 +643,42 @@
                                 <span class="slider-value" id="slider-rho-val">-0.50</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-lambda">Jump Rate (lambda)</label><button class="info-trigger" type="button" data-info="lambda" aria-label="Info: Jump Rate">?</button>
+                                <label class="stat-label" for="slider-lambda">Jump rate (lambda)</label><button class="info-trigger" type="button" data-info="lambda" aria-label="Info: Jump rate">?</button>
                                 <input type="range" id="slider-lambda" min="0.0" max="15.0" step="0.5" value="0.5">
                                 <span class="slider-value" id="slider-lambda-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-muJ">Jump Mean (muJ)</label><button class="info-trigger" type="button" data-info="muJ" aria-label="Info: Jump Mean">?</button>
+                                <label class="stat-label" for="slider-muJ">Jump mean (muJ)</label><button class="info-trigger" type="button" data-info="muJ" aria-label="Info: Jump mean">?</button>
                                 <input type="range" id="slider-muJ" min="-0.25" max="0.15" step="0.01" value="-0.02">
                                 <span class="slider-value" id="slider-muJ-val">-0.02</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-sigmaJ">Jump Vol (sigmaJ)</label><button class="info-trigger" type="button" data-info="sigmaJ" aria-label="Info: Jump Vol">?</button>
+                                <label class="stat-label" for="slider-sigmaJ">Jump vol (sigmaJ)</label><button class="info-trigger" type="button" data-info="sigmaJ" aria-label="Info: Jump vol">?</button>
                                 <input type="range" id="slider-sigmaJ" min="0.005" max="0.25" step="0.005" value="0.03">
                                 <span class="slider-value" id="slider-sigmaJ-val">0.03</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-a">Rate Rev (a)</label><button class="info-trigger" type="button" data-info="a" aria-label="Info: Rate Reversion">?</button>
+                                <label class="stat-label" for="slider-a">Rate rev (a)</label><button class="info-trigger" type="button" data-info="a" aria-label="Info: Rate reversion">?</button>
                                 <input type="range" id="slider-a" min="0.01" max="2.0" step="0.01" value="0.5">
                                 <span class="slider-value" id="slider-a-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-b">Rate Mean (b)</label><button class="info-trigger" type="button" data-info="b" aria-label="Info: Rate Mean">?</button>
+                                <label class="stat-label" for="slider-b">Rate mean (b)</label><button class="info-trigger" type="button" data-info="b" aria-label="Info: Rate mean">?</button>
                                 <input type="range" id="slider-b" min="-0.05" max="0.20" step="0.01" value="0.04">
                                 <span class="slider-value" id="slider-b-val">0.04</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-sigmaR">Rate Vol (sigmaR)</label><button class="info-trigger" type="button" data-info="sigmaR" aria-label="Info: Rate Vol">?</button>
+                                <label class="stat-label" for="slider-sigmaR">Rate vol (sigmaR)</label><button class="info-trigger" type="button" data-info="sigmaR" aria-label="Info: Rate vol">?</button>
                                 <input type="range" id="slider-sigmaR" min="0.001" max="0.050" step="0.001" value="0.005">
                                 <span class="slider-value" id="slider-sigmaR-val">0.005</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-borrowSpread">Borrow Spread (k)</label><button class="info-trigger" type="button" data-info="borrowSpread" aria-label="Info: Borrow Spread">?</button>
+                                <label class="stat-label" for="slider-borrowSpread">Borrow spread (k)</label><button class="info-trigger" type="button" data-info="borrowSpread" aria-label="Info: Borrow spread">?</button>
                                 <input type="range" id="slider-borrowSpread" min="0.0" max="5.0" step="0.1" value="0.5">
                                 <span class="slider-value" id="slider-borrowSpread-val">0.5</span>
                             </div>
                             <div class="ctrl-row">
-                                <label class="stat-label" for="slider-q">Dividend Yield (q)</label><button class="info-trigger" type="button" data-info="q" aria-label="Info: Dividend Yield">?</button>
+                                <label class="stat-label" for="slider-q">Dividend yield (q)</label><button class="info-trigger" type="button" data-info="q" aria-label="Info: Dividend yield">?</button>
                                 <input type="range" id="slider-q" min="0.0" max="0.10" step="0.005" value="0.02">
                                 <span class="slider-value" id="slider-q-val">0.02</span>
                             </div>
@@ -738,7 +738,7 @@
                     <button id="epilogue-back" class="ghost-btn hidden">Back</button>
                     <button id="epilogue-next" class="ghost-btn">Next</button>
                     <button id="epilogue-restart" class="ghost-btn hidden">Restart</button>
-                    <button id="epilogue-keep" class="ghost-btn hidden">Keep Playing</button>
+                    <button id="epilogue-keep" class="ghost-btn hidden">Keep playing</button>
                 </div>
             </div>
         </div>
@@ -763,24 +763,24 @@
       <article>
         <h2>What is Shoals?</h2>
         <p>Shoals is an options trading simulator that models derivatives pricing under realistic market conditions. Stock prices evolve with stochastic volatility and jump diffusion while a narrative event engine introduces market shocks, connecting abstract pricing theory to real-world dynamics.</p>
-        <h3>Pricing Models</h3>
+        <h3>Pricing models</h3>
         <p>The underlying stock follows geometric Brownian motion with optional Merton jump diffusion (sudden large moves) and Heston stochastic volatility (time-varying vol that mean-reverts). Interest rates follow a Vasicek process. American options are priced on a 128-step CRR binomial tree with term-structure volatility and moneyness skew adjustments.</p>
-        <h3>Strategy Builder</h3>
+        <h3>Strategy builder</h3>
         <p>The multi-leg strategy builder supports spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy displays a payoff diagram, Greek overlays showing how sensitivity changes across strikes, maximum profit and loss, and break-even points. A margin system tracks portfolio-level exposure and buying power.</p>
-        <h3>Market Events</h3>
+        <h3>Market events</h3>
         <p>Roughly 350 curated events span Federal Reserve, macro, market, firm, political, investigation, media, HCN, tip, trait, and interjection domains. Depending on the event, they can change process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups.</p>
-    <h3>Price Impact</h3>
+    <h3>Price impact</h3>
     <p>Shoals records decaying cumulative volume separately for stock, bonds, VXHCN futures, and each option contract. Square-root fill costs and valuation overlays model execution impact; option delta changes generate market-maker stock hedges, and very large gross exposure can add temporary capped parameter overlays.</p>
-    <h3>Narrative Framework</h3>
+    <h3>Narrative framework</h3>
     <p>The simulation is set at Meridian Capital during the Barron administration. The event registry combines Poisson arrivals, scheduled pulses, portfolio triggers, one-shot conditions, and followup chains. Twelve permanent convictions, six dynamic reputation tags, and six institutional-standing dimensions shape later eligibility and consequences, culminating in one of six ending types with a five-page adaptive epilogue.</p>
     <h3>Accessibility</h3>
     <p>Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market and portfolio readouts, and focus trapping for narrative popups and the epilogue. The live candlestick chart, sparklines, typewriter treatment, and other animated feedback create continuous motion.</p>
     <p><em>See also: <a href="/geon">Geon</a> for particle physics, <a href="/cyano">Cyano</a> for cellular metabolism, <a href="/gerry">Gerry</a> for electoral fairness.</em></p>
-<h3>Learning Outcomes</h3>
+<h3>Learning outcomes</h3>
 <p>After using Shoals, students should be able to: explain why American exercise is handled with a binomial tree; interpret delta, gamma, theta, vega, and rho for single options and multi-leg positions; distinguish spot volatility, term volatility, skew, and VXHCN futures; connect margin and execution impact to position sizing; and trace how market events and institutional decisions propagate into portfolio value.</p>
 <h3>Prerequisites</h3>
 <p>Basic probability and statistics (expected value, standard deviation, normal distribution). Familiarity with compound interest and present value. No prior knowledge of options or derivatives is required.</p>
-<h3>Volatility Surface</h3>
+<h3>Volatility surface</h3>
 <p>Shoals computes a contract-specific pricing volatility rather than plotting or reverse-engineering a market-implied surface. The Heston variance state and mean reversion produce the term component; price/variance correlation and volatility of volatility add moneyness skew and curvature. Events can shift those underlying parameters, after which the configured decay and mean-reversion mechanisms act on them.</p>
 <h3>References</h3>
 <p>F. Black and M. Scholes, <a href="https://doi.org/10.1086/260062" target="_blank" rel="noopener">"The Pricing of Options and Corporate Liabilities"</a> (1973). S. L. Heston, <a href="https://doi.org/10.1093/rfs/6.2.327" target="_blank" rel="noopener">"A Closed-Form Solution for Options with Stochastic Volatility"</a> (1993). J. C. Cox, S. A. Ross, and M. Rubinstein, <a href="https://doi.org/10.1016/0304-405X(79)90015-1" target="_blank" rel="noopener">"Option pricing: A simplified approach"</a> (1979).</p>

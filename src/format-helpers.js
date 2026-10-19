@@ -58,8 +58,8 @@ export function posTypeLabel(type, sideOrQty) {
         case 'bond':      return prefix + ':BND';
         case 'vxhcnfuture': return prefix + ':VXHCN';
         case 'computefuture': return prefix + ':CMP';
-        case 'call':      return prefix + ':CALL';
-        case 'put':       return prefix + ':PUT';
-        default:      return type.toUpperCase();
+        case 'call':      return prefix + ':Call';
+        case 'put':       return prefix + ':Put';
+        default:      return type.charAt(0).toUpperCase() + type.slice(1);
     }
 }

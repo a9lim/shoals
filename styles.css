@@ -1,8 +1,9 @@
 /* ===================================================
    styles.css -- Project-specific layout overrides for
-   the Shoals trading simulator. Colors/fonts injected
-   by colors.js at runtime. Most styling provided by
-   shared-base.css.
+   the Shoals trading simulator. Fonts and neutrals come
+   from shared/tokens.js + shared/base.css; financial
+   colors are injected by colors.js. Every readout is
+   Newsreader with its default lining tabular figures.
    =================================================== */
 
 /* --- P&L Colour Classes --- */
@@ -85,8 +86,6 @@ main {
 .time-slider-row .slider-value {
     min-width: 56px;
     text-align: right;
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
     font-size: var(--font-base);
 }
 
@@ -170,15 +169,17 @@ main {
 }
 
 /* --- Chain Table --- */
+/* Numeric columns are right-aligned so decimals stack. On the three-column
+   tables the right padding (percentages resolve against the table width)
+   brings the widest figure, ~2.5em, back to each column's centre. */
 .chain-table {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
     font-size: var(--font-sm);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
     overflow-x: auto;
 }
 
 .chain-tbl {
+    --chain-pad-r: calc(100% / 6 - 1.25em);
     width: 100%;
     border-collapse: collapse;
     table-layout: fixed;
@@ -186,32 +187,43 @@ main {
 
 .chain-th {
     font-size: var(--font-base);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.04em;
+    font-weight: 400;
+    font-style: italic;
     color: var(--text-muted);
-    padding: 4px 6px;
-    text-align: center;
+    padding: 4px var(--chain-pad-r) 4px 6px;
+    text-align: right;
+    border-bottom: 1px solid var(--border);
 }
 
+
 .chain-cell {
-    padding: 4px 6px;
-    text-align: center;
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-variant-numeric: tabular-nums;
+    padding: 4px var(--chain-pad-r) 4px 6px;
+    text-align: right;
+    font-variant-numeric: lining-nums tabular-nums;
     font-size: var(--font-base);
+    white-space: nowrap;
     transition: background 0.12s;
 }
 
 .chain-cell[role="button"] {
     cursor: pointer;
-    transition: background 0.2s var(--ease-out), transform 0.2s var(--ease-out);
+    transition: background 0.2s var(--ease-out);
 }
 
 .chain-cell[role="button"]:hover {
     background: var(--chain-hover);
-    transform: translateX(2px);
+}
+
+/* Consensus / compute books: a text label column, then numeric columns. */
+#consensus-table,
+#compute-table {
+    --chain-pad-r: 8px;
+}
+#consensus-table .chain-th:first-child,
+#consensus-table .chain-cell:first-child,
+#compute-table .chain-th:first-child,
+#compute-table .chain-cell:first-child {
+    text-align: left;
 }
 
 .call-cell {
@@ -223,7 +235,7 @@ main {
 }
 
 .strike-cell {
-    font-weight: 600;
+    font-weight: 500;
     color: var(--text);
 }
 
@@ -232,18 +244,16 @@ main {
 }
 
 .atm-row .chain-cell:first-child {
-    box-shadow: inset 3px 0 0 var(--accent);
+    box-shadow: inset 2px 0 0 var(--accent);
 }
 
 .atm-row .chain-cell:last-child {
-    box-shadow: inset -3px 0 0 var(--accent);
+    box-shadow: inset -2px 0 0 var(--accent);
 }
 
 #stock-bond-table,
 #strategy-stock-bond-table {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
     margin-bottom: 8px;
 }
 
@@ -264,18 +274,17 @@ main {
 
 /* --- Position indicators on chain cells --- */
 .pos-long {
-    font-weight: 700;
+    font-weight: 600;
 }
 .pos-short {
-    font-weight: 700;
+    font-weight: 600;
     font-style: italic;
 }
 
 .chain-placeholder {
     color: var(--text-muted);
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
     font-size: var(--font-base);
+    font-style: italic;
     padding: 12px 0;
 }
 
@@ -330,8 +339,6 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
 }
 
 .pos-nums {
@@ -342,18 +349,14 @@ main {
 }
 
 .pos-value {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
     color: var(--text-secondary);
     font-size: 0.75em;
     line-height: 1.2;
 }
 
 .pos-pnl {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
 }
 
 .pos-actions {
@@ -371,6 +374,9 @@ main {
     padding: 0;
     font-size: var(--font-sm);
     line-height: 1;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
 }
 
 /* --- Order Rows --- */
@@ -380,12 +386,8 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
 }
 .order-detail {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
     font-size: var(--font-sm);
     color: var(--text-muted);
     margin-top: 2px;
@@ -427,9 +429,23 @@ main {
     gap: 8px;
 }
 
+/* Fixed label and readout columns so every slider track starts and ends on
+   the same line. 9em clears the widest label ("Jump rate (lambda)", 8.65em);
+   3em clears the widest value ("0.005", 2.6em). */
 .advanced-section .stat-label {
     font-size: var(--font-sm);
-    min-width: 90px;
+    flex: 0 0 9em;
+    white-space: nowrap;
+}
+
+.advanced-section input[type="range"] {
+    flex: 1;
+    min-width: 0;
+}
+
+.advanced-section .slider-value {
+    flex: 0 0 3em;
+    text-align: right;
 }
 
 /* --- Capital Input (overrides shared .sim-input padding) --- */
@@ -458,14 +474,14 @@ main {
 
 #time-slider-bar input[type="range"]::-webkit-slider-runnable-track {
     background: linear-gradient(var(--accent), var(--accent)) no-repeat,
-                var(--slider-track, rgba(168,160,152,0.3));
+                var(--slider-track);
     background-size: var(--slider-fill, 100%) 100%, 100% 100%;
     height: 4px;
     border-radius: var(--radius);
 }
 
 #time-slider-bar input[type="range"]::-moz-range-track {
-    background: var(--slider-track, rgba(168,160,152,0.3));
+    background: var(--slider-track);
     height: 4px;
     border-radius: var(--radius);
 }
@@ -480,8 +496,6 @@ main {
     display: flex;
     align-items: center;
     gap: 10px;
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
     font-size: var(--font-base);
     color: var(--text-secondary);
     white-space: nowrap;
@@ -523,8 +537,6 @@ main {
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
 }
 
 /* --- Leg Inline Qty --- */
@@ -532,15 +544,13 @@ main {
     width: 40px;
     padding: 1px 4px;
     font-size: var(--font-sm);
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    text-align: center;
+    font-variant-numeric: lining-nums tabular-nums;
+    text-align: right;
     border: none;
     border-radius: var(--radius);
     background: var(--bg-hover);
     color: var(--text);
     outline: none;
-    transition: border-color 0.15s;
     flex-shrink: 0;
 }
 
@@ -619,12 +629,12 @@ main {
     gap: 4px;
     align-items: center;
 }
+/* The API key is a literal token, so it is set in the code face. */
 .key-input-wrap .sim-input {
     flex: 1;
     min-width: 0;
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-size: var(--font-base);
+    font-family: var(--font-code);
+    font-size: var(--font-sm);
 }
 .key-toggle {
     width: 28px;
@@ -648,9 +658,8 @@ main {
     line-height: 1.3;
 }
 .event-log-day {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
     font-size: var(--font-sm);
+    font-variant-numeric: lining-nums tabular-nums;
     color: var(--text-muted);
     flex-shrink: 0;
     min-width: 32px;
@@ -680,13 +689,9 @@ main {
     align-items: center;
 }
 .congress-chamber-label {
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
-    font-size: var(--font-sm);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-secondary);
+    font-size: var(--font-base);
+    font-style: italic;
+    color: var(--text-muted);
     margin-bottom: 4px;
 }
 .congress-chamber canvas {
@@ -706,8 +711,6 @@ main {
     display: flex;
     align-items: center;
     gap: 4px;
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
     font-size: var(--font-sm);
     color: var(--text-secondary);
 }
@@ -729,10 +732,9 @@ main {
 }
 
 .epilogue-title {
-    font-family: var(--font-display);
-    font-variation-settings: var(--fvs-prose);
-    font-size: 1.3rem;
-    font-weight: 600;
+    font-size: 1.6rem;
+    font-weight: 400;
+    line-height: 1.15;
     margin: 0;
 }
 
@@ -746,13 +748,10 @@ main {
 }
 
 .epilogue-body h3 {
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
-    font-size: var(--font-sm);
-    font-weight: 600;
-    text-transform: uppercase;
-    letter-spacing: 0.12em;
-    color: var(--text-secondary);
+    font-size: var(--font-lg);
+    font-weight: 400;
+    font-style: italic;
+    color: var(--text-muted);
     margin: 20px 0 8px;
 }
 
@@ -805,9 +804,8 @@ main {
     align-items: start;
 }
 .epilogue-timeline-day {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
     font-size: var(--font-base);
+    font-variant-numeric: lining-nums tabular-nums;
     color: var(--text-muted);
     white-space: nowrap;
     padding-top: 2px;
@@ -856,29 +854,21 @@ main {
 }
 .strategy-group-header .strategy-group-name {
     flex: 1;
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
     min-width: 0;
     overflow: hidden;
     text-overflow: ellipsis;
     white-space: nowrap;
 }
 .strategy-group-header .strategy-group-value {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
     color: var(--text-secondary);
     font-size: 0.75em;
     line-height: 1.2;
 }
 .strategy-group-header .strategy-group-pnl {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
-    font-variant-numeric: tabular-nums;
+    font-variant-numeric: lining-nums tabular-nums;
 }
 .strategy-group-detail {
-    font-family: var(--font-mono);
-    font-variation-settings: var(--fvs-mono);
     font-size: var(--font-sm);
     color: var(--text-muted);
     margin-top: 2px;
@@ -893,32 +883,38 @@ main {
     max-width: 520px;
     border-top: none;
 }
+/* Category kicker: a muted italic label; the category color rides on the
+   dot (--tag-color, set per event in ui.js) so the text keeps its contrast. */
 .popup-tag {
-    display: inline-block;
-    font-family: var(--font-sans);
-    font-variation-settings: var(--fvs-prose);
-    font-size: var(--font-sm);
-    font-weight: 700;
-    text-transform: uppercase;
-    letter-spacing: 0.1em;
-    padding: 3px 10px;
-    border-radius: var(--radius);
-    margin-bottom: 10px;
-    color: var(--accent);
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    font-size: var(--font-lg);
+    font-style: italic;
+    font-weight: 400;
+    margin-bottom: 8px;
+    color: var(--text-muted);
+}
+.popup-tag::before {
+    content: '';
+    width: 7px;
+    height: 7px;
+    border-radius: 50%;
+    background: var(--tag-color, var(--accent));
+    flex-shrink: 0;
 }
 .popup-headline {
-    font-family: var(--font-display);
-    font-variation-settings: var(--fvs-prose);
-    font-size: 1.25rem;
+    font-size: 1.4rem;
+    font-weight: 400;
     margin: 0 0 12px;
     color: var(--text);
-    line-height: 1.35;
+    line-height: 1.25;
 }
 .popup-context {
     color: var(--text-secondary);
     line-height: 1.6;
     margin: 0 0 20px;
-    font-size: 0.875rem;
+    font-size: var(--font-lg);
 }
 .popup-choices {
     display: flex;
@@ -933,22 +929,22 @@ main {
     border-radius: var(--radius);
     background: var(--bg-hover);
     border: none;
+    box-shadow: inset 0 0 0 1px transparent;
+    color: var(--text);
     cursor: pointer;
     text-align: left;
-    transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+    transition: background 0.2s var(--ease-out), box-shadow 0.2s var(--ease-out);
 }
 .popup-choice-btn:hover {
-    background: var(--bg-hover);
-    box-shadow: var(--shadow-hover);
-    transform: translateX(4px);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
 }
 .popup-choice-btn:active {
-    transform: translateX(2px);
+    background: var(--chain-hover);
 }
 .popup-choice-label {
     font-weight: 600;
     color: var(--text);
-    font-size: 0.9rem;
+    font-size: var(--font-lg);
 }
 .popup-choice-desc {
     font-size: var(--font-base);
@@ -972,12 +968,11 @@ main {
 /* -- Superevent presentation ------------------------------------------------ */
 #popup-event-overlay.superevent { background: none; }
 #popup-event-overlay.superevent .popup-event-body { max-width: 600px; animation: superEventIn 1.5s var(--ease-out) both; }
-#popup-event-overlay.superevent .popup-headline { font-size: 1.5rem; line-height: 1.3; }
-#popup-event-overlay.superevent .popup-context { font-size: 0.9rem; line-height: 1.7; }
+#popup-event-overlay.superevent .popup-headline { font-size: 1.75rem; line-height: 1.2; }
+#popup-event-overlay.superevent .popup-context { font-size: var(--font-lg); line-height: 1.7; }
 @keyframes superEventIn {
-    0% { opacity: 0; transform: translateY(20px) scale(0.97); }
-    40% { opacity: 0; transform: translateY(20px) scale(0.97); }
-    100% { opacity: 1; transform: translateY(0) scale(1); }
+    0%, 40% { opacity: 0; }
+    100% { opacity: 1; }
 }
 .typewriter-cursor {
     display: inline-block; width: 2px; height: 1em;
@@ -989,8 +984,8 @@ main {
     animation: choiceFadeIn 0.4s var(--ease-out) both;
 }
 @keyframes choiceFadeIn {
-    0% { opacity: 0; transform: translateY(10px); }
-    100% { opacity: 1; transform: translateY(0); }
+    0% { opacity: 0; }
+    100% { opacity: 1; }
 }
 
 /* -- Regulations ------------------------------------------------------------ */
@@ -1015,8 +1010,8 @@ main {
 
 /* -- Reduced Motion ---------------------------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-    @keyframes superEventIn { from, to { opacity: 1; transform: none; } }
+    @keyframes superEventIn { from, to { opacity: 1; } }
     @keyframes blink { from, to { opacity: 1; } }
-    @keyframes choiceFadeIn { from, to { opacity: 1; transform: none; } }
+    @keyframes choiceFadeIn { from, to { opacity: 1; } }
     .typewriter-cursor { animation: none; }
 }

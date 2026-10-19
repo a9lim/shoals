@@ -2574,12 +2574,12 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
 
     // -- Rig: a race whose PUBLIC released-frontier rung we drive by hand, a real
     //         EventEngine and a sim stand-in carrying only the two params. The
-    //         stand-in starts at the LIVE Dynamic (Offline) preset's Vasicek
-    //         parameters (Calm Bull b = 0.04 / sigmaR = 0.005), not invented ones --
+    //         stand-in starts at the LIVE Dynamic (offline) preset's Vasicek
+    //         parameters (Calm bull b = 0.04 / sigmaR = 0.005), not invented ones --
     //         the whole point of an exact-delta check is that it prices the curve the
     //         player actually gets, so four waves land on 0.06 / 0.009 here exactly
     //         as they would in a run.
-    const OFFLINE = PRESETS.find(p => p.name.includes('Offline'));
+    const OFFLINE = PRESETS.find(p => /\(offline\)/i.test(p.name));
     const B0 = OFFLINE.b, SR0 = OFFLINE.sigmaR;
     const mkSim = () => ({ b: B0, sigmaR: SR0, _recomputeRhoDerived() {} });
     function capexRig(seed) {

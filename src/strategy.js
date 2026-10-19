@@ -24,6 +24,10 @@ const SAMPLE_COUNT   = STRATEGY_SAMPLES;
 const Y_PADDING_PCT  = STRATEGY_Y_PAD;
 const MARGIN         = STRATEGY_MARGIN;
 
+// Canvas type: Newsreader at 12px for every label (lining tabular figures by default).
+const LABEL_FONT = () => `12px ${_FONT.text}`;
+const Y_TITLE_COL = 26;   // left column holding the rotated "P&L" title (centred at x=14)
+
 // Greek display metadata: key → { label }
 const GREEK_META = {
     delta: { label: 'Delta' },
@@ -35,10 +39,11 @@ const GREEK_META = {
 
 function _colors() {
     const ext = _PALETTE.extended;
+    const pal = _themePalette();
     return {
         up:     ext.green,
         down:   ext.rose,
-        accent: _PALETTE.accent,
+        accent: pal.accent,
         delta:  ext.blue,
         gamma:  ext.orange,
         theta:  ext.cyan,
@@ -48,8 +53,8 @@ function _colors() {
 }
 
 function _themeTextColors() {
-    const pal = document.documentElement.dataset.theme === 'dark' ? _PALETTE.dark : _PALETTE.light;
-    return { text: pal.text, textSecondary: pal.textSecondary, textMuted: pal.textMuted };
+    const pal = _themePalette();
+    return { text: pal.text, textSecondary: pal.textSecondary, textMuted: pal.textMuted, canvas: pal.canvas };
 }
 
 // ---------------------------------------------------------------------------
@@ -303,6 +308,9 @@ export class StrategyRenderer {
         // Legend hit areas (populated during draw)
         this._legendItems = [];
 
+        // Left gutter, widened per draw when the measured Y labels need it
+        this._marginLeft = MARGIN.left;
+
         this.resize();
     }
 
@@ -365,7 +373,7 @@ export class StrategyRenderer {
             const dx = e.clientX - lastX;
             if (Math.abs(e.clientX - startX) > 3) dragged = true;
             // Convert pixel delta to world units: pixels / (plotW / (2 * xRange))
-            const plotW = this._cssW - MARGIN.left - MARGIN.right;
+            const plotW = this._cssW - this._marginLeft - MARGIN.right;
             if (plotW > 0) this._xCenter -= dx * (2 * this._xRange) / plotW;
             lastX = e.clientX;
             this._dirty = true;
@@ -388,7 +396,7 @@ export class StrategyRenderer {
         el.addEventListener('touchmove', (e) => {
             if (!touchPanning || e.touches.length !== 1) return;
             const dx = e.touches[0].clientX - touchLastX;
-            const plotW = this._cssW - MARGIN.left - MARGIN.right;
+            const plotW = this._cssW - this._marginLeft - MARGIN.right;
             if (plotW > 0) this._xCenter -= dx * (2 * this._xRange) / plotW;
             touchLastX = e.touches[0].clientX;
             this._dirty = true;
@@ -447,16 +455,17 @@ export class StrategyRenderer {
 
         // Clear
         ctx.clearRect(0, 0, cssW, cssH);
+        this._spotLabelSpan = null;
 
         // --- X range from zoom state ---
         const xMin = this._xCenter - this._xRange;
         const xMax = this._xCenter + this._xRange;
 
-        // --- Plot area ---
-        const plotX = MARGIN.left;
+        // --- Plot area (left edge is fitted to the Y labels once their range is known) ---
         const plotY = MARGIN.top;
-        const plotW = cssW - MARGIN.left - MARGIN.right;
         const plotH = cssH - MARGIN.top  - MARGIN.bottom;
+        let plotX = this._fitLeftMargin(ctx, -1, 1);
+        let plotW = cssW - plotX - MARGIN.right;
 
         if (plotW <= 0 || plotH <= 0) return;
 
@@ -467,11 +476,11 @@ export class StrategyRenderer {
             this._drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, -1, 1, xToPixel, pnlToPixel);
             this._drawZeroLine(ctx, plotX, plotW, pnlToPixel);
             this._drawYAxis(ctx, plotX, plotY, plotH, -1, 1, pnlToPixel, themeClrs);
-            this._drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel, themeClrs);
-            // Draw spot marker if in range
+            // Spot marker before the X axis, so tick labels can yield to its label
             if (spot >= xMin && spot <= xMax) {
                 this._drawSpotMarker(ctx, spot, plotY, plotH, xToPixel, clrs.accent);
             }
+            this._drawXAxis(ctx, plotX, plotY, plotW, plotH, xMin, xMax, xToPixel, themeClrs);
             this._legendItems = [];
             return;
         }
@@ -542,6 +551,10 @@ export class StrategyRenderer {
         const pnlPad = (pnlMax - pnlMin) * Y_PADDING_PCT;
         const yLo = pnlMin - pnlPad;
         const yHi = pnlMax + pnlPad;
+
+        plotX = this._fitLeftMargin(ctx, yLo, yHi);
+        plotW = cssW - plotX - MARGIN.right;
+        if (plotW <= 0) return;
 
         const xToPixel   = (S) => plotX + ((S   - xMin) / (xMax - xMin)) * plotW;
         const pnlToPixel = (p) => plotY + ((yHi - p)    / (yHi - yLo))   * plotH;
@@ -700,9 +713,24 @@ export class StrategyRenderer {
     // Drawing helpers
     // -----------------------------------------------------------------------
 
+    /**
+     * Left gutter wide enough for the widest Y tick label (right-aligned 6px
+     * from the plot) plus the rotated "P&L" title column. Never narrower than
+     * STRATEGY_MARGIN.left. Stores and returns the plot's left edge.
+     */
+    _fitLeftMargin(ctx, yLo, yHi) {
+        ctx.save();
+        ctx.font = LABEL_FONT();
+        const ticks = 6, step = (yHi - yLo) / (ticks - 1);
+        let w = 0;
+        for (let i = 0; i < ticks; i++) w = Math.max(w, ctx.measureText(_fmt$(yLo + i * step)).width);
+        ctx.restore();
+        this._marginLeft = Math.max(MARGIN.left, Math.ceil(w + 6 + Y_TITLE_COL));
+        return this._marginLeft;
+    }
+
     _drawZeroLine(ctx, plotX, plotW, pnlToPixel) {
-        const isDark = (this._cachedTheme || document.documentElement.dataset.theme) === 'dark';
-        const muted = isDark ? _PALETTE.dark.textMuted : _PALETTE.light.textMuted;
+        const muted = this._cachedThemeColors.textMuted;
         const y0 = pnlToPixel(0);
         ctx.save();
         ctx.strokeStyle = _r(muted, 0.6);
@@ -725,14 +753,17 @@ export class StrategyRenderer {
         ctx.moveTo(x, plotY);
         ctx.lineTo(x, plotY + plotH);
         ctx.stroke();
-        // Label
+        // Label, on the X tick row; _drawXAxis skips any tick label it would overlap
         ctx.setLineDash([]);
         ctx.globalAlpha  = 1;
         ctx.fillStyle    = accentColor;
-        ctx.font         = `11px ${_FONT.mono}`;
+        ctx.font         = LABEL_FONT();
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
-        ctx.fillText(_fmt$(spot), x, plotY + plotH + 4);
+        const text = _fmt$(spot);
+        const half = ctx.measureText(text).width / 2;
+        ctx.fillText(text, x, plotY + plotH + 6);
+        this._spotLabelSpan = [x - half, x + half];
         ctx.restore();
     }
 
@@ -810,7 +841,7 @@ export class StrategyRenderer {
             ctx.fill();
             // Label
             ctx.fillStyle    = accentColor;
-            ctx.font         = `11px ${_FONT.mono}`;
+            ctx.font         = LABEL_FONT();
             ctx.textAlign    = 'center';
             ctx.textBaseline = 'top';
             ctx.fillText(_fmt$(bx), px, y0 + 7);
@@ -819,8 +850,7 @@ export class StrategyRenderer {
     }
 
     _drawGrid(ctx, plotX, plotY, plotW, plotH, xMin, xMax, yLo, yHi, xToPixel, pnlToPixel) {
-        const isDark = (this._cachedTheme || document.documentElement.dataset.theme) === 'dark';
-        const muted = isDark ? _PALETTE.dark.textMuted : _PALETTE.light.textMuted;
+        const muted = this._cachedThemeColors.textMuted;
         ctx.save();
         ctx.strokeStyle = _r(muted, 0.15);
         ctx.lineWidth   = 1;
@@ -844,7 +874,7 @@ export class StrategyRenderer {
     _drawYAxis(ctx, plotX, plotY, plotH, yLo, yHi, pnlToPixel, themeClrs) {
         ctx.save();
         ctx.fillStyle    = themeClrs.textSecondary;
-        ctx.font         = `11px ${_FONT.mono}`;
+        ctx.font         = LABEL_FONT();
         ctx.textAlign    = 'right';
         ctx.textBaseline = 'middle';
 
@@ -862,7 +892,7 @@ export class StrategyRenderer {
         ctx.rotate(-Math.PI / 2);
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'middle';
-        ctx.font         = `11px ${_FONT.mono}`;
+        ctx.font         = LABEL_FONT();
         ctx.fillStyle    = themeClrs.textMuted;
         ctx.fillText('P&L', 0, 0);
         ctx.restore();
@@ -874,23 +904,28 @@ export class StrategyRenderer {
         const baseY = plotY + plotH;
         ctx.save();
         ctx.fillStyle    = themeClrs.textSecondary;
-        ctx.font         = `11px ${_FONT.mono}`;
+        ctx.font         = LABEL_FONT();
         ctx.textAlign    = 'center';
         ctx.textBaseline = 'top';
 
         const ticks = 6;
         const step  = (xMax - xMin) / (ticks - 1);
+        const spot  = this._spotLabelSpan;
         for (let i = 0; i < ticks; i++) {
             const v = xMin + i * step;
-            const x = xToPixel(v);
-            ctx.fillText(_fmt$(v), x, baseY + 6);
+            const text = _fmt$(v);
+            const half = ctx.measureText(text).width / 2;
+            // Keep the end labels inside the canvas (the right gutter is narrow)
+            const x = Math.min(xToPixel(v), this._cssW - half - 2);
+            if (spot && x + half + 6 > spot[0] && x - half - 6 < spot[1]) continue;
+            ctx.fillText(text, x, baseY + 6);
         }
 
         // Axis label
         ctx.textBaseline = 'bottom';
-        ctx.font         = `11px ${_FONT.mono}`;
+        ctx.font         = LABEL_FONT();
         ctx.fillStyle    = themeClrs.textMuted;
-        ctx.fillText('Stock Price', plotX + plotW / 2, baseY + 42);
+        ctx.fillText('Stock price', plotX + plotW / 2, baseY + 42);
         ctx.restore();
     }
 
@@ -901,33 +936,38 @@ export class StrategyRenderer {
         for (const [key, meta] of Object.entries(GREEK_META)) {
             items.push({
                 label:  meta.label,
-                color:  clrs[key] || _PALETTE.light.textMuted,
+                color:  clrs[key] || themeClrs.textMuted,
                 active: !!(greekToggles && greekToggles[key]),
                 key:    key,
             });
         }
 
-        const boxW = 110;
-        const lineH = 18;
-        const padX  = 10;
-        const padY  = 8;
-        const legendH = padY * 2 + items.length * lineH;
-        // Position in top-LEFT of plot area (inside MARGIN.left)
-        const lx = MARGIN.left + 8;
-        const ly = MARGIN.top + 4;
-
-        const isDark = document.documentElement.dataset.theme === 'dark';
+        const lineH  = 20;
+        const padX   = 10;
+        const padY   = 8;
+        const swatch = 12;
+        const gap    = 8;
 
         ctx.save();
-        ctx.fillStyle   = isDark ? _r(_PALETTE.dark.canvas, 0.55) : _r(_PALETTE.light.canvas, 0.75);
-        ctx.strokeStyle = _r(isDark ? _PALETTE.dark.textMuted : _PALETTE.light.textMuted, isDark ? 0.3 : 0.4);
+        ctx.font         = LABEL_FONT();
+        ctx.textBaseline = 'middle';
+
+        // Box width from the widest measured label, not a fixed guess.
+        let labelW = 0;
+        for (const item of items) labelW = Math.max(labelW, ctx.measureText(item.label).width);
+        const boxW    = Math.ceil(padX * 2 + swatch + gap + labelW);
+        const legendH = padY * 2 + items.length * lineH;
+        // Position in top-LEFT of the plot area
+        const lx = this._marginLeft + 8;
+        const ly = MARGIN.top + 4;
+
+        const isDark = this._cachedTheme === 'dark';
+        ctx.fillStyle   = _r(themeClrs.canvas, isDark ? 0.55 : 0.75);
+        ctx.strokeStyle = _r(themeClrs.text, isDark ? 0.13 : 0.12);   // the --border hairline
         ctx.lineWidth   = 1;
-        _roundRect(ctx, lx, ly, boxW, legendH, 6);
+        _roundRect(ctx, lx + 0.5, ly + 0.5, boxW, legendH, 2);
         ctx.fill();
         ctx.stroke();
-
-        ctx.font         = `11px ${_FONT.sans}`;
-        ctx.textBaseline = 'middle';
 
         // Reset legend hit areas
         this._legendItems = [];
@@ -945,16 +985,16 @@ export class StrategyRenderer {
                 key: item.key,
             });
 
-            // Swatch
+            // Swatch — dimmed when the overlay is off
             ctx.fillStyle   = item.color;
             ctx.globalAlpha = item.active ? 1 : 0.35;
-            ctx.fillRect(lx + padX, iy - 4, 12, 8);
+            ctx.fillRect(lx + padX, iy - 4, swatch, 8);
 
-            // Label — theme-aware text colors
-            ctx.globalAlpha = item.active ? 1 : 0.35;
+            // Label — full-contrast text when on, muted (still legible) when off
+            ctx.globalAlpha = 1;
             ctx.fillStyle   = item.active ? themeClrs.text : themeClrs.textMuted;
             ctx.textAlign   = 'left';
-            ctx.fillText(item.label, lx + padX + 18, iy);
+            ctx.fillText(item.label, lx + padX + swatch + gap, iy);
         }
 
         ctx.globalAlpha = 1;

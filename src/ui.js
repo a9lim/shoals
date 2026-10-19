@@ -663,7 +663,7 @@ export function updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap) {
 
 
 const _STRATEGY_INFO = {
-    netCost:    { title: 'Net Debit / Credit', body: 'Cost to enter the strategy at current prices. Debit = you pay; credit = you receive premium.' },
+    netCost:    { title: 'Net debit / credit', body: 'Cost to enter the strategy at current prices. Debit = you pay; credit = you receive premium.' },
     breakevens: { title: 'Breakevens', body: 'Stock prices where strategy P&L crosses zero at expiry. Multi-leg strategies can have multiple breakevens.' },
 };
 
@@ -694,9 +694,9 @@ export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, o
                 return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
             };
             const items = [
-                { label: summary.netCost < 0 ? 'Net Credit' : summary.netCost > 0 ? 'Net Debit' : 'Net Cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost), info: 'netCost' },
-                { label: 'Max Profit', value: fmtVal(summary.maxProfit), cls: summary.maxProfit > 0 ? 'pnl-up' : '' },
-                { label: 'Max Loss', value: fmtVal(summary.maxLoss), cls: summary.maxLoss < 0 ? 'pnl-down' : '' },
+                { label: summary.netCost < 0 ? 'Net credit' : summary.netCost > 0 ? 'Net debit' : 'Net cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost), info: 'netCost' },
+                { label: 'Max profit', value: fmtVal(summary.maxProfit), cls: summary.maxProfit > 0 ? 'pnl-up' : '' },
+                { label: 'Max loss', value: fmtVal(summary.maxLoss), cls: summary.maxLoss < 0 ? 'pnl-down' : '' },
             ];
             if (summary.breakevens.length > 0) {
                 items.push({
@@ -777,12 +777,12 @@ export function updateStrategyDropdowns($, strategies) {
 export function updateCreditDebit($, netCost) {
     if (!$.strategyCreditDebit || !$.strategyNetCost) return;
     if (netCost == null || !isFinite(netCost)) {
-        $.strategyCreditDebit.querySelector('.stat-label').textContent = 'Net Cost';
+        $.strategyCreditDebit.querySelector('.stat-label').textContent = 'Net cost';
         $.strategyNetCost.textContent = '\u2014';
         $.strategyNetCost.className = 'stat-value';
         return;
     }
-    const label = netCost < 0 ? 'Net Credit' : netCost > 0 ? 'Net Debit' : 'Net Cost';
+    const label = netCost < 0 ? 'Net credit' : netCost > 0 ? 'Net debit' : 'Net cost';
     const value = Math.abs(netCost).toFixed(2);
     $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
     $.strategyNetCost.textContent = value;
@@ -826,8 +826,9 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
     // Remove button
     const removeBtn = document.createElement('button');
     removeBtn.className = 'ghost-btn pos-close-btn';
-    removeBtn.textContent = 'X';
+    removeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
     removeBtn.title = 'Remove leg';
+    removeBtn.setAttribute('aria-label', 'Remove leg');
     removeBtn.addEventListener('click', () => {
         if (typeof onRemoveLeg === 'function') onRemoveLeg(index);
         if (typeof _haptics !== 'undefined') _haptics.trigger('light');
@@ -856,23 +857,23 @@ export function wireInfoTips() {
     const data = {
         // --- Simulation parameters ---
         mu:           { title: 'Drift (\u03BC)', body: 'Expected annualised return of the stock. Positive = bullish tendency. The actual drift also accounts for dividends, jumps, and the Itô correction.' },
-        theta:        { title: 'Vol Mean (\u03B8)', body: 'Long-run variance level. Volatility reverts toward $\\sqrt{\\theta}$ over time. $\\theta = 0.04$ corresponds to ~20% annualised vol.' },
-        kappa:        { title: 'Mean Reversion (\u03BA)', body: 'Speed at which variance returns to $\\theta$. Half-life of a vol shock is $\\ln(2)/\\kappa$. Higher = faster reversion, shallower term structure.' },
-        xi:           { title: 'Vol of Vol (\u03BE)', body: 'Volatility of the variance process. Higher $\\xi$ steepens the volatility skew and fattens return tails.' },
+        theta:        { title: 'Vol mean (\u03B8)', body: 'Long-run variance level. Volatility reverts toward $\\sqrt{\\theta}$ over time. $\\theta = 0.04$ corresponds to ~20% annualised vol.' },
+        kappa:        { title: 'Mean reversion (\u03BA)', body: 'Speed at which variance returns to $\\theta$. Half-life of a vol shock is $\\ln(2)/\\kappa$. Higher = faster reversion, shallower term structure.' },
+        xi:           { title: 'Vol of vol (\u03BE)', body: 'Volatility of the variance process. Higher $\\xi$ steepens the volatility skew and fattens return tails.' },
         rho:          { title: 'Correlation (\u03C1)', body: 'Correlation between price and variance shocks. Negative = leverage effect (price drops cause vol spikes, steepening the skew).' },
-        lambda:       { title: 'Jump Rate (\u03BB)', body: 'Expected Poisson jump count per year. $\\lambda = 0.5$: ~1 jump every 2 years. $\\lambda = 8$: crisis-level discontinuity.' },
-        muJ:          { title: 'Jump Mean (\u03BCJ)', body: 'Average log-jump size. Negative = predominantly downward jumps (crash risk). The drift compensator $\\lambda k$ offsets the expected jump effect.' },
-        sigmaJ:       { title: 'Jump Vol (\u03C3J)', body: 'Standard deviation of jump sizes. Higher = more unpredictable jump magnitudes, fattening both tails of the return distribution.' },
-        a:            { title: 'Rate Reversion (a)', body: 'Speed of Vasicek mean reversion. Higher $a$ means rate shocks are transient. Bond duration capped at $1/a$.' },
-        b:            { title: 'Rate Mean (b)', body: 'Long-run equilibrium rate in the Vasicek model. Rates revert toward $b$ over time. Affects bond prices inversely.' },
-        sigmaR:       { title: 'Rate Vol (\u03C3R)', body: 'Volatility of the interest rate process. Higher = wider rate swings, more volatile bond prices.' },
-        borrowSpread: { title: 'Borrow Spread (k)', body: 'Volatility-scaled borrow cost factor. Daily charge = notional $\\times$ (max($r$,0) + $k \\sigma$) / 252. Events like short squeezes spike this.' },
-        q:            { title: 'Dividend Yield (q)', body: 'Continuous dividend yield. Reduces stock drift and option cost of carry ($b = r - q$). Cash dividends paid quarterly.' },
+        lambda:       { title: 'Jump rate (\u03BB)', body: 'Expected Poisson jump count per year. $\\lambda = 0.5$: ~1 jump every 2 years. $\\lambda = 8$: crisis-level discontinuity.' },
+        muJ:          { title: 'Jump mean (\u03BCJ)', body: 'Average log-jump size. Negative = predominantly downward jumps (crash risk). The drift compensator $\\lambda k$ offsets the expected jump effect.' },
+        sigmaJ:       { title: 'Jump vol (\u03C3J)', body: 'Standard deviation of jump sizes. Higher = more unpredictable jump magnitudes, fattening both tails of the return distribution.' },
+        a:            { title: 'Rate reversion (a)', body: 'Speed of Vasicek mean reversion. Higher $a$ means rate shocks are transient. Bond duration capped at $1/a$.' },
+        b:            { title: 'Rate mean (b)', body: 'Long-run equilibrium rate in the Vasicek model. Rates revert toward $b$ over time. Affects bond prices inversely.' },
+        sigmaR:       { title: 'Rate vol (\u03C3R)', body: 'Volatility of the interest rate process. Higher = wider rate swings, more volatile bond prices.' },
+        borrowSpread: { title: 'Borrow spread (k)', body: 'Volatility-scaled borrow cost factor. Daily charge = notional $\\times$ (max($r$,0) + $k \\sigma$) / 252. Events like short squeezes spike this.' },
+        q:            { title: 'Dividend yield (q)', body: 'Continuous dividend yield. Reduces stock drift and option cost of carry ($b = r - q$). Cash dividends paid quarterly.' },
         // --- Portfolio / Account ---
-        margin:       { title: 'Margin Status', body: 'Your margin health. OK = well-collateralised. Low = approaching maintenance threshold. MARGIN CALL = equity below required level.' },
+        margin:       { title: 'Margin status', body: 'Your margin health. OK = well-collateralised. Low = approaching maintenance threshold. Margin call = equity below required level.' },
         cash:         { title: 'Cash', body: 'Available cash. Changes with trades, dividends, borrow costs, and exercises. Can go negative (buying on margin).' },
-        portfolioValue: { title: 'Portfolio Value', body: 'Total equity: cash plus mark-to-market value of all open positions at mid-price.' },
-        borrowCost:   { title: 'Borrow Cost', body: 'Cumulative interest on short positions and margin debit. Charged daily using the borrow spread formula.' },
+        portfolioValue: { title: 'Portfolio value', body: 'Total equity: cash plus mark-to-market value of all open positions at mid-price.' },
+        borrowCost:   { title: 'Borrow cost', body: 'Cumulative interest on short positions and margin debit. Charged daily using the borrow spread formula.' },
         dividends:    { title: 'Dividends', body: 'Net cumulative dividends. Long stock receives cash quarterly; short stock pays. Amount = $S \\times q/4$ per share.' },
         // --- Greeks ---
         delta:        { title: 'Delta ($\\Delta$)', body: 'Rate of change of option price w.r.t. stock price. Calls: 0 to +1, puts: $-1$ to 0. Measures directional exposure.' },
@@ -881,18 +882,18 @@ export function wireInfoTips() {
         vega:         { title: 'Vega ($\\mathcal{V}$)', body: 'Sensitivity to implied volatility. Long options benefit from rising vol. ATM and longer-dated options have the most vega.' },
         rho_greek:    { title: 'Rho ($\\rho$)', body: 'Sensitivity to interest rates. Calls have positive rho (higher rates help); puts negative. More meaningful with Vasicek stochastic rates.' },
         // --- Trade tab ---
-        orderTypes:   { title: 'Order Types', body: 'Market: fills immediately at bid/ask. Limit: waits until price reaches your target. Stop: triggers a market order when price crosses a level.' },
+        orderTypes:   { title: 'Order types', body: 'Market: fills immediately at bid/ask. Limit: waits until price reaches your target. Stop: triggers a market order when price crosses a level.' },
         expiry:       { title: 'Expiry', body: '8 rolling expiry dates, each 63 trading days apart (~quarterly). Nearer expiries have faster theta decay and higher ATM gamma.' },
-        bidask:       { title: 'Bid-Ask Spread', body: 'You buy at the ask and sell at the bid. Spreads widen with higher volatility and deeper OTM strikes. Hover any cell to see bid/ask.' },
+        bidask:       { title: 'Bid-ask spread', body: 'You buy at the ask and sell at the bid. Spreads widen with higher volatility and deeper OTM strikes. Hover any cell to see bid/ask.' },
         // --- Strategy ---
-        strategies:   { title: 'Strategy Builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
-        sharedExpiry: { title: 'Shared Expiry', body: 'On: all legs share the expiry dropdown selection. Off: each leg keeps its own DTE offset (for calendar spreads).' },
+        strategies:   { title: 'Strategy builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
+        sharedExpiry: { title: 'Shared expiry', body: 'On: all legs share the expiry dropdown selection. Off: each leg keeps its own DTE offset (for calendar spreads).' },
         // --- Settings ---
-        regime:       { title: 'Market Regime', body: '5 static presets (Calm Bull to Rate Hike) plus 2 dynamic modes with narrative events. Changing preset resets the simulation.' },
-        riskFreeRate: { title: 'Risk-Free Rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },
-        events:       { title: 'Event Engine', body: 'Generates narrative events that shift parameters. Fed ~every 32 days, non-Fed Poisson ~1/30 days. Followup chains create storylines.' },
-        llm:          { title: 'LLM Integration', body: 'Dynamic (LLM) uses Claude to generate contextual events. Set your API key in Settings. Falls back to offline events on failure.' },
-        gbm:          { title: 'Pricing Models', body: 'GBM + Merton jumps + Heston stochastic vol + Vasicek rates. American options priced via 128-step CRR binomial tree.' },
+        regime:       { title: 'Market regime', body: '5 static presets (Calm bull to Rate hike) plus 2 dynamic modes with narrative events. Changing preset resets the simulation.' },
+        riskFreeRate: { title: 'Risk-free rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },
+        events:       { title: 'Event engine', body: 'Generates narrative events that shift parameters. Fed ~every 32 days, non-Fed Poisson ~1/30 days. Followup chains create storylines.' },
+        llm:          { title: 'LLM integration', body: 'Dynamic (LLM) uses Claude to generate contextual events. Set your API key in the Info tab. Falls back to offline events on failure.' },
+        gbm:          { title: 'Pricing models', body: 'GBM + Merton jumps + Heston stochastic vol + Vasicek rates. American options priced via 128-step CRR binomial tree.' },
     };
     registerInfoTips(data);
 }
@@ -959,7 +960,7 @@ function _ensureStandingOrdersSection($, onToggle) {
 
     const label = document.createElement('div');
     label.className = 'group-label';
-    label.textContent = 'Standing Orders';
+    label.textContent = 'Standing orders';
     section.appendChild(label);
 
     const list = document.createElement('div');
@@ -1054,7 +1055,7 @@ export function updateStandingOrdersPanel($, view, onToggle) {
 }
 
 // ---------------------------------------------------------------------------
-// Consensus Markets panel (milestone binaries -- overhaul phase 3a)
+// Consensus markets panel (milestone binaries -- overhaul phase 3a)
 // ---------------------------------------------------------------------------
 
 /**
@@ -1103,9 +1104,9 @@ export function updateConsensusPanel($, consensus, portfolio, day) {
         cQuote.className = 'chain-cell';
         let quoteCls = '';
         if (st) {
-            cQuote.textContent = st.outcome === 'YES' ? 'YES'
+            cQuote.textContent = st.outcome === 'YES' ? 'Yes'
                 : st.outcome === 'FALLBACK' ? (c.fallbackValue * 100).toFixed(0) + '¢'
-                : 'NO';
+                : 'No';
             quoteCls = consensusOutcomeClass(st.outcome);
         } else if (pending) {
             cQuote.textContent = 'closeout';
@@ -1141,7 +1142,7 @@ export function updateConsensusPanel($, consensus, portfolio, day) {
 }
 
 // ---------------------------------------------------------------------------
-// Compute Futures panel (compute-index term structure -- overhaul phase 3b)
+// Compute futures panel (compute-index term structure -- overhaul phase 3b)
 // ---------------------------------------------------------------------------
 
 /**
@@ -1222,9 +1223,9 @@ export function updateStandings($, world, factions, getFactionDescriptor) {
 function _renderWorldState(container, world) {
     container.textContent = '';
     const entries = [
-        ['Barron Approval', (world?.election?.barronApproval ?? '?') + '%'],
-        ['Fed Stance', (world?.fed?.hikeCycle) ? 'Hiking' : (world?.fed?.cutCycle) ? 'Cutting' : 'Holding'],
-        ['Fed Credibility', (world?.fed?.credibilityScore ?? '?') + '/10'],
+        ['Barron approval', (world?.election?.barronApproval ?? '?') + '%'],
+        ['Fed stance', (world?.fed?.hikeCycle) ? 'Hiking' : (world?.fed?.cutCycle) ? 'Cutting' : 'Holding'],
+        ['Fed credibility', (world?.fed?.credibilityScore ?? '?') + '/10'],
     ];
     for (const [label, value] of entries) {
         const row = document.createElement('div');
@@ -1247,9 +1248,9 @@ const _FACTION_LABELS = {
     federalistSupport: 'Federalists',
     farmerLaborSupport: 'Farmer-Labor',
     mediaTrust: 'Media',
-    fedRelations: 'Fed Relations',
-    safetyNetworkTrust: 'Safety Network',
-    labRelations: 'Lab Relations',
+    fedRelations: 'Fed relations',
+    safetyNetworkTrust: 'Safety network',
+    labRelations: 'Lab relations',
 };
 
 function _renderFactionScores(container, factions, getFactionDescriptor) {
@@ -1400,35 +1401,33 @@ const _popupCategoryMeta = {
     market:         { label: 'Markets',             color: 'var(--ext-yellow)' },
     compound:       { label: 'Crisis',              color: 'var(--ext-red)' },
     desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
-    margin:         { label: 'Margin Call',         color: 'var(--down)' },
-    gameover:       { label: 'Game Over',           color: 'var(--ext-red)' },
+    margin:         { label: 'Margin call',         color: 'var(--down)' },
+    gameover:       { label: 'Game over',           color: 'var(--ext-red)' },
     // Race-era categories (overhaul): previously fell through to 'desk'.
-    release:        { label: 'The Race',            color: 'var(--vxhcn)' },
-    certification:  { label: 'Consensus Markets',   color: 'var(--vxhcn)' },
-    incident:       { label: 'Incident Report',     color: 'var(--ext-red)' },
+    release:        { label: 'The race',            color: 'var(--vxhcn)' },
+    certification:  { label: 'Consensus markets',   color: 'var(--vxhcn)' },
+    incident:       { label: 'Incident report',     color: 'var(--ext-red)' },
     theft:          { label: 'Exfiltration',        color: 'var(--ext-red)' },
-    strait:         { label: 'The Strait',          color: 'var(--ext-rose)' },
-    regime:         { label: 'The State',           color: 'var(--ext-indigo)' },
+    strait:         { label: 'The strait',          color: 'var(--ext-rose)' },
+    regime:         { label: 'The state',           color: 'var(--ext-indigo)' },
     halcyon:        { label: 'Halcyon',             color: 'var(--vxhcn)' },
     china:          { label: 'Beijing',             color: 'var(--ext-red)' },
     polaris:        { label: 'Polaris',             color: 'var(--ext-cyan)' },
-    wonder:         { label: 'The Wonders',         color: 'var(--ext-lime)' },
+    wonder:         { label: 'The wonders',         color: 'var(--ext-lime)' },
     policy:         { label: 'Washington',          color: 'var(--ext-indigo)' },
     treaty:         { label: 'Geneva',              color: 'var(--ext-blue)' },
     summit:         { label: 'Reykjavik',           color: 'var(--ext-blue)' },
-    insider:        { label: 'The Channel',         color: 'var(--ext-orange)' },
+    insider:        { label: 'The channel',         color: 'var(--ext-orange)' },
     ghostwritten:   { label: 'Unsigned',            color: 'var(--ext-cyan)' },
 };
 
 export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude, superevent = false) {
-    // Category badge + accent color
+    // Category kicker (label + colored dot)
     const meta = _popupCategoryMeta[category] || _popupCategoryMeta.desk;
-    const panel = $.popupOverlay.querySelector('.sim-overlay-panel');
-    panel.style.borderTopColor = meta.color;
 
     // Magnitude-based backdrop (blur only, no darkening)
     if (magnitude === 'major') {
-        $.popupOverlay.style.backdropFilter = 'blur(8px) saturate(1.2)';
+        $.popupOverlay.style.backdropFilter = 'blur(8px)';
     } else {
         $.popupOverlay.style.backdropFilter = '';
     }
@@ -1441,8 +1440,7 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
         $.popupHeadline.parentNode.insertBefore(tag, $.popupHeadline);
     }
     tag.textContent = meta.label;
-    tag.style.color = meta.color;
-    tag.style.borderColor = meta.color;
+    tag.style.setProperty('--tag-color', meta.color);
 
     $.popupHeadline.textContent = headline;
     if (superevent) {
@@ -1496,7 +1494,6 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
         btn.addEventListener('click', () => {
             $.popupOverlay.classList.add('hidden');
             // Clean up inline styles
-            panel.style.borderTopColor = '';
             $.popupOverlay.style.background = '';
             $.popupOverlay.style.backdropFilter = '';
             $.popupOverlay.classList.remove('superevent');
