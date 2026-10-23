@@ -36,8 +36,8 @@ node tools/endings-test.mjs   # [N] [--seed S], N=2000: family distribution, pla
 The six harnesses import `src/` directly and exit 1 on any failure. They are the
 regression gate for anything that touches the Dynamic-mode systems. Run them at the
 default N, because their calibration bands are sized for it and small-N runs miss
-them legitimately. Each harness header lists its sections. `tools/` is not in the
-parent stager's exclusions, so the harnesses deploy alongside the app.
+them legitimately. Each harness header lists its sections. The parent build doesn't
+stage `tools/`.
 
 ## Layout
 
