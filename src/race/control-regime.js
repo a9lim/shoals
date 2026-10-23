@@ -16,7 +16,7 @@
    orchestrated step `stepControlRegime` (race-state.js), which
    main.js and the reachability harness call after advanceRace;
    that separation (advanceRace stays a pure ledger producer)
-   is ratified in 02a's phase-5a block. `stepControlRegime`
+   is ratified in 02a's "Control regime and content plumbing" block. `stepControlRegime`
    calls `desiredRegime` and then `setControlRegime` only on a
    forward move. The import stays one-way (race-state.js ->
    control-regime.js) with no cycle, and monotonicity is
@@ -48,7 +48,7 @@ export const CONTROL_REGIMES = ['private', 'supervised', 'mobilized', 'nationali
 export const REGIME_RANK = { private: 0, supervised: 1, mobilized: 2, nationalized: 3, classified: 3 };
 
 /**
- * Phase-5a transition gates (RATIFIED, 02a phase-5a block). The regime escalates
+ * Phase-5a transition gates (RATIFIED, 02a "Control regime and content plumbing"). The regime escalates
  * when a DECAYING "grip pressure" (recent detected-incident severity, weighted;
  * theft; blockade) crosses a gate, or heat is high, or an exogenous push (lobbying
  * / election) fires. Pressure DECAYS so the ratchet responds to recent SPIKES

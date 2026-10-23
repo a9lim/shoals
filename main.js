@@ -978,7 +978,7 @@ function init() {
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) {
-            // P7-1 ladder (02a ruling 2): a PLAYER exit takes the same lag as an
+            // P7-1 ladder (02a "Act III"): a PLAYER exit takes the same lag as an
             // entry -- exits are not faster than entries in a market made of
             // machines. Machinery-initiated closes (expiry, margin trims, popup
             // trades, terminal liquidation) never route through here.
@@ -1369,7 +1369,7 @@ function _closeTradingDay() {
 }
 
 /**
- * The POPUP BARRIER (02a P7-1 ruling 2): true while a decision is on screen or
+ * The POPUP BARRIER (02a "Act III"): true while a decision is on screen or
  * still waiting. While it holds, `_closeTradingDay` / `_onDayComplete` may NOT run
  * on ANY path (frame / tick / step) -- the day stays open, overlays installed,
  * until the player has answered. Without it a substep-lane arrival at substep 15
@@ -1389,7 +1389,7 @@ function _popupBarrier() {
 
 /**
  * Close a day whose substeps finished while the barrier held, SYNCHRONOUSLY from
- * the drain (02a P7-1 ruling 2): the player never presses play to collect a day
+ * the drain (02a "Act III"): the player never presses play to collect a day
  * the world already finished. Called from the popup-dismissal callback, after its
  * own `_processPopupQueue` has had the chance to show the next queued beat.
  *
@@ -1406,7 +1406,7 @@ function _closeCompletedDayIfPending() {
 }
 
 /**
- * Terminal partial-day ABORT (02a P7-1 ruling 3). A terminal entered mid-day --
+ * Terminal partial-day ABORT (02a "Act III"). A terminal entered mid-day --
  * an intraday compliance choice, a rogue-trading latch off a substep-lane popup --
  * unwinds the day's overlays LIFO (same discipline as `_closeTradingDay`'s
  * restore), re-syncs to baseline, and marks the day closed WITHOUT running
@@ -1470,7 +1470,7 @@ function frame(now) {
             }
             // All sub-steps done — close the day (overlays removed) then run
             // day-complete bookkeeping against baseline params. UNLESS the popup
-            // barrier holds (02a P7-1 ruling 2): a decision on screen or waiting
+            // barrier holds (02a "Act III"): a decision on screen or waiting
             // keeps the day OPEN. Retry the drain first, so a beat parked behind
             // the trade dialog reaches the player the moment the dialog closes and
             // the day is never stranded.
@@ -1599,7 +1599,7 @@ function _updateLobbyPills() {
  * THE popup-queue chokepoint (P7-2). Every beat that could reach the player goes
  * through here, so a standing order that INTERCEPTS a decision can do it before
  * the beat is ever queued: an intercepted tip never holds a day open (the popup
- * BARRIER reads this queue -- 02a P7-1 ruling 2) and never flashes on screen.
+ * BARRIER reads this queue -- 02a "Act III") and never flashes on screen.
  * Because interception happens at INSERTION, the barrier's state is untouched and
  * `_closeCompletedDayIfPending` keeps working exactly as before -- an interception
  * cannot leave a completed day stranded, since the queue never grew.
@@ -1924,7 +1924,7 @@ function _applyPopupChoice(event, choice) {
         _haptic('heavy');
     }
     // Rogue trading / margin-deficit game over: the announcement popup is the
-    // BEAT; what follows is the SHARED terminal machinery (02a P6-3 ruling 2),
+    // BEAT; what follows is the SHARED terminal machinery (02a "Resolution"),
     // NOT a preset reset -- latch -> extrapolate -> closeout -> epilogue, with the
     // involvement split deciding the overlay like any other resignation.
     if (event._gameOverAction) {
@@ -2006,7 +2006,7 @@ function _showComplianceTermination() {
  */
 function _triggerGameOver(endingId) {
     if (_gameOver) return;
-    // 0. The band stops mid-note (P7-1 terminal latch, 02a ruling 6): immediately
+    // 0. The band stops mid-note (P7-1 terminal latch, 02a "Act III"): immediately
     //    after the idempotency guard, BEFORE the game-over latch, the play mutation,
     //    the UI update, and the resolution-day beat. The desk goes quiet; the hum
     //    and the machines do not notice. Dynamic modes only -- Classic never enters
@@ -2015,7 +2015,7 @@ function _triggerGameOver(endingId) {
     _gameOver = true;
     playing = false;
     updatePlayBtn($, playing);
-    // 0b. Partial-day abort (02a P7-1 ruling 3): a terminal reached MID-DAY -- an
+    // 0b. Partial-day abort (02a "Act III"): a terminal reached MID-DAY -- an
     //     intraday compliance choice, a rogue latch off a substep-lane popup --
     //     unwinds the day's overlays and closes the day WITHOUT running
     //     _onDayComplete. The world does not tick after the latch, and the closeout
@@ -2030,7 +2030,7 @@ function _triggerGameOver(endingId) {
     freezeStandingOrders();
     portfolio.restricted = true;
 
-    // TERMINAL QUEUE DISCIPLINE (02a P6-3): the world's resolution supersedes the day's
+    // TERMINAL QUEUE DISCIPLINE (02a "Resolution"): the world's resolution supersedes the day's
     // ordinary news. FILTER the popup queue -- BEFORE closeout / epilogue generation --
     // to terminal-safe beats only: today exactly category 'summit' (treaty_holds /
     // treaty_resolution, effect-free acknowledgments by construction). DISCARD every
@@ -2061,7 +2061,7 @@ function _triggerGameOver(endingId) {
     }
 
     // 4. Epilogue (structure + numbers here; sentences are coordinator slots). DEFERRED
-    //    behind the popup queue (02a P6-3 ruling 2): any resolution-day beat already
+    //    behind the popup queue (02a "Resolution"): any resolution-day beat already
     //    queued -- the treaty superevent above all -- shows as an EVENT first; the
     //    epilogue renders only once the queue has drained (see _processPopupQueue).
     _pendingEpilogue = generateEnding(endingId, {
@@ -2092,7 +2092,7 @@ function _runTerminalCloseout(resolution, geo) {
     // authoritative process price; market.vxhcn is the last-valid VXHCN spot (Heston,
     // impact-free -- the formal validity-history/realized-var-fallback observation
     // record is a market-integrity seam, FLAGGED); bonds carry their last live MTM via
-    // the impact-free Vasicek price (02a P6-3 ruling -- non-doom families mark at MTM,
+    // the impact-free Vasicek price (02a "Terminal closeout and overlays" -- non-doom families mark at MTM,
     // doom recovers on face inside closeout.js).
     const book = closeoutBook(portfolio.positions, resolution, raceState, {
         spot: sim.S, varianceIndex: market.vxhcn,
@@ -2137,7 +2137,7 @@ function _checkFirmConversion() {
     }
 }
 /**
- * THE ROOM (P7-3; 02a Act III "The room" + P7-3 semantics item 1) -- the endgame
+ * THE ROOM (P7-3; 02a "Act III", the room) -- the endgame
  * branch point, evaluated as a day-complete LATCH on a race-side PURE predicate
  * (`roomTriggerReady`: the leader lab's internal track within 0.15 of R5). The
  * conversion-latch precedent: the orchestrator owns the latch, the model owns the
@@ -2208,7 +2208,7 @@ function _runScrutiny() {
     if (Math.abs(gap) <= 20) return;               // not divergent -> no scrutiny
     const lastRev = quarterlyReviews[quarterlyReviews.length - 1];
     const vs = lastRev ? lastRev.vsBenchmark : 0;
-    // Two-sided by rule (02a phase-4): the committee grudgingly respects P&L --
+    // Two-sided by rule (02a "Belief, η, and the firm"): the committee grudgingly respects P&L --
     // +3 divergent & outperforming, -3 divergent & underperforming.
     const delta = vs > 0 ? 3 : vs < 0 ? -3 : 0;
     if (delta !== 0) shiftFaction('firmStanding', delta);
@@ -2523,14 +2523,14 @@ function _onDayComplete() {
     // (phase 3a) read the ledger it produces.
     // The race advances every day, even after it has terminally resolved (P6): the
     // resolution latch does NOT freeze the race -- freezing it left race-instrument
-    // contracts unsettled past their deadlines (02a phase-6 interim ruling). The
+    // contracts unsettled past their deadlines (02a "Resolution"). The
     // interim instead clears the ledger + bars new trades at the latch (below).
     if (raceState) {
         // P6-2 cost-of-capital coupling: fold today's net persistent HCN positioning
         // into the EMA and pass the bounded velocity multiplier as an ORCHESTRATOR
         // input (the straitTension precedent) -- never a mutation export. The channel
         // routes through deterministicDrift, so the plateau detector sees it too.
-        // POST-RESOLUTION the channel is INERT (02a ruling 2): once the race has
+        // POST-RESOLUTION the channel is INERT (02a "Player influence and the ledger"): once the race has
         // latched, the player moves nothing that counts -- pass no coupling (unfed =>
         // zero drift term, zero C row), matching the frozen ledger. The race still
         // advances for instrument settlement; that is settlement mechanics, not a
@@ -2636,7 +2636,7 @@ function _onDayComplete() {
             stepFirmBelief(raceState);   // F wakes toward B; converts on the player's track record
             // P6-2 F-channel ledger (advice line): stepFirmBelief exposes the applied
             // movement's decomposition -- ledger ONLY the PLAYER conversion term
-            // (race.lastFConvert), never the autonomous B-wake (02a ruling 1: the
+            // (race.lastFConvert), never the autonomous B-wake (02a "Player influence and the ledger": the
             // ledger charges the player for persuasion, not for the world waking on its
             // own). Gated on the player ever having locked (the advice channel is silent
             // otherwise); zero-dropped like every channel. F is 0-100; /100 keeps the
@@ -2651,8 +2651,8 @@ function _onDayComplete() {
         // tick's settlement/belief have applied. On the resolving tick, checkResolution
         // latches (freezeLedger -> mark -> clear lastTransitions, preserving the treaty
         // -outcome stamp for the bridge pass below) and bars new race-instrument trades.
-        // The 02a phase-6 interim (freeze + keep playing to term) is SUPERSEDED (P6-3
-        // gate): letting the sim run past resolution mutated settlements the closeout
+        // Freezing and playing on to term-end is ruled out (02a "Resolution"):
+        // letting the sim run past resolution mutated settlements the closeout
         // should have fixed at resolution time. Instead this tick completes its bridge
         // pass + popup drain (the treaty superevent reaches the player), then the
         // endings block below enters the atomic game-over -- SAME tick, resolution-time
@@ -2786,7 +2786,7 @@ function _onDayComplete() {
             _triggerGameOver(endingId);
             return;
         }
-        // NATURAL world resolution ends the desk's story too (02a P6-3: the
+        // NATURAL world resolution ends the desk's story too (02a "Resolution": the
         // post-resolution interim is SUPERSEDED -- letting the sim run past
         // resolution mutated settlements the closeout should have fixed at
         // resolution time). The resolving tick already completed the race pipeline
@@ -2908,7 +2908,7 @@ function _onDayComplete() {
  *  day's substeps and removed before `_onDayComplete` via the shared helpers, so
  *  the step button now applies impulses (previously it never did). */
 function tick() {
-    // The popup barrier binds here too (02a P7-1 ruling 2): a substep-lane arrival
+    // The popup barrier binds here too (02a "Act III"): a substep-lane arrival
     // stops the batch and holds the day OPEN, exactly as in frame(). The day
     // resumes from `sim.substepsDone` once the decision is answered.
     if (dayInProgress) {
@@ -3101,7 +3101,7 @@ function togglePlay() {
 }
 
 /**
- * The in-day clock origin for a resume (02a P7-1 ruling 4). `frame()` derives an
+ * The in-day clock origin for a resume (02a "Act III"). `frame()` derives an
  * ABSOLUTE in-day `targetSteps` from `lastTickTime`, so resuming a partially-run
  * day from a bare `performance.now()` would make the desk wait out every substep
  * the day had already traded -- after a lane popup at substep 15, about fifteen
@@ -3136,7 +3136,7 @@ function step() {
     }
 
     // If all substeps done, close the day (overlays removed) then bookkeeping --
-    // unless the popup barrier holds (02a P7-1 ruling 2). Retry the drain first so
+    // unless the popup barrier holds (02a "Act III"). Retry the drain first so
     // a beat waiting behind the trade dialog is never stranded.
     if (sim.dayComplete) {
         if (_popupBarrier()) _processPopupQueue();

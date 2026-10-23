@@ -35,7 +35,7 @@
    Pure / DOM-free -- headless-importable for MC.
    =================================================== */
 
-// ---- Constants (02a evidence-machinery block) -----------------------------
+// ---- Constants (02a "Incidents") -----------------------------
 
 /** Eventual-disclosure probability, decided once at commit. */
 export const DISCLOSE_PROB = 0.75;

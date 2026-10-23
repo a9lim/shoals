@@ -1,249 +1,320 @@
-# AGENTS.md
+# Shoals
 
-Part of the **a9l.im** portfolio. See root `AGENTS.md` for the shared design system, head loading order, CSS conventions, and shared code policy. Sibling projects: `geon`, `cyano`, `gerry`, `scripture`.
+Shoals is the AI race played from a derivatives desk, at a9l.im/shoals. The player
+trades Halcyon (HCN) stock, bonds, VXHCN volatility futures and American options.
+In the Dynamic modes they also trade Consensus milestone binaries and Cambria
+compute futures, while a hidden race model runs underneath and ends each run in one
+of six terminal families. It is vanilla ES modules with Canvas 2D charts and Web
+Audio synthesis. KaTeX for the reference panels loads from jsDelivr, and the
+Dynamic (LLM) mode calls the Anthropic API from the browser.
+It is a submodule of the a9l.im repository (`a9lim.github.io`, at `projects/shoals`); the
+root `AGENTS.md` covers the shared layer, design system, build, and deployment.
 
-## The overhaul (landed 2026-07)
+`docs/design/` is the source of truth for what the game is and why. Read
+`00-vision.md` first. `02a-tuning.md` holds the ratified constants and implementation
+rulings that code comments cite as "02a …", and the other files cover the world (01),
+race model (02), market mechanics (03), arcs (04), endings (05), naming (06) and
+market integrity (09). Constants in code mirror 02a, so a retune is recorded there
+too.
+`docs/lore.md` is the world bible (cast, places, products, legislation), and
+`docs/art-prompts.md` is an image-prompt sheet. No generated art ships.
 
-Shoals was overhauled (2026-07-23/24, phases P0–P7 per `docs/design/07-migration.md`) from politics-satire trading sim into the AI-race/x-risk game specified in **`docs/design/00-vision.md` … `09-market-integrity.md` — still the source of truth for all design questions** (read 00 first; `02a-tuning.md` carries every ratified constant and implementation ruling, and design changes land there BEFORE code). `lore.md` is v2, the current world. The prototype chassis (pricing, portfolio, chart, the political event pool) remains the live trading engine underneath the race — its conventions below stay binding, and the gotcha-deletion rule stands: delete gotcha entries *with* their code, never before. The 2026-07-23 naming pass is history but its bans are permanent: dead names (`vix`/VXPNT, PNTH, `serica*`, the fictional geography) are enforced-zero in runtime files — write no new content against them. The **six-harness roster** — race-mc, plumbing-test, belief-test, compute-test, consensus-test, endings-test (`node tools/<name>.mjs`, exit 1 on failure, run at default N; small-N runs legitimately miss calibration bands) — is the regression gate for any change touching Dynamic-mode systems; name all six, never a count.
+## Running and checking
 
-## Rules
-
-- Always prefer parent `shared/` modules over project-specific reimplementations. Check the root repo before adding utility code.
-- Never use the phrase "retarded potential(s)" in code, comments, or user-facing text. Use "signal delay" or "finite-speed force propagation" instead.
-- Do not manually test via browser automation. The user will test changes themselves.
-
-## Running Locally
+Preview through the parent build (root `AGENTS.md`), then open `/shoals/`.
 
 ```bash
-cd path/to/a9lim.github.io && npm run build && python -m http.server --directory dist
+for f in main.js colors.js src/*.js src/events/*.js src/race/*.js tools/*.mjs; do node --check "$f"; done
+node tools/race-mc.mjs        # [N] [--seed S], N=1000: race calibration vs 02a targets (~1 s)
+node tools/plumbing-test.mjs  # [N], N=2000: content plumbing, evidence, Act III, standing orders, room/intel, capex/concealment (~11 s)
+node tools/belief-test.mjs    # [N] [--seed S], N=300: belief B, quoters, credibility, impulse decay (~1 s)
+node tools/compute-test.mjs   # [N] [--seed S], N=300: compute-futures lifecycle, conservation, integrity (~1 s)
+node tools/consensus-test.mjs # [N] [--seed S], N=500: binary settlement, regime split, accounting (~1 s)
+node tools/endings-test.mjs   # [N] [--seed S], N=2000: family distribution, player channels, closeout, terminal path (~8 s)
 ```
 
-The project itself has no compile step, test runner, or linter; the parent build stages it with the shared assets. After changes, run `node --check`
-over `main.js`, `colors.js`, and `src/**/*.js`, then `git diff --check`.
-
-## Overview
-
-The singularity, priced from a derivatives desk. The player is a senior trader at **Meridian Capital** during the Barron administration while a hidden AI-race state machine (Halcyon / Tianxia / Polaris) runs underneath the market — two-track capability with a rung ladder, incidents that fire on detection, weight thefts, export controls, a control-regime ratchet, Consensus milestone binaries, Cambria compute futures, market belief coupling, a complicity ledger, and a resolution engine that ends every run in one of six terminal families with a 5-page slot-composed epilogue. The trading chassis underneath: GBM+Merton+Heston stock (HCN), Vasicek rates, CRR binomial tree pricing (128 steps, BSS smoothing), VXHCN volatility index + tradeable futures, strategy builder, portfolio/margin system, Almgren-Chriss-style price impact, narrative event engine with popup decisions, lounge jazz soundtrack. Act III dehumanizes the presentation itself: substep event tempo, a manual-latency ladder, standing orders, display-only degradation, and a machine register in the audio — the band stops being a band. Classic mode is the pure trading sim (race inert, byte-identical). The project is vanilla ES6 modules; KaTeX is loaded from the root site's allowed CDN.
-
-## Architecture
-
-**Orchestrator**: `main.js` (~2300 lines) — DOM cache `$`, rAF loop, sub-step streaming, all system wiring. Shared micro-helpers at module top: `_toast()` / `_haptic()` (guarded global access), `_syncAll()` (syncMarket + VXHCN computation), `_clampRate()` (regulation rate bounds), `_runSubstep()` (full substep pipeline), `_refreshStrategyView()` / `_populateStrategyLegs()` (strategy UI update sequence).
-
-**Module separation**: simulation.js/portfolio.js = state, ui.js = DOM, chart.js/strategy.js = renderers, main.js = orchestrator. `market.js` is shared mutable state (single-writer main.js via `_syncAll`/`syncMarket`, multiple readers — includes `vxhcn` field computed from Heston params).
-
-**Narrative systems** (Dynamic and Dynamic (LLM) modes): events.js (Poisson scheduler + followup chains + filibuster/media/interjection recurring pulses + trait-aware likelihood weighting + `evaluateTriggers` for portfolio-triggered events), `src/events/` directory (prototype domain files fed.js, macro.js, congress.js, investigation.js, media.js, market.js, firm.js, tips.js, interjections.js, traits.js, plus the race files (race-events.js, race-bridge.js) and the arc files halcyon.js, china.js, polaris.js, wonders.js, policy.js, treaty.js, insider.js, room.js — ALL prose coordinator-final; all events share a unified schema; index.js merges pools with by-id lookup and followup chain validation, including choice-level followups; `_helpers.js` provides portfolio calculation helpers for trigger functions; `param-ranges.js` exports canonical parameter clamping ranges), world-state.js (congress/geopolitical/Fed/investigations/election/media, plus the `ai` domain — exportControlStage, treatyStage, wonderCount, arc narrative flags, the race-owned read-only mirrors controlRegime/reportingRegime/frontierRung, and the belief-owned mirror fundLive), faction-standing.js (unified 8-faction standing system: firmStanding, regulatoryExposure, federalistSupport, farmerLaborSupport, mediaTrust, fedRelations, safetyNetworkTrust, labRelations + capitalMultiplier), traits.js (12 prototype + 6 phase-5a permanent convictions + 6 dynamic reputation tags), regulations.js (event-driven regulatory pipeline — legislative bills move through introduced→committee→floor→active/failed, executive orders auto-expire via daily tick; no condition-based activation), lobbying.js (6-action 3-tier targeted PAC funding system), endings.js (slot-based terminal-family epilogue engine — see the "Endings and closeout" block).
-**Race model** (`src/race/`, phase 1 of the overhaul, 2026-07-23): hidden AI-race state machine per `docs/design/02-race-model.md` + `02a-tuning.md` — seeded RNG (`rng.js`), per-run hidden state (`sampler.js`), two-track capability with rung ladder + certification (`capability.js`), composition + S/heat dials (`race-state.js`). Binding conventions: (1) modules are **DOM-free by requirement** — `tools/race-mc.mjs` (`node tools/race-mc.mjs [N] [seed]`) is the headless Monte Carlo calibration gate, exits 1 on MISS; (2) `raceState` is null outside Dynamic modes — guard every touch, same convention as `eventEngine`; (3) the ONLY capability-mutation routes are `commitTheft` / `commitRelease` on race-state.js — capability.js exports kinematics and read-only helpers; never re-add `applyRelease` / `applyTheftDiscontinuity` / `stepReleases` as exports; (4) `advanceRace` stores `race.lastTransitions` ({spawned, releases, thefts incl. failed attempts, crossings, certifications}) — later phases consume the ledger, never state-diff; (5) RNG substreams via `deriveSeed(seed, name)` — each new subsystem draws from its own named stream so same-seed trajectories stay stable under extension; (6) constants come verbatim from 02a (`RACE_TUNING` is exported mutable for harness sweeps only) — retuning is a design decision recorded in 02a first; (7) certification is nested (settling a rung settles unresolved lower rungs; ledger marks implied-vs-direct); crossings are stamped `endDay = day + 1`.
-
-**Events spine** (phase 2, 2026-07-23): `src/race/incidents.js` (two-track incident generator + evidence beats, draws ONLY from `streams.incidents`), `src/events/race-bridge.js` (transitions ledger → narrative events), `src/events/race-events.js` (event shells; prose is orchestrator-written). Binding conventions: (1) incidents fire narratively on DETECTION only — occurrence is silent by design; S4 is never persuasion-class and always self-discloses same-tick; (2) race-shell `params` stay `{}` until phase 4's decaying-impulse/B coupling (03's incident-coupling rule — permanent additive deltas on the ~160-event stream walk sim params to their clamps); the pre-zero sign intents live in `// P4 coupling reference:` comments; (3) all fired strings pass the bridge's `finalize` (variant pick → token substitution → capitalization); tokens are `{lab}` `{model}` `{aModel}` `{rung}` `{rungName}` `{lag}`; the engine's `_fireEvent` variant-pool collapse does NOT substitute tokens, so followup-fired pools must stay token-free; (4) headline variant rotation is deterministic (per-shell fire counters; `resetRaceBridge()` in `_resetCore`) — never an RNG-substream draw; (5) categories `release`/`incident`/`certification` are Poisson-excluded — bridge or followup fire only; (6) insider tips: Bernoulli(0.3) per non-immediate occurrence; reporting regime activation is retroactive-once via `applyReportingRegime` (unwired until P5 policy events).
-
-**Consensus binaries** (phase 3a, 2026-07-23): `src/race/consensus.js` — milestone binaries as 09 oracle tuples, settled off `lastTransitions.certifications`. Binding conventions: (1) the quote path receives ONLY `buildPublicView(race)` — day, rung claims, certifications, public release records, controlRegime; never continuous C values, latents, or τ (09 information hygiene; the harness corrupts every hidden field and asserts quote+settlement invariance); (2) position type `'binary'`: `strike` carries the contract key, `expiryDay` the deadline; no greeks, no delta/gross-notional contribution, excluded from maintenance margin (shorts are fully collateralized via `_reservedMargin`, longs cash-funded); binary closes route through `executeBinaryTrade` — never `_fillPrice`; (3) every equity decision uses canonical `portfolioValue`/`_portfolioEquity` (includes `_reservedMargin`) — never cash+MTM; forced liquidation with frozen legs restricts without a deficit test and reports `{stuck}`, never force-fills — restriction is real state (`portfolio.restricted`, cleared by `resetPortfolio`) enforced at the four chokepoints `executeMarketOrder`/`placePendingOrder`/`checkPendingOrders`/`executeBinaryTrade`, cancels pending orders on entry, and auto-releases when no stuck leg remains and canonical equity ≥ 0; (4) R5 settles only via terminal closeout (`pendingTerminalCloseout()`, wired at endings) — pending contracts carry their last live mid as a frozen mark (09 halted-leg protocol), and `CERT_RUNGS = [2,3,4]` is by design; (5) `setControlRegime(race, regime)` is the sole controlRegime writer — monotone (private→supervised→mobilized→nationalized/classified), freezes Consensus synchronously; mobilized = freeze + successor adjudicator keeps settling, nationalized/classified = fallback-settles everything including pending; (6) `race-state.js → consensus.js` import is ratified (synchronous consequence bundle beats a forgettable callback); (7) quote magnitudes are placeholder until belief.js swaps in via `setBinaryQuoteSource` — listing base rates must stay two-sided per the 02a block.
-
-**Compute futures** (phase 3b, 2026-07-23): `src/race/compute-market.js` — Cambria allocation-quarter contracts, rolling 4-maturity quarterly ladder, DOM-free singleton mirroring consensus.js. Binding conventions: (1) the curve path receives ONLY `buildComputePublicView(race, geo)` — day, releaseCount, certifiedFrontierRung, blockade, straitTension, controlRegime; curve magnitudes are the P4-swappable placeholder via `setComputePriceSource` (same seam as the binary quoter; structure ratified, magnitudes deliberately unrecorded — 02a phase-3b block); (2) **two straits, two flags**: the blockade condition is `geopolitical.taiwanBlockade` (Hsinchu — chips), NEVER the Gulf arc's `straitClosed` (Hormuz — oil); `taiwanBlockade` is dormant until P5 wires the strait generator, harness-exercised only; (3) position type `'computefuture'`: spread-only fills (no impact pool), Reg-T shorts via `COMPUTE_MAINTENANCE_MARGIN`, zero greeks/net-delta/gross-notional, skipped by `processExpiry` and borrow by fall-through — settlement is event-driven via `settleComputeFutures` on **race-day** maturities, never sim-day expiry; `unitPrice` reads the cached mark (`getComputeMark`); (4) **entryBasis deviation**: computefuture positions carry a VWAP `entryPrice` on same-direction extends (09 ruling — formula-priced closeout pays off the basis directly, so only VWAP conserves cash under multi-fill); every other type keeps the chassis first-entry convention; (5) lifecycle: `isComputeTradeable(key)` (active ∧ listed ∧ open ∧ unfrozen ∧ unsettled) gates the `executeMarketOrder` branch; settlement precedence decree ⊃ force-majeure ⊃ ordinary; **freeze is terminal** — no listings while frozen, frozen marks held at the captured decree/last-valid mark and never repriced, `freezeComputeMarket` called only from `setControlRegime`; (6) the nationalization reference (20-session median, multiple U[0.60,1.15] from a fresh `createRng(deriveSeed(seed,'nationalization'))` — deliberately not in `race.streams`, so race trajectories are bit-identical with the market on or off) is **HCN-conversion state for the endings phase**; the compute decree uses the contract's own listed multiplier (= 1) — the two multipliers never mix (09); (7) `_postTradeMarginOk(…, proposedReserved)` — computefuture shorts pass old+new total reserved, all other call sites pass 0 (prior algebra preserved); `positionLabel(pos, day)` is the single pure source for portfolio row labels, and compute rows omit sim-clock DTE (the race-clock maturity lives in the compute panel); (8) `tools/compute-test.mjs` (`node tools/compute-test.mjs [N] [seed]`) is the exit-1-on-fail gate; its curve check is duplicated-code parity, not doc calibration.
-
-**Belief and coupling** (phase 4, 2026-07-23): `src/race/belief.js` + `src/race/impulse.js` — market belief `B`, player posterior/credibility, firm belief `F`, and the decaying event-impulse overlay. Binding conventions: (1) `B` is per-rung logistic hazards; `stepBelief` consumes ONLY `race.lastTransitions`; the quoted probability is **survival-conditioned** `P(T ≤ D | T > today)` — day-0 quotes equal the listing base rates exactly by conditional-law seeding; (2) **two-channel routing**: the crossing-date timeline moves only on releases + certifications; incidents/tips/evidence fold into the bounded alignment sentiment; every `m`/`w`/monotonicity mutation is ledgered under its originating event ID (`beliefCauses()` audit — the harness reconstructs live state from the ledger alone); belief noise is off, the `belief` substream reserved; (3) the real quoters install via `setBinaryQuoteSource`/`setComputePriceSource` **after** `initConsensus`/`initComputeMarket` — the inits reset sources to placeholder (ordering trap); Section Z in both instrument harnesses asserts the belief sources are genuinely active; (4) event market coupling rides `impulse: {...}` on race shells (`params` stay `{}`); the canonical impulse dispatch lives inside `_fireEvent` (bridge, followup, and Poisson paths alike — the bridge only stamps `_impulseScale`, the Act-II pre-pricing factor `(1 − 0.6·η)`); impulses decay with half-life 5 trading days and NEVER mutate sim params permanently; (5) the day pipeline is `_beginTradingDay()`/`_closeTradingDay()` shared by `frame()`, `tick()`, and `step()` — overlays (Layer-3, then impulse innermost) are removed LIFO **before** `_onDayComplete`, so events mutate baseline params and day-complete valuations never price through a transient overlay; (6) forecast locks: quarterly grid 0/63/…, full 4-rung vector or nothing, immutable once accepted (idempotent exact replay only), day 0 is a real prompted lock; skipping stalls the credibility EMA; `hasEverLocked()` guards scrutiny — no lock, no belief gap; credibility = EMA(α 0.25) of (1 − 2·Brier), gates memos > 0.55 and fund > 0.65 ∧ F > 60; (7) `F` lives on `race.F`; `marketPilled` reads R4 while the compute lift reads R5 (ratified asymmetry); scrutiny is two-sided ±3 at |gap| > 20; (8) `tools/belief-test.mjs` (sections A–K incl. the ledger-reconstruction and day-lifecycle mu-probes) is the exit-1-on-fail gate. Harness invocations use their default N — small-N runs legitimately miss the calibration bands.
-
-**Content plumbing** (phase 5a, 2026-07-24): `src/race/strait.js` (Taiwan-strait generator), `src/race/control-regime.js` (controlRegime ratchet evaluator), dispute-lifecycle activation in consensus.js, day-level base-rate scaling in events.js, the `world.ai` domain, factions/traits v2, and the arc-file skeletons. Binding conventions: (1) the strait draws ONLY from `streams.strait` and runs inside `advanceRace` (it is race dynamics); a blockade sets `race.taiwanBlockade` (Hsinchu — NEVER Hormuz's `straitClosed`), applies the reversible `heat.strait` overlay (0.20, cleared on lift), and latches `mobilizationGateOpen` for the run; no gray-zone or new-blockade rolls while a blockade is active; blockade runs legitimately diverge from pre-strait trajectories (heat feeds theft/incidents) — no-blockade runs stay bit-identical; `straitTension(geo)` in strait.js is the single tension source (0.6·china + 0.4·trade, public facts only), re-used by the compute curve. (2) Regime evaluation is ORCHESTRATED, never baked into `advanceRace`: `desiredRegime` (pure) + exported `stepControlRegime` are called by main.js (and the harness) after `advanceRace`; the sole writer stays `setControlRegime`; grip pressure DECAYS (0.97/day) so the ratchet answers severity clusters, not the S0/S1 farce stream; the event-triggered terminal predicates (S4∧theft → nationalized, ≥2 persuasion → classified) are ratified design (02a phase-5a block) — never "simplify" them to conjunctive pressure gates; `stepControlRegime` stamps its consumed race day (same-day replay is a no-op); terminal peers never swap (nationalized↔classified rejected both directions). (3) Disputes: a timely ruling settles the contract synchronously at ruling time and is terminal — no later regime fallback overrides it; post-deadline rulings are VOID and the boundary is singular (`ruleDispute` accepts through the deadline day, the daily-pass fallback fires only at `day > disputeDeadline` — never `>=`, or call order decides deadline-day outcomes); the adjudicator is resolved from the CURRENT regime at ruling/settlement time, never the dispute-open snapshot (`openedUnder` is ledger-only); `executeBinaryTrade` bars disputed quotes. ALL binary settlement rows — daily pass and ruling hook alike — route through `portfolio.applyBinarySettlementRows(rows)` (cash + `settleClaims` credibility + `_consumed` exactly-once; no path may settle a milestone without scoring it), and `ruleDispute` stashes its row in the `consensus.pendingRows` outbox as well as returning it — the daily pass drains unconsumed rows, so a dropped return still pays exactly once. (4) `world.ai` = {exportControlStage, treatyStage, wonderCount, controlRegime, reportingRegime, frontierRung, plus arc narrative flags (fixedpointPublic, summitLive)}; controlRegime/reportingRegime/frontierRung plus `geopolitical.taiwanBlockade` are race-owned read-only mirrors written by main.js each day-complete (order: advanceRace → stepControlRegime → mirror → setBaseRateScale) and are EXCLUDED from `WORLD_STATE_RANGES` — structured effects cannot write them; `frontierRung` is the public act proxy every arc guard/likelihood keys on; `summitLive` mirrors `race.treaty.summitOpen` (live since the P6-1 summit machinery) — the seam that gates `treaty_window`. (5) `eventBaseRateScale(releasedFrontierRung)`: ×1.0 at R1 → ×2.5 at R5, linear in the released rung (same public driver as η), applied to accept-rate and cooldown sequentially (≈2.5× effective compression, not multiplicative); exactly 1 in Classic; P7's substep firing pass rides the same driver. (6) Prototype world-state slimming is DEFERRED — candidate-dead geopolitical fields still have live `when` readers; delete a field only with its last reader (the gotcha-deletion rule applied to state). (7) Factions v2 adds `safetyNetworkTrust` and `labRelations` (a SCALAR — per-lab nuance lives in playerFlags and insider-channel state, not the faction table); traits v2 (agi-pilled, doomer, accelerationist, deal-believer, insider, whistleblower) gate on observable play only, thresholds code-local through the prose rounds, `effects` land with the content that uses them. (8) Arc files (`src/events/{halcyon,china,polaris,wonders,policy,treaty,insider}.js` + firm/media additions): ALL prose is final and coordinator-written as of the 2026-07-24 content rounds — agents never write player-facing prose. Categories 'halcyon'/'china'/'wonder'/'policy'/'treaty'/'ghostwritten' are Poisson-live with `frontierRung` guards; 'polaris' (bridgeSpawn), 'insider' (bridgeTips: safetyNetworkTrust ≥ 20, 45-day throttle, one/day max), and 'conversion' (main.js `_checkFirmConversion` latches: memo at cred-gate ∧ F ≥ 40, verdict at F ≥ 75 made-the-case / 85 hedged) are excluded by DESIGN — ledger/latch-fired only. Ordinary popups schedule followups at CHOICE level only — the engine's popup path returns before top-level scheduling; superevents and non-popups schedule top-level. Deferred seams (never resurrect early): the trade-verb tip→detection outcome coupling (the leak verb's coupling LANDED with the evidence round; the trade verb stays uncoupled by ruling), the classification blackout (P7; `summitLive` landed with P6-1). The exportControlStage dampener, leak coupling, and theft disclosure track landed with the evidence machinery round — see its block below. (9) `tools/plumbing-test.mjs` (`node tools/plumbing-test.mjs [N] [seed]`) is the exit-1-on-fail gate; run at default N — small-N runs legitimately miss the calibration bands.
-
-**Endings and closeout** (phase 6, 2026-07-24): `src/race/coupling.js` (player→race coupling), `src/race/ledger.js` (complicity ledger), `src/race/resolution.js` (resolution ladder + `resolveNow`), `src/race/closeout.js` (terminal valuation matrix), the treaty/summit completion, and the rewritten `src/endings.js` (slot-based 5-page epilogue engine). Binding conventions: (1) player coupling is a 50-trading-day EMA of net persistent HCN positioning → bounded Halcyon velocity multiplier (cap **0.05**, 02a); it enters as the orchestrator-passed input `advanceRace(race, {straitTension, playerCoupling})` and flows through `deterministicDrift`, so the plateau detector MUST receive the same coupling — kinematics and detector price ONE drift. (2) The complicity ledger is append-only with no zero-effect rows; freeze is a MUTATION gate (check-then-mutate: `applyRaceEffects` is a full no-op while frozen/inactive, and main.js passes playerCoupling=0 post-latch); `raceEffects` on choices whitelist S-per-lab + heat with per-effect clamp ±0.15; `d_eff = d_W + clip(d_P, ±(3/7)·|d_W|)` verbatim. (3) F-channel decomposition: `stepFirmBelief` stamps `race.lastFWake` (autonomous B-wake) vs `race.lastFConvert` (player persuasion); ONLY persuasion ledgers; raw terms in the interior — exact wake/convert cancellation records BOTH at full magnitude — with proportional apportionment only when the [0,100] clamp binds. (4) The terminal path is ATOMIC and SHARED: natural resolution and early ejection both run latch (freezeLedger → mark → clear) → resolution-day beat (epilogue deferred behind the popup queue via `_pendingEpilogue`) → closeout at resolution-time regime → epilogue; the extrapolation cap is ABSOLUTE (`HORIZON + EXTRAP_CAP`, never relative to ejection day) so the desk's exit timing never moves the world's endpoint, and extrapolation-era certifications settle early-ejection binaries YES (desk-ends-before-world). Rogue-trading and margin-deficit blowups route through the same latch (`_gameOverAction` → `_triggerGameOver`) — never a preset reset. (5) Terminal queue discipline: `_triggerGameOver` filters `_popupQueue` to `TERMINAL_SAFE_CATEGORIES` (today exactly `'summit'` — effect-free by construction) and discards the rest; later terminal beats (P7's room) opt in by CATEGORY, never by exemption; the predicate `isTerminalSafeBeat` lives in endings.js so the harness gates it on real events. Popup dismissal cascade-drains the queue. (6) The closeout draws from a `'closeout'` substream via `deriveSeed` OUTSIDE `race.streams` (race trajectories are bit-identical with the closeout on or off); the nine cells are 02a-ratified — HCN options settle intrinsic-vs-family-mark in ALL terminal families, shares redeem to cash at reference × the pre-sampled U[0.60,1.15] multiple (NEVER the compute decree multiplier — the two never mix), bonds mark last-live impact-free Vasicek MTM in non-doom families and 0.40-on-face in dooms, VXHCN marks last-valid (the exchange-variance-index machinery is a declared P7 seam); `CLOSEOUT_TUNING` magnitudes ratified 2026-07-24. (7) The personal-overlay split (gray_eminence vs bystander) judges INVOLVEMENT on frozen-ledger ACTIONS — |C| ≥ 0.02 UNSIGNED, S ≥ 0.03, |F| ≥ 0.05, treaty ≥ 1, |d_P| ≥ 0.03, or the firm-conversion latch; traits/credibility/raw `race.F` are never primary signals (a belief is not an act). (8) The epilogue engine composes NO sentences: `EPILOGUE_SLOTS[family][overlay][page]` with fallback [fam][ov] → [fam]['*'] → ['*']['*'] and NO cross-family overlay fallback — overlay prose is placed per-family; all cells are coordinator-written and the table is COMPLETE as of 2026-07-24; `resolution.movability` renders always, as a number (a9 ruling). (9) Consensus listing base rates and `belief.js RUNG_BASE` are ONE number in TWO homes (day-0 conditional-law exactness) — edit in lockstep or not at all. (10) The treaty window bridge-fires on window-open (`summitLive` mirror) and its OUTCOMES are ledger-fired (`treaty_holds` / `treaty_resolution`) — window choices schedule NOTHING. (11) `tools/endings-test.mjs` (`node tools/endings-test.mjs [N] [seed]`) is the exit-1-on-fail gate; the harness roster is SIX — race-mc, plumbing-test, belief-test, compute-test, consensus-test, endings-test — and every brief/gate names all six explicitly, never a count.
-
-**Evidence machinery** (pre-P7 round, 2026-07-24): `src/race/theft-disclosure.js` (theft occurrence→disclosure two-track), the exportControlStage→Tianxia compute dampener, and the insider-channel leak coupling. Binding conventions: (1) `exportControlStage` is the THIRD orchestrator-passed `advanceRace` input (straitTension/playerCoupling precedent), read from `world.ai.exportControlStage` by main.js; absent → stage 0 → **bit-identical trajectories** (harness-proven vs 6b0ce26, 120 seeds); growth factors [1.30, 1.20, 1.06, 0.90] substitute directly into the closed form — mid-run stage raises revalue installed compute (drift-rate discontinuity is RATIFIED physics, C always continuous); the dampener binds the compute leg ONLY — `k_f` distillation is untouchable (controls bind chips, never weights); the extrapolation path re-passes the frozen stage. (2) Leak coupling: `raceLeak: true` on the insider leak choice, applied at the same main.js chokepoint as `raceEffects` through the SAME frozen/inactive gate (`raceChannelsLive()` in ledger.js is THE shared gate); `forceLeakDetection` sets detectable unconditionally with meanLag as a FLOOR min(current, 4) — a leak never slows a detection; `foldPlayerLeak` claims the incident's `det_${id}` fold EARLY (cause `'player-leak'`) so the real detection's fold no-ops via the existing leak-once set — for would-detect-anyway incidents the total B displacement is identical leaked or unleaked (timing only); for the never-detectable tail the leak's fold is NEW mass the counterfactual never gets (the override is the verb's purpose); a leak also advances `streams.incidents` downstream (added daily hazard draws), which is ruled legitimate — the no-player run is the bit-identity invariant; the trade and sit verbs get NO race coupling. (3) Theft disclosure is narrative+belief ONLY — `commitTheft`'s occurrence bundle is untouchable; rolls draw from `streams.theftDisclosure` (own substream — on/off bit-identity); eligibility (pDisclose 0.75) decided at commit, memoryless mean lag 40d, never same-tick; PUBLIC attribution sampled 0.55/0.30/0.15 (espionage/insider/model) independent of the record's true attribution — the thief field is truth and is NEVER surfaced in prose; bridge fires `theft_disclosed` / `theft_disclosed_frontier` (superevent; frontier = highest public released-rung claim, ties → earlier crossing) off `tr.theftDisclosures` — never `tr.thefts`; B folds −0.20 once per disclosure (`theftdisc_` ids); category 'theft' is Poisson-excluded; NO tips on thefts, NO treaty mutation, NO followups on the theft shells. (4) `headlinesByAttribution` pools: the sampled public attribution selects the pool; rotation deterministic per-(shell, attribution) fire counters — never RNG; popup `context` is NOT token-substituted (token-free, attribution-agnostic). (5) The complicity-ledger B channel stays CLOSED (zero net displacement by construction; whistleblower involvement reaches endings via flags).
-
-**Act III systemic layer** (P7-1, 2026-07-24): `src/act3.js` — the smoothed driver `x`/`d`, latency ladder + deferred-order queue, display latches, glitch clustering. Binding conventions: (1) act3.js is DOM-free and the SOLE owner of `x`/`d`; the driver reads ONLY the world.ai mirrors (public state — never race internals), stepped in `_onDayComplete` immediately after `setBaseRateScale` (the documented mirror order gains `_stepAct3` at its tail); Classic mode: `x` stays 0, `setMachineIntensity` never called, everything inert. (2) The substep event lane (frontierRung ≥ 4): the DISCRETIONARY decision stays at the day boundary with byte-identical accept/cooldown arithmetic — only the ARRIVAL moves to a uniform substep (rate invariance by construction); Poisson-excluded/bridge/ledger/pulse categories NEVER ride the lane; the popup queue drains at substep boundaries only while lane-live ∧ `!_gameOver`. (3) `_midDayBaseline(fn)` is the MANDATORY wrapper for any intraday sim-param mutation — it LIFO-unwinds Layer-3 + impulse overlays, mutates the true baseline, re-derives, `_syncAll()`; without it `_closeTradingDay`'s restore silently erases the mutation; no-op at day boundaries. (4) Latency ladder (0/1/3/6 substeps by released rung, spread ×1/×1/×1.25/×1.5): lag 0 MUST bypass the queue entirely and `spreadMult === 1` MUST short-circuit (bit-identity — the naive mid+(ask−mid)·1 algebra is NOT bit-exact); all five manual routes + the player's close gestures (position-row close → kind `'close'`, strategy unwind → kind `'unwind'`, one unit like the entry) go through `_deferManual`; `liquidateAll` has NO player entry point today (every caller is machinery — a future flatten control takes a `'liquidate'` kind, one case + one param, never pre-wired dead); `closePosition` is NOT restriction-gated, so the due-close drop lives in the drain BY NECESSITY; `exerciseOption` and ALL machinery-initiated paths (popup `choice.trades`, margin liquidation, forced trims, rogue/terminal) stay instant — the ladder binds the player's hand, never the machinery's; restriction/expiry/terminal re-checked at EXECUTION (due orders drop, cash untouched; `executeMarketOrder` rejects time-bound instruments with `expiryDay <= currentDay` before counting the trade — a latency window can outlive an expiry, and resting pending orders always could); `_triggerGameOver` calls `silenceDesk()` immediately after its idempotency guard, then aborts any open day (`_abortPartialDay`: LIFO overlay unwind, `dayInProgress` cleared, NO `finalizeDay` and NO `_onDayComplete` — the world never ticks after the terminal latch, the partial bar stays as the desk's last unfinished day, and play/step early-return on `_gameOver`), then clears the queue. (4b) The popup queue is a BARRIER to day close on every path (`_popupBarrier()`: popup on screen ∨ queued ∨ `_pendingEpilogue`; gates retry `_processPopupQueue` first so a beat parked behind the trade dialog never deadlocks the day): `_closeTradingDay`/`_onDayComplete` never run while the barrier holds — the day stays open (overlays applied, lane choices write through `_midDayBaseline`) until the queue drains, and the popup-dismissal callback runs `_closeCompletedDayIfPending()` synchronously (called from dismissal ONLY, never inside `_processPopupQueue` — `_runSubstep` drains mid-batch and a close there would hand `setLiveCandle` a null partial; idempotency-guarded on day-in-progress state, never `sim.dayComplete` alone). (5) Degradation is display-only BY CONSTRUCTION: no pricing module may import act3.js; chain holds copy the snapshot (chain state is a shared mutable singleton — holding the reference holds nothing); VXHCN staleness latches display spot+variance together and NEVER writes `market.vxhcn`; settlement/fills/margin always price true values. (6) Presentation RNG draws from act3's own fixed-seed stream — NEVER `Math.random`, so display failure cannot shift the price path (harness-asserted). (7) Feel numbers live in `ACT3_TUNING`, ratified rev-1 in 02a; reduced motion drops stutter/repaint but KEEPS staleness (information pacing is not motion). (8) `tools/plumbing-test.mjs` sections J/K/L gate the lane, ladder, and latches.
-
-**Standing orders** (P7-2, 2026-07-24): `src/standing-orders.js` — the delegation layer: six menu-authored precommitments, run-scoped, DOM-free. Binding conventions: (1) `_queuePopup(event, front)` in main.js is THE popup-queue insertion chokepoint (every push/unshift site routes through it; `front` preserves the margin/game-over unshift) — rule (e) tip auto-sit intercepts AT INSERTION, so an intercepted tip never enters `_popupQueue`, never trips `_popupBarrier`, never holds a day open; it STAYS in the event feed (refresh the log at interception) and consumes the 45-day tip throttle — the call happened, the record shows both. (2) `_applyPopupChoice(event, choice)` is the shared choice applicator (extracted verbatim from the `showPopupEvent` callback): the intercepted sit applies through it exactly once — factionShifts, playerFlag, followups, resultToast; the sit verb is found by `playerFlag === 'sat_on_insider_tip'` with NO positional fallback (an unfindable sit choice shows the popup normally rather than risking the trade verb). (3) Standing executions are MACHINERY: zero ladder lag, no spreadMult, never `_deferManual`; restriction/frozen/terminal respected like every machinery path; `freezeStandingOrders()` at `_triggerGameOver` — nothing fires after the latch; standing-orders.js never imports act3.js and draws ZERO RNG (harness-asserted). (4) Episode identities: per incident id for (a) with same-tick collapse to ONE 50% cut (never compounded); per (lab, rung) certification for (d), implied certs are separate episodes; blockade ONSET edge for (b) — arming mid-blockade does not fire; per day for (f), and the episode burns even on a rejected fill (no per-substep retry hammer). Cut rounding ties UP (a 1-lot leg flattens); "ITM long binary" = quote mid > 0.5, and (f)'s gate is strictly MORE than 8% — symmetric in direction by construction, never by `/open` rounding. (5) `liquidateAll(..., typeFirst)` + the exported pure `liquidationSequence` (portfolio.js): the default path keeps the original descending-index loop bit-identical; rule (c) only hoists bonds to the front while armed ∧ utilization > 80% (currently unobservable — a triggered margin call is > 100% by definition; the gate goes live only if a soft-trim path ever runs between 80% and 100%). (6) Unlock at released `frontierRung ≥ 3`; LOCKED at R5 in both directions (arm AND disarm refused); `_resetCore` clears rules and episode memory; Classic: the engine never evaluates and the panel never shows. (7) The panel is ui.js-built into `#tab-portfolio` before the convictions section, existing classes only, delegated change handler bound once on the stable list, arm/lock signature guard against render churn — NO styles.css/index.html edits. (8) Plumbing section M gates the engine: episode semantics, bitwise fill parity vs manual `mult=1`, zero RNG draws, Classic inertness.
-
-**The room, the blackout, the backchannel, the intel** (P7-3, 2026-07-24): `src/events/room.js` + `src/race/intel.js`. Binding conventions: (1) the room is LATCH-FIRED once per run: main.js `_checkRoom` runs at day-complete AFTER `checkResolution` (pre-terminal by construction) on the race-side pure helper `roomTrigger(race)` → `{ready, leaderLab}` (leader `C_internal ≥ R5 − 0.15`, one traversal for ready + argmax, ties by the `frontierInternal` walk order) — main.js never pokes latents; the latch BURNS on the first predicate day, seat or no seat (a later standing gain never reopens it), and below the ≥2-of-6 gate NO beat fires. Category 'room' is Poisson-excluded and NOT terminal-safe. (2) Voice = satisfied-criteria count; `roomChoices(voice, summitLive)` deep-clones and scales every raceEffect by voice/6 (full-voice magnitudes in 02a) and filters the deal choice on `summitLive`; effects land through the standard ledgered chokepoint. The room carries NO impulse and empty params — the tape does not print a private meeting. `sat_in_the_room` is set at the choice chokepoint keyed on `category === 'room'`; say-nothing adds `room_declined`. (3) Presentation: `headlinesByLeader`/`contextsByLeader` keyed by coarse side (`RIVAL_LABS = {tianxia}`; Halcyon/Polaris/unknown → 'home'), selected at fire time by `roomPresentation(leaderLab)` with deterministic per-(shell, side, field) counters — never RNG; NO scalar headline/context on the shell BY CONSTRUCTION (a scalar would pre-empt the pools; the intel shells share this discipline); `resetRoomRotation()` in `_resetCore`. (4) Blackout: under `controlRegime === 'classified'` the bridge routes severity ≤ 3 detections (INCLUDING persuasion) to toast-weight classified-brief shells with NO impulse key (absent, not zeroed) — the briefs do not ask, which is the point; S4 keeps its public superevent; `stepBelief` suppresses detection folds ≤ S3 while leaving `det_${id}` UNCLAIMED (a player leak can still claim it); insider-tip Bernoulli 0.3 → 0.5 at ROLL time with draw counts in lockstep (non-classified runs bit-identical). `controlRegime` is read directly in `stepBelief`/`bridgeIncidents` — public state; the orchestrator-input precedent binds race-dynamics steps only. (5) The fund latch `_fundLive` is MONOTONE over belief.js's `canActAsFund` (0.65/60 never re-derived), mirrors to `world.ai.fundLive` (excluded from `WORLD_STATE_RANGES`); the `treasury_backchannel` oneShot reads the mirror, accept = `treasury_backchannel` flag (the room's sixth criterion) + regulatoryExposure +6. (6) Intel: `intel: true` + `headlinesByRead` resolved inside `_fireEvent` — total (no race → matched pool; every ask on an active channel consumes EXACTLY two draws from intel.js's module stream, `deriveSeed(seed,'intel')` OUTSIDE `race.streams`, before validation); buckets at 0.90/1.10 edges-upper, p = 0.7 truthful else ONE bucket off (matched-noise 50/50); narrative-only — no B folds, no race mutation, and `chinaTrue.velocity` is NEVER printed, only the bucket. (7) Plumbing section N (67 checks) gates the lot.
-
-**Reality-beats round** (2026-09-08, ratified same day — 02a "Reality-beats round" block): `src/events/rates.js` (the capex channel), the concealment term in `src/race/incidents.js`, the population register on the incident shells, and six prose beats. Binding conventions: (1) `rates_capex_wave` is a LOW-volume shell (≤ 4 fires/run) carrying PERMANENT `params: { b: +0.005, sigmaR: +0.001 }` — the prototype's additive convention applies and the 03 incident-coupling rule does NOT (it is not a race shell; never "fix" it into an impulse; it carries NO `impulse` key); category `'rates'` is Poisson-excluded and fired ONLY by the bridge's `bridgeCapex(emit, race)`, a PUBLIC-STATE LATCH on `buildPublicView(race).releasedFrontierRung` (`_lastCapexRung`: seeded without firing on the first call of a run, one fire per rung STEP on a rise, nothing on hold or same-day replay, cleared by `resetRaceBridge`) and a ruled exception to the bridge's consumes-the-ledger header (a per-lab crossing in `tr` does not imply the frontier max rose); main.js passes the LIVE rung snapshot captured after `_syncRaceToWorld()` and BEFORE `checkResolution()` into `runRaceBridge` — the timeout extrapolation advances the race headless before the terminal bridge pass, and a bridge reading race state there would fire extrapolation-era waves into the bond closeout (gate finding); the state read is the headless default only; the delta lands EXACTLY because `_computeCoupling` keys off a `mu` delta and the shell has none; Classic never fires. (2) `resetRaceBridge()` is UNCONDITIONAL in `_resetCore` — the old `if (raceState)` guard left every bridge latch stale across a Classic→Dynamic switch (`loadPreset` creates the race AFTER `_resetCore`; a stale `_lastTipDay` would throttle the new run's first tip); one authoritative reset path, NO self-healing branch in the bridge (a stale capex latch above the rung fires nothing and tracks down on the trailing assignment — no phantom, no dropped fires — but the tip throttle and rotation counters have no such property). (3) Concealment: `lagMultiplier(cRelFrontier, cIntSource) = (1 + K·(cInt−3)⁺) / (1 + K·(cRel−3)⁺)`, K = `INCIDENT_TUNING.CONCEAL_K` (1.0; exported mutable from incidents.js — race-state.js imports incidents.js, so it cannot live in `RACE_TUNING`), stamped on the latent at occurrence as `baseMeanLag` + `lagMult` with `meanLag = base · lagMult` THEN `× 0.5` under reporting; `applyReportingRegime` recomputes from the stamped pair, never the ladder; `forceLeakDetection` (floor 4) and pDet untouched; `C_rel,frontier` = max `C_released` over ACTIVE labs (never `frontierReleased()`, never the open ecosystem); lagMult is exactly 1 when both legs are ≤ R3 or when `C_int,source === C_rel,frontier` (a trailing lab with its own gap closed under a higher released frontier sits BELOW 1 — the denominator is the GLOBAL released frontier by design); the multiplier costs NO draw but is NOT run-level bit-identity — an affected incident leaves the detection-eligible set later (> 1) or earlier (< 1) than its K=0 twin, so whichever arm still holds the live record takes the extra hazard draws and `streams.incidents` re-phases in either direction (the leak-coupling precedent; legitimate); what holds: per-tick identity from shared state, ledgers + RNG position identical through the first AFFECTED record's creation day (the latent record differs immediately in lagMult and meanLag), and full identity before any R3 crossing. (4) Plumbing sections O and P gate both; race-mc carries an era diagnostic (occurDay < 700 vs ≥ 700), not a band. (5) The six beats use one-shots ONLY where the same-day coincidence is the beat (`policy_ban_bill` at released R4) or a second random guard exists (`treaty_pacing_letter` on treatyStage ≥ 1): the pre-pass fires a one-shot the first day its guard holds and preempts that day's draw, so stacking one-shots on a rung clusters them — flag-gate the rest (`halcyonPaused` / `proofDisputed` / `fixedpointIndex`, function-effect-set, never whitelisted). (6) Followup resolution prefers an INLINE object that carries its own `headline`/`params` and resolves by id only for id-only references, and llm.js renames generated ids that collide with authored ones — an LLM followup named after an authored shell must never become that shell (gate finding; `rates_capex_wave` was reachable that way). (6b) The epilogue Restart goes through `loadPreset`, never `_resetCore` alone — a bare core reset keeps the resolved race and re-terminates the desk. (7) Followup `weight` is a same-day sibling tiebreak among pending followups of one chain, NOT a firing probability — never write it on a single-followup chain. (8) The incident generator's row stays ONE incident, ONE severity — the population is prose (the unit line in lore's incident canon), on BOTH tracks: the wonders shells carry the same fleets with headcounts growing by rung, and `wonder_proof_disputed` → `wonder_proof_verified` is the claim → certification two-hop (only the certified hop increments `wonderCount`); no headcount field.
-
-**LLM event source**: `src/llm.js` (LLMEventSource) is an Anthropic API client for dynamic narrative event generation, activated via the "Dynamic (LLM)" mode (option 6 in the mode dropdown). Generates event batches with parameter deltas, faction shifts, and world state effects via structured tool use. API key and model are configured in the LLM Settings section of the sidebar (localStorage keys `shoals_llm_key`, `shoals_llm_model`; default model `claude-haiku-4-5-20251001`). `eventEngine = new EventEngine('llm', llmSource)` swaps in the LLM source at mode-select time; event schema and tool definitions reuse `PARAM_RANGES` from events.js.
-
-**Audio**: `audio.js` — all Web Audio API synthesis, no external audio files. Three layers: (1) background jazz loop (72 BPM, 16-bar Am form: Rhodes piano (sine+bell partial) with hand-placed comp events and ghost voicings, spacious walking bass (triangle+sub-sine) with chromatic approaches, brush drums (swish circles + dab backbeats), sparse ride cymbal shimmer on swung upbeats, and muted trumpet melody fragments (60% chance per loop, two alternating pentatonic phrases). Convolution reverb (1.8s synthetic IR, 12ms predelay, darkened via LP return) on piano and trumpet. Form: A(Am9→Dm9→Hd→E7) A'(Am9→FM7→Hd→E7) B(FM7→Em7→Dm9→CM7) C(Hd→E7→E7→Am9). 4-note spread voicings (Bill Evans style). (2) continuous Am drone pad (sine/triangle/sawtooth oscillators), (3) event stingers + superevent chord stabs. `setAmbientMood(mood)` crossfades between jazz and drone: calm = full jazz, tense = jazz 55% / drone 45%, crisis = jazz 15% / drone 85%. Jazz loop uses a look-ahead scheduler (`_jazzSchedule`) that keeps 4s of audio queued. `playMusic(track)` ducks both jazz and drone to silence for superevent chord stabs, `stopMusic` restores them to the current mood mix.
-
-**Act III machine register** (audio, 2026-07-24 — coordinator-written like all audio): `setMachineIntensity(x)` (0..1) re-renders the SAME 16-bar form with progressively less humanity — swing 0.62→0.50 via `_swing()`, ±6ms timing breath via `_jit()` (nonzero at baseline BY DESIGN: the human warmth quantization removes), trumpet gone by x≈0.4 and never returns, comp velocities compress toward 0.62, Rhodes bell detune 2.003→2.000 with hardening attack/filter, bass staccato+brightening, brushes/ride fade under a machine bus (`_machineGain`, sibling of `_jazzGain` — ducks with nothing) carrying a 4-voice Shepard riser (40s/octave, sin² windows at quarter-period stagger — ensemble loudness exactly flat) and a tick grid at constant BPM with sharpening subdivision (quarters ≥0.5, 8ths ≥0.75, 16ths ≥0.9) on its OWN scheduler/phase (`_machineSchedule` — the machines keep their own time); reverb send dries 0.3→0.05 and the drone's fifth detunes +6 cents past x=0.85. `glitchAudio(severity)` (1 dropout / 2 stutter / 3 stutter+warble) rides a normally-silent parallel feedback delay off the jazz bus — zero cost until fired. `silenceDesk()` = terminal latch: jazz cuts mid-note in 30ms, drone + machine layer persist, `setAmbientMood` no-ops until `resetAudio` (which unwinds everything: machine 0, glitch closed, reverb restored, desk un-silenced). The harmony NEVER changes with x — the tune is the tune; valence stays unsigned (03). All three entry points are **wired by P7-1**: `setMachineIntensity(x)` daily from the act3 driver step, `glitchAudio` from degradation clusters (severity by cluster size, wall-clock rate-limited), `silenceDesk()` first act of `_triggerGameOver` after its idempotency guard. BPM stays 72 at every x — the tick grid subdivides, it never accelerates. Volume slider is in the settings dropdown, triggered by the gear icon (`#settings-btn`) in the toolbar. The dropdown uses `_settings.create()` from `shared/settings.js`. `$.settingsBtn` is the DOM cache reference.
-
-**Lore bible**: `lore.md` at project root — canonical creative reference for all named characters, nations, products, legislation, publications, and journalists. Not consumed by runtime code. Consult when writing new events or modifying narrative text.
-
-## Data Flow
-
-### Sub-Step Pipeline (playing)
-
-1. `frame()` applies Layer 3 param overlays, calls `sim.beginDay()`
-2. 16 sub-steps per day: `_runSubstep()` (substep → rate clamp → impact decay → market sync → MM rehedge → order check) → `chart.setLiveCandle()`
-3. After substep batch: `_onSubstepUI()` (reprice chain sidebar, update portfolio display)
-4. After all 16: `sim.finalizeDay()`, overlays removed. `_onDayComplete()` runs: borrow interest, expiry, dividends, quarterly review, trait eval, event engine, regulation eval, endings check, portfolio popups, Layer 3 shifts, scrutiny, ambient mood, rogue trading check, margin check, lobby pill update, standings update, popup queue drain
-
-### Bootstrap
-
-`sim.prepopulate()` backfills 252-bar history (negates `mu` for correct reverse drift). Call `_syncAll()` after `prepopulate()` in both `init()` and `_resetCore()` so `market` receives the simulation parameters and the derived VXHCN spot value.
-
-### Reset
-
-`_resetCore()` clears player choices, popup queues, impact/review history, lobby count, and event trigger cooldowns, then calls `resetUsedTips()`, `resetFactions()`, `resetTraits()`, `resetRegulations()`, `resetLobbying()`, `resetAudio()`, and `resetImpactState()`. It resets the simulation and portfolio, prepopulates history, calls `_syncAll()`, rebuilds histories/chain state, and clears the chart lerp object. After `resetFactions()`, re-wire `eventEngine.world.factions = factions`.
-
-## Key Conventions
-
-### Display Scaling
-
-Internal values use original scale ($10,000 starting capital). `fmtDollar()` appends "k" for portfolio-scale amounts. Per-unit prices (fills, strikes, breakevens, strategy net debit) display raw `$X.XX` — do NOT use `fmtDollar` for per-unit values.
-
-### Value Coloring
-
-- P&L: `pnl-down` (red) / no class (neutral) / `pnl-up` (green)
-- Portfolio value: colored vs buy-and-hold benchmark, not absolute
-- Greeks: per-Greek CSS vars (`--delta`/`--gamma`/`--theta`/`--vega`/`--rho`), NOT `pnl-up`/`pnl-down`
-- VXHCN cells: `--vxhcn` (purple) — `#vxhcn-price-cell`, `#strategy-vxhcn-cell`
-- VXHCN sparkline: `--vxhcn` CSS var color
-- Sparklines: rate/portfolio use `--text` CSS var color
-
-### Type and Layout
-
-The root design system applies (Newsreader, neutral ground, per-theme oxblood accent). Project specifics:
-
-- **No monospace UI.** Every readout, table, position label and canvas label is `--font-text` / `_FONT.text`; columns align on Newsreader's default lining tabular figures. `--font-code` is used only for the API-key input (a literal token).
-- **Canvas text** (`chart.js`, `strategy.js`): `LABEL_FONT()` = `12px ${_FONT.text}` (the chart's empty-state line is 14px). Theme colors, including the accent, come from `_themePalette()` and are cached per `data-theme` value, so a theme toggle refreshes them on the next draw. `main.js` redraws once the shared `_loadTextFonts()` resolves so labels never stay in a fallback face.
-- **Crosshair tags** (chart price/day labels): accent fill with the theme's `elevated` color as text (`--text-on-accent`): white on oxblood in light, near-black on the lighter red in dark.
-- **Chart gutters** (`config.js`): `CHART_Y_AXIS_W` 64px holds right-aligned 12px price labels (widest, `$100.0`, measures 39px) and the 60px crosshair tag. The strategy view's left gutter is fitted per draw to the widest measured Y label plus the rotated "P&L" column (`_fitLeftMargin`, never below `STRATEGY_MARGIN.left`); its legend box is sized from measured label widths; X tick labels skip any tick that would collide with the accent spot label and clamp inside the canvas at the right edge.
-- **Tables**: numeric columns are right-aligned so decimals stack. The three-column tables (stock/bond/VXHCN and call/strike/put) use `--chain-pad-r: calc(100% / 6 - 1.25em)` — cell padding percentages resolve against the table width — which centres the widest figure in each column at any sidebar width. The Consensus and compute books keep a left-aligned label column. Headers are italic `--text-muted` over a hairline rule.
-- **Popup kicker** (`.popup-tag`): an italic muted label with a category-colored dot; `showPopupEvent` sets `--tag-color` per category, so the label text keeps full contrast.
-- **Sentence case in source** for every UI label, info-tip title, reference heading, preset, built-in strategy, trait and epilogue label; proper nouns, tickers (HCN, BND, VXHCN, CMP) and acronyms keep their capitals. Code that finds a preset by name matches `/\(offline\)/i`, not a display string's casing.
-- Motion is color and opacity only: chain-cell and popup-choice hover change background or a hairline inset rule; superevent and choice entrances are opacity fades.
-
-### Pricing
-
-Always use `unitPrice()` (position-value.js) — includes vol surface + impact overlay. Handles 5 types: `stock`, `bond`, `vxhcnfuture`, `call`, `put`. Only exception: strategy.js payoff curve sweeps via direct tree pricing.
-
-All option pricing uses `prepareTree` + `priceWithTree`. No `priceAmerican` function exists. Each module owns reusable trees for zero-alloc pricing. VXHCN spot uses `computeVXHCNSpot()` (Heston 30-day expected integrated vol × 100). VXHCN futures use `computeVXHCNFuturePrice()` (forward variance curve → forward integrated vol). Both in `pricing.js`.
-
-### Price Impact
-
-Impact is an **overlay** on `sim.S` — never mutates it. `getStockImpact(sigma)`, `getBondImpact(sigmaR)`, `getVxhcnImpact(xi)`, and `getOptionImpact(...)` each require their respective vol parameter at read time. VXHCN futures impact is keyed off `xi` (vol-of-vol) — higher xi deepens the VXHCN liquidity pool. Only `resetImpactState()` clears cumulative volumes.
-
-### Popups vs Toasts
-
-Events are unified under `src/events/`. Toast-only events have `headline` + `params` but no `choices`. Popup events have `popup: true` + `choices`. Portfolio-triggered popups have `trigger` + `cooldown` + `tone` (`'positive'` or `'negative'`) evaluated daily by `EventEngine.evaluateTriggers`. Positive-tone events fire more often at high firm standing (inverse cooldown multiplier); negative-tone events fire less often. Superevents have `superevent: true` (full-screen treatment + chord stab). `showToast(message, duration)` — duration is numeric ms, no severity parameter. Long toasts auto-detect multiline and switch from pill to rounded-rect shape.
-
-### Positions
-
-Signed qty: `qty > 0` = long, `qty < 0` = short. No `side` property. Netting key: `type + strike + expiryDay + strategyName`. Seven position types: `stock`, `bond`, `vxhcnfuture`, `call`, `put`, plus the Dynamic-only `binary` (phase 3a) and `computefuture` (phase 3b) — see their convention blocks above for the ways each deviates from the chassis (margin, greeks, expiry, basis). VXHCN futures are cash-settled at VXHCN spot on expiry, use Reg-T margin for shorts, and contribute vega + theta to portfolio greeks.
-
-### Strategies
-
-Saved as relative offsets (`strikeOffset`/`dteOffset`) in localStorage. `selectableExpiry: true` → `dteOffset: null`, uses expiry dropdown at execution. Built-ins are const in strategy-store.js, never in localStorage. `executeWithRollback()` rolls back all legs on partial failure.
-
-## Gotchas
-
-### Will Cause Bugs
-
-- `sim.history` is `HistoryBuffer` (`.get(day)`, `.last()`, `.minDay`/`.maxDay`) — not array-indexable
-- `sim._partial` pushed by reference — `beginDay()` pushes, `substep()` mutates in-place
-- `portfolio` is a singleton — `resetPortfolio()` mutates in place, never replace the reference
-- `eventEngine` is null in non-Dynamic mode — always guard
-- Use `_haptic(pattern)` and `_toast(msg, duration)` — never raw `_haptics.trigger()` or `showToast()` in main.js
-- `computeEffectiveSigma(v, T, kappa, theta, xi)` takes **variance** `v`, not vol. `computeSkewSigma` takes the additional S, K, rho args
-- Dual pricing shares `_V` buffer — `_priceCore` after `_pricePairCore` overwrites call values
-- Chain table rebuilt every call — never cache cell refs; delegation bound once via `_chainClicksBound`
-- Trade dialog confirm button cloned on each open to avoid stacking listeners
-- `initAudio()` must be called from a user gesture handler (deferred to first click/keydown via one-shot listeners in `main.js`)
-- `scheduleFollowup` must use `{ event, chainId, targetDay, weight, depth }` — NOT `{ id, fireDay }`
-
-### Semantic Traps
-
-- `close_short` is **directional** — closes short stock, short calls, AND long puts. `close_long` is the inverse
-- Compliance triggers use directional notional, not raw `qty` sign
-- `q` (dividend) NOT in GBM drift — stock grows at `mu`, not `mu - q`; only discrete quarterly drops
-- Vasicek rate can go negative — tree handles via per-step `pu` clamped to [0,1]
-- Rate ceiling/floor is a permanent `sim.r` mutation (not an overlay) via `_clampRate()`. Mean-reversion operates from clamped value
-- Event deltas are additive and clamped to `PARAM_RANGES` — never set absolute values
-- Superevent params apply at fire time (in `_fireEvent`), not choice time — popup is informational only
-- `minDay`/`maxDay` use live trading days (`day - 252`), different from `era` which uses absolute `day`
-- `tick()` in main.js is currently UNCALLED dead code — `step()` is the actual step-button handler; tick's barrier gates are correct-if-resurrected, not live behavior. Do not wire new behavior into it assuming it runs
-- `getTraitEffect(key, defaultVal)` multiplies all active effects onto defaultVal (boolean: any true wins)
-- `getRegulationEffect(key, defaultVal)` — mult keys: product; add: sum; ceiling: min; floor: max; boolean: any true
-- One-shot events (migrated compound triggers) fire at most once per game — tracked by event id in `EventEngine._firedOneShots` Set. Guard also applies in `_checkFollowups` so one-shots referenced as followups can't fire twice
-- `advanceBill(id, 'failed')` and `advanceBill(id, 'repealed')` remove from `_state` entirely — they are terminal states, not display states
-- `getPipelineStatus(id)` returns null if the regulation was never introduced or was removed — event guards must check for null, not 'inactive'
-- `trigger` (portfolio-triggered, daily eval) vs `when` (world-state eligibility guard) — events with `trigger` are never Poisson-drawn
-- `factionShifts` on choices are additive — conditional bonuses (`when.hasTrait`) add to the base `value`, not replace it
-- `superevent: true` on event objects is the sole source of truth — no hardcoded sets or heuristics
-- VXHCN futures `spreadVol` uses `market.xi` (vol-of-vol), not `market.sigma` — same pattern as bonds using `market.sigmaR`
-- `computeVXHCNSpot` and `computeVXHCNFuturePrice` take **variance** `v`, not vol — same convention as `computeEffectiveSigma`
-- VXHCN futures have no borrow cost — `chargeBorrowInterest` only processes `stock` and `bond`
-- VXHCN futures theta is positive in backwardation (v > θ), negative in contango (v < θ) — for long positions
-
-### Do NOT Re-add
-
-- `priceAmerican` function or its transparent cache — use `prepareTree` + `priceWithTree`
-- `portfolio.strategies` — strategies live in localStorage via strategy-store.js
-- `speed` variable — use `SPEED_OPTIONS[speedIndex]`
-- `$.totalPnl` references — Total P&L row removed from HTML
-- Nested `.glass` — backdrop-filter stacks make inner elements opaque; use `bg-hover`/`bg-elevated`
-- Lobby overlay / `lobbyOverlay` / `_lobbyTrapCleanup` — lobbying is inline pill buttons in `#lobby-bar`, no overlay
-- Lobby actions that directly set congress seats — use `barronApproval` ±2 and `lobbyMomentum` ±1 instead
-- `sericaRelations` — renamed (back) to `chinaRelations` in the 2026-07 naming pass; the wheel turned
-- Dark overlay backgrounds on popups — use blur-only (`background: none`), never `rgba(0,0,0,...)`
-- `AMBIENT_MOODS` / `_stopAmbient` / `_ambientNodes` / `_ambientGain` — old drone-only ambient system replaced by jazz loop + drone crossfade via `MOOD_MIX`
-- `_jazzFilter` for mood — mood is now a jazz↔drone crossfade, not a lowpass filter
-- `compound-triggers.js` / `checkCompoundTriggers` / `resetCompoundTriggers` / `getFiredTriggerIds` — deleted; all 18 triggers migrated to domain files under `src/events/` as `oneShot: true` events, fired by the standard EventEngine one-shot pre-pass
-- `interjections.js` / `checkInterjections` / `resetInterjections` — deleted; all interjections migrated to `src/events/interjections.js` as `category: 'interjection'` events with recurring pulse in events.js
-- `epilogue.js` / `generateEpilogue` — deleted; replaced by `endings.js` with `checkEndings` + `generateEnding` supporting 6 ending types and 5-page adaptive epilogue
-- `convictions.js` / `getConvictionEffect` / `getConvictionIds` / `evaluateConvictions` / `resetConvictions` — renamed to `traits.js` with `getTraitEffect` / `getActiveTraitIds` / `evaluateTraits` / `resetTraits`
-- `evaluateRegulations` / condition-based regulation activation — regulations are now exclusively activated by events via `activateRegulation()` / `advanceBill()`, not by polling world state
-- `event-pool.js` / `popup-events.js` as monolithic files — events live in `src/events/*.js` domain files
-- `onChoose` on popup event choices — use declarative `factionShifts` arrays instead
-- `SUPEREVENT_IDS` set in main.js — use `superevent: true` on the event object
-- `resetPopupCooldowns` / `evaluatePortfolioPopups` — use `eventEngine.resetTriggerCooldowns()` and `eventEngine.evaluateTriggers()`
-- Inline `typeof showToast !== 'undefined'` / `typeof _haptics !== 'undefined'` guards in main.js — use `_toast()` and `_haptic()` helpers
-- Inline substep pipeline (substep + rate clamp + decay + sync + rehedge + tick) — use `_runSubstep()`
-- Inline strategy refresh sequences (resetRange + priceExpiry + updateChainDisplay + updateStockBondPrices + updateStrategyBuilder + updateTimeSliderRange) — use `_refreshStrategyView()`
-- `_LOBBY_COLORS` / `_LOBBY_LABELS` as separate objects — merged into `_LOBBY_META`
-- `_active` + `_pipeline` dual maps in regulations.js — unified into single `_state` Map (id → `{ status, remainingDays }`)
-- `_poisson(lam)` method on Simulation — dead code, only `_poissonFast()` is used
-- Duplicate `.sim-input` CSS block — single definition at line ~534, not repeated
-- Empty `.pos-row {}` / `.order-row {}` CSS rules — no-ops, removed
-- `_hideClass` helper in ui.js — dead code, never called
-- `_noteOn` / generic `_noise` in audio.js — replaced by specialized instrument functions (`_rhodesNote`, `_bassNote`, `_brushSwish`, `_brushDab`, `_rideTing`, `_trumpetNote`)
-- Algorithmic COMP generation loop in audio.js — comp events are hand-placed for musical phrasing
-- `BPM = 128` — tempo is 72 BPM for melancholic lounge feel; do not speed up
-- `factions` block in `createWorldState()` — removed; faction state lives solely in `faction-standing.js`, attached by reference
-- Fictional geography (`Strait of Farsis`, `Korindian`, `Meridine`, Nanjing-as-Chinese-capital) — real places everywhere since the naming pass: Strait of Hormuz, Beijing, Little St. James. Real geography and polities, fictional people
-- `$.volumeSlider` / `#volume-slider` in the Info tab — volume slider moved to the settings dropdown (`#settings-btn` toolbar gear icon); DOM cache is `$.settingsBtn`
-- `<h2 class="stats-title">Trading</h2>` in the main sidebar — replaced by `.sidebar-tabs` inside `.stats-header` with tab buttons directly in the header (matches scripture's pattern)
-- `syncMarket(sim)` calls in main.js — use `_syncAll()` which also computes `market.vxhcn`
-- `src/events/pnth.js` / `src/events/silmarillion.js` / `world.pnth` / the `model_release` + `pnth_earnings` pulses / `_fireSilmarillionRelease` machinery — excised in the naming pass; Halcyon-era content is written fresh against docs/design, never resurrected from these
-- `vix` / `VIX` / `VXPNT` in any identifier, DOM id, CSS var, or string — renamed to `vxhcn`/`VXHCN`; `PNTH` ticker → `HCN`
-- `aegisDemandSurge` / `crucibleCompetitionPressure` — pnth-arc geopolitical flags, removed with the domain
-
-### Cross-Domain Event Wiring
-
-Events form an interconnected web, not isolated threads. Key cross-domain connections:
-- **Geopolitical → Fed**: Strait closure sets `energyCrisis` → Fed emergency followup.
-- **Investigation cross-pollination**: Okafor probe / Tan-Bowman story at stage 2+ trigger `meridian_exposed` bridge event (followupOnly) — but only if player has dirty flags (`pursued_insider_tip`, `hosted_fundraiser`, etc.) or high `regulatoryExposure`. Clean players are unaffected.
-- **Fed ↔ Geopolitical**: `recessionDeclared` / `energyCrisis` boost Fed cut event likelihood. Late-cycle hikes nudge `barronApproval` down.
-- **Election downstream**: Midterm results (`midtermResult`) reshape event likelihood — F-L win boosts investigations, blocks Big Beautiful Bill. Federalist landslide boosts deregulation, penalizes investigations.
-- **Lobbying → narrative**: `lobbyingExposed` flag (set when `lobbyCount >= 3` and `mediaTrust < 40`) boosts media/compliance events and feeds into `meridianExposed` conditions.
-- **playerFlags → endings**: ~22 unused playerFlags wired into reputation synthesis in endings.js (compliance stance, trading style, political engagement, information edge).
-
-### Lore Reference
-
-**Lore rule:** Real geography, real polities, real public institutions; fictional people and fictional private organizations (parties too: Federalist / Farmer-Labor). See `lore.md` (v2) for the full world bible. Key surviving cast:
-
-**United States**. President John Barron (Federalist) vs Robin Clay (Farmer-Labor). VP Jay Bowman. Fed Chair Hayden Hartley. Player is at Meridian Capital. Term ends live day 1008. Midterm elections at live day 504.
-
-**Congress**: Sen. Roy Lassiter (F-SC, trade hawk), Sen. Peggy Haines (F-WY, deficit hawk/swing vote), Rep. Vincent Tao (F-TX, Majority Leader), Rep. Diane Whittaker (F-OH, moderate), Sen. James Whitfield (F-L, MA, filibuster master), Rep. Carmen Reyes (F-L, CA, firebrand), Sen. Patricia Okafor (F-L, IL, investigations). Key bills: Big Beautiful Bill (omnibus), Chinese Reciprocal Tariff Act, Financial Freedom Act, Digital Markets Accountability Act.
-
-**Industry**: the PNTH/Palanthropic company and cast were excised with the naming pass. Andrea Dirks survives in a handful of Okafor/Bowman-arc events and becomes Halcyon's CEO in the overhaul (see `docs/design/06-naming.md`).
-
-**Geopolitics**: China (Premier Liang Wei), Russia (President Volkov), the Gulf (Emir al-Farhan, Strait of Hormuz), Bolivia (President Madero), Israel (PM Navon).
-
-**Media**: The Continental (Rachel Tan, Tom Driscoll), The Sentinel (Marcus Cole), MarketWire (Priya Sharma), The Meridian Brief (internal).
-
-### World State Domains
-
-`congress` (seats + `filibusterActive` + `bigBillStatus` 0–4), `geopolitical` (`chinaRelations` ±3, `gulfEscalation`/`russianCrisis` 0–3, `straitClosed`, `energyCrisis`, `taiwanBlockade` — race-owned mirror, NOT in `WORLD_STATE_RANGES`, structured effects cannot write it), `fed`, `investigations` (`tanBowmanStory`/`okaforProbeStage`/`impeachmentStage` 0–3, `meridianExposed` bool — set by bridge event when dirty player is caught in investigative crossfire), `election`, `media` (`tanCredibility`/`sentinelRating` 0–10, `pressFreedomIndex` 0–10, `leakCount` 0–5, `lobbyingExposed` bool — set when `lobbyCount >= 3` and `mediaTrust < 40`), `ai` (phase 5a: `exportControlStage` 0–3, `treatyStage` 0–4, `wonderCount`, arc narrative flags like `fixedpointPublic` (and, since the 2026-09-08 reality-beats round, `halcyonPaused`/`proofDisputed`/`fixedpointIndex` — function-effect-set, never whitelisted), plus race-owned read-only mirrors `controlRegime`/`reportingRegime`/`frontierRung` — main.js writes the mirrors each day-complete, order advanceRace → stepControlRegime → mirror → setBaseRateScale; `frontierRung` is the public act proxy arc `when` guards key on).
-
-`factions` is NOT in `createWorldState()` — it lives in `faction-standing.js` and is attached by reference via `eventEngine.world.factions = factions` at init/reset/preset-load.
-
-### Exercise Netting
-
-`exerciseOption` nets delivered stock into existing stock positions (same `strategyName`). Call exercise buys stock (covers shorts first), put exercise sells stock (sells longs first, creates short if none). Exercise creates price impact via `recordStockTrade`.
+The six harnesses import `src/` directly and exit 1 on any failure. They are the
+regression gate for anything that touches the Dynamic-mode systems. Run them at the
+default N, because their calibration bands are sized for it and small-N runs miss
+them legitimately. Each harness header lists its sections. `tools/` is not in the
+parent stager's exclusions, so the harnesses deploy alongside the app.
+
+## Layout
+
+```
+index.html, styles.css, colors.js  page, styles, project color tokens (--up/--down, Greeks, --vxhcn)
+main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~3.9k lines)
+src/config.js      named constants and PRESETS
+src/simulation.js  GBM + Merton + Heston stock, Vasicek rate, 16 substeps/day; history-buffer.js ring buffer
+src/pricing.js     CRR binomial American pricing, Heston term/skew vol, VXHCN spot/futures, Vasicek bond
+src/chain.js, chain-renderer.js       option chain skeleton/pricing and its table
+src/position-value.js  unitPrice() for every position type
+src/price-impact.js    square-root impact overlays, MM rehedge flow, Layer-3 exposure param shifts
+src/portfolio.js       positions, orders, margin, expiry, borrow, liquidation, binary/compute settlement
+src/portfolio-renderer.js, ui.js, chart.js, strategy.js, reference.js  DOM and canvas rendering, info/reference panels
+src/strategy-store.js  built-in and saved (localStorage) strategies
+src/market.js          shared market snapshot, written only by main.js `_syncAll()`
+src/events.js          EventEngine: Poisson draw, pulses, one-shots, followups, triggers, impulse dispatch
+src/events/            authored event pools by domain + param-ranges.js; index.js merges and validates
+src/events/race-bridge.js, race-events.js  race ledger → narrative shells
+src/world-state.js, faction-standing.js, traits.js, regulations.js, lobbying.js  narrative state
+src/endings.js         ending triggers, family/overlay selection, slot-based 5-page epilogue
+src/race/              hidden race model and its markets (DOM-free; see below)
+src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
+src/audio.js           all music and SFX, synthesized
+src/llm.js             Dynamic (LLM) event source
+tools/*.mjs            the six headless harnesses
+docs/design/, docs/lore.md, docs/art-prompts.md
+```
+
+## How it works
+
+### Modes
+
+`PRESETS` (`src/config.js`) lists five fixed regimes, collectively "Classic" (Calm
+bull, Sideways, Volatile, Crisis, Rate hike), plus Dynamic (offline), which is the
+default at index 5, and Dynamic (LLM) at index 6. `loadPreset` creates `eventEngine`
+and `raceState` only for index ≥ 5. In Classic both are null, and the race, its
+markets, belief, Act III and standing orders are all inert, so Classic is the pure
+trading sim. `resetSim` re-rolls the race in place with a fresh seed, while a mode
+change creates or nulls it.
+
+### The trading day
+
+`Simulation` advances HCN as a GBM with Merton jumps and Heston variance, plus a
+Vasicek short rate, in `INTRADAY_STEPS` = 16 substeps per trading day. `sim.history`
+is a 252-bar `HistoryBuffer` (`.get(day)`, `.last()`, `.minDay`/`.maxDay`), and
+`prepopulate()` backfills it by running with `mu` negated. `beginDay()` pushes
+`sim._partial` by reference and `substep()` mutates it in place.
+
+`frame()` (the playing loop) and `step()` (one substep per press, closing the day
+after the sixteenth) share the same pipeline. `_beginTradingDay()` installs the
+Layer-3 and impulse overlays. `_runSubstep()` runs substep → `_clampRate()` → impact
+decay → `_syncAll()` → market-maker rehedge → pending-order check, then the Act III
+boundary work (deferred manual fills, the substep event lane, a popup drain).
+`_closeTradingDay()` finalizes the bar and removes the overlays LIFO before
+`_onDayComplete()`. That handles borrow, dividends, expiry, the quarterly review,
+traits, the race block, the event engine and endings, impact and Layer-3 decay, the
+rogue-trading and margin checks, UI and the popup drain. `tick()` in `main.js` has no
+callers.
+
+Race-block order in `_onDayComplete`: `stepCoupling` → `advanceRace(race,
+{straitTension, playerCoupling, exportControlStage})` → `stepControlRegime` →
+`stepTreaty` → `_syncRaceToWorld()` (the mirrors) → `setBaseRateScale` →
+`_stepAct3()` → standing-order sync → `stepBelief` → Consensus and compute
+settlement → standing day rules → forecast lock, scrutiny and firm conversion →
+`checkResolution` → `_checkRoom`.
+
+### Pricing, impact, portfolio
+
+- `pricing.js` uses a 128-step CRR tree with discrete dividends. Each tree carries an
+  N−1-step companion, and the public APIs average the two to cancel odd/even
+  oscillation. Contract vol is `computeEffectiveSigma` (Heston expected integrated
+  variance) plus `computeSkewSigma`. Delta, gamma and theta come from tree nodes;
+  vega and rho come from finite differences. VXHCN spot is 30-day expected Heston
+  vol × 100 (`computeVXHCNSpot`), and the futures use the forward variance curve.
+- `unitPrice()` in `position-value.js` is the one valuation path. It covers stock,
+  bond, vxhcnfuture, computefuture, binary, call and put, with the vol surface and
+  impact overlay included. Only the strategy payoff sweep prices trees directly.
+- Impact is an overlay on `sim.S` and never rewrites the path. The decaying
+  cumulative volume per instrument feeds `getStockImpact(sigma)`,
+  `getBondImpact(sigmaR)`, `getVxhcnImpact(xi)` and `getOptionImpact(…)`. Layer 3
+  shifts selected process params temporarily when gross exposure is large.
+- Positions carry a signed `qty` (no `side`) and net on `type + strike + expiryDay +
+  strategyName`. `portfolio` is a singleton that `resetPortfolio()` mutates in place.
+  `executeWithRollback` (main.js) unwinds every leg of a strategy on partial failure.
+  Strategies are saved as strike/DTE offsets, with built-ins as constants.
+
+### Events and narrative state
+
+- Events share one schema across `src/events/*.js`. A toast event has `headline` +
+  `params`. A popup has `popup: true` + `choices`. A portfolio trigger has `trigger` +
+  `cooldown` + `tone` and is evaluated daily, never Poisson-drawn. A superevent has
+  `superevent: true`, and that flag is the only source of truth for one. `when` is the
+  world-state eligibility guard, and `oneShot: true` events fire at most once per run
+  (`_firedOneShot`, including when referenced as followups).
+- `params` are additive deltas clamped to `PARAM_RANGES`. Race-era shells carry
+  `impulse: {…}` instead: a decaying overlay with a 5-day half-life (`race/impulse.js`)
+  that never permanently mutates sim params, dispatched inside `_fireEvent` on every
+  path. Permanent deltas on the race-era stream would walk params to their clamps.
+  The exception is `rates_capex_wave` (`src/events/rates.js`), which fires at most
+  once per released-rung step and deliberately carries permanent `b`/`sigmaR` deltas
+  and no impulse.
+- The discretionary draw (`_discretionaryDraw`) is Poisson with cooldown, and
+  `eventBaseRateScale` scales it from ×1 at released R1 to ×2.5 at R5. Categories in
+  `_PULSE_CATEGORIES` (events.js) never ride it. Those are the pulses (fed, midterm,
+  interjection) and everything fired by the race bridge, the ledger or main.js
+  latches (release, incident, certification, strait, regime, dispute, theft, polaris,
+  insider, conversion, summit, room, rates). Arc categories (halcyon, china, wonder,
+  policy, treaty, ghostwritten) are Poisson-live, gated by `world.ai.frontierRung`.
+- `race-bridge.js` turns `race.lastTransitions` into shells. Its `finalize` picks a
+  variant, substitutes tokens (`{lab}` `{model}` `{aModel}` `{rung}` `{rungName}`
+  `{lag}`) and capitalizes. Variant rotation uses per-shell counters reset by
+  `resetRaceBridge()`, never RNG.
+- `world-state.js` holds congress, geopolitical, fed, investigations, election, media
+  and `ai`. `world.ai.controlRegime`, `reportingRegime`, `frontierRung`, `summitLive`,
+  `fundLive` and `geopolitical.taiwanBlockade` are mirrors written by main.js and are
+  absent from `WORLD_STATE_RANGES`, so no event effect can write them. Factions (eight
+  standings) live in `faction-standing.js`, attached as `eventEngine.world.factions`.
+  Traits (18 permanent convictions, 6 dynamic tags) live in `traits.js`, and the
+  regulation pipeline in `regulations.js` moves only by event (`activateRegulation`,
+  `advanceBill`).
+
+### The race (`src/race/`)
+
+Read `02-race-model.md` with this. The modules are DOM-free so the harnesses can drive
+them headless.
+
+- `race-state.js` holds per-run hidden state seeded by `createRaceState()`. The labs
+  are Halcyon, Tianxia, Polaris (spawned mid-run by the schism) and the open
+  ecosystem, and each has internal and released capability on the R1–R5 rung ladder.
+  `advanceRace` steps a day and writes `race.lastTransitions` (spawns, releases,
+  thefts, crossings, certifications, incident and evidence tracks, strait beats,
+  theft disclosures, regime change). Downstream systems consume that ledger and
+  never diff state. The only capability mutations are `commitRelease` and
+  `commitTheft`.
+- RNG: each subsystem draws from a named stream, `createRng(deriveSeed(seed, name))`.
+  The race's own streams live in `race.streams`. The nationalization reference,
+  closeout, intel, belief noise and act3 presentation keep streams outside it, so race
+  trajectories are bit-identical whether those systems run or not.
+- Incidents (`incidents.js`) occur silently and fire narratively only on detection.
+  The concealment term `lagMultiplier` scales detection lag by how far the source
+  lab's internal capability runs past the released frontier. The other race
+  modules: `strait.js` (Taiwan blockade, kept distinct from the Gulf arc's
+  `straitClosed`), `theft-disclosure.js`,
+  `control-regime.js` + `stepControlRegime` (a monotone ratchet private → supervised
+  → mobilized → nationalized | classified, whose sole writer is `setControlRegime`;
+  the writer freezes Consensus and compute synchronously) and `treaty-track.js`.
+- `resolution.js` `checkResolution` applies the precedence ladder. At day 1008
+  (`HORIZON`) it extrapolates headless up to `HORIZON + EXTRAP_CAP`, and the result
+  picks a family 1–6. `coupling.js` (player HCN positioning → bounded Halcyon velocity)
+  and `ledger.js` (the append-only complicity ledger, with `raceChannelsLive()` as the
+  shared gate) carry the player's influence, and `closeout.js` values the book at the
+  terminal.
+- `belief.js` holds market belief B: per-rung hazards, survival-conditioned quotes,
+  quarterly forecast locks, credibility, and firm belief F with scrutiny. It feeds the
+  real quoters into `consensus.js` (milestone binaries settled off certifications,
+  disputes, R5 settled only at terminal closeout) and `compute-market.js` (the Cambria
+  quarterly futures ladder, settled on race-day maturities through
+  decree ⊃ force-majeure ⊃ ordinary). `intel.js` samples reliability-bucketed reads of
+  Tianxia velocity for prose.
+
+### Endings, Act III, audio, LLM
+
+- In a Dynamic run, natural resolution and early ejection (rogue trading, margin
+  deficit, compliance) share one atomic terminal path. It freezes the ledger,
+  fires the resolution-day beat, runs the closeout at the resolution-time regime,
+  then shows the epilogue. `_triggerGameOver` keeps only `TERMINAL_SAFE_CATEGORIES`
+  (`'summit'`) in the popup queue. `endings.js` composes nothing: pages come from
+  `EPILOGUE_SLOTS[family][overlay][page]` with fallback [fam][ov] → [fam]['*'] →
+  ['*']['*']. Five personal overlays follow the ending cause, and gray eminence vs
+  bystander is decided by involvement in ledgered actions, never by traits or beliefs.
+- `act3.js` owns one smoothed public driver `x` (and degradation `d`) from the
+  released rung and regime. `x` drives the audio machine register, the substep event
+  lane (from released R4), the manual latency ladder (`ACT3_TUNING.ladder`) and the
+  display-only degradation latches. `standing-orders.js` holds six precommitment
+  rules that unlock at released R3 and lock at R5. They execute as machinery, so they
+  take no ladder lag and draw no RNG.
+- `audio.js` plays a 72 BPM jazz loop (16-bar Am form), an Am drone crossfaded by
+  `setAmbientMood`, stingers and superevent stabs. `setMachineIntensity(x)` re-renders
+  the same form with less humanity plus a machine bus. `glitchAudio` and
+  `silenceDesk()` (the terminal cut) round it out. `initAudio()` waits for the first
+  user gesture.
+- `llm.js` (`LLMEventSource`) fetches event batches through forced tool use. Settings
+  persist in localStorage (`shoals_llm_key`, `shoals_llm_model`; the default is
+  `claude-haiku-4-5-20251001`). In LLM mode only the discretionary draw comes from the
+  queue, and it falls back to the authored pool when the queue is empty. Race shells
+  and latches stay authored, and `SYSTEM_PROMPT` still describes the pre-race world.
+
+## Conventions
+
+- **Authored voice work.** Player-facing prose (events, popup copy, epilogue slots)
+  and `src/audio.js` are authored and ratified by a9, not generated. Changes to either
+  go through a9. Lore and naming are in `docs/lore.md` and `06-naming.md`: real places
+  and public institutions, fictional people, companies and parties. Dead names
+  (VXPNT, PNTH, Serica and the other invented polities) appear nowhere at runtime.
+- **Prose encoding.** Event headlines and contexts render via `textContent`, so they
+  use literal typographic apostrophes, quotes and dashes, never HTML entities.
+  `EPILOGUE_SLOTS` cells are HTML and use entities.
+- **Public state only.** Quotes, curves, act3 and the bridge's capex latch read only
+  public views (`buildPublicView`, `buildComputePublicView`, the `world.ai` mirrors).
+  No hidden capability, latent or τ reaches a price. The harnesses corrupt every
+  hidden field and assert the quotes are unchanged.
+- **Bit-identity is a test invariant.** The harnesses assert bit-identical race
+  trajectories for no-player runs, stage-0 export controls and substream isolation,
+  and they assert that Classic stays inert. A new random draw belongs in its own
+  `deriveSeed` stream. The price path and the event engine use `Math.random`, so
+  presentation randomness (act3) never does, or a display draw would move the
+  market.
+- **Orchestrator inputs.** Race steps that need world facts take them as
+  `advanceRace` inputs (strait tension, player coupling, export-control stage), and
+  the regime ratchet is called by main.js after `advanceRace`, never inside it.
+- **Player channels into the race.** These are HCN positioning (`coupling.js`),
+  choice `raceEffects` (S per lab and heat, clamped) and the insider-tip leak verb
+  (`raceLeak`). `raceEffects` and the leak share the ledger gate `raceChannelsLive()`,
+  and main.js passes zero coupling once the race has resolved, so nothing the player
+  does counts after the resolution latch. The trade and sit verbs on a tip are
+  uncoupled by ruling.
+- **Intraday mutation.** `_midDayBaseline(fn)` wraps any sim-param change made while
+  a day is open. Without it, `_closeTradingDay`'s overlay restore silently erases the
+  change.
+- **The popup queue.** `_queuePopup(event, front)` is the only insertion point, and
+  standing-order tip interception happens there. `_applyPopupChoice` is the only
+  choice applicator. `_popupBarrier()` keeps a day open while any popup is shown,
+  queued or the epilogue is pending, and dismissal closes the waiting day via
+  `_closeCompletedDayIfPending()`.
+- **Machinery vs the player's hand.** The latency ladder and spread multiplier apply
+  to every manual entry (market and chain orders, binaries, compute futures,
+  strategies) plus position close and strategy unwind, all via `_deferManual`.
+  Exercise, popup trades, margin liquidation, standing orders and terminal paths
+  stay instant. Lag 0 bypasses the queue and `spreadMult === 1`
+  short-circuits, because the general formula is not bit-exact at 1.
+- **Settlement chokepoints.** Every binary settlement row goes through
+  `portfolio.applyBinarySettlementRows` (cash, credibility scoring, exactly-once).
+  Binary trades go through `executeBinaryTrade`, never `_fillPrice`. Equity decisions
+  use `_portfolioEquity`/`portfolioValue`, which include reserved margin. A frozen leg
+  restricts the book (`portfolio.restricted`) rather than force-filling it.
+- **Two homes, one number.** The Consensus listing base rates in `consensus.js` and
+  `RUNG_BASE` in `belief.js` must match so that day-0 quotes equal the listing
+  priors. Edit them together.
+- **Reset paths.** `_resetCore` resets every module singleton. `resetRaceBridge()`
+  runs unconditionally, because `loadPreset` creates the race after `_resetCore` and
+  stale latches would throttle a fresh run. The epilogue Restart goes through
+  `loadPreset`, since a bare core reset keeps the resolved race.
+- **Variance, not vol.** `computeEffectiveSigma`, `computeVXHCNSpot` and
+  `computeVXHCNFuturePrice` take Heston variance `v`. `_priceCore` and
+  `_pricePairCore` share the `_V` buffer, so a single price after a pair call
+  overwrites the pair's call value.
+- **Chassis semantics.** `q` drops the price only at the discrete quarterly dividend;
+  it is not in the drift. `_clampRate()` is a permanent `sim.r` mutation from
+  regulation ceilings and floors. Popup `trades` actions `close_short` and
+  `close_long` are directional (`close_short` also closes long puts). Followup
+  `weight` breaks ties among same-day siblings and is not a probability. Choice-level
+  `factionShifts` add to the base value.
+- **Display.** Internal money is at $10,000 scale, and `fmtDollar()` appends "k" for
+  portfolio amounts while per-unit prices show raw `$X.XX`. Greeks color by their own
+  CSS vars (`--delta` …), VXHCN by `--vxhcn`, and P&L by `pnl-up`/`pnl-down`.
+  Portfolio value is colored against buy-and-hold. All UI and canvas text is
+  `--font-text`/`_FONT.text`; `--font-code` is used only for the API-key input. The
+  canvas redraws once `_loadTextFonts()` resolves.
+- **Labels.** UI labels, presets, built-in strategies, traits and epilogue labels are
+  sentence case in source, so code finds a preset by `/\(offline\)/i`. The chain
+  table is rebuilt on every update, with one delegated listener (`_chainClicksBound`).
+
+## Open work
+
+- a9 is play-testing the reality-beats content (capex waves, concealment, the six
+  beats) and the feel of the capex rates channel.
+- The feel pass: the `ACT3_TUNING` magnitudes and ladder numbers are first-pass, and
+  whether the standing-orders lock at R5 is right will be judged at feel.
+- Deferred seams:
+  - Terminal VXHCN marks last-valid. The exchange-variance-index machinery is not
+    built.
+  - The post-theft "why slow down if it can be stolen" margin burn is still missing
+    (see the header of `src/events/china.js`).
+  - LLM mode has no race-era event source, and `llm.js`'s `SYSTEM_PROMPT` predates
+    the race.
+- `lobbying.js` still has the prototype menu (party PACs, fundraiser, broker a deal,
+  leak, counsel the Fed). The AI-policy menu in `03-market-mechanics.md` is unbuilt.
+- `tick()` in `main.js` is dead code. The `/` shortcut and `#step-btn` say "Step
+  forward one day", but `step()` advances one substep.

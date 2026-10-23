@@ -144,7 +144,7 @@ let totalCauses = 0;
     }
     assert(allCausesHaveId, 'a B move was recorded with no causal evidence ID');
 
-    // 1b. Causal-ledger FULL COVERAGE (02a phase-4 ruling): reconstruct each
+    // 1b. Causal-ledger FULL COVERAGE (02a "Belief, η, and the firm"): reconstruct each
     //     rung's (m, w) trajectory from the ledger ALONE and assert it lands
     //     exactly on the live belief -- no m/w/monotonicity mutation lacks a cause
     //     entry (not merely "existing records have IDs"). Entries must also chain
@@ -291,7 +291,7 @@ let lockSkipStallsOK = false, noManufacturedOK = false;
     credAvgOK = Math.abs(c3 - 0.2075) < 1e-9;
     assert(credAvgOK, `coincident-average credibility ${c3} != 0.2075`);
 
-    // Lock semantics (02a phase-4): full VECTOR mandatory; on-grid + CURRENT-day
+    // Lock semantics (02a "Belief, η, and the firm"): full VECTOR mandatory; on-grid + CURRENT-day
     // only; immutable once accepted (exact replay idempotent, edits rejected).
     const race3 = createRaceState((BASE_SEED + 224) >>> 0);
     initBelief(race3);   // belief.day == 0

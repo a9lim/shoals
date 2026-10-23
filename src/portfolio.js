@@ -360,7 +360,7 @@ const TIME_BOUND_TYPES = new Set(['call', 'put', 'bond', 'vxhcnfuture']);
 
 /**
  * True when a time-bound instrument's expiry has already been settled, or is being
- * settled at today's boundary (02a P7-1 ruling 1). `processExpiry` matches the
+ * settled at today's boundary (02a "Act III"). `processExpiry` matches the
  * boundary day EXACTLY, so a position opened at or past its own expiry would never
  * expire -- it would sit in the book, permanently live, forever.
  *
@@ -405,7 +405,7 @@ export function executeMarketOrder(
     // Compute-future lifecycle gate: only an active/listed/open/unfrozen/unsettled
     // contract is tradeable (rejects fabricated + settled keys and a frozen book).
     if (type === 'computefuture' && !isComputeTradeable(strike)) return null;
-    // Expiry re-checked at EXECUTION (02a P7-1 ruling 1), centrally and BEFORE the
+    // Expiry re-checked at EXECUTION (02a "Act III"), centrally and BEFORE the
     // trade is counted: a time-bound contract at or past its own expiry day can
     // never be opened, because the expiry pass would never match it again.
     if (isExpiredForTrading(type, expiryDay, currentDay)) return null;
@@ -774,7 +774,7 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
  * Cash is credited/debited accordingly.
  * qty > 0 = long position, qty < 0 = short position.
  *
- * `spreadMult` (P7-1 latency ladder, 02a ruling 2) widens the exit spread for a
+ * `spreadMult` (P7-1 latency ladder, 02a "Act III") widens the exit spread for a
  * PLAYER-initiated close, exactly as it widens an entry -- exits are not faster
  * or cheaper than entries in a market made of machines. Omitted / 1 is an exact
  * no-op, which is what every MACHINERY caller passes (processExpiry,

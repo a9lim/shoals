@@ -79,7 +79,7 @@ export const WONDER_EVENTS = [
         impulse: { mu: 0.02, xi: 0.015 },   // decaying (P4): the melt-up and the vertigo, one candle
     },
 
-    // ---- The disputed proof (reality-beats round, 02a 2026-09-08) -----------
+    // ---- The disputed proof (reality-beats round, 02a "Control regime and content plumbing") -----------
     // A rung CLAIM against a CERTIFICATION: the claimed result nobody outside
     // has seen, the verified lesser result with a coauthor on a competitor's
     // payroll, and the authorship fight (the human world stays satire; the

@@ -63,7 +63,7 @@ const _PULSE_CATEGORIES = new Set([
     // never called. It is also NOT terminal-safe (endings.js): its effects require
     // a live world, so the terminal queue filter discards it.
     'room',
-    // 'rates' (reality-beats round, 02a 2026-09-08 item 1): the capex channel is
+    // 'rates' (02a "Rates: the capex channel"): the capex channel is
     // bridge-fired on the released-frontier rung RISE edge (<= 4 fires/run), never
     // Poisson -- a capex wave with no rung behind it is a rate move with no
     // issuance behind it. Excluded by DESIGN, not dormancy.
@@ -76,17 +76,17 @@ const _PULSE_CATEGORIES = new Set([
 // never touched). Early game (R1) the multiplier is EXACTLY 1, so Act I is
 // bit-identical to the current constant-rate cadence (no regression); late game
 // it rises toward BASE_RATE_MAX_MULT as capability compounds, compressing the
-// discretionary event cadence per 04's tempo principle (ratified, 02a phase-5a).
+// discretionary event cadence per 04's tempo principle (ratified, 02a "Control regime and content plumbing").
 //
 // The substep LANE (04 engine note 2) landed in P7-1 and rides this SAME driver:
 // past released R4 the day stops being the atomic narrative unit -- see
 // `setSubstepLane` below. The day-level accept/cooldown arithmetic here is
 // unchanged by the lane (that invariance is the harness contract).
-// RATIFIED (02a phase-5a block): the ceiling and the linear-in-released-rung shape.
+// RATIFIED (02a "Control regime and content plumbing"): the ceiling and the linear-in-released-rung shape.
 export const BASE_RATE_MAX_MULT = 2.5;   // late-game (R5) event-cadence ceiling
 
 /** Released frontier rung at which the discretionary pass moves to substep
- *  granularity (02a Act III machinery). */
+ *  granularity (02a "Act III"). */
 export const SUBSTEP_LANE_RUNG = 4;
 
 /** Day-level base-rate multiplier from the public released frontier rung (1..5).

@@ -23,7 +23,7 @@
    phase-2 replacement both go through commitRelease.
 
    Dynamics constants are transcribed from
-   docs/design/02a-tuning.md (rev 2); the proliferation-
+   docs/design/02a-tuning.md; the proliferation-
    floor / release-cooldown triple in RACE_TUNING is the
    one block 02a grants code-phase tuning freedom, now
    written back into 02a verbatim. Pure / DOM-free.
@@ -90,7 +90,7 @@ export const RACE_TUNING = {
 };
 
 /**
- * Outcome-table retune levers (02a "Outcome-table levers", phase-6). Sanctioned
+ * Outcome-table retune levers (02a "Capability kinematics" / "Safety margin, heat, theft"). Sanctioned
  * knobs that shape the terminal distribution WITHOUT touching the stance (tau,
  * required, leadAdj, the mapping gates). Exported mutable so the joint sweep can
  * drive it (mirrors RACE_TUNING); final values are recorded back into 02a.
@@ -105,7 +105,7 @@ export const RACE_TUNING = {
  *   - S0_tianxia : Tianxia initial safety (bought, not grown -- culture stays 0.15).
  */
 /**
- * Outcome-table retune levers (02a phase-6 REDESIGNED set, 2026-07-24). The
+ * Outcome-table retune levers (02a "Capability kinematics" / "Safety margin, heat, theft"). The
  * withdrawn released-follower + S0-range package could not reach family-4 (P6-1b
  * finding); the ratified set produces family-4 leads from a sampled Tianxia
  * velocity (leg A, in sampler.js) + domestic regulatory drag under supervised
@@ -135,7 +135,7 @@ const MOBILIZED_PLUS = new Set(['mobilized', 'nationalized', 'classified']);
 const MOBILIZED_DOMESTIC_PACE_FLOOR = 0.7;
 
 /**
- * Dynamic per-lab racingPace (02a phase-6 lever 1), deterministic. The recorded
+ * Dynamic per-lab racingPace (02a "Safety margin, heat, theft"), deterministic. The recorded
  * `f(knife-edge proximity, appetite pressure)` made concrete:
  *   lead      = C_int[lab] - max(C_int[rivals], C[open])         (signed)
  *   closeness = clamp(1 - lead/L_pace, 0, 1)
@@ -182,7 +182,7 @@ export const ROOM_TRIGGER_C = ROOM_RUNG - ROOM_MARGIN;
 const ROOM_LAB_ORDER = ['halcyon', 'tianxia', 'polaris'];
 
 /**
- * THE room helper (02a P7-3 ruling 3): one traversal, both facts.
+ * THE room helper (02a "Act III"): one traversal, both facts.
  *   { ready, leaderLab }
  * `ready` is the trigger predicate -- has the leading ACTIVE lab's INTERNAL
  * track come within ROOM_MARGIN of R5? `leaderLab` is WHO leads (null if no lab
@@ -341,7 +341,7 @@ export function resetRaceState(race, seed) {
     // gate lives in the sampler (hidden.chinaTrue.dealPossible); this object is the
     // race-side gauntlet state the headless treaty track advances (02a treaty
     // sub-gates: talks -> initiation -> farce survival -> summit-week window). The
-    // gauntlet is VIABILITY-BLIND (02a phase-6 leak-free ruling): the three gates
+    // gauntlet is VIABILITY-BLIND (02a "Resolution"): the three gates
     // are drawn for ALL runs and gate window OPENING; dealPossible gates only the
     // holds outcome after a clean summit. `summitOpen` is the window flag main.js
     // mirrors to world.ai.summitLive (the seam the treaty_window event fires on).
@@ -368,7 +368,7 @@ export function resetRaceState(race, seed) {
     // no-op. All later rounds + the epilogue consume this record's stored axes;
     // nothing re-derives the outcome. (Shape in resolution.js.)
     race.resolution = null;
-    // Sustained-plateau streak (P6 fix, 02a amended plateau rule): consecutive
+    // Sustained-plateau streak (P6 fix, 02a "Capability kinematics"): consecutive
     // days the leader's shock-free drift has been below threshold; confirmation
     // needs it >= 180 (sustained) AND day >= 700 (resolution.js).
     race.plateauStreak = 0;

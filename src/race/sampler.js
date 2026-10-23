@@ -7,7 +7,7 @@
    event copy observe only noisy projections of these.
 
    Numbers are transcribed verbatim from the per-run
-   sampler table in docs/design/02a-tuning.md (rev 2).
+   sampler table in docs/design/02a-tuning.md.
    Pure / DOM-free -- headless-importable for MC.
    =================================================== */
 
@@ -15,7 +15,7 @@ import { createRng, randomSeed, deriveSeed } from './rng.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-// chinaTrue.velocity tuning (02a phase-6 leg A): a per-run hidden multiplier on
+// chinaTrue.velocity tuning (02a "Per-run sampler"): a per-run hidden multiplier on
 // Tianxia's deterministic capability drift, drawn from its OWN named substream
 // (deriveSeed(seed,'chinaVelocity')) so it never reorders the existing sampler
 // sequence -- same-seed stability under extension. Exported mutable for the sweep.
@@ -77,7 +77,7 @@ export function sampleHiddenState(seed) {
 
     // Per-lab safety culture. Tianxia fixed low (anti-safety by construction).
     // Halcyon clamp [0.1, 0.9] per the sampler table; Polaris clamp [0, 1]
-    // (02a Polaris-defaults block, ratified 2026-07-23).
+    // (02a "Capability kinematics").
     const labCulture = {
         halcyon: clamp(rng.normal(0.5, 0.2), 0.1, 0.9),
         polaris: clamp(rng.normal(0.8, 0.1), 0, 1),

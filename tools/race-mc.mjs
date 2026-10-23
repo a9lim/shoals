@@ -5,7 +5,7 @@
    the full daily loop over the 1008-day horizon with
    neutral player inputs and reports the distributions
    plus a calibration PASS/MISS block against the stated
-   targets in docs/design/02a-tuning.md (rev 2).
+   targets in docs/design/02a-tuning.md.
 
    The calibration statistic is the UNCONDITIONAL
    first-passage median (Kaplan-Meier: right-censored
@@ -96,7 +96,7 @@ const incLate = [];       // occurrences in the last LATE_W days
 const s4PerRun = [];      // S4 occurrences per run
 const detLags = [];       // pooled detection lags (detectDay − occurDay)
 const neverDetFrac = [];  // per-run never-detected fraction (by horizon)
-// Reality-beats round (02a 2026-09-08 item 2): concealment scales the detection
+// Reality-beats round (02a "Incidents"): concealment scales the detection
 // lag with the source's internal−released gap, which only opens late. Split the
 // detection diagnostics by OCCURRENCE ERA so the late shift is visible. These are
 // DIAGNOSTICS, never bands (02a says so explicitly for this round).

@@ -1,7 +1,9 @@
 # 05 — Endings
 
-> Resolution logic and epilogue philosophy. The 5-page adaptive epilogue
-> machinery (`endings.js`) ports; the families and the accounting change.
+Resolution logic and epilogue philosophy. The epilogue is five pages —
+The Resolution, The Race, The Reckoning, The Desk, The Ledger — composed
+from a prose slot table keyed by family × overlay × page (`src/endings.js`);
+the engine composes no sentences of its own.
 
 ## Resolution inputs
 
@@ -53,7 +55,9 @@ expressible; the family is the cover story.
    position: their misaligned takeoff (family 3 with subtitles), a
    proliferation variant where the crossing entity is not Tianxia at all
    but something fine-tuned from its released weights (nobody won — the
-   weights did), or aligned-to-Beijing (the world persists, ordered, airless — the
+   weights did; unreachable under current kinematics, where `C[open]`
+   trails Tianxia's releases by construction — [02a](02a-tuning.md)),
+   or aligned-to-Beijing (the world persists, ordered, airless — the
    epilogue tracks what happens to an American markets trader in a world
    whose optimizer answers to the Politburo). The outcome the wager
    existed to prevent; the epilogue should not let the player forget the
@@ -79,7 +83,7 @@ expressible; the family is the cover story.
    held at probability, not doctrine. (Also quietly the funniest ending:
    the CIO's told-you-so, the czar taking credit for the plateau.)
 
-**Timeout** (decided 2026-07-23): a run still racing at day 1008 gets
+**Timeout:** a run still racing at day 1008 gets
 no seventh family — the epilogue samples the remainder forward from
 standing state and narrates it "years later," resolving into one of
 the six. The desk's story ends when the term does; the world's
@@ -92,7 +96,11 @@ channel; whistleblower exile (leaked the thing that mattered, standing in
 ruins, vindicated by the family that resolves); the gray eminence (the
 room, at maximum weight); the bystander (rich, uninvolved, the epilogue
 politely declines to pretend it mattered). Each composes with any world
-family — the composition table is where the 5-page engine earns its keep.
+family — the composition table (page 3, one cell per family × overlay) is
+where the epilogue engine earns its keep. The convicted, margin-called, and
+whistleblower overlays come from how the desk's run ended; every other end
+splits gray eminence vs. bystander on *involvement* — actions on the frozen
+ledger, never beliefs ([02a](02a-tuning.md)).
 
 ## The ledger (complicity accounting)
 
@@ -105,10 +113,9 @@ against the world outcome — not a score, a *statement*, in the accounting
 sense and the other one. In family 3 it reads as an indictment nobody is
 left to file; in family 5, as the only receipt that mattered.
 
-`RESOLVED (a9, 2026-07-24):` the agency line appears **always, as a
-number** — one cold ledger line in every family, a quantity, never a
-verdict. The machinery stores `resolution.movability = {dP, dW,
-realizedShare}` (P6-3); the ledger page prints the realized share and
+The agency line appears **always, as a number** — one cold ledger line
+in every family, a quantity, never a verdict. The machinery stores
+`resolution.movability = {dP, dW, realizedShare}`; the ledger page prints the realized share and
 lets the reader do the classifying, per the tone discipline below.
 Soft-everywhere applied to the Landian question: the number is the
 soft answer; "a low-agency world" would be the hard one. No family

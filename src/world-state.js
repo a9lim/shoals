@@ -62,7 +62,7 @@ export function createWorldState() {
             leakCount:         0,
             lobbyingExposed:   false,
         },
-        // AI-policy domain (overhaul phase 5a; 07-migration). The slim narrative-
+        // AI-policy domain (02a "Control regime and content plumbing"). The slim narrative-
         // facing state the new arcs read via event `when` guards. Export-control
         // politics + the treaty track + the wonders track live here; controlRegime
         // and reportingRegime are READ-ONLY MIRRORS of race-state (main.js writes
@@ -84,7 +84,7 @@ export function createWorldState() {
                                              // canActAsFund gate (credibility > 0.65 AND F > 60), latched once
                                              // for the run. Read-only for guards (gates treasury_backchannel);
                                              // NOT in WORLD_STATE_RANGES -- no event effect can forge it.
-            // Reality-beats round (02a, 2026-09-08): three narrative flags on the
+            // Reality-beats round (02a "Control regime and content plumbing"): three narrative flags on the
             // fixedpointPublic pattern -- set by function effects on their beats so
             // a flag-gated Poisson draw fires exactly once; never whitelisted.
             halcyonPaused:      false,       // halcyon_pause fired (the voluntary pause that ends)

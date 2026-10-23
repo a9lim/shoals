@@ -3,7 +3,7 @@
    the hidden AI-race (overhaul phase 6, endings round 1).
 
    ONE precedence ladder, checked continuously (02 "Resolution";
-   02a "Resolution arithmetic and the exclusive mapping"),
+   02a "Resolution"),
    exclusive, in order:
      1. S4 incident            -> family 3 (resolved in place)
      2. implemented treaty     -> family 5 (the Deal)
@@ -40,7 +40,7 @@ const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 export const HORIZON = 1008;          // game days 0..1008 (02a)
 export const EXTRAP_CAP = 2520;       // hard cap on forward extrapolation days ("a decade of no ignition IS the fizzle")
 
-// ---- Plateau confirmation (02a amended phase-6 rule) ---------------------
+// ---- Plateau confirmation (02a "Capability kinematics") ---------------------
 // Confirmation requires ALL of: recursion never ignited (q < 0.01 / E <= 0.60),
 // R5 never crossed, day >= 700, and the SHOCK-FREE leader drift (deterministicDrift,
 // the full retuned ODE drift without the daily shock) < 2e-4/day SUSTAINED over the trailing
@@ -74,7 +74,7 @@ const REQ_SHARP_W = 0.08;
 const FAIL_MARGIN = 0.15;   // technical failure: margin <= required - 0.15  (d <= -0.15)
 const FAMILY1_LEAD = 0.25;  // family 1 requires lead >= 0.25 (no knife-edge vindication)
 
-// Bounded influence (02a "margin units"): d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|).
+// Bounded influence (02a "Player influence and the ledger"): d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|).
 // ROUND 2 wires the player complicity-ledger delta d_P; until then d_P = 0 => d_eff = d_W.
 const PLAYER_CLIP_FRAC = 3 / 7;
 
@@ -235,7 +235,7 @@ function makeRecord(race, family, terminalCause, extrapolated, axes, overrides =
 }
 
 /**
- * Confirmed-plateau test (02a amended). Called once per completed day (evaluateLadder
+ * Confirmed-plateau test (02a "Capability kinematics"). Called once per completed day (evaluateLadder
  * runs once per day, live and extrapolated), so it maintains the sustained-drift
  * streak here: the leader's shock-free drift below threshold increments the streak,
  * above it resets. Confirmation = never-ignited (q < 0.01) AND R5 never crossed AND
@@ -250,7 +250,7 @@ function plateauConfirmed(race) {
     // and false-latches plateaus. The player-coupling omission was the P6-2 P0 gate
     // find (same class as the P6-1b re-gate labExpectedDrift bug): if sustained capital
     // is the only thing holding Halcyon's drift above threshold, the race has NOT
-    // plateaued (02a P6-2 ruling 3). `race.playerCoupling` is 0 on the unfed/headless
+    // plateaued (02a "Player influence and the ledger"). `race.playerCoupling` is 0 on the unfed/headless
     // path, so deterministicDrift's Halcyon guard is falsy and this stays bit-identical.
     // The regime feeds leg B; RETUNE feeds legs B/2; playerCoupling feeds the Halcyon leg.
     const leader = frontierLeaderLab(cap);
@@ -349,7 +349,7 @@ function extrapolate(race, geo) {
     // here and re-passed every extrapolated tick -- advanceRace normalizes an absent
     // stage to 0, so re-passing is what keeps the captured value in force. 0 headless.
     const exportStage = race.exportControlStage || 0;
-    // ABSOLUTE cap (02a P6-3 ruling 2): the world continues to a FIXED endpoint
+    // ABSOLUTE cap (02a "Resolution"): the world continues to a FIXED endpoint
     // (HORIZON + EXTRAP_CAP), never a decade past whenever the DESK happened to leave.
     // For the timeout path startDay == HORIZON, so this is byte-identical to the old
     // `startDay + EXTRAP_CAP` loop (the no-player calibration is unchanged); for an
@@ -359,7 +359,7 @@ function extrapolate(race, geo) {
     const capDay = HORIZON + EXTRAP_CAP;
     while (race.day < capDay) {
         advanceRace(race, { straitTension: tension, exportControlStage: exportStage });
-        // Neutral-signal control-regime stepping (02a phase-6 ruling): the
+        // Neutral-signal control-regime stepping (02a "Resolution"): the
         // political-control axis reads the EXTRAPOLATED world, not the day the
         // desk's story ended. "Neutral" == no exogenous pushes (exo {}); the
         // endogenous ratchet carries it, exactly as headless / the harness.

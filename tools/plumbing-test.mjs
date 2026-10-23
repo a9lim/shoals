@@ -5,7 +5,7 @@
 
    A. Event base-rate scaling bounds (04 engine note 1):
       Act-I exactness + monotone bounded acceleration.
-   B. Strait blockade incidence calibration (02a Strait
+   B. Strait blockade incidence calibration (02a "The strait"
       block): ~3% baseline / 12-15% hot -- harness-asserted.
    C. controlRegime ratchet reachability + monotonicity:
       every regime reachable, mobilized+ a minority,
@@ -43,7 +43,7 @@
       lag), strategies deferring as ONE unit, the exact-no-op
       unit multiplier (R<=3 bit-identity), execution-time
       restriction / freeze rejection with cash untouched, and
-      (02a P7-1 ruling 2) PLAYER EXITS on the same ladder while
+      (02a "Act III") PLAYER EXITS on the same ladder while
       every MACHINERY path -- forced liquidation, expiry trims,
       popup trades -- and `exerciseOption` stay instant. Plus
       the P7-1 fix round: the EXPIRY ROLLOVER reject (ruling 1 --
@@ -93,7 +93,7 @@
       RNG drawn at rest) and the reduced-motion split.
 
    All numeric bands are DESIGN bands; the tuning is RATIFIED in
-   02a's "Content plumbing (phase-5a ratifications, 2026-07-23)"
+   02a's "Control regime and content plumbing"
    and "Evidence machinery (pre-P7 ratifications, 2026-07-24)"
    blocks. Exits 1 on any MISS.
 
@@ -1209,7 +1209,7 @@ let ladderRows = '';
     resetPortfolio();
     deactivateConsensus(); deactivateBelief();
 
-    // -- K5. PLAYER EXITS take the same ladder (02a P7-1 ruling 2) --------
+    // -- K5. PLAYER EXITS take the same ladder (02a "Act III") --------
     // Exits are not faster -- or cheaper -- than entries in a market made of
     // machines. The queue treats a close / unwind exactly like an entry...
     resetAct3();
@@ -1277,7 +1277,7 @@ let ladderRows = '';
         `entry ${exStock ? exStock.entryPrice : '--'}, cash ${(portfolio.cash - cashBeforeEx).toFixed(4)}`);
     resetPortfolio(); resetImpactState();
 
-    // -- K7. EXPIRY RE-CHECKED AT EXECUTION (02a P7-1 ruling 1) -----------
+    // -- K7. EXPIRY RE-CHECKED AT EXECUTION (02a "Act III") -----------
     // The rollover case the ladder makes reachable: the live chain lists
     // tomorrow's expiry until the day rolls, so an order placed late with lag 3/6
     // can land AFTER that expiry has been processed. `processExpiry` matches the
@@ -1325,7 +1325,7 @@ let ladderRows = '';
         `opened ${opened}, left ${portfolio.positions.length}`);
     resetPortfolio(); resetImpactState(); syncFixed(0);
 
-    // -- K8. Reset restores an honest display (02a P7-1 ruling 5) ---------
+    // -- K8. Reset restores an honest display (02a "Act III") ---------
     // The renderer's transient fields are cleared through ONE method, so a repaint
     // generated while the strategy view was up (draw() never consumed it) cannot
     // survive a Dynamic->Classic reset and print an Act-III wrong tick at rest.
@@ -1938,7 +1938,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
         check('N1: the LEADER triggers it -- an inactive lab does not, an active rival does',
             inactiveLeader === false && roomTriggerReady(race2) === true);
     }
-    // -- N1b. ONE helper, both facts: `ready` + `leaderLab` (02a ruling 3) ---
+    // -- N1b. ONE helper, both facts: `ready` + `leaderLab` (02a "Act III") ---
     {
         check('N1b: roomTrigger is total on a null race (no leader, not ready)',
             JSON.stringify(roomTrigger(null)) === '{"ready":false,"leaderLab":null}'
@@ -2057,7 +2057,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
             const c = roomChoices(2, false).find(x => x._roomVerb === 'silence');
             return c && !c.raceEffects && c.playerFlag === ROOM_FLAGS.declined;
         })());
-    // -- N2b. Per-leader presentation (02a ruling 3) -----------------------
+    // -- N2b. Per-leader presentation (02a "Act III") -----------------------
     {
         check('N2b: sides are home (Halcyon, Polaris -- the schism) vs rival (Tianxia); unknown defaults home',
             JSON.stringify(ROOM_LEADER_SIDES) === '["home","rival"]'
@@ -2545,7 +2545,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
 }
 
 // =====================================================================
-// O. The capex channel (reality-beats round, 02a 2026-09-08 item 1)
+// O. The capex channel (02a "Rates: the capex channel")
 // =====================================================================
 let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMaxFires = 0;
 {
@@ -2633,7 +2633,7 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
     }
 
     // -- O3. Latch reset. resetRaceBridge() is the ONE path that clears the latch
-    //        between runs (02a reality-beats ruling 2: main.js calls it
+    //        between runs (02a "Rates: the capex channel": main.js calls it
     //        UNCONDITIONALLY in _resetCore; the bridge has no self-healing branch).
     {
         // explicit reset -- the latch is at 5 from O2.
@@ -2789,7 +2789,7 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
 }
 
 // =====================================================================
-// P. Concealment vs. detection (reality-beats round, 02a 2026-09-08 item 2)
+// P. Concealment vs. detection (02a "Incidents")
 // =====================================================================
 let concealFrac = 0, concealPrefixRecords = 0, concealFullyIdentical = 0, concealProbeTicks = 0;
 let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;

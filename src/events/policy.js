@@ -150,7 +150,7 @@ export const POLICY_EVENTS = [
     },
 
     // ---- Treasury backchannel (P7-3: fund-as-actor) -----
-    // 02a P7-3 semantics item 3, the fund-as-actor wager. Gated on the fund being
+    // 02a "Act III", the fund-as-actor wager. Gated on the fund being
     // LIVE -- `world.ai.fundLive`, the read-only mirror of main.js's monotone latch
     // over belief.js's OWN gate predicate `canActAsFund` (credibility > 0.65 AND
     // F > 60). The gate is never recomputed here: this `when` reads the mirror, the
@@ -184,7 +184,7 @@ export const POLICY_EVENTS = [
         ],
     },
 
-    // ---- The ban bill (reality-beats round, 02a 2026-09-08) -----------------
+    // ---- The ban bill (reality-beats round, 02a "Control regime and content plumbing") -----------------
     // oneShot at released R4 BY INTENT: the beat is the coincidence -- the bill
     // lands the morning of the keynote that declares the era, because the R4
     // release headline IS that keynote (the pre-pass fires it the first day the

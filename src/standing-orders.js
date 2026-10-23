@@ -8,7 +8,7 @@
    III executes them -- "takeoff is felt as your own agency
    migrating into machinery you configured earlier".
 
-   Six rules (02a "Standing orders" + "P7-2 semantics"):
+   Six rules (02a "Act III", standing orders):
      (a) severity_cut    S>=3 DETECTION -> cut gross 50%
      (b) blockade_halve  blockade ONSET -> halve HCN stock
      (c) bonds_first     margin util > 80% -> bonds liquidate
@@ -23,7 +23,7 @@
      (f) delta_flatten   |HCN move vs day open| > 8% at any
                          substep -> flatten net delta to +-20
 
-   BINDING CONVENTIONS (02a P7-2 semantics):
+   BINDING CONVENTIONS (02a "Act III", standing orders):
    1. Standing executions are MACHINERY: every trade below
       omits `spreadMult` (the exact pre-P7 fill) and NEVER
       touches the P7-1 latency queue -- precommitments are the

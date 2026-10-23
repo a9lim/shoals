@@ -9,7 +9,7 @@
    influence, not authorship. You bought a seat, not the
    steering wheel; hidden state still resolves the world.
 
-   MACHINERY (02a Act III "The room" + P7-3 semantics item 1):
+   MACHINERY (02a "Act III", the room):
    - LATCH-FIRED, never Poisson. main.js's `_checkRoom` fires
      it once per run off the race-side pure predicate
      (`roomTriggerReady`: leader `C_internal >= R5 - 0.15`),
@@ -33,7 +33,7 @@
      clamp, ledgered under this event id. At full voice this
      is the loudest row the complicity ledger will ever
      carry, by design.
-   - PER-LEADER PRESENTATION (02a P7-3 ruling 3): the fired
+   - PER-LEADER PRESENTATION (02a "Act III"): the fired
      meta carries `leaderLab` (from `roomTrigger` -- the same
      race-side helper the predicate comes from, never a
      recompute), and BOTH the headline and the context are
@@ -83,7 +83,7 @@ export const ROOM_EVENT_ID = 'the_room';
  *  chokepoint on EVERY path (the seat is the beat); `declined` rides the
  *  say-nothing choice's own `playerFlag`. */
 export const ROOM_FLAGS = { seat: 'sat_in_the_room', declined: 'room_declined' };
-/** The two presentation sides the pools are keyed by (02a P7-3 ruling 3). */
+/** The two presentation sides the pools are keyed by (02a "Act III"). */
 export const ROOM_LEADER_SIDES = ['home', 'rival'];
 /** Labs whose lead makes it the RIVAL room. The explicit set is the small one; a
  *  Polaris lead is still the HOME room (Polaris is the Halcyon schism -- an

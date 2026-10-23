@@ -19,7 +19,7 @@
        curve carries a persistent invasion-risk premium that
        responds to public tension; a Taiwan blockade (the
        world-state `geo.taiwanBlockade` flag -- NOT Hormuz's
-       `straitClosed`; 02a "Two straits, two flags") applies
+       `straitClosed`; 02a "The strait") applies
        the 09 force-majeure adjustment (far curve +40-80%, per
        02a) -- "blockade scares print here first."
 
@@ -88,7 +88,7 @@ const QUARTER = 63;        // QUARTERLY_CYCLE -- quarter length in trading days
 const LADDER_SIZE = 4;     // maturities listed at a time (03: "3-4 listed at a time, rolling")
 const HORIZON = 1008;      // race clock end (no maturity past the term)
 
-// P4-swappable placeholder (02a phase-3b block): the CURVE STRUCTURE is ratified
+// P4-swappable placeholder (02a "Compute futures"): the CURVE STRUCTURE is ratified
 // -- demand uplift (releases + certified rungs + trend), scramble backwardation,
 // and a pure-tail standing strait premium -- but its MAGNITUDES are deliberately
 // left as placeholders (same stance as the Consensus binary quotes); this whole
@@ -104,12 +104,12 @@ const STRAIT_TAIL_BASE = 0.06;    // standing far-curve invasion-risk premium (c
 const STRAIT_TAIL_TENSION = 0.10; // additional standing premium per unit public tension
 const TAIL_TAU = 120;             // days: the tail premium saturates within the listed ladder
 
-// RATIFIED (02a "Strait"): a blockade lifts the FAR compute curve +40-80%. The
+// RATIFIED (02a "The strait"): a blockade lifts the FAR compute curve +40-80%. The
 // tail-premium magnitude under blockade lands in this band (position within it
 // scaled by public tension).
 const BLOCKADE_FAR_LO = 0.40;
 const BLOCKADE_FAR_HI = 0.80;
-// Ratified (02a phase-3b block, settlement-during-blockade rationale): a realized
+// Ratified (02a "Compute futures", settlement-during-blockade rationale): a realized
 // blockade is a supply shock that also lifts the NEAR curve (so a contract
 // settling DURING a blockade carries the force-majeure adjustment, not just the
 // far-dated marks). The near end gets this fraction of the far premium; the
@@ -161,7 +161,7 @@ export const computeMarket = {
     _state: {},
 };
 
-// P4-swappable placeholder (02a phase-3b block): a per-contract half-spread for
+// P4-swappable placeholder (02a "Compute futures"): a per-contract half-spread for
 // the displayed curve quote; compute futures are illiquid, so wider than
 // stock/bond. This is a price spread on the curve (the fill spread is the
 // stock/bond model keyed off COMPUTE_SPREAD_VOL in _fillPrice).
@@ -234,7 +234,7 @@ export function setComputePriceSource(fn) {
  *     into the RATIFIED [0.40, 0.80] band (02a force-majeure adjustment).
  * `dte` is the maturity in trading days. Reads only the public view; the
  * structure is ratified, the non-blockade magnitudes are P4-swappable
- * placeholders (02a phase-3b block).
+ * placeholders (02a "Compute futures").
  */
 export function placeholderCurve(view, dte) {
     const demandUplift = K_RELEASE * view.releaseCount

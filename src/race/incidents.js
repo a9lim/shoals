@@ -88,7 +88,7 @@ const PERSUASION_SHARE = 0.20;
 // ---- Detection constants (02a) -------------------------------------------
 
 // Eventual-detection probability and mean lag (Exp) per severity S0..S4 --
-// full ladder ratified in 02a (2026-07-23): S0 0.70/Exp(10d), S1 0.78/Exp(8d),
+// full ladder in 02a: S0 0.70/Exp(10d), S1 0.78/Exp(8d),
 // S2 0.86/Exp(6d), S3 0.94/Exp(3d), S4 1.00/immediate (self-disclosing).
 const DET_PROB = [0.70, 0.78, 0.86, 0.94, 1.00];
 const DET_LAG_MEAN = [10, 8, 6, 3, 0];             // Exp mean, days; S4 = 0 (immediate)
@@ -101,7 +101,7 @@ const PERSUASION_DET_LAG_MEAN = 90;
 const REPORTING_P_BONUS = 0.12;
 const REPORTING_LAG_MULT = 0.5;
 
-// ---- Concealment vs. detection (reality-beats round, 02a 2026-09-08 item 2) --
+// ---- Concealment vs. detection (02a "Incidents") --
 // Both sides of detection are automated, and they license different models:
 //
 //   defend  = 1 + K * (C_rel,frontier - 3)+     (defenders license the released frontier)
@@ -116,7 +116,7 @@ const REPORTING_LAG_MULT = 0.5;
 // SOONER and leaves the K=0 arm consuming the extra future draws. Either way
 // `streams.incidents` re-phases from the first affected record's detection
 // onward and downstream realizations legitimately differ -- the leak-coupling
-// precedent (02a evidence-machinery ruling 3). What IS identical: the
+// precedent (02a "Incidents"). What IS identical: the
 // occurrence/detection ledgers and the RNG position through the first affected
 // record's CREATION day (the latent record itself differs immediately, in
 // lagMult and meanLag), and everything before any R3 crossing (plumbing P).
@@ -303,7 +303,7 @@ export function stepIncidents(race, day, endDay, heat) {
         const detectable = rng.next() < pDet;
         const immediate = detectable && meanLag <= 0;   // S4 self-discloses in its occurrence tick
 
-        // Occurrence (silent) physical effect: deferred ENTIRELY (02a, 2026-07-23).
+        // Occurrence (silent) physical effect: deferred ENTIRELY (02a).
         // The field stays null until a 02a revision ratifies a magnitude -- no
         // invented truth-valued numbers in state, even inert; applying one would
         // also double-count the calibrated S path.
@@ -405,7 +405,7 @@ export function applyReportingRegime(race) {
 
 /** Remaining mean lag a LEAKED incident detects on: a memoryless hazard 1/4 per
  *  day from the leak day. "The story forces the filing inside a week, usually"
- *  (02a evidence-machinery block). */
+ *  (02a "Incidents"). */
 export const LEAK_FORCED_MEAN_LAG = 4;
 
 /**

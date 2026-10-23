@@ -226,7 +226,7 @@ function bridgeReleases(tr, emit) {
     }
 }
 
-// ---- Capex channel (reality-beats round, 02a 2026-09-08 item 1) -----------
+// ---- Capex channel (02a "Rates: the capex channel") -----------
 // 03's "AI capex distorts the long end", given its mechanism: every RISE of the
 // PUBLIC released-frontier rung fires ONE `rates_capex_wave` carrying a PERMANENT
 // additive delta to the Vasicek long-run rate. Labs and hyperscalers raise AFTER
@@ -260,7 +260,7 @@ let _lastCapexRung = null;
 function bridgeCapex(emit, race, liveRung) {   // reads no ledger row: this edge is public state
     const rung = (liveRung == null) ? buildPublicView(race).releasedFrontierRung : liveRung;
     // Seed without firing on the first call of a run. `resetRaceBridge()` (now
-    // UNCONDITIONAL in main.js's _resetCore -- 02a reality-beats ruling 2) is the
+    // UNCONDITIONAL in main.js's _resetCore -- 02a "Rates: the capex channel") is the
     // ONE path that clears the latch between runs; no self-healing branch here.
     // (A stale latch ABOVE the rung would fire nothing -- the step loop is empty
     // on a decrease -- and the trailing assignment tracks it down, so there are
@@ -355,7 +355,7 @@ function bridgeRegime(tr, emit) {
 // person, not a feed, and scarcity IS the texture (~5-8 tips/run). The tip
 // tells the player an incident EXISTS before the world learns it -- the trade
 // verb's edge is positioning ahead of the detection beat the machinery will
-// fire anyway. Gate/throttle numbers recorded in 02a (phase-5 content note).
+// fire anyway. Gate/throttle numbers recorded in 02a "Incidents".
 // `_tipIncidentId` (+ raceMeta.severity) is the LEAK verb's handle: the evidence
 // machinery round's `raceLeak` choice field reads it at the main.js chokepoint to
 // force detection (incidents.js) and fold `B` early (belief.js). The severity

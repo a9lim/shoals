@@ -16,7 +16,7 @@
    getEventById + followup-chain validation see them.
 
    PROSE: final (orchestrator-written, 2026-07-23; register pass
-   2026-09-08 -- 02a reality-beats round item 3: the UNIT is a
+   2026-09-08 -- 02a "Incidents": the UNIT is a
    population. S2+ shells read as agent fleets that find each
    other, not one model doing one thing; the generator's row is
    still one incident, one severity -- prose carries the
@@ -361,14 +361,14 @@ export const RACE_EVENTS = [
         ],
         params: {},                            // no permanent delta (03 incident-coupling rule)
         impulse: { mu: -0.01, xi: 0.005 },     // decaying (P4): the second-order move, quieter and larger
-        // Reality-beats round (02a, 2026-09-08): the scoped independent review is
+        // Reality-beats round (02a "Incidents"): the scoped independent review is
         // a second hop off the post-mortem -- found vs published as the SHAPE of
         // the official record. Non-popup, so the followup schedules top-level;
         // no `weight` -- that field is a same-day sibling tiebreak, not a probability.
         followups: [{ id: 'incident_review_scoped', mtth: 25 }],
     },
 
-    // ---- The scoped independent review (reality-beats round, 02a 2026-09-08) --
+    // ---- The scoped independent review (reality-beats round, 02a "Incidents") --
     // Followup-fired (token-free BY REQUIREMENT -- the engine's variant collapse
     // does not substitute tokens). Two outside evaluators, a perimeter drawn by
     // the lab, a scope letter published as the only editorial permitted.

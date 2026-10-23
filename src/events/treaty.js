@@ -69,7 +69,7 @@ export const TREATY_EVENTS = [
             },
         ],
     },
-    // ---- The pacing letter (reality-beats round, 02a 2026-09-08) -------------
+    // ---- The pacing letter (reality-beats round, 02a "Control regime and content plumbing") -------------
     // The racers ask Washington for the tools to stop LATER. oneShot on TWO
     // guards -- treatyStage (itself Poisson-timed by talks_farce) and released
     // R3 -- so the pre-pass cannot cluster it onto the R3 week. No mechanics:

@@ -10,7 +10,7 @@ const FACTION_DEFAULTS = {
     farmerLaborSupport: 30,
     mediaTrust: 40,
     fedRelations: 40,
-    // Roster v2 (07-migration, phase 5a). safetyNetworkTrust: standing with the
+    // Roster v2 (02a "Control regime and content plumbing"). safetyNetworkTrust: standing with the
     // safety-researcher source network -- the insider channel's moral core (04),
     // grown through discreet handling; starts low (unearned). labRelations: the
     // player's/firm's relationship with the frontier labs (Halcyon board access,

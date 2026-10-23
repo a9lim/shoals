@@ -4,10 +4,9 @@
    market efficiency `eta`, the locked player posterior +
    credibility, and firm belief `F` (overhaul phase 4).
 
-   This is the module 07-migration names: "belief.js (`B`,
-   implied timeline, locked player posterior,
-   credibility/Brier)". Firm belief `F` lives "here or
-   beside" (07); it is STORED on `race.F` (race-state.js
+   This module owns `B`, the implied timeline, the locked
+   player posterior, and credibility/Brier. Firm belief `F`
+   is STORED on `race.F` (race-state.js
    owns the reset), and its update logic lives here beside
    `B` -- UNRATIFIED seam choice (the alternative is
    faction-standing.js; F is belief-shaped, so it sits with
@@ -85,7 +84,7 @@ const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 
 // ---- Contract-space listing priors (PUBLIC; mirror consensus.js) ----------
 // The tracked rungs and their public listing info: deadlines and base rates are
-// legitimately-public market-consistent priors (02a phase-3a, ratified). Kept
+// legitimately-public market-consistent priors (02a "Consensus binaries"). Kept
 // here so belief seeding does not depend on consensus init ORDER; they must stay
 // in lockstep with consensus.js contractDefs (a divergence would desync the
 // day-0 belief quote from the listed base rate).
@@ -117,7 +116,7 @@ const A_ROUTINE = 0.06;      // a routine (no-rung) release is a faint cadence n
 const RUNG_SPACING = 150;    // UNRATIFIED implied days between successive rung crossings
 const A_LEAK = 0.30;         // RATIFIED leak blend: B_new = 0.7*B + 0.3*L (alignment channel)
 const ALIGN_INCIDENT = 0.06; // additive alignment hit per DETECTED incident, x(severity+1) (bounded by clamp)
-// RATIFIED (02a evidence machinery): a DISCLOSED weight theft folds -0.20 into the
+// RATIFIED (02a "Incidents"): a DISCLOSED weight theft folds -0.20 into the
 // alignment sentiment, once per disclosure (`theftdisc_` fold-id class). A theft
 // becoming public is unambiguous bad news about the security of the frontier --
 // which is why it is a fixed magnitude, not severity-scaled like an incident.
@@ -175,7 +174,7 @@ function _freshPlayer() {
 
 /** Survival-conditioned crossing probability P(T <= D | T > t) under a logistic
  *  law {m,w}: (F(D) - F(t)) / (1 - F(t)). "No progress as the deadline nears IS
- *  decay toward NO" (02a phase-4 ruling) -- as t -> D with m fixed, this -> 0. */
+ *  decay toward NO" (02a "Belief, η, and the firm") -- as t -> D with m fixed, this -> 0. */
 function _condProb(m, w, t, D) {
     if (D <= t) return 0;
     const Ft = sigmoid((t - m) / w);
@@ -200,7 +199,7 @@ function _solveMedian(w, D, b) {
 function _seedRungs() {
     // Seed each rung so the day-0 SURVIVAL-CONDITIONED quote of the deadline
     // equals the listing base rate exactly (the unconditional CDF is a seeding
-    // device only -- 02a phase-4 ruling).
+    // device only -- 02a "Belief, η, and the firm").
     const rungs = {};
     for (const R of RUNG_LIST) {
         const D = RUNG_DEADLINE[R], b = RUNG_BASE[R], w = RUNG_WIDTH[R];
@@ -224,7 +223,7 @@ export function initBelief(race) {
     belief.rng = race ? createRng(deriveSeed(race.seed, 'belief')) : null;
     belief.noise = false;
     belief.player = _freshPlayer();
-    // NO manufactured day-0 forecast (02a phase-4 ruling): day 0 is a REAL
+    // NO manufactured day-0 forecast (02a "Belief, η, and the firm"): day 0 is a REAL
     // prompted lock. Until the player locks, there is no claim to score, and the
     // credibility EMA stalls (staleness is its own penalty).
 }
@@ -249,7 +248,7 @@ export function deactivateBelief() {
 // ---- The hazard curve ----------------------------------------------------
 
 /** SURVIVAL-CONDITIONED P(rung R crossed/certified by day D | not yet, as of
- *  today) -- the quoted probability (02a phase-4 ruling). "today" is belief.day;
+ *  today) -- the quoted probability (02a "Belief, η, and the firm"). "today" is belief.day;
  *  no progress as the deadline nears decays the quote toward NO on its own. */
 export function binaryProb(R, D) {
     const rung = belief.rungs[R];
@@ -280,7 +279,7 @@ export function impliedTimeline() {
 }
 
 // ---- Update primitives (EVERY m/w/monotonicity mutation is ledgered) -------
-// 02a phase-4 ruling: every median/width/monotonicity mutation carries a cause
+// 02a "Belief, η, and the firm": every median/width/monotonicity mutation carries a cause
 // entry under the originating event ID -- monotonicity corrections are
 // consequences of their trigger, not anonymous drift. Each entry records the
 // FULL before/after of the affected rung's (m, w) so the harness can reconstruct
@@ -534,7 +533,7 @@ function _diffuse(day) {
 
 /**
  * Market-efficiency dial `eta` in [0,1], RISING with the RELEASED frontier
- * (02a phase-4 ruling: "max(C) means max(C_released)", read through the PUBLIC
+ * (02a "Belief, η, and the firm": "max(C) means max(C_released)", read through the PUBLIC
  * released-rung projection -- latent C_internal never touches efficiency). eta
  * is monotone non-decreasing in `view.releasedFrontierRung`, so the Act-II alpha
  * decay it drives is public-state-derived and the corruption harness stays
@@ -562,7 +561,7 @@ export function binaryQuoteFromBelief(view, contract) {
 
 /** The compute market's read of `B`: survival-conditioned belief that R5
  *  (takeoff) lands within the near horizon -> compute-demand urgency in [0,1]
- *  (public-derived). RATIFIED at R5 (02a phase-4): structural curve lifted by
+ *  (public-derived). RATIFIED at R5 (02a "Belief, η, and the firm"): structural curve lifted by
  *  (1 + 0.15*P(R5 by day+252)). */
 export function computeUrgency() {
     return binaryProb(5, belief.day + COMPUTE_BELIEF_HORIZON);
@@ -640,7 +639,7 @@ export function lockedClaim(R) {
 /**
  * Score one or more matured claims and EMA-update credibility. Only rungs the
  * player ACTUALLY LOCKED are scored; a never-locked rung contributes no Brier
- * (02a phase-4: skipping stalls the EMA -- staleness is its own penalty). Brier
+ * (02a "Belief, η, and the firm": skipping stalls the EMA -- staleness is its own penalty). Brier
  * is averaged over the scored batch, then credibility advances one EMA step:
  * cred <- (1-a)*cred + a*(1 - 2*Brier), a = 0.25, init 0. If nothing was locked,
  * the EMA STALLS (returns unchanged).
@@ -718,7 +717,7 @@ export function firmBelief(race) {
  * in proportion to POSITIVE credibility (being right early converts the firm;
  * 03/02a). Bounded [0,100]. Mutates race.F and returns it.
  *
- * P6-2 F-channel decomposition (02a ruling 1): the step's applied movement splits
+ * P6-2 F-channel decomposition (02a "Player influence and the ledger"): the step's applied movement splits
  * into the AUTONOMOUS B-wake term (the world waking on its own) and the PLAYER
  * conversion term (advice acts converting the firm). Both are STAMPED on the race
  * (`race.lastFWake` / `race.lastFConvert`) so the orchestrator ledgers ONLY the
@@ -741,7 +740,7 @@ export function stepFirmBelief(race, opts = {}) {
     // Decompose the APPLIED movement into its two contributions. Use the RAW terms
     // whenever the unclamped target is INTERIOR (no rail bound) -- so wake and
     // conversion that exactly OFFSET are each recorded at full magnitude, never
-    // erased (02a P6-2 ruling amendment: preventing the autonomous move IS
+    // erased (02a "Player influence and the ledger": preventing the autonomous move IS
     // persuasion, and a ledger that zeroed offsetting contributions would launder the
     // very involvement it exists to record). The earlier `applied/rawTotal` form set
     // scale = 0 at the exact-cancellation singularity (rawTotal === 0), erasing both.

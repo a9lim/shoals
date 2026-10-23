@@ -105,7 +105,7 @@ const OVERLAY_NAMES = {
     bystander: 'Bystander',
 };
 
-// Terminal queue discipline (02a P6-3): once terminal closeout starts, only
+// Terminal queue discipline (02a "Resolution"): once terminal closeout starts, only
 // terminal-SAFE beats survive in the popup queue -- TODAY exactly category 'summit'
 // (treaty_holds / treaty_resolution: effect-free acknowledgments by construction).
 // Every ordinary queued popup is discarded so no queued choice (cashPenalty,

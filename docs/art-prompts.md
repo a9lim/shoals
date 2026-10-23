@@ -1,6 +1,8 @@
-# Shoals — Art Prompts for Gemini Image Generation
+# Shoals — Art Prompts
 
-> Disco Elysium-style portraits and flavor images for the Shoals trading sim.
+> Disco Elysium-style portraits and flavor images for Shoals, written for
+> any image-generation model. No generated art ships with the app; names
+> and roles follow `docs/lore.md`.
 > All prompts target a **painterly oil-on-canvas** look: visible brushstrokes,
 > slightly impressionistic, psychologically expressive faces, muted earth tones
 > punctuated by saturated accent colors. Portraits are bust/shoulder crops with
@@ -129,62 +131,77 @@ For flavor/scene images, replace the last sentence with:
 > expression carries the weight of a presidential campaign that didn't quite
 > make it. Still dignified. Still relevant. Barely.
 
-#### Gov. Patricia Chen (OH)
-> A poised Asian American woman in her late 40s, straight black hair to her
-> shoulders, calm intelligent eyes, a careful half-smile. Navy suit, subtle
-> pearl necklace. Background: clean whites and blues — a governor's office,
-> not the chaos of Washington. She looks like the future of the party, and
-> she knows it. Composed where others are frantic.
-
 ---
 
-### Palanthropic (PNTH)
+### Halcyon
 
-#### Andrea Dirks — Chairwoman
-> A severe woman in her late 50s with ash-blonde hair in a tight French twist,
-> ice-blue eyes, sharp angular features. Black turtleneck under a structured
-> blazer — Silicon Valley meets Langley. Background: cold steel blues and
-> gunmetal, abstract suggestion of drone silhouettes. Former intelligence
-> community. She looks at the viewer the way she looks at a threat assessment:
-> with total, unsentimental clarity. Her jawline could cut glass.
+#### Andrea Dirks — CEO
+> A woman in her late 50s with ash-blonde hair in a tight French twist,
+> ice-blue eyes, sharp angular features, and an open, disarming
+> half-smile. Black turtleneck under a structured blazer — keynote stage.
+> Background: warm stage light bleeding into cool blues, a vague
+> suggestion of an auditorium in darkness. She has done the arithmetic
+> and believes every word of it. Charismatic, sincere, quotable — the
+> brushstrokes should make her persuasive now and terrifying in
+> retrospect.
 
-#### Eugene Gottlieb — CEO
-> A disheveled man in his early 50s with curly dark hair going gray, round
-> wire-rimmed glasses, gentle brown eyes that are currently worried. Rumpled
-> oxford shirt, sleeves rolled, no tie — he dressed for the lab, not the
-> boardroom. Background: warm amber and green, suggestion of code on screens.
-> A brilliant man watching his company become something he didn't intend. The
-> idealism hasn't died yet but the brushstrokes around his eyes say it's close.
+#### Dr. Anja Reinholt — Chief Scientist
+> A tall, angular woman in her late 40s with dark hair streaked grey,
+> pulled back loosely, and heavy-lidded, careful eyes. Plain grey
+> cardigan, no jewelry. Background: muted chalkboard greens and the
+> faint geometry of plots. She is choosing her next word very slowly.
+> Every hedge she speaks moves a stock; the portrait should feel like a
+> sentence held back.
 
-#### Mira Kassis — CTO
-> A composed South Asian woman in her mid-40s with long dark hair pulled into
-> a loose ponytail, thoughtful dark eyes, a slight furrow between her brows.
-> Simple black t-shirt, lanyard badge still around her neck — she came here
-> from the engineering floor. Background: split between warm amber (research)
-> and cold blue (military) — she's caught between two visions. Her expression
-> is one of moral calculation.
+#### Dr. Yuki Sato — Head of Alignment
+> A slight Japanese woman in her early 40s with a short dark bob and
+> tired, steady eyes behind thin glasses. Faded company hoodie over a
+> collared shirt. Background: cold monitor light, dim open-plan office
+> after hours, empty desks. Her team's headcount is a vital sign. She is
+> deciding whether to stay, and it shows.
 
 #### Raj Malhotra — CFO
 > A sleek Indian man in his late 40s with perfectly groomed short black hair
 > graying at the temples, a thousand-watt smile with no warmth behind it.
 > Tailored navy suit, Hermès tie, French cuffs. Background: financial
-> greens and golds — Bloomberg terminals reflected in his glasses. Former
+> greens and golds — terminal screens reflected in his glasses. Former
 > Goldman. He speaks fluent analyst-ese and sides with whoever is winning.
 > The portrait of a man who has never had a conviction that cost him money.
 
-#### David Zhen — Board Kingmaker
-> An elderly Chinese man in his early 80s, thin white hair, deep-set eyes
-> behind thick-framed glasses, weathered face with an expression that reveals
-> nothing. Simple dark suit, no tie. Background: deep shadow with a single
-> warm light source — he sits in darkness and decides. Early PNTH investor.
-> Both factions court him. His silence is the most powerful force in the
-> boardroom.
+#### Edwin Osei — Board Kingmaker
+> A Ghanaian-British man in his early 70s, close-cropped white hair,
+> deep-set eyes and a face that reveals nothing. Simple dark suit, no
+> tie, a single old wristwatch. Background: deep shadow with one warm
+> light source — he sits in darkness and decides. Early money, late
+> caution. Both factions court him; his read of speed versus margin
+> settles the proxy fight.
+
+### Polaris
+
+#### Eugene Gottlieb — Halcyon Co-founder, Polaris Founder
+> A disheveled man in his early 50s with curly dark hair going gray, round
+> wire-rimmed glasses, gentle brown eyes that are currently worried. Rumpled
+> oxford shirt, sleeves rolled, no tie — he dressed for the lab, not the
+> boardroom. Background: warm amber and green, suggestion of code on screens
+> and, through a window, the Flatirons. A brilliant man who watched his
+> company become something he didn't intend and walked out. The idealism
+> hasn't died yet but the brushstrokes around his eyes say it's close.
+
+### Cambria Semiconductors
+
+#### Helena Karras — CEO
+> A composed woman in her late 50s, silver hair in a severe low knot,
+> pale eyes that answer exactly the question asked. Dark high-collared
+> jacket, a cleanroom badge clipped at the hip. Background: the amber
+> light of a fab's lithography bays, rendered as soft blocks of color.
+> She refuses roadshows. Asked about invasion risk, she publishes
+> capacity numbers.
 
 ---
 
 ### Geopolitical Leaders
 
-#### Premier Liang Wei — Serica
+#### Premier Liang Wei — China
 > A composed man in his early 60s with a round, impassive face, short black
 > hair peppered with silver, small dark eyes that miss nothing. Dark
 > Mao-collared suit. Background: deep red and gold — state power. He plays
@@ -192,22 +209,22 @@ For flavor/scene images, replace the last sentence with:
 > strategic, and absolutely willing to accept short-term pain. His slight
 > smile is the most dangerous expression in international diplomacy.
 
-#### President Yevgeny Volkov — Khasuria
+#### President Yevgeny Volkov — Russia
 > A compact, muscular man in his late 50s with a shaved head, pale blue eyes,
 > and a hard, flat expression. Dark suit with a military bearing — the clothes
 > are civilian but the posture isn't. Background: cold whites and icy blues,
 > suggestion of snow and steel. He probes for weakness the way a predator
 > tests a fence. Expansionist energy contained in a deliberately still frame.
 
-#### Emir Rashid al-Farhan — Farsistan
+#### Emir Rashid al-Farhan — The Gulf
 > A refined man in his mid-50s with a neatly trimmed black beard, warm brown
 > skin, and dark eyes that radiate charm and calculation in equal measure.
 > White thobe and gold-trimmed bisht, keffiyeh held by a black agal.
 > Background: warm golds, desert ochres, and petroleum blacks — oil wealth.
-> He plays all sides simultaneously: buys Columbian weapons, hosts Khasurian
-> oligarchs, invests in Serican tech. His hospitality is a weapon.
+> He plays all sides simultaneously: buys American weapons, hosts Russian
+> oligarchs, invests in Chinese tech. His hospitality is a weapon.
 
-#### President Luis Madero — Boliviara
+#### President Luis Madero — Bolivia
 > A broad-faced man in his late 40s with thick dark hair, deep brown skin,
 > and the fiery eyes of a true believer. Open-collared shirt with military
 > jacket — populist revolutionary chic. Background: jungle greens and
@@ -215,12 +232,12 @@ For flavor/scene images, replace the last sentence with:
 > lets foreign companies take them. The brushstrokes are rougher here —
 > he's a disruptive force, not a polished one.
 
-#### PM Ari Navon — Meridia
+#### PM Ari Navon — Israel
 > A lean, weathered man in his early 60s with close-cropped gray hair, deep
 > tan, and the focused stare of a former military officer. Dark suit, tieless,
 > top button undone. Background: dusty golds and Mediterranean blue, faint
-> suggestion of desert horizon. Hawkish but pragmatic. He's asking for Atlas
-> Aegis support and he won't take no for an answer. The lines around his eyes
+> suggestion of desert horizon. Hawkish but pragmatic. He's asking for
+> American troops and he won't take no for an answer. The lines around his eyes
 > are from squinting into sun, not smiling.
 
 ---
@@ -247,7 +264,7 @@ For flavor/scene images, replace the last sentence with:
 #### Priya Sharma — MarketWire
 > A poised South Asian woman in her late 30s with dark hair in a neat bun,
 > intelligent brown eyes behind fashionable glasses, and an expression of
-> analytical calm. Understated blazer, Bloomberg terminal glow reflected in
+> analytical calm. Understated blazer, terminal glow reflected in
 > her lenses. Background: financial greens and data blues — numbers
 > everywhere. The most trusted name on trading floors. When she tweets before
 > an FOMC decision, bond markets move. She knows this and it makes her
@@ -265,28 +282,27 @@ For flavor/scene images, replace the last sentence with:
 
 ### Meridian Capital (The Firm)
 
-#### Webb — Managing Director
+#### Webb — Risk Allocation
 > A patrician white man in his early 60s with immaculate silver hair, cold
 > gray eyes, and the kind of face that was born in a boardroom. Bespoke
 > charcoal suit, white shirt, no visible emotion. Background: dark walnut
-> and brass — the corner office. He evaluates you the way he evaluates a
+> and brass — a glass office off the floor. He evaluates you the way he evaluates a
 > position: purely on risk-adjusted return. His disappointment is quiet and
 > final.
 
-#### Vasquez — Senior Trader
+#### Vasquez — Managing Director
 > A sharp-eyed Latina woman in her late 30s with dark hair pulled back, bold
 > eyebrows, and a knowing half-smile. Trading floor casual — fitted blazer
 > over a dark top, no jewelry except a chunky watch. Background: flickering
 > green and red of trading screens. She's been at the desk long enough to
 > smell trouble before the numbers show it. Streetwise, fast, respected.
 
-#### Riggs — Compliance
+#### Riggs — Rival on the Floor
 > A thin, precise man in his early 50s with receding sandy hair, pale eyes
 > behind reading glasses, and a perpetual expression of mild suspicion.
 > White shirt buttoned to the collar, pen in breast pocket. Background:
-> sterile fluorescent whites and filing-cabinet grays. He doesn't enjoy
-> catching people — but he doesn't not enjoy it either. Every trade you make
-> crosses his desk.
+> sterile fluorescent whites and filing-cabinet grays. He tracks your book
+> as closely as his own, and he smiles when yours slips.
 
 ---
 
@@ -309,11 +325,10 @@ For flavor/scene images, replace the last sentence with:
 ### Capitol Rotunda — Vote Night
 > The interior of a grand legislative chamber seen from above, painted in deep
 > mahoganies and warm golds. Tiny figures at desks, a speaker at the podium.
-> Gallery packed with shadows. The American flag analog (Columbian flag) hangs
-> behind the dais. Dramatic chiaroscuro lighting — shafts of light from high
+> Gallery packed with shadows. The American flag hangs behind the dais. Dramatic chiaroscuro lighting — shafts of light from high
 > windows cut through institutional gloom. The weight of democracy.
 
-### PNTH Board Room
+### Halcyon Board Room — The Schism
 > A stark, modern conference room with floor-to-ceiling glass overlooking a
 > tech campus. Long white table, a few figures in silhouette at opposite ends —
 > the Dirks-Gottlieb divide made spatial. Cold blue-whites and steel grays.
@@ -334,6 +349,19 @@ For flavor/scene images, replace the last sentence with:
 > reflects fire colors. The chokepoint that controls the global economy,
 > rendered as a Turner seascape.
 
+### Hsinchu — Cambria Fab at Night
+> A semiconductor fab complex on the edge of a coastal city, painted at
+> night in sodium ambers and cleanroom whites, the long low buildings lit
+> from within. Beyond them, a dark strip of sea. The most valuable factory
+> on Earth, a hundred miles of water from the country it is forbidden to
+> serve. Quiet, industrial, exposed.
+
+### Taiwan Strait — Blockade
+> Gray hulls strung across a gray sea at dawn, painted in slate, steel
+> blue, and a thin band of warning orange on the horizon. No smoke, no
+> fire — just ships standing where ships should be moving. Tiny container
+> vessels idle at the edge of the frame. Menace rendered as stillness.
+
 ### Federal Reserve — FOMC Meeting
 > A wood-paneled conference room with a long oval table, institutional
 > lighting, and the weight of monetary policy visible in every muted surface.
@@ -342,14 +370,14 @@ For flavor/scene images, replace the last sentence with:
 > warm wood tones. Calm on the surface, but the brushstrokes vibrate with
 > the tension of a rate decision that will move trillions.
 
-### Khasurian Border — Night
+### Russian Border — Night
 > A frozen Eastern European landscape under a dark sky, painted in icy blues,
 > slate grays, and the distant orange glow of military positions. Bare trees,
 > snow, a road disappearing into darkness. Tiny vehicle headlights in the
 > distance. The ceasefire line — quiet, but the kind of quiet that precedes
 > artillery. Atmospheric, ominous, vast.
 
-### Farsistan — Palace Interior
+### The Gulf — Palace Interior
 > An opulent palace reception hall painted in warm golds, rich crimsons, and
 > marble whites. Ornate arches, geometric tilework suggested by impressionistic
 > brushwork. A few robed figures in conversation. Through a window, desert
@@ -363,12 +391,13 @@ For flavor/scene images, replace the last sentence with:
 > should feel exclusive and slightly sinister — the place where deals are made
 > away from cameras. Paradise with an agenda.
 
-### Boliviara — Lithium Mines
-> A vast open-pit mine carved into a mountainside, painted in raw earth tones —
-> sienna, umber, iron oxide red. Tiny machinery at the bottom of the pit.
-> Jungle creeping in at the edges. A single flag (Boliviaran) on a pole at
-> the ridge. The resource that powers AI chips, dug from the earth by hand.
-> Beautiful and brutal. The scale makes humans invisible.
+### Bolivia — Lithium Flats
+> A vast high-altitude salt flat under a hard blue sky, cut into a grid of
+> brine evaporation ponds painted in turquoise, jade, and bone white. Tiny
+> machinery along the dikes; bare mountains on the horizon. A single
+> Bolivian flag on a pole at the edge of the works. A line item in a chip
+> company's cost guidance, seen from the ground. Beautiful and brutal. The
+> scale makes humans invisible.
 
 ### The Sentinel Studio
 > A cable news set painted in aggressive reds, electric blues, and harsh white
@@ -381,7 +410,7 @@ For flavor/scene images, replace the last sentence with:
 > A wide panoramic view of a city skyline at sunrise, painted in soft pinks,
 > lavenders, and gold. The skyline is recognizable as a major eastern city —
 > neoclassical buildings, modern towers. A river in the foreground reflects the
-> sky. No people visible. The morning after everything: the election, the
+> sky. No people visible. The morning after everything: the race, the
 > crisis, the resolution. Whatever happened, the city is still here. Quiet,
 > hopeful, ambiguous. The final image the player sees.
 

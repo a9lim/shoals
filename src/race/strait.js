@@ -2,7 +2,7 @@
    src/race/strait.js -- The Taiwan-strait generator
    (overhaul phase 5a): gray-zone incidents and the
    blockade tail, the race's physical single point of
-   failure (02-race-model.md; 02a "Strait" block).
+   failure (02-race-model.md; 02a "The strait").
 
    Cambria's fabs sit in Hsinchu, a hundred miles from the
    coast Beijing drills off of. Gray-zone incidents are
@@ -32,7 +32,7 @@
    The 3% baseline / 12-15% hot-desperate blockade incidence
    is a CALIBRATION TARGET (02a), harness-asserted; the
    blockade DURATION model (Exp(45d) clamped [20,120]) is
-   RATIFIED in 02a's phase-5a block. Gray-zone detections and
+   RATIFIED in 02a's "The strait" block. Gray-zone detections and
    blockade start/end are RECORDED in the ledger; the race
    bridge fires their narrative.
    =================================================== */
@@ -54,10 +54,10 @@ function poisson(rng, lambda) {
 const GRAY_MEAN = 90;   // per-day gray-zone rate = (1/90)·(1+heat)·tension
 
 // ---- Blockade constants (02a target: ~3% baseline -> 12-15% hot/desperate) --
-// The blockade hazard FORM is ratified in 02a's phase-5a/phase-6 block:
+// The blockade hazard FORM is ratified in 02a's "The strait" block:
 //   h_block/day = BASE · (1 + heat) · (TENSION_FLOOR + TENSION_W·tension)
 //                       · (DESP_FLOOR + DESP_W·desperation)
-// where `desperation` is the SHARED strategic-desperation quantity (02a phase-6
+// where `desperation` is the SHARED strategic-desperation quantity (02a "The strait"
 // amendment; strategicDesperation in capability.js) -- max(velocity deficit,
 // post-ignition runaway), replacing rev-1's raw internal gap (which the fast-
 // follower bounded near the release lag, so it stopped meaning desperation).
@@ -73,7 +73,7 @@ const BLOCKADE_DESP_W = 1.4;
 // Heat the blockade adds while active (02a: "heat +0.20"). Reversible overlay.
 export const BLOCKADE_HEAT = 0.20;
 
-// Blockade duration (RATIFIED, 02a phase-5a block): Exp(mean 45d) clamped
+// Blockade duration (RATIFIED, 02a "The strait"): Exp(mean 45d) clamped
 // [20, 120]. Blockades END -- the flag, the heat overlay, and the compute
 // force-majeure all lift when the duration elapses.
 const BLOCKADE_DURATION_MEAN = 45;

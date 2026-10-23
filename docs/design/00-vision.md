@@ -1,9 +1,23 @@
 # 00 — Vision
 
-> Overhaul scaffolding, phase 1 (July 2026). Design only — nothing here is
-> implemented. Names are settled in [06-naming.md](06-naming.md) (rev 3);
-> its ✓/◇ markers are authoritative.
-> `OPEN:` marks a genuine undecided fork. Argue with everything.
+The design record for Shoals: what the game is, why, and the numbers it
+runs on. The code implements these documents; where a design element is
+specified but not yet built, the doc says so in place.
+
+| Doc | Covers |
+|---|---|
+| [00-vision.md](00-vision.md) | The stance, the pillars, tone, and scope (this file) |
+| [01-world.md](01-world.md) | The world: lore rule, labs, rivals, government, incident genre, act skeleton |
+| [02-race-model.md](02-race-model.md) | The hidden state machine: sampled variables, the five dials, incidents, evidence, theft, resolution |
+| [02a-tuning.md](02a-tuning.md) | Every constant and implementation ruling, the knife-edge principle, and the target outcome distribution |
+| [03-market-mechanics.md](03-market-mechanics.md) | How the race reaches the desk: instruments, stances, alpha decay, scrutiny, fund-as-actor, policy levers |
+| [04-arcs.md](04-arcs.md) | Narrative arcs, act tempo, standing orders, the room, cross-domain wiring |
+| [05-endings.md](05-endings.md) | Resolution families, personal overlays, the complicity ledger, epilogue tone |
+| [06-naming.md](06-naming.md) | Naming principles, the settled slate, cast, dead names |
+| [09-market-integrity.md](09-market-integrity.md) | Marks, oracle discipline, instrument lifecycles, closeout, fairness invariants |
+
+People, places, products, and legislation live in the lore bible,
+[lore.md](../lore.md).
 
 ## One line
 
@@ -61,7 +75,7 @@ is deliberately rigged the way reality rigs it:
 
 Transmission is honest ([03-market-mechanics.md](03-market-mechanics.md)):
 a secondary fill wires nobody money. Capital moves the race through
-primary events, governance, and a lagged cost-of-capital channel — the
+governance and policy choices and a lagged cost-of-capital channel — the
 ledger records channels, not fills.
 
 **3. Takeoff arrives through the sim, not a cutscene.** As frontier
@@ -119,7 +133,7 @@ theater.
 
 ## The stakes ladder
 
-- **Early:** be right, get paid. (The prototype's whole game — now Act I.)
+- **Early:** be right, get paid. (Act I: the trading game alone.)
 - **Mid:** complicity. Your book finances the thing. The ledger remembers.
 - **Late:** agency. Your P&L is your credibility; credibility converts the
   firm; the fund becomes an actor — anchor investments, backing the splinter
@@ -129,15 +143,51 @@ theater.
 
 ## The title
 
-**Shoals** — the hazard on the chart, shallow water at speed. The title now
-means what it always should have. Extended into a naming system (see
-[06-naming.md](06-naming.md)): everyone in this world names themselves after
+**Shoals** — the hazard on the chart, shallow water at speed. Extended into a naming system
+([06-naming.md](06-naming.md)): everyone in this world names themselves after
 ways of not running aground — Meridian, Polaris, and Halcyon, the bird whose
 nesting becalms the sea itself — and nobody agrees on where the rocks are.
 
-## What survives from the prototype
+## Scope
 
-More than you'd think — the codebase is an AI-race narrative engine wearing
-a politics costume. The event engine, faction standings, regulation
-pipeline, release pulses, adaptive epilogue, and impact machinery all port
-with re-aimed content. Details in [07-migration.md](07-migration.md).
+- **Two modes, one chassis.** Classic mode is the pure trading sim:
+  the race is inert and the market is the GBM+Merton+Heston / Vasicek
+  chassis alone. The Dynamic modes run the race underneath the same
+  chassis; the political event pool survives from the earlier
+  politics-satire version of the game as the satire register's
+  background texture.
+- **Dynamic (LLM) mode stays.** A game about the race, narrated by a
+  frontier model: the resonance is a feature, worth one knowing line
+  in about.md and nothing more.
+- **Deliberate cuts** (choices, not oversights):
+  - *No endogenous macro sim.* Automated labor share, wage collapse,
+    and fiscal capacity are not linked stocks; the agent economy stays
+    legible through events, sector prints, and the rates channel.
+    Revisit only if the wonders track feels weightless in play.
+  - *No compute stock-flow ledger.* Compute stays a per-lab scalar
+    stock moved by events (Cambria allocation, export controls, theft
+    integration, mobilization); the compute-futures curve is its
+    market shadow, which is the desk's view anyway.
+  - *Doom shorts never settle.* Terminal wealth in the doom families is
+    priced by the epilogue as what it is: a claim on a counterparty
+    that no longer exists ([05](05-endings.md), [09](09-market-integrity.md)).
+  - *No provenance economy.* Superpersuasion is mechanized minimally
+    (campaigns as persuasion-class incidents, attackable source trust);
+    a full provenance/verification-budget economy would be a second
+    game.
+  - *Two capability tracks, not a pipeline.* Internal vs. released
+    buys most of the fantasy; a four-stage pipeline is overkill.
+  - *Security levels, not a compromise simulation.* Discrete levels
+    with costs and tells; no compromise-state model.
+- **Real-world events are calibration, never content.** The world's
+  own news is one draw from the game's distribution, so it never
+  retunes the stance or the outcome priors. Readings held deliberately
+  against it: HCN stays listed (the central trade needs an underlying;
+  the real-world form of "the market cannot price this" — the asset
+  does not exist — is stronger than the game's, and the game keeps the
+  weaker, playable one); Polaris is founded mid-game (the schism and
+  the fund-as-actor wager need the founding inside the run); the race
+  stays bilateral (a quiet Beijing is not evidence against the wager —
+  `chinaTrue` is sampled); Fixedpoint stays secret until the leak (the
+  leak superevent beats a published index, which arrives as post-leak
+  texture).

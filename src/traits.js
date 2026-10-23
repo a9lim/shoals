@@ -184,7 +184,7 @@ const TRAITS = [
         effects: { regExposureMult: 1.5, boredomImmune: true },
     },
 
-    // ── Conviction set v2 (overhaul phase 5a; 07-migration) ────
+    // ── Conviction set v2 (02a "Control regime and content plumbing") ────
     // Driven ONLY by observable play -- the player's OWN locked posterior
     // (ctx.beliefPilled), credibility (ctx.credibility), lock participation
     // (ctx.everLocked), tip verbs, and lobbying flags -- NEVER latent race state

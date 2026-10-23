@@ -1,6 +1,6 @@
 /* ===================================================
    src/events/rates.js -- The capex channel (reality-beats
-   round, 02a 2026-09-08, ratified same day).
+   round, 02a "Rates: the capex channel").
 
    03's Act-II sentence -- "AI capex distorts the long end"
    -- given its mechanism: each RISE of the public released-
@@ -50,7 +50,7 @@ export const RATES_EVENTS = [
             // R4 -> R5: the last step; the edge is almost gone.
             'The last step. The curve has repriced four times on four release ladders, each time for the same mundane reason -- somebody had to finance the compute -- and each time a strategist wrote that the market was "finally taking AI seriously." It was taking duration supply seriously. The distinction is the desk\'s whole edge and it is, this morning, almost gone: the long end is where the race is being paid for, and nowhere on it is the race being priced.',
         ],
-        // PERMANENT additive delta -- ratified 02a reality-beats item 1. Clamped
+        // PERMANENT additive delta -- ratified 02a "Rates: the capex channel". Clamped
         // to PARAM_RANGES by the standard params path like every Fed step. No
         // `impulse`: the permanent step IS the market effect; an impulse on top
         // would double-count it.

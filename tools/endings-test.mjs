@@ -109,7 +109,7 @@ function runSeed(seed, capture) {
         stepTreaty(race, {});
         detCount += race.lastTransitions.incidents.detected.length;
         const h = heatValue(race.heat);
-        if (h > maxHeat) maxHeat = h;         // RUN MAXIMUM of total heat (02a phase-6: not terminal)
+        if (h > maxHeat) maxHeat = h;         // RUN MAXIMUM of total heat (02a "Resolution": not terminal)
         if (race.controlRegime === 'supervised') sawSup = true;   // for the family-4 drag composition
         if (race.lastTransitions.strait.blockadeStart) sawBlockade = true;   // for the blockade|f4 anti-correlation
         if (race.treaty.summitOpen) sawSummit = true;
@@ -152,7 +152,7 @@ let dealPossibleRuns = 0, dealRuns = 0, windowRuns = 0, windows = 0, windowsPass
 let windowDealPossible = 0;              // dealPossible AND a window opened (for the leak posterior)
 // Family-4 composition (feeds the epilogue prose): velocity vs drag vs theft-assisted.
 const f4comp = { velocity: 0, drag: 0, theft: 0 };
-// Blockade anti-correlation diagnostic (02a phase-6: blockades concentrate in
+// Blockade anti-correlation diagnostic (02a "The strait": blockades concentrate in
 // slow-velocity worlds, family 4 in fast ones -- intended anti-correlation).
 let blockadeRuns = 0, blockadeAndF4 = 0;
 // Late-determination oracle (section D).
@@ -188,7 +188,7 @@ for (let i = 0; i < N; i++) {
         else f4comp.velocity++;   // residual (slow-velocity, never-supervised): attribute to velocity
     }
 
-    // Ratchets: {nationalized, classified, permanent max-heat} (02a phase-6 set).
+    // Ratchets: {nationalized, classified, permanent max-heat} (02a "Resolution").
     const reg = res.axes.politicalControl;
     if (reg === 'nationalized') natCount++;
     if (reg === 'classified') clsCount++;
@@ -321,7 +321,7 @@ check('A: every run resolves (no unresolved)', unresolved === 0, `${unresolved} 
 check('A: family buckets sum to resolved count', bucketSum === resolved, `${bucketSum} vs ${resolved}`);
 
 // A-distribution: EVENTUAL families (in-horizon + extrapolated, per family) vs the
-// 02a phase-6 bands; the timeout row is replaced by an extrapolation-SHARE statistic.
+// 02a "Target outcome distribution"; the timeout row is replaced by an extrapolation-SHARE statistic.
 for (const k of [1, 2, 3, 4, 6]) {
     const got = famAll[k] / N, want = CONTRACT[k], band = BANDS[k];
     dist(`A: family ${k} eventual ${(want * 100).toFixed(0)}+-${(band * 100).toFixed(0)}pt`, Math.abs(got - want) <= band, pct(got));
@@ -331,11 +331,11 @@ for (const k of [1, 2, 3, 4, 6]) {
     dist('A: family 5 eventual 5% (2.3-8)', got >= DEAL_LO && got <= DEAL_HI, pct(got));
 }
 {
-    const share = timeoutCount / N;   // extrapolation share (02a phase-6: replaces the timeout row)
+    const share = timeoutCount / N;   // extrapolation share (02a "Target outcome distribution": replaces the timeout row)
     dist('A: extrapolation share in [0.18, 0.32]', share >= 0.18 && share <= 0.32, pct(share));
 }
 {
-    const f6ih = famInHorizon[6] / N;   // 02a phase-6: in-horizon family-6 expected ~0
+    const f6ih = famInHorizon[6] / N;   // 02a "Target outcome distribution": in-horizon family-6 expected ~0
     dist('A: in-horizon family-6 <= 3%', f6ih <= 0.03, pct(f6ih));
 }
 
@@ -391,7 +391,7 @@ check('H: leak-free P(dealPossible|window) within +-0.05 of 0.15', Math.abs(leak
 diag('H: summit-week-no-incident pass ~0.75', summitPass >= 0.65 && summitPass <= 0.85, `${f3(summitPass)} (n=${windows})`);
 check('H: treaty substream isolation (full non-treaty stream states)', isolationPass);
 
-// Blockade|family-4 anti-correlation (02a phase-6, DIAGNOSTIC non-gating): the
+// Blockade|family-4 anti-correlation (02a "Target outcome distribution", DIAGNOSTIC non-gating): the
 // shared desperation makes blockades concentrate in slow-velocity worlds and
 // family 4 in fast ones, so P(blockade|f4) should be well below P(blockade).
 const pBlock = blockadeRuns / N;
@@ -635,7 +635,7 @@ let closeoutOK = true, coDetail = '', coCells = 0;
     ];
     const spot = 100, varianceIndex = 22;
     // Rate-MOVED bond params -> the Vasicek MTM is NOT par (99.2), so non-doom bonds
-    // must carry the MTM (02a P6-3 ruling), not redeem at face.
+    // must carry the MTM (02a "Terminal closeout and overlays"), not redeem at face.
     const bond = { rate: 0.055, a: 0.15, b: 0.03, sigmaR: 0.01, day: 400, face: 100 };
     const fail = (m) => { if (closeoutOK) { closeoutOK = false; coDetail = m; } };
     for (const family of families) {
@@ -776,7 +776,7 @@ let e2eOK = true, qDetail = '';
             { id: 4, type: 'bond', qty: 5, expiryDay: 950, entryPrice: 98 },
         ];
         // Rate-moved bond params -> the bond leg carries a Vasicek MTM != par; conservation
-        // (equity == cash) must still hold with the MTM leg (02a P6-3 ruling test (a)).
+        // (equity == cash) must still hold with the MTM leg (02a "Terminal closeout and overlays").
         const bond = { rate: 0.055, a: 0.15, b: 0.03, sigmaR: 0.01, day: 400, face: 100 };
         const book = closeoutBook(positions, res, race, { spot: 100, varianceIndex: 22, bond });
         const bondRow = book.rows.find(r => r.type === 'bond');
@@ -818,7 +818,7 @@ let natRefOK = true, rDetail = '';
 check('R: nationalization reference (multiple in range, frozen once, conversion vs decree separate)', natRefOK, rDetail);
 
 // ---- S: ejection-invariance -- the desk's presence never changes the oracle -
-// 02a P6-3 ruling 2: an early ejection extrapolates the world forward; a certification
+// 02a "Resolution": an early ejection extrapolates the world forward; a certification
 // that lands INSIDE the extrapolated trajectory before a contract's deadline settles
 // that contract YES, exactly as if the desk had stayed. So the SAME seed settles
 // IDENTICALLY whether the desk ejects early (finalize against the extrapolated world)
@@ -882,7 +882,7 @@ let ejInvOK = true, sDetail = '', nonVacuous = 0, seedsChecked = 0;
 }
 check(`S: ejection-invariance (desk presence never changes the oracle; ${seedsChecked} seeds, ${nonVacuous} non-vacuous)`, ejInvOK, sDetail);
 
-// ---- T: natural-resolution atomic closeout (02a P6-3: interim SUPERSEDED) ---
+// ---- T: natural-resolution atomic closeout (02a "Resolution": interim SUPERSEDED) ---
 // A world that resolves BEFORE term now enters the SAME atomic path as ejection --
 // latch (freeze ledger before marking) -> closeout AT the resolution-time regime ->
 // epilogue -- instead of running on with a drifting regime the delayed finalizers
@@ -957,7 +957,7 @@ check(`T: natural-resolution atomic closeout (${natChecked} seeds conserve + fro
 }
 
 // ---- V: terminal queue discipline (only effect-free 'summit' beats survive) --
-// 02a P6-3: once terminal closeout starts, the world's resolution supersedes the day's
+// 02a "Resolution": once terminal closeout starts, the world's resolution supersedes the day's
 // ordinary news. A queued effect-carrying popup (the REAL scrutiny_enforcement, which
 // deterministically queues on 58/5000 forecast-lock resolutions and carries a
 // cashPenalty 2000) MUST be discarded at game-over -- BEFORE closeout/epilogue -- so

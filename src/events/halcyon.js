@@ -169,7 +169,7 @@ export const HALCYON_EVENTS = [
     },
 
     // ---- The voluntary pause (Act II/III; release-as-choice, seen from the tape) --
-    // Reality-beats round (02a, 2026-09-08). Flag-gated Poisson draw, fires once
+    // Reality-beats round (02a "Control regime and content plumbing"). Flag-gated Poisson draw, fires once
     // (`world.ai.halcyonPaused`, the fixedpointPublic pattern). No mechanics --
     // the pause does not touch the race, and that it does not is the beat.
     {
@@ -194,7 +194,7 @@ export const HALCYON_EVENTS = [
         impulse: { mu: 0.02, xi: -0.005 },   // decaying (P4): the cadence resumes; the tape exhales
     },
 
-    // ---- The index (post-leak texture; reality-beats round, 02a 2026-09-08) --
+    // ---- The index (post-leak texture; reality-beats round, 02a "Control regime and content plumbing") --
     // The word belongs to the world, so the lab publishes a number for it: a
     // self-scored automation index -- a rung claim with a decimal point.
     // Consensus declines to list it: the claim/certification split in one beat.

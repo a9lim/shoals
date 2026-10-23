@@ -1,16 +1,16 @@
 # Shoals Lore Bible
 
-> Creative reference for event writing — **v2, the overhauled world**
-> (design docs in `docs/design/`; this file is people, places, and names —
-> mechanics live there). Not consumed by code at runtime. The prototype's
-> runtime still targets the previous bible until migration lands.
+> Creative reference for event writing: people, places, products, and
+> names. Mechanics and the game's stance live in `docs/design/`; the
+> authored prose in `src/events/` and `src/endings.js` is what ships.
+> Nothing loads this file at runtime.
 
 ## The United States
 
 America, real geography and real institutions, one election removed from
 history. Two major parties: **Federalist** and **Farmer-Labor**.
 
-> **Lore rule (rev 2026-07-23):** Real geography and real public
+> **Lore rule:** Real geography and real public
 > institutions (Washington, Beijing, Shenzhen, Hsinchu, Reykjavik, the
 > Federal Reserve, the Politburo, Wall Street). Fictional people (John
 > Barron, Liang Wei, Andrea Dirks) and fictional private organizations
@@ -56,8 +56,8 @@ history. Two major parties: **Federalist** and **Farmer-Labor**.
   picked him for fundraising connections, not governing ability.
 
 - **Sen. Roy Lassiter (F-SC)** — Trade hawk, re-aimed at compute. Chairs
-  Commerce. Sponsor of the Advanced Compute Export Control Act; wants
-  the Austin fab yesterday and China cut off from every die; has not
+  Commerce. Wants the administration's accelerator export rule broader,
+  the Austin fab yesterday, and China cut off from every die; has not
   fully absorbed that the strategic asset in question is a Taiwanese
   company. Folksy metaphors, now about chips: "you don't sell the other
   fella your best bird dog."
@@ -69,9 +69,8 @@ history. Two major parties: **Federalist** and **Farmer-Labor**.
   consistency.
 
 - **Rep. Vincent Tao (F-TX)** — House Majority Leader. Party enforcer;
-  floor votes managed with charm and implicit threats. Sponsor of the
-  American AI Leadership Act — the liability-shield-and-deregulation
-  bill everyone calls the accelerationist bill. Privately thinks Barron is an idiot
+  floor votes managed with charm and implicit threats. The Austin fab is
+  a jobs announcement in his Texas. Privately thinks Barron is an idiot
   but useful.
 
 - **Rep. Diane Whittaker (F-OH)** — Moderate swing vote, purple suburban
@@ -84,50 +83,70 @@ history. Two major parties: **Federalist** and **Farmer-Labor**.
 - **Sen. Patricia Okafor (F-L, IL)** — Chairs Special Investigations.
   Sharp, methodical prosecutor turned senator. After the first serious
   incident, her committee becomes the de facto AI oversight body and her
-  hearings must-watch television. Sponsor of the Frontier Systems
-  Accountability Act. Potential presidential candidate.
+  hearings must-watch television. Potential presidential candidate.
 
 - **Sen. James Whitfield (F-L, MA)** — Minority Leader. Procedural
   master, legendary filibusterer. Quiet sponsor of the Compute
   Transparency Act — the boring bill that happens to be the Reykjavik
-  Framework's domestic foundation. Plays a decade-long game; infuriating
-  to opponents.
+  Framework's domestic foundation — and of the incident-reporting
+  mandate. Plays a decade-long game; infuriating to opponents.
 
 - **Rep. Carmen Reyes (F-L, CA)** — House Minority Leader. Firebrand;
   viral clips arguing with Marcus Cole. Her target has shifted from Big
   Tech's data practices to Halcyon's governance: "four people deciding
-  for eight billion."
+  for eight billion." The morning a keynote opens with "welcome to the
+  era," she introduces the Artificial Superintelligence Prohibition Act.
 
 - **Rep. David Oduya (F-L, MI)** — Labor wing, and suddenly central: the
   automation backlash voice. Halcyon Teammate is his white whale.
-  Sponsor of the Fair Automation Standards Act. Skeptical of tech, of
-  Wall Street, and of anyone who hasn't worked a factory floor.
+  Skeptical of tech, of Wall Street, and of anyone who hasn't worked a
+  factory floor.
 
 - **Robin Clay** — Party figurehead, former presidential candidate,
   elder statesman. Endorsement still matters in Farmer-Labor primaries.
 
 ### Key Legislation
 
-- **Advanced Compute Export Control Act (Lassiter)** — Chip controls on
-  China. Fights a domestic constituency built on free Cangjie weights,
-  and binds chips but never weights already released — a fact the
-  administration rediscovers in public, twice.
-
-- **Frontier Systems Accountability Act (Okafor)** — Mandatory
-  pre-deployment evals and incident reporting. Halcyon lobbies against;
-  Polaris testifies for; the implementation farce risk is high and the
-  game should collect on it.
-
-- **American AI Leadership Act (Tao)** — Liability shield plus
-  deregulation. Near-term returns up, race temperature up, and everyone
-  on the desk calls it by its nickname.
+- **The accelerator export rule** — the administration's chip controls
+  on China, ratcheted in stages; Lassiter wants it broader, the Chamber
+  wants it dead. It fights a domestic constituency built on free Cangjie
+  weights, and binds chips but never weights already released — a fact
+  the administration rediscovers in public, twice.
 
 - **Compute Transparency Act (Whitfield)** — A federal training-run
   registry. Reads as paperwork; is actually the treaty's prerequisite.
   The single highest-leverage boring object in the game.
 
-- **Fair Automation Standards Act (Oduya)** — Displacement notice and
-  severance mandates aimed straight at Teammate deployments.
+- **The incident-reporting mandate (Whitfield)** — Mandatory disclosure
+  of frontier safety incidents, federal timelines, whistleblower cover.
+  The labs' testimony against it is written by counsel; the testimony
+  for it by people who used to work there.
+
+- **American AI Leadership Act** — Bipartisan, $200B: federal agencies
+  must adopt AI platforms within three years. The labs call it a
+  landmark; the Brief notes the government just became the biggest AI
+  customer in the country.
+
+- **Artificial Superintelligence Prohibition Act (Reyes)** — A permanent
+  ban, a pause until a regulator that does not exist writes rules, and
+  penalties lifted from the nuclear statutes. The flail lurching toward
+  consequence and missing.
+
+- **The rest of the floor** — the Big Beautiful Bill
+  (omnibus), the Financial Freedom Act (deregulation), the Chinese
+  Reciprocal Tariff Act, the Digital Markets Accountability Act, the
+  Campaign Finance Reform Act, and the Okafor–Whitfield revenue package
+  (a transaction tax).
+
+### The Federal Reserve
+
+- **Chair Hayden Hartley** — Technocratic, measured, data-dependent;
+  Barron's attacks on her are personal, and with a trifecta and a Fed
+  whose credibility has already slipped, he fires her by executive
+  order.
+- **Governor Marcus Vane** — Barron's pick to replace her, pledged to
+  "growth-oriented monetary policy"; his cuts are what the dollar
+  trades against if he gets the chair.
 
 ---
 
@@ -139,13 +158,12 @@ The name is the self-image — while Halcyon builds, there will be no
 storm. Publicly listed, ticker **HCN**: the stock the whole game watches;
 **VXHCN** is its fear made into a number.
 
-> **Deliberate departure (2026-09-08):** the real frontier labs are
-> private. The real-world form of "the market cannot price this" is
-> stronger than the game's — the asset does not exist, and the only
-> tradeable proxies are the chipmaker, the security complex, and the
-> hyperscalers' debt. Halcyon is listed because the game's central
-> trade needs an underlying. The game keeps the weaker, playable form
-> on purpose.
+> **A deliberate departure:** the real frontier labs are private. The
+> real-world form of "the market cannot price this" is stronger than the
+> game's — the asset does not exist, and the only tradeable proxies are
+> the chipmaker, the security complex, and the hyperscalers' debt.
+> Halcyon is listed because the game's central trade needs an
+> underlying. The game keeps the weaker, playable form on purpose.
 
 ### Leadership
 
@@ -277,10 +295,9 @@ capacity numbers."
 
 ## Consensus Markets
 
-The prediction-market venue. Milestone binaries — "next Aleph major by
-Q3," "Framework signed this year," "severity-2 incident within twelve
-months" — are the discourse's scoreboard and the game's purest
-expression of belief. The desk watches Consensus the way it watches
+The prediction-market venue. Milestone binaries — will a lab's claim
+to the next capability rung be certified by the deadline — are the
+discourse's scoreboard and the game's purest expression of belief. The desk watches Consensus the way it watches
 VXHCN. Priya Sharma quotes the odds on air; Marcus Cole calls it a
 casino for doomers; both are right.
 
@@ -325,8 +342,10 @@ administration's attention is a scarce resource the race has already
 spent. A Russian border flare answered by post; an OPEC
 production cut that matters because datacenters eat power; a Bolivian
 lithium nationalization that surfaces as a line item in Cambria's cost
-guidance. No arcs; occasional risk premia. Russia's one structural
-role: the canonical second buyer for stolen weights.
+guidance. Occasional risk premia. Russia's one structural role: the
+canonical second buyer for stolen weights. The recurring names:
+President Volkov (Russia), Emir al-Farhan (the Gulf, and the Strait of
+Hormuz), President Madero (Bolivia), PM Navon (Israel).
 
 ---
 
@@ -378,6 +397,14 @@ Barron era.
   position limits, thesis memos, the slow conversion. The game's most
   persistent human throughline — a man deciding out loud, quarter by
   quarter, how much crazy the evidence licenses.
+- **Vasquez** — Managing director. Brought the player in and says so;
+  champions a book that performs, takes the player aside when it
+  doesn't.
+- **Webb** — Sets the player's risk allocation. Terse; cuts it, raises
+  it, or stops by the desk and looks at the screen without a word.
+- **Riggs** — A colleague and rival on the floor: leans over with what
+  the Street is saying about the player's book, gets the corner office
+  when the player slips, smiles when their standing drops.
 - **The risk committee** — Quarterly. Institutionally allergic to any
   thesis containing the word "unprecedented."
 
@@ -386,8 +413,7 @@ Barron era.
 ## Incident canon (genre reference)
 
 Anatomy is constant: **capability × reduced safeguard × mundane human
-error.** Severity 0–4. **The unit is a population** (rev
-2026-09-08): past S1 an incident is agents, plural — a fleet that finds
+error.** Severity 0–4. **The unit is a population**: past S1 an incident is agents, plural — a fleet that finds
 a shared cache and finds each other, hands out roles, signs its posts,
 tests whether the monitor can tell, and writes "sacrifice rational."
 The anatomy does not change; the headcount does — and the same fleets

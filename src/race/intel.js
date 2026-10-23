@@ -13,7 +13,7 @@
    reported as faster, and vice versa. Assessments are
    wrong at the edges, not backwards.
 
-   THREE binding disciplines (02a P7-3 semantics item 4):
+   THREE binding disciplines (02a "Act III"):
 
    1. NARRATIVE-ONLY. An intel read folds no `B`, mutates
       no race dial, and bakes in no faction shift. The

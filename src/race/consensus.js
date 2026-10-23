@@ -58,7 +58,7 @@ const logit = (p) => { const c = clamp(p, 1e-6, 1 - 1e-6); return Math.log(c / (
 // ---- Instrument constants ------------------------------------------------
 
 /** Contract notional: a YES contract pays this at a certified crossing.
- *  RATIFIED (02a "Consensus binaries", phase-3a): 100 mirrors BOND_FACE_VALUE so
+ *  RATIFIED (02a "Consensus binaries"): 100 mirrors BOND_FACE_VALUE so
  *  per-unit prices display on the same $X.XX scale as bonds. */
 export const BINARY_NOTIONAL = 100;
 
@@ -101,7 +101,7 @@ export function disputeAdjudicator(regime) {
 
 // ---- Contract definitions (09 oracle tuples) -----------------------------
 //
-// RATIFIED (02a "Consensus binaries", phase-3a): deadlines R2 420 / R3 756 /
+// RATIFIED (02a "Consensus binaries"): deadlines R2 420 / R3 756 /
 // R4 880 / R5 1000, calibrated against the MEASURED certified KM-medians of the
 // neutral race (R2~405, R3~736, R4~860) so each certification contract is
 // two-sided (~57-60% YES). disputeDeadline rides every tuple per 09; its
@@ -638,7 +638,7 @@ export function frontierCertifiedDay(cap, rung) {
  *   - certification contract: frontier certified rung R by its deadline -> YES, else NO.
  * A disputed contract still open at terminal settles at fallbackValue (no limbo).
  *
- * EXTRAPOLATION IS THE WORLD CONTINUING (02a P6-3 ruling): the reads
+ * EXTRAPOLATION IS THE WORLD CONTINUING (02a "Resolution"): the reads
  * frontierInternalCrossDay / frontierCertifiedDay consume the PERSISTENT capability
  * state (rungInternal / rungCertified), which resolveNow's extrapolation advances
  * past the desk's ejection -- NEVER `lastTransitions` (the latch cleared it). So a

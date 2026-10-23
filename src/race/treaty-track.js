@@ -12,7 +12,7 @@
    on nobody having a bad incident during summit week. The
    Deal is the rarest ending (02a: ~4% overall).
 
-   LEAK-FREE BY CONSTRUCTION (02a phase-6 ruling): window
+   LEAK-FREE BY CONSTRUCTION (02a "Resolution"): window
    OPENING is INDEPENDENT of hidden.chinaTrue.dealPossible.
    Non-deal worlds traverse the SAME viability-blind gauntlet
    pacing and open doomed windows at the same rate; dealPossible
@@ -160,7 +160,7 @@ export function stepTreaty(race, inputs = {}) {
                 t.windowEndDay = day + SUMMIT_WINDOW;
                 // Stamp the window-open transition on the ledger so race-bridge.js
                 // fires treaty_window: the window is a race-model DECISION, and
-                // model decisions fire from the ledger, never Poisson (02a phase-6).
+                // model decisions fire from the ledger, never Poisson (02a "Resolution").
                 if (race.lastTransitions) race.lastTransitions.treatyWindowOpen = { day };
             }
             break;

@@ -10,7 +10,7 @@
    track by construction (release IS its mode of being).
 
    All kinematics constants are transcribed verbatim from
-   docs/design/02a-tuning.md (rev 2, Codex-verified).
+   docs/design/02a-tuning.md.
    Pure / DOM-free -- headless-importable for MC.
 
    Module boundary (Codex review round 2): this module
@@ -77,13 +77,13 @@ export const SL_SUCCESS = [null, 0.70, 0.45, 0.18, 0.04];
 // distribution. Exported mutable so the joint sweep can drive it (mirrors RACE_TUNING).
 export const THEFT_TUNING = { base: 0.0015 };   // recalibrated: E[successes]~0.60 (rev1 0.0011 gave 0.44 under new desperation)
 const THEFT_GAP_FLOOR = 0.10;    // 0.10 floor keeps parity-state espionage alive
-const THEFT_DESP_W = 1.4;        // 02a amended: clamp(0.10 + 1.4*desperation, 0, 1.5)
+const THEFT_DESP_W = 1.4;        // 02a "Safety margin, heat, theft": clamp(0.10 + 1.4*desperation, 0, 1.5)
 const THEFT_CLAMP_HI = 1.5;
 const THEFT_FAIL_COOLDOWN = 60;  // failed attempts cool down 60d
 const EPSILON_LO = 0.15;         // integration-lag epsilon ~ U(0.15, 0.35)
 const EPSILON_HI = 0.35;
 
-// ---- Shared strategic-desperation quantity (02a phase-6 amendment) --------
+// ---- Shared strategic-desperation quantity (02a "Safety margin, heat, theft") --------
 // vDeficit = clamp((1.05 - velocity)/0.30, 0, 1)  (Beijing's program genuinely
 //            slower -- their own hidden state)
 // runaway  = clamp((C_int[frontier] - C_int[tianxia] - 0.25)/0.60, 0, 1)  (the
@@ -100,7 +100,7 @@ const DESP_V_SCALE = 0.30;
 const DESP_FOLLOW_FLOOR = 0.25;   // ~= Halcyon release appetite; distillation floor
 const DESP_RUNAWAY_SCALE = 0.60;
 
-// ---- Export controls -> Tianxia compute dampener (02a evidence machinery) --
+// ---- Export controls -> Tianxia compute dampener (02a "Capability kinematics") --
 // Tianxia's ANNUAL compute growth factor by `world.ai.exportControlStage` 0..3
 // (the 0.8-1.6x range reserved at the P6-1b lever block; baseline 1.30 is stage
 // 0, so an absent/undefined stage is BIT-IDENTICAL to the pre-round build):
@@ -213,7 +213,7 @@ function makeLab(id, C_internal, C_released, compute0, computeGrowth, talent, se
  *
  * Compute curves: Halcyon 1.0 doubling yearly; Tianxia 0.75 growing 1.3x/yr
  * (export-control-dependent 0.8-1.6x -- baseline 1.3, event modulation later-
- * phase); Polaris 0.25 doubling yearly (02a Polaris-defaults block).
+ * phase); Polaris 0.25 doubling yearly (02a "Capability kinematics").
  */
 export function createCapabilityState(hidden) {
     const position = hidden.chinaTrue.position;
@@ -481,7 +481,7 @@ export function rollTheftDecision(cap, heat, day, rng) {
         ? 'polaris' : 'halcyon';
     const victim = cap.labs[victimId];
 
-    // Attempt hazard (02a amended): the raw victim-thief gap term is replaced by
+    // Attempt hazard (02a "Safety margin, heat, theft"): the raw victim-thief gap term is replaced by
     // the shared strategic-desperation quantity (the fast-follower made the raw gap
     // meaningless). 0.0011*clamp(0.10 + 1.4*desperation, 0, 1.5)*(1+heat).
     const desperation = strategicDesperation(cap);

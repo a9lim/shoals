@@ -175,7 +175,7 @@ export function closeoutUnitValue(pos, ctx) {
             // the cutoff (09); never reconstructed from abandoned Heston state.
             return Math.max(0, ctx.varianceIndex);
         case 'bond': {
-            // Bonds never halt (02a P6-3 ruling): a non-doom terminal marks the bond at
+            // Bonds never halt (02a "Terminal closeout and overlays"): a non-doom terminal marks the bond at
             // its last LIVE MTM -- the impact-free Vasicek price (par-at-the-world's-end
             // is only true when the world actually ends). Default ONLY inside doom
             // families (09), at a recovery fraction of FACE.

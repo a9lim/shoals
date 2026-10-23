@@ -3,7 +3,7 @@
    phase 7, slice 1).
 
    ONE public driver, smoothed, two projections (02a
-   "Act III machinery (P7 ratifications)"): `x` is the
+   "Act III"): `x` is the
    machine parameter -- how much of the world runs at
    machine tempo -- and `d = max(0, (x - 0.5)/0.5)` is the
    presentation degradation it projects. Everything here
@@ -384,7 +384,7 @@ export function resetAct3() {
     _substepClock = 0;
     _rng = createRng(_DISPLAY_SEED);
     _deferred.length = 0;
-    _nextTicket = 1;            // queue state is fully run-scoped (02a P7-1 ruling 5)
+    _nextTicket = 1;            // queue state is fully run-scoped (02a "Act III")
     _chainSnapValid = false;
     _chainPrintClock = -1;
     _pubSpot = null; _pubV = null; _pubClock = -1; _pubStale = false;

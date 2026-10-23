@@ -54,7 +54,7 @@ export function deactivateLedger() { ledger.entries = []; ledger.frozen = false;
 export function freezeLedger() { ledger.frozen = true; }
 
 /**
- * THE player->race mutation gate (02a P6-2 ruling 2), exported so every player
+ * THE player->race mutation gate (02a "Player influence and the ledger"), exported so every player
  * channel shares ONE predicate rather than re-deriving it. False in Classic /
  * no-race (inactive) and after the terminal latch (frozen): a player act past
  * either boundary does nothing MECHANICAL -- narrative still fires, by design.
@@ -117,7 +117,7 @@ export function ledgerComputeEquiv(cAmount) {
  */
 export function applyRaceEffects(race, effects, source, day) {
     if (!race || !Array.isArray(effects)) return [];
-    // Freeze is a MUTATION gate, not merely an append gate (02a P6-2 ruling 2):
+    // Freeze is a MUTATION gate, not merely an append gate (02a "Player influence and the ledger"):
     // post-resolution (frozen) and in Classic / no-race (inactive), player channels
     // are INERT -- check BEFORE touching any dial. Mutating S/heat/playerS and only
     // then dropping the row would leave a race mutation with no ledger record, which

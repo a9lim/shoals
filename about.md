@@ -23,11 +23,11 @@ The multi-leg strategy builder lets users construct spreads, straddles, strangle
 
 ## Instruments and Portfolio
 
-The trading surface includes HCN stock, bonds, VXHCN volatility futures, and American options. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
+The trading surface includes HCN stock, bonds, VXHCN volatility futures, and American options; the dynamic modes add Consensus milestone binaries and Cambria compute futures. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
 
 ## Institutional Narrative
 
-Shoals is also a branching institutional simulation. A domain-organized event graph connects firm decisions, regulators, the Federal Reserve, counterparties, media, farmers, labor, and political actors. Choices change world state, unlock or foreclose later events, and move six standing dimensions: firm standing, regulatory exposure, federalist support, farmer and labor support, media trust, and Fed relations. Twelve permanent traits and six dynamic tags make the consequences of earlier choices visible in later scenes.
+Shoals is also a branching institutional simulation. A domain-organized event graph connects firm decisions, regulators, the Federal Reserve, counterparties, media, farmers, labor, and political actors. Choices change world state, unlock or foreclose later events, and move eight standing dimensions: firm standing, regulatory exposure, federalist support, farmer and labor support, media trust, Fed relations, safety-network trust, and lab relations. Eighteen permanent traits and six dynamic tags make the consequences of earlier choices visible in later scenes. In the dynamic modes, a hidden AI-race model (three labs on a capability ladder, incidents that surface only on detection, weight thefts, and a ratcheting government control regime) runs beneath the market and drives much of the event graph.
 
 ## Policy and Endings
 
