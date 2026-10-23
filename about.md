@@ -1,13 +1,13 @@
 ---
 name: Shoals
-title: Shoals — Options Trading and Politics Simulator
-description: Trade stock, bonds, VXHCN volatility futures, and American options through a branching institutional narrative with stochastic pricing, regulation, lobbying, and six endings.
-updated: 2026-07-17
+title: Shoals — Trading the AI Race
+description: Trade stock, bonds, VXHCN volatility futures, American options, and AI-milestone binaries through the last years of the race — stochastic pricing, a hidden capability model, and six ways it ends.
+updated: 2026-09-08
 ---
 
-# Shoals — Interactive Options Trading Simulator
+# Shoals — Trading the AI Race
 
-Shoals is an options trading simulator that models derivatives pricing under stochastic volatility. It combines quantitative pricing models with a narrative market event engine for scenario-based learning.
+Shoals is a derivatives trading game set in the last years of the AI race. The player runs a book at Meridian Capital while three labs (Halcyon, Polaris, and China's Tianxia) climb toward transformative capability, and the market prices what it can see of that race. Five fixed market regimes teach the pricing on their own; the two Dynamic modes add the race, its milestone and compute markets, and a branching institutional narrative that ends in one of six terminal families.
 
 ## Pricing Models
 
@@ -27,7 +27,7 @@ The trading surface includes HCN stock, bonds, VXHCN volatility futures, and Ame
 
 ## Institutional Narrative
 
-Shoals is also a branching institutional simulation. A domain-organized event graph connects firm decisions, regulators, the Federal Reserve, counterparties, media, farmers, labor, and political actors. Choices change world state, unlock or foreclose later events, and move eight standing dimensions: firm standing, regulatory exposure, federalist support, farmer and labor support, media trust, Fed relations, safety-network trust, and lab relations. Eighteen permanent traits and six dynamic tags make the consequences of earlier choices visible in later scenes. In the dynamic modes, a hidden AI-race model (three labs on a capability ladder, incidents that surface only on detection, weight thefts, and a ratcheting government control regime) runs beneath the market and drives much of the event graph.
+Shoals is also a branching institutional simulation. A domain-organized event graph connects firm decisions, regulators, the Federal Reserve, counterparties, media, Congress and the two parties, the labs, and foreign governments. Choices change world state, unlock or foreclose later events, and move eight standing dimensions: firm standing, regulatory exposure, federalist support, farmer and labor support, media trust, Fed relations, safety-network trust, and lab relations. Eighteen permanent traits and six dynamic tags make the consequences of earlier choices visible in later scenes. In the dynamic modes, a hidden AI-race model (three labs on a capability ladder, incidents that surface only on detection, weight thefts, and a ratcheting government control regime) runs beneath the market and drives much of the event graph.
 
 ## Policy and Endings
 

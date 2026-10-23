@@ -848,7 +848,7 @@ function init() {
     if (typeof initAboutPanel === 'function') {
         initAboutPanel({
             title: 'Shoals',
-            lastUpdated: '2026-07-17',
+            lastUpdated: '2026-09-08',
             description: 'Trade stock, bonds, VXHCN volatility futures, and American options in a stochastic market simulator. Build multi-leg strategies, manage a margin portfolio, and navigate branching institutional events during a volatile political term.',
             controls: [
                 { label: 'Buy / sell stock', value: 'Click the HCN price or press B' },
