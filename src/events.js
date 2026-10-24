@@ -29,6 +29,10 @@ export { PARAM_RANGES } from './events/index.js';
 const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
+// Pulse and random draws prefer events that have not fired within this many
+// trading days, so the paper does not reprint an item within a couple of quarters.
+const RECENCY_DAYS = 126;
+
 // -- Pulse-excluded categories (not drawn by Poisson random) ------------
 // The race categories (overhaul phase 2) fire ONLY via the race->narrative
 // bridge (src/events/race-bridge.js), never by Poisson draw -- excluding them
@@ -167,14 +171,18 @@ export class EventEngine {
         // Player context for enriched guard signatures
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot = new Set();
+        this._lastFired = {};           // event id -> day it last fired (recency for draws)
 
-        // Pre-filter pools from ALL_EVENTS (exclude followupOnly events)
+        // Pre-filter pools from ALL_EVENTS (exclude followupOnly events, and
+        // portfolio triggers: those fire only through evaluateTriggers, so a
+        // random draw can never skip their trigger predicate)
+        const drawable = ALL_EVENTS.filter(e => !e.followupOnly && typeof e.trigger !== 'function');
         this._pools = {
-            fed:            ALL_EVENTS.filter(e => e.category === 'fed' && !e.followupOnly),
-            random:         ALL_EVENTS.filter(e => !_PULSE_CATEGORIES.has(e.category) && !e.followupOnly),
-            filibuster:     ALL_EVENTS.filter(e => e.category === 'filibuster' && !e.followupOnly),
-            media:          ALL_EVENTS.filter(e => e.category === 'media' && !e.followupOnly),
-            interjection:   ALL_EVENTS.filter(e => e.category === 'interjection' && !e.followupOnly),
+            fed:            drawable.filter(e => e.category === 'fed'),
+            random:         drawable.filter(e => !_PULSE_CATEGORIES.has(e.category)),
+            filibuster:     drawable.filter(e => e.category === 'filibuster'),
+            media:          drawable.filter(e => e.category === 'media'),
+            interjection:   drawable.filter(e => e.category === 'interjection'),
         };
 
         // Portfolio-triggered event pool (evaluated daily, not Poisson-drawn)
@@ -239,7 +247,10 @@ export class EventEngine {
                 if (day >= pulse.nextDay) {
                     // Reschedule regardless of whether we find an event
                     pulse.nextDay = day + pulse.interval + this._jitterRoll(pulse.jitter);
-                    const eligible = this._filterEligible(this._pools[pulse.poolKey], sim);
+                    // Flavor pulses run nothing rather than a rerun; the Fed and
+                    // filibuster pulses carry mechanics, so they fall back to the full pool.
+                    const strict = pulse.poolKey === 'media' || pulse.poolKey === 'interjection';
+                    const eligible = this._fresh(this._filterEligible(this._pools[pulse.poolKey], sim), strict);
                     if (eligible.length > 0) {
                         const event = this._weightedPick(eligible, sim);
                         return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
@@ -355,6 +366,11 @@ export class EventEngine {
      * lane). Returns { fired, popups } like maybeFire.
      */
     fireArrival(event, sim, day, netDelta = 0) {
+        // The beat was drawn at the day boundary; its eligibility guard must still
+        // hold when it prints, or a headline that states the world can be stale.
+        if (event.when && !event.when(sim, this.world, congressHelpers(this.world), this._playerCtx)) {
+            return { fired: [], popups: [] };
+        }
         const r = this._fireEvent(event, sim, day, 0, netDelta);
         if (!r) return { fired: [], popups: [] };
         return r.queued ? { fired: [], popups: [r.event] } : { fired: [r], popups: [] };
@@ -440,6 +456,7 @@ export class EventEngine {
         this._epilogueFired = false;
         this._playerCtx = { playerChoices: {}, factions: {}, activeRegIds: [], traitIds: [], portfolio: {} };
         this._firedOneShot.clear();
+        this._lastFired = {};
         this._triggerCooldowns = {};
         this._baseRateScale = 1;
         this._substepLane = false;
@@ -536,6 +553,7 @@ export class EventEngine {
     }
 
     _fireEvent(event, sim, day, depth, netDelta = 0) {
+        if (event.id) this._lastFired[event.id] = day;
         // P7-3 chinaTrue INTEL read: a shell declaring `intel: true` carries
         // `headlinesByRead` (behind / matched / faster) instead of a headline pool.
         // Resolve ONE read here -- the canonical fire path, so a Poisson draw, a
@@ -773,7 +791,19 @@ export class EventEngine {
         );
         const eligible = this._filterEligible(pool, sim);
         if (eligible.length === 0) return null;
-        return this._weightedPick(eligible, sim);
+        return this._weightedPick(this._fresh(eligible), sim);
+    }
+
+    /** The eligible events that have not fired within RECENCY_DAYS. When none
+     *  are fresh, `strict` returns none (the draw runs nothing); otherwise all of
+     *  them come back, so a draw that carries mechanics never starves. */
+    _fresh(eligible, strict = false) {
+        const day = this._currentDay;
+        const fresh = eligible.filter(ev => {
+            const last = this._lastFired[ev.id];
+            return last == null || day - last >= RECENCY_DAYS;
+        });
+        return fresh.length || strict ? fresh : eligible;
     }
 
     _drawLLM(sim) {

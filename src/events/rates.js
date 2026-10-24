@@ -48,7 +48,7 @@ export const RATES_EVENTS = [
             // R3 -> R4: "risk-free" gets its air-quotes.
             '"Risk-free" gets air-quotes on the desk for the first time. The rate you discount the future at is now, arithmetically, a function of how many buildings the future needs, and the buildings need more every quarter. Sharma: "If you think rates are finally saying what the timeline says, look at who is borrowing. It is not the future. It is the landlord."',
             // R4 -> R5: the last step; the edge is almost gone.
-            'The last step. The curve has repriced four times on four release ladders, each time for the same mundane reason -- somebody had to finance the compute -- and each time a strategist wrote that the market was "finally taking AI seriously." It was taking duration supply seriously. The distinction is the desk\'s whole edge and it is, this morning, almost gone: the long end is where the race is being paid for, and nowhere on it is the race being priced.',
+            'The last step. The curve has repriced four times on four release ladders, each time for the same mundane reason — somebody had to finance the compute — and each time a strategist wrote that the market was "finally taking AI seriously." It was taking duration supply seriously. The distinction is the desk\'s whole edge and it is, this morning, almost gone: the long end is where the race is being paid for, and nowhere on it is the race being priced.',
         ],
         // PERMANENT additive delta -- ratified 02a "Rates: the capex channel". Clamped
         // to PARAM_RANGES by the standard params path like every Fed step. No

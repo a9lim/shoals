@@ -102,6 +102,7 @@ export const FIRM_EVENTS = [
         id: 'markets_drift_sideways_2',
         category: 'neutral',
         likelihood: 6,
+        when: () => market.vxhcn < 14,   // the headline states the level
         headline: 'Another quiet session as major indices trade in a tight range; VXHCN slips below 14. The Meridian Brief: "Vol sellers are getting paid. Enjoy it while it lasts."',
         params: { theta: -0.002 },
         magnitude: 'minor',

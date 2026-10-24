@@ -134,7 +134,10 @@ export function substituteTokens(str, meta, shellId) {
     }
     if (out.includes('{lag}')) {
         const l = meta ? meta.lag : null;
-        if (l != null) out = out.replaceAll('{lag}', String(Math.round(l))); else warnToken(shellId, '{lag}');
+        if (l != null) {
+            const n = Math.round(l);
+            out = out.replaceAll('{lag} days', n === 1 ? '1 day' : `${n} days`).replaceAll('{lag}', String(n));
+        } else warnToken(shellId, '{lag}');
     }
     return out;
 }

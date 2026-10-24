@@ -488,7 +488,8 @@ function _table() {
         const L = LAB[r.lab];
         const li = document.createElement('li');
         const d = document.createElement('span'); d.className = 'b-day'; d.textContent = `Day ${r.day}`;
-        li.append(d, `${L.name}${r.spawn ? ' spins out with ' : ' ships '}${L.model}, claiming R${r.rung}`);
+        // A release below R1 claims no rung: the ladder starts at R1.
+        li.append(d, `${L.name}${r.spawn ? ' spins out with ' : ' ships '}${L.model}${r.rung >= 1 ? `, claiming R${r.rung}` : ''}`);
         log.appendChild(li);
     }
 }
