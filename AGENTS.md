@@ -73,7 +73,7 @@ src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-author
 src/audio.js           all music and SFX, synthesized
 src/llm.js             Dynamic (LLM) event source
 tools/*.mjs            the six headless harnesses
-docs/design/, docs/lore.md, docs/art-prompts.md
+docs/design/, docs/lore.md, docs/art-prompts.md, docs/horizons.md
 ```
 
 ## How it works
@@ -372,6 +372,14 @@ key is `shoals-theme`.
 
 ## Open work
 
+- `docs/horizons.md` is the 2026-10-24 review: an unratified discussion
+  draft with the proposed direction, the autumn's real-world mechanisms, and
+  an order of work. Its headline finding is that through the preset forecast
+  lock, credibility tops out at 0.481 in fast worlds and 0.649 in slow ones, so
+  the fund gate (0.65) never opens and the firm memo can't reach the player
+  before the term ends. It also records two confirmed bugs left for a ruling:
+  a natural S4 never fires its own shell, and `china_controls_backlash` carries
+  a permanent race-stream `mu`.
 - a9 is play-testing the reality-beats content (capex waves, concealment, the six
   beats) and the feel of the capex rates channel.
 - The feel pass: the `ACT3_TUNING` magnitudes and ladder numbers are first-pass, and
