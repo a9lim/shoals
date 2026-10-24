@@ -613,9 +613,9 @@ The simulation pauses and presents options:</p>
 <li><strong>Liquidate</strong> &mdash; auto-close positions to restore margin health</li>
 <li><strong>Dismiss</strong> &mdash; continue playing at risk (further losses possible)</li>
 </ul>
-<p>Status indicator: <span style="color:var(--ext-green)">OK</span> &rarr;
-<span style="color:var(--ext-orange)">Low</span> &rarr;
-<span style="color:var(--ext-red)">Margin call</span></p>
+<p>Status indicator: <span style="color:var(--ink-viridian)">OK</span> &rarr;
+<span style="color:var(--ink-sienna)">Low</span> &rarr;
+<span style="color:var(--accent)">Margin call</span></p>
 
 <h3>Equity calculation</h3>
 $$\\text{Equity} = \\text{Cash} + \\sum_{\\text{positions}} \\text{marketValue}(\\text{pos})$$
@@ -1422,8 +1422,8 @@ $$\\text{Total P\\&L} = \\text{Portfolio Value} - \\text{Initial Capital}$$
 </ul>
 
 <h3>Colour coding</h3>
-<p>Positive P&amp;L is displayed in <span style="color:var(--ext-green)">green</span>;
-negative in <span style="color:var(--ext-rose)">rose</span>. The colour updates
+<p>Positive P&amp;L is displayed in <span style="color:var(--ink-viridian)">green</span>;
+negative in <span style="color:var(--ink-madder)">rose</span>. The colour updates
 in real time as market prices change.</p>
 `,
     },

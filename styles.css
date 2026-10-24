@@ -63,11 +63,11 @@ main {
     pointer-events: auto;
     animation: none;
 }
-.lobby-pill-fed     { color: var(--ext-orange); }
-.lobby-pill-fl      { color: var(--ext-lime); }
-.lobby-pill-pol     { color: var(--ext-yellow); }
-.lobby-pill-media   { color: var(--ext-cyan); }
-.lobby-pill-fed-rel { color: var(--ext-blue); }
+.lobby-pill-fed     { color: var(--ink-sienna); }
+.lobby-pill-fl      { color: var(--ink-sap); }
+.lobby-pill-pol     { color: var(--ink-ochre); }
+.lobby-pill-media   { color: var(--ink-verdigris); }
+.lobby-pill-fed-rel { color: var(--ink-prussian); }
 #lobby-actions { display: flex; align-items: center; }
 
 /* --- Time Slider (below chart in strategy mode) --- */

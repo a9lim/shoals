@@ -1,47 +1,43 @@
 /* ===================================================
    colors.js -- Shoals project-specific design tokens.
-   Maps financial concepts to shared extended palette
-   colors and injects themed CSS custom properties.
+   Maps financial concepts to the shared inks and
+   injects themed CSS custom properties.
    =================================================== */
 
 // --- Financial Color Aliases ---
-_PALETTE.up    = _PALETTE.extended.green;
-_PALETTE.down  = _PALETTE.extended.rose;
-_PALETTE.call  = _PALETTE.extended.green;
-_PALETTE.put   = _PALETTE.extended.rose;
-_PALETTE.stock = _PALETTE.extended.yellow;
-_PALETTE.bond  = _PALETTE.extended.blue;
-_PALETTE.delta = _PALETTE.extended.yellow;
-_PALETTE.gamma = _PALETTE.extended.green;
-_PALETTE.theta = _PALETTE.extended.rose;
-_PALETTE.vega  = _PALETTE.extended.purple;
-_PALETTE.rho   = _PALETTE.extended.blue;
-_PALETTE.vxhcn   = _PALETTE.extended.purple;
+// Per theme, since the inks are theme-paired; read through _themePalette().
+for (const T of [_PALETTE.light, _PALETTE.dark]) {
+  const k = T.inks;
+  T.up    = k.viridian;
+  T.down  = k.madder;
+  T.call  = k.viridian;
+  T.put   = k.madder;
+  T.stock = k.ochre;
+  T.bond  = k.prussian;
+  T.delta = k.ochre;
+  T.gamma = k.viridian;
+  T.theta = k.madder;
+  T.vega  = k.violet;
+  T.rho   = k.prussian;
+  T.vxhcn = k.violet;
+}
 
 _freezeTokens();
 
 // --- CSS Variable Injection ---
 (function() {
   const P = _PALETTE, L = P.light, D = P.dark;
+  const fin = ['up', 'down', 'call', 'put', 'stock', 'bond', 'delta', 'gamma', 'theta', 'vega', 'rho', 'vxhcn'];
+  const genFin = (T) => fin.map(k => `  --${k}: ${T[k]};`).join('\n');
   _injectProjectVars(
-    `  --up: ${P.up};
-  --down: ${P.down};
-  --call: ${P.call};
-  --put: ${P.put};
-  --stock: ${P.stock};
-  --bond: ${P.bond};
-  --delta: ${P.delta};
-  --gamma: ${P.gamma};
-  --theta: ${P.theta};
-  --vega: ${P.vega};
-  --rho: ${P.rho};
-  --vxhcn: ${P.vxhcn};
+    genFin(L) + `
   --chart-grid: ${_r(L.text, 0.06)};
   --chart-crosshair: ${_r(L.text, 0.25)};
   --chart-axis: ${L.textSecondary};
   --chain-hover: ${_r(L.text, 0.04)};
   --dialog-bg: ${L.panelSolid};`,
-    `  --chart-grid: ${_r(D.text, 0.06)};
+    genFin(D) + `
+  --chart-grid: ${_r(D.text, 0.06)};
   --chart-crosshair: ${_r(D.text, 0.25)};
   --chart-axis: ${D.textSecondary};
   --chain-hover: ${_r(D.text, 0.06)};

@@ -244,7 +244,7 @@ export class ChartRenderer {
         }
         const textMuted = this._textMuted;
         const textSec = this._textSec;
-        const palette   = _PALETTE;
+        const palette   = _themePalette();
         // Layout constants
         const W   = this.width;
         const H   = this.height;
@@ -548,7 +548,7 @@ export class ChartRenderer {
                 const py = Math.round(ys) + 0.5;
 
                 const lineColor = (flags.green && flags.rose)
-                    ? (_PALETTE.extended.yellow)
+                    ? palette.inks.ochre
                     : flags.green ? green : rose;
                 ctx.strokeStyle = lineColor + '99'; // semi-transparent
                 ctx.setLineDash(strikeDash);

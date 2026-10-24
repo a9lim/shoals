@@ -38,17 +38,16 @@ const GREEK_META = {
 };
 
 function _colors() {
-    const ext = _PALETTE.extended;
-    const pal = _themePalette();
+    const pal = _themePalette(), k = pal.inks;
     return {
-        up:     ext.green,
-        down:   ext.rose,
+        up:     k.viridian,
+        down:   k.madder,
         accent: pal.accent,
-        delta:  ext.blue,
-        gamma:  ext.orange,
-        theta:  ext.cyan,
-        vega:   ext.purple,
-        rho:    ext.slate,
+        delta:  k.prussian,
+        gamma:  k.sienna,
+        theta:  k.verdigris,
+        vega:   k.violet,
+        rho:    pal.textMuted,
     };
 }
 

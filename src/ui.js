@@ -1312,8 +1312,8 @@ export function updateEventLog($, eventLog, dayOrigin) {
 
 function _congressColors() {
     return {
-        federalist: _PALETTE.extended.orange,
-        farmerLabor: _PALETTE.extended.lime,
+        federalist: _themePalette().inks.sienna,
+        farmerLabor: _themePalette().inks.sap,
     };
 }
 
@@ -1391,34 +1391,34 @@ export function updateCongressDiagrams($, world) {
 }
 
 const _popupCategoryMeta = {
-    fed:            { label: 'Federal Reserve',    color: 'var(--ext-blue)' },
-    investigation:  { label: 'Investigation',      color: 'var(--ext-red)' },
-    congressional:  { label: 'Congress',            color: 'var(--ext-indigo)' },
-    political:      { label: 'Political',           color: 'var(--ext-orange)' },
-    midterm:        { label: 'Election',            color: 'var(--ext-rose)' },
-    macro:          { label: 'Macro',               color: 'var(--ext-cyan)' },
-    sector:         { label: 'Sector',              color: 'var(--ext-lime)' },
-    market:         { label: 'Markets',             color: 'var(--ext-yellow)' },
-    compound:       { label: 'Crisis',              color: 'var(--ext-red)' },
+    fed:            { label: 'Federal Reserve',    color: 'var(--ink-prussian)' },
+    investigation:  { label: 'Investigation',      color: 'var(--accent)' },
+    congressional:  { label: 'Congress',            color: 'var(--ink-indigo)' },
+    political:      { label: 'Political',           color: 'var(--ink-sienna)' },
+    midterm:        { label: 'Election',            color: 'var(--ink-madder)' },
+    macro:          { label: 'Macro',               color: 'var(--ink-verdigris)' },
+    sector:         { label: 'Sector',              color: 'var(--ink-sap)' },
+    market:         { label: 'Markets',             color: 'var(--ink-ochre)' },
+    compound:       { label: 'Crisis',              color: 'var(--accent)' },
     desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
     margin:         { label: 'Margin call',         color: 'var(--down)' },
-    gameover:       { label: 'Game over',           color: 'var(--ext-red)' },
+    gameover:       { label: 'Game over',           color: 'var(--accent)' },
     // Race-era categories (overhaul): previously fell through to 'desk'.
     release:        { label: 'The race',            color: 'var(--vxhcn)' },
     certification:  { label: 'Consensus markets',   color: 'var(--vxhcn)' },
-    incident:       { label: 'Incident report',     color: 'var(--ext-red)' },
-    theft:          { label: 'Exfiltration',        color: 'var(--ext-red)' },
-    strait:         { label: 'The strait',          color: 'var(--ext-rose)' },
-    regime:         { label: 'The state',           color: 'var(--ext-indigo)' },
+    incident:       { label: 'Incident report',     color: 'var(--accent)' },
+    theft:          { label: 'Exfiltration',        color: 'var(--accent)' },
+    strait:         { label: 'The strait',          color: 'var(--ink-madder)' },
+    regime:         { label: 'The state',           color: 'var(--ink-indigo)' },
     halcyon:        { label: 'Halcyon',             color: 'var(--vxhcn)' },
-    china:          { label: 'Beijing',             color: 'var(--ext-red)' },
-    polaris:        { label: 'Polaris',             color: 'var(--ext-cyan)' },
-    wonder:         { label: 'The wonders',         color: 'var(--ext-lime)' },
-    policy:         { label: 'Washington',          color: 'var(--ext-indigo)' },
-    treaty:         { label: 'Geneva',              color: 'var(--ext-blue)' },
-    summit:         { label: 'Reykjavik',           color: 'var(--ext-blue)' },
-    insider:        { label: 'The channel',         color: 'var(--ext-orange)' },
-    ghostwritten:   { label: 'Unsigned',            color: 'var(--ext-cyan)' },
+    china:          { label: 'Beijing',             color: 'var(--accent)' },
+    polaris:        { label: 'Polaris',             color: 'var(--ink-verdigris)' },
+    wonder:         { label: 'The wonders',         color: 'var(--ink-sap)' },
+    policy:         { label: 'Washington',          color: 'var(--ink-indigo)' },
+    treaty:         { label: 'Geneva',              color: 'var(--ink-prussian)' },
+    summit:         { label: 'Reykjavik',           color: 'var(--ink-prussian)' },
+    insider:        { label: 'The channel',         color: 'var(--ink-sienna)' },
+    ghostwritten:   { label: 'Unsigned',            color: 'var(--ink-verdigris)' },
 };
 
 export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude, superevent = false) {
