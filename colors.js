@@ -1,25 +1,30 @@
 /* ===================================================
-   colors.js -- Shoals project-specific design tokens.
-   Maps financial concepts to the shared inks and
-   injects themed CSS custom properties.
+   colors.js -- Shoals' data hues on the shared inks.
+   Red is the accent, spent on losses and down moves;
+   gains take viridian. Each instrument has its ink
+   (the tape's entry marks, the strategy diagram), and
+   the Greeks match the strategy diagram's overlays.
+   Inks are theme-paired, so canvas code reads these
+   through _themePalette() on every draw.
    =================================================== */
 
-// --- Financial Color Aliases ---
-// Per theme, since the inks are theme-paired; read through _themePalette().
 for (const T of [_PALETTE.light, _PALETTE.dark]) {
   const k = T.inks;
-  T.up    = k.viridian;
-  T.down  = k.madder;
-  T.call  = k.viridian;
-  T.put   = k.madder;
-  T.stock = k.ochre;
+  T.up    = k.viridian;      // gains
+  T.down  = T.accent;        // losses and down moves: the one red
+  T.stock = k.ochre;         // HCN
   T.bond  = k.prussian;
-  T.delta = k.ochre;
-  T.gamma = k.viridian;
-  T.theta = k.madder;
-  T.vega  = k.violet;
-  T.rho   = k.prussian;
+  T.call  = k.verdigris;
+  T.put   = k.sienna;
   T.vxhcn = k.violet;
+  T.vxhcnfuture = k.violet;
+  T.binary = k.indigo;       // Consensus
+  T.computefuture = k.umber; // Cambria
+  T.delta = k.prussian;
+  T.gamma = k.sienna;
+  T.theta = k.verdigris;
+  T.vega  = k.violet;
+  T.rho   = T.textMuted;
 }
 
 _freezeTokens();
@@ -27,20 +32,7 @@ _freezeTokens();
 // --- CSS Variable Injection ---
 (function() {
   const P = _PALETTE, L = P.light, D = P.dark;
-  const fin = ['up', 'down', 'call', 'put', 'stock', 'bond', 'delta', 'gamma', 'theta', 'vega', 'rho', 'vxhcn'];
-  const genFin = (T) => fin.map(k => `  --${k}: ${T[k]};`).join('\n');
-  _injectProjectVars(
-    genFin(L) + `
-  --chart-grid: ${_r(L.text, 0.06)};
-  --chart-crosshair: ${_r(L.text, 0.25)};
-  --chart-axis: ${L.textSecondary};
-  --chain-hover: ${_r(L.text, 0.04)};
-  --dialog-bg: ${L.panelSolid};`,
-    genFin(D) + `
-  --chart-grid: ${_r(D.text, 0.06)};
-  --chart-crosshair: ${_r(D.text, 0.25)};
-  --chart-axis: ${D.textSecondary};
-  --chain-hover: ${_r(D.text, 0.06)};
-  --dialog-bg: ${D.panelSolid};`
-  );
+  const fin = ['up', 'down', 'call', 'put', 'stock', 'bond', 'delta', 'gamma', 'theta', 'vega', 'rho', 'vxhcn', 'binary', 'computefuture'];
+  const gen = (T) => fin.map(k => `  --${k}: ${T[k]};`).join('\n');
+  _injectProjectVars(gen(L), gen(D));
 })();

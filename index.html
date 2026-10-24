@@ -49,19 +49,14 @@
     <script defer src="colors.js"></script>
     <script defer src="/shared/icons.js"></script>
     <script defer src="/shared/colophon.js"></script>
-    <script defer src="/shared/toolbar.js"></script>
     <script defer src="/shared/forms.js"></script>
-    <script defer src="/shared/settings.js"></script>
-    <script defer src="/shared/dropdown.js"></script>
 
     <script defer src="/shared/touch.js"></script>
     <script defer src="/shared/info.js"></script>
     <script defer src="/shared/shortcuts.js"></script>
     <script defer src="/shared/about.js"></script>
-    <script defer src="/shared/sparkline.js"></script>
     <script defer src="/shared/tooltip.js"></script>
     <link rel="stylesheet" href="/shared/base.css">
-    <link rel="stylesheet" href="/shared/hud.css">
     <link rel="stylesheet" href="styles.css">
 
     <script type="application/ld+json">
@@ -204,7 +199,7 @@
           "name": "How do I build a multi-leg options strategy in Shoals?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Open the Strategy tab, select an expiry, and click stock, bond, VXHCN, call, or put cells to add long legs; use sell mode or right-click for short legs. The combined view updates payoff, Greek overlays, max profit or loss, and break-even estimates."
+            "text": "Open the Strategy page, select an expiry, and click stock, bond, VXHCN, call, or put cells to add long legs; use sell mode or right-click for short legs. The combined view updates payoff, Greek overlays, max profit or loss, and break-even estimates."
           }
         },
         {
@@ -253,104 +248,133 @@
     </script>
 </head>
 
-<body class="sim-body app-ready">
-    <a href="#sidebar" class="skip-link">Skip to controls</a>
-    <a href="#chart-canvas" class="skip-link">Skip to chart</a>
+<body class="sim-body brief">
+    <a href="#page-front" class="skip-link">Skip to the front page</a>
+    <a href="#sidebar" class="skip-link">Skip to quotes</a>
 
-    <!-- Floating Toolbar -->
-    <header id="toolbar" class="sim-toolbar glass" role="toolbar" aria-label="Trading tools">
-        <div class="toolbar-brand">
-            <a href="/" class="sim-home" title="a9l.im"><img src="/logo.svg" alt="a9l.im" height="28"></a>
-            <h1 class="sim-brand">Shoals</h1>
-        </div>
-        <div class="toolbar-actions sim-toolbar-actions">
-            <button id="mode-btn" class="tool-btn" aria-label="Buy mode" aria-pressed="false" title="Buy mode (X)" data-icon="modeShoals"></button>
-            <div class="tool-sep"></div>
-            <button id="play-btn" class="tool-btn" aria-label="Play/pause simulation" title="Play"></button>
-            <button id="speed-btn" class="tool-btn speed-btn" aria-label="Simulation speed" title="Speed: 0.25x">
-                <span class="speed-label">0.25x</span>
-            </button>
-            <button id="step-btn" class="tool-btn" aria-label="Step forward one day" title="Step" data-icon="step"></button>
-            <button id="reset-btn" class="tool-btn" aria-label="Reset simulation" title="Reset" data-icon="reset"></button>
-            <div class="tool-sep hide-sm"></div>
-            <button id="theme-btn" class="tool-btn hide-sm" aria-label="Toggle theme" data-icon="theme"></button>
-            <button id="settings-btn" class="tool-btn" aria-label="Settings" title="Settings" data-icon="gear"></button>
-            <button id="about-btn" class="tool-btn" aria-label="About" title="About" data-icon="about"></button>
-            <button id="panel-toggle" class="tool-btn" aria-label="Toggle sidebar panel" aria-expanded="false" data-icon="menu"></button>
+    <header class="colophon">
+        <a class="colophon-seal" href="/" title="a9l.im" aria-label="a9l.im" data-icon="seal" data-icon-size="24"></a>
+        <h1 class="colophon-name">Shoals</h1>
+        <div class="colophon-tools" role="toolbar" aria-label="Simulation">
+            <button class="colophon-btn" id="play-btn" data-colophon="play"></button>
+            <button class="colophon-btn" id="step-btn" data-colophon="step" data-icon="step"></button>
+            <button class="colophon-btn" id="theme-btn" data-colophon="theme" data-icon="theme"></button>
+            <button class="colophon-btn" id="help-btn" data-colophon="help" data-icon="about"></button>
         </div>
     </header>
 
-    <!-- Main Content -->
-    <main>
-        <div id="chart-container">
-            <canvas id="chart-canvas" aria-label="Interactive stock price chart with geometric Brownian motion and stochastic volatility"></canvas>
-            <canvas id="strategy-canvas" class="hidden" aria-label="Options strategy payoff and Greek sensitivity diagram"></canvas>
-            <div id="zoom-controls" class="sim-controls glass">
-                <button class="tool-btn zoom-ctrl-btn icon-tight" id="zoom-in-btn" aria-label="Zoom in" data-icon="plus" data-icon-size="16"></button>
-                <span id="zoom-level" class="zoom-level">100%</span>
-                <button class="tool-btn zoom-ctrl-btn icon-tight" id="zoom-out-btn" aria-label="Zoom out" data-icon="minus" data-icon-size="16"></button>
-                <div class="ctrl-sep"></div>
-                <button class="tool-btn zoom-ctrl-btn" id="zoom-reset-btn" aria-label="Fit to view" data-icon="fitView" data-icon-size="16"></button>
+    <!-- The masthead: The Meridian Brief, one edition per trading day -->
+    <header class="mast" id="mast">
+        <div class="mast-row">
+            <p class="mast-title" id="mast-title">The Meridian Brief</p>
+            <p class="ears">
+                <span class="ear">Meridian Capital · for the desk</span>
+                <span class="ear ear-ed"><span class="extra" id="ed-extra" hidden>Extra</span><span id="ed-no">Edition 1</span></span>
+            </p>
+        </div>
+        <p class="dateline" id="dateline" aria-live="off">
+            <span id="dl-day">Day 0</span>
+            <span id="dl-regime">Dynamic</span>
+            <span id="dl-hcn">HCN 100.00</span>
+            <span id="dl-vx">VXHCN 20.0</span>
+            <span id="dl-rate">Rate 4.00%</span>
+            <span id="dl-book">Book $10.0k</span>
+        </p>
+        <nav class="folios" aria-label="Sections">
+            <div class="folio-list" role="tablist" aria-label="Sections">
+                <button class="folio" id="folio-front" data-page="front" role="tab" aria-selected="true" aria-controls="page-front">Front page</button>
+                <button class="folio" id="folio-markets" data-page="markets" role="tab" aria-selected="false" aria-controls="page-markets" tabindex="-1">Markets</button>
+                <button class="folio" id="folio-race" data-page="race" role="tab" aria-selected="false" aria-controls="page-race" tabindex="-1">Race</button>
+                <button class="folio" id="folio-strategy" data-page="strategy" role="tab" aria-selected="false" aria-controls="page-strategy" tabindex="-1">Strategy</button>
+                <button class="folio" id="folio-desk" data-page="desk" role="tab" aria-selected="false" aria-controls="page-desk" tabindex="-1">Desk</button>
             </div>
-        </div>
-        <div id="time-slider-bar" class="time-slider-bar hidden">
-            <label class="time-slider-row">
-                <span class="time-slider-label">Time to expiry</span>
-                <input type="range" id="time-slider" min="0" max="100" step="1" value="100">
-                <span class="slider-value" id="time-slider-label">0 DTE</span>
-            </label>
-        </div>
-    </main>
-
-    <!-- Sidebar Panel -->
-    <div id="lobby-bar" class="sim-bar glass" style="display:none">
-        <div id="lobby-actions"></div>
-    </div>
-
-    <aside id="sidebar" class="sim-panel glass" role="complementary" aria-label="Trading panel">
-        <div class="sheet-handle"></div>
-        <div class="stats-header">
-            <div class="sidebar-tabs" role="tablist" aria-label="Sidebar tabs">
-                <button class="tab-btn active" id="tab-btn-trade" data-tab="trade" role="tab" aria-selected="true">Trade</button>
-                <button class="tab-btn" id="tab-btn-portfolio" data-tab="portfolio" role="tab" aria-selected="false">Portfolio</button>
-                <button class="tab-btn" id="tab-btn-strategy" data-tab="strategy" role="tab" aria-selected="false">Strategy</button>
-                <button class="tab-btn" id="tab-btn-settings" data-tab="settings" role="tab" aria-selected="false">Info</button>
+            <div class="folio-tools">
+                <button id="speed-btn" class="hbtn" type="button" aria-label="Simulation speed" title="Speed (. faster, , slower)">1×</button>
+                <button id="reset-btn" class="hbtn" type="button" title="Reset (R)">Reset</button>
             </div>
-            <button id="close-panel" class="tool-btn icon-tight" aria-label="Close panel" data-icon="close" data-icon-size="16"></button>
-        </div>
-        <div class="tabs-wrap">
-            <div class="tab-panels scrollbar-thin">
-                <!-- Trade Tab -->
-                <div class="tab-panel active" id="tab-trade" role="tabpanel" aria-labelledby="tab-btn-trade">
-                    <div class="stat-group">
-                        <div class="group-label">Quick trade</div>
-                        <div class="control-group">
-                            <label for="trade-qty">
-                                <span>Quantity</span>
-                                <span class="slider-value" id="trade-qty-val">1k</span>
-                            </label>
-                            <input type="range" id="trade-qty" min="1" max="100" step="1" value="1">
-                        </div>
-                        <div class="control-group">
-                            <span class="ctrl-label">Order type <button class="info-trigger" type="button" data-info="orderTypes" aria-label="Info: Order types">?</button></span>
-                            <div class="mode-toggles" id="order-type-toggles">
-                                <button class="mode-btn active" data-ordertype="market">Market</button>
-                                <button class="mode-btn" data-ordertype="limit">Limit</button>
-                                <button class="mode-btn" data-ordertype="stop">Stop</button>
+        </nav>
+    </header>
+
+    <main id="pages">
+        <!-- Front page: the lead dispatch, the tape, the agate -->
+        <section class="page page-front active" id="page-front" role="tabpanel" aria-labelledby="folio-front">
+            <article class="lead" id="lead">
+                <div class="lead-item" id="lead-item" aria-live="polite">
+                    <p class="kick" id="lead-kick">The desk</p>
+                    <h2 class="lead-head" id="lead-head">Markets open</h2>
+                    <p class="lead-body" id="lead-body"></p>
+                    <p class="lead-src" id="lead-src"></p>
+                </div>
+                <figure class="surface">
+                    <h3 class="col-h">Implied volatility <span class="sub">· by strike and expiry</span></h3>
+                    <canvas id="surface-canvas" role="img" aria-label="The pricing volatility surface: vol by strike and expiry, rising toward low strikes. Drag to turn it."></canvas>
+                </figure>
+                <section class="briefs" aria-labelledby="briefs-h">
+                    <h3 class="col-h" id="briefs-h">In brief</h3>
+                    <ol class="briefs-list" id="briefs"></ol>
+                </section>
+                <section id="lobby-bar" class="lobby" style="display:none" aria-labelledby="lobby-h">
+                    <h3 class="col-h" id="lobby-h">Government affairs</h3>
+                    <div id="lobby-actions"></div>
+                </section>
+            </article>
+
+            <figure class="tape">
+                <div id="chart-container" class="figure-box">
+                    <canvas id="chart-canvas" role="img" aria-label="HCN: the close as a line over a band of each day's range, with news days marked. Drag to pan; scroll or use = and - to zoom."></canvas>
+                </div>
+                <div class="fig-foot">
+                    <figcaption class="caption"><span class="caption-n">Fig. 1</span><span id="cap-front">HCN.</span></figcaption>
+                    <div id="zoom-controls" class="zoom" role="group" aria-label="Zoom">
+                        <button class="hbtn" id="zoom-out-btn" type="button" aria-label="Zoom out">−</button>
+                        <span id="zoom-level" class="zoom-level">100%</span>
+                        <button class="hbtn" id="zoom-in-btn" type="button" aria-label="Zoom in">+</button>
+                        <button class="hbtn" id="zoom-reset-btn" type="button" aria-label="Fit to view">Fit</button>
+                    </div>
+                </div>
+            </figure>
+
+            <aside id="sidebar" class="rail" aria-label="Quotes and book">
+                <div class="rail-tabs" role="tablist" aria-label="Quotes and book">
+                    <button class="rail-tab active" id="tab-btn-trade" data-tab="trade" role="tab" aria-selected="true" aria-controls="tab-trade">Quotes</button>
+                    <button class="rail-tab" id="tab-btn-portfolio" data-tab="portfolio" role="tab" aria-selected="false" aria-controls="tab-portfolio" tabindex="-1">Book</button>
+                </div>
+                <div class="rail-panels">
+                    <!-- Quotes: the agate, and where the desk trades -->
+                    <div class="tab-panel active" id="tab-trade" role="tabpanel" aria-labelledby="tab-btn-trade">
+                        <div class="ticket">
+                            <div class="ticket-row">
+                                <button id="mode-btn" class="seg-btn mode-btn" type="button" aria-pressed="false" title="Buy or sell (X)">Buy</button>
+                                <label class="ticket-qty" for="trade-qty">
+                                    <span class="lbl">Quantity</span>
+                                    <input type="range" id="trade-qty" min="1" max="100" step="1" value="1">
+                                    <span class="slider-value" id="trade-qty-val">1k</span>
+                                </label>
+                            </div>
+                            <div class="ticket-row">
+                                <span class="lbl">Order <button class="info-trigger" type="button" data-info="orderTypes" aria-label="Info: Order types">?</button></span>
+                                <div class="seg" id="order-type-toggles" role="group" aria-label="Order type">
+                                    <button class="mode-btn active" type="button" data-ordertype="market">Market</button>
+                                    <button class="mode-btn" type="button" data-ordertype="limit">Limit</button>
+                                    <button class="mode-btn" type="button" data-ordertype="stop">Stop</button>
+                                </div>
+                            </div>
+                            <div class="ticket-row hidden" id="trigger-price-group">
+                                <label class="ticket-qty" for="trigger-price">
+                                    <span class="lbl">Trigger</span>
+                                    <input type="range" id="trigger-price" min="40" max="160" step="5" value="100">
+                                    <span class="slider-value" id="trigger-price-val">$100</span>
+                                </label>
+                            </div>
+                            <div class="ticket-row">
+                                <label for="trade-expiry" class="lbl">Expiry <button class="info-trigger" type="button" data-info="expiry" aria-label="Info: Expiry">?</button></label>
+                                <select id="trade-expiry" class="sim-select" aria-label="Expiry date">
+                                    <option value="">Select expiry</option>
+                                </select>
                             </div>
                         </div>
-                        <div class="control-group hidden" id="trigger-price-group">
-                            <label>
-                                <span>Trigger price</span>
-                                <span class="slider-value" id="trigger-price-val">$100</span>
-                            </label>
-                            <input type="range" id="trigger-price" min="40" max="160" step="5" value="100">
-                        </div>
-                        <label for="trade-expiry" class="ctrl-label">Expiry <button class="info-trigger" type="button" data-info="expiry" aria-label="Info: Expiry">?</button></label>
-                        <select id="trade-expiry" class="sim-select" aria-label="Expiry date">
-                            <option value="">Select expiry</option>
-                        </select>
-                        <table class="chain-tbl" id="stock-bond-table">
+                        <h3 class="col-h">Stock, bond, volatility</h3>
+                        <table class="agate chain-tbl quotes-tbl" id="stock-bond-table">
                             <thead><tr>
                                 <th class="chain-th">HCN</th>
                                 <th class="chain-th">Bond</th>
@@ -362,11 +386,39 @@
                                 <td class="chain-cell" id="vxhcn-price-cell" role="button" tabindex="0">—</td>
                             </tr></tbody>
                         </table>
+                        <h3 class="col-h">HCN options</h3>
                         <div id="chain-table" class="chain-table">
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
+                        <p class="panel-hint trade-hint" id="trade-hint">Click to buy · right-click to sell or short · hover for bid and ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-ask spreads">?</button></p>
+                        <div id="consensus-section" class="stat-group hidden">
+                            <h3 class="col-h">Consensus</h3>
+                            <table class="agate chain-tbl" id="consensus-table">
+                                <thead><tr>
+                                    <th class="chain-th">Milestone</th>
+                                    <th class="chain-th">Quote</th>
+                                    <th class="chain-th">Pos</th>
+                                    <th class="chain-th">Days</th>
+                                </tr></thead>
+                                <tbody id="consensus-tbody"></tbody>
+                            </table>
+                            <p class="panel-hint">Click to buy yes · right-click to sell yes</p>
+                        </div>
+                        <div id="compute-section" class="stat-group hidden">
+                            <h3 class="col-h">Cambria compute</h3>
+                            <table class="agate chain-tbl" id="compute-table">
+                                <thead><tr>
+                                    <th class="chain-th">Maturity</th>
+                                    <th class="chain-th">Curve</th>
+                                    <th class="chain-th">Pos</th>
+                                    <th class="chain-th">Days</th>
+                                </tr></thead>
+                                <tbody id="compute-tbody"></tbody>
+                            </table>
+                            <p class="panel-hint">Click to buy · right-click to sell or short</p>
+                        </div>
                         <div class="stat-group saved-strategies-section" id="saved-strategies-section">
-                            <div class="group-label">Saved strategies</div>
+                            <h3 class="col-h">Saved strategies</h3>
                             <select id="trade-strategy-select" class="sim-select" aria-label="Saved strategy">
                                 <option value="">Select a strategy&hellip;</option>
                             </select>
@@ -374,115 +426,147 @@
                                 <span class="stat-label">Net cost</span>
                                 <span class="stat-value" id="strategy-net-cost">&mdash;</span>
                             </div>
-                            <button id="trade-exec-strategy-btn" class="ghost-btn trade-btn up" disabled>Execute strategy</button>
-                        </div>
-                        <p class="panel-hint trade-hint" id="trade-hint">Left-click: buy &middot; Right-click: sell/short &middot; Hover: bid/ask <button class="info-trigger" type="button" data-info="bidask" aria-label="Info: Bid-ask spreads">?</button></p>
-                        <div id="consensus-section" class="stat-group hidden">
-                            <div class="group-label">Consensus markets</div>
-                            <table class="chain-tbl" id="consensus-table">
-                                <thead><tr>
-                                    <th class="chain-th">Milestone</th>
-                                    <th class="chain-th">Quote</th>
-                                    <th class="chain-th">Pos</th>
-                                    <th class="chain-th">DTE</th>
-                                </tr></thead>
-                                <tbody id="consensus-tbody"></tbody>
-                            </table>
-                            <p class="panel-hint">Left-click: buy Yes &middot; Right-click: sell Yes</p>
-                        </div>
-                        <div id="compute-section" class="stat-group hidden">
-                            <div class="group-label">Compute futures</div>
-                            <table class="chain-tbl" id="compute-table">
-                                <thead><tr>
-                                    <th class="chain-th">Maturity</th>
-                                    <th class="chain-th">Curve</th>
-                                    <th class="chain-th">Pos</th>
-                                    <th class="chain-th">DTE</th>
-                                </tr></thead>
-                                <tbody id="compute-tbody"></tbody>
-                            </table>
-                            <p class="panel-hint">Left-click: buy &middot; Right-click: sell/short</p>
+                            <button id="trade-exec-strategy-btn" class="ghost-btn trade-btn" type="button" disabled>Execute strategy</button>
                         </div>
                     </div>
-                </div>
-                <!-- Portfolio Tab -->
-                <div class="tab-panel" id="tab-portfolio" role="tabpanel" aria-labelledby="tab-btn-portfolio">
-                    <div class="stat-group">
-                        <div class="group-label">Account</div>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap">
-                                <span class="stat-label">Cash</span>
-                                <button class="info-trigger" type="button" data-info="cash" aria-label="Info: Cash">?</button>
-                            </span>
-                            <span class="stat-value" id="cash-display">$10,000</span>
+                    <!-- Book: the account, positions, orders, Greeks -->
+                    <div class="tab-panel" id="tab-portfolio" role="tabpanel" aria-labelledby="tab-btn-portfolio">
+                        <div class="stat-group">
+                            <h3 class="col-h">Account</h3>
+                            <div class="stat-row">
+                                <span class="stat-label-wrap"><span class="stat-label">Cash</span><button class="info-trigger" type="button" data-info="cash" aria-label="Info: Cash">?</button></span>
+                                <span class="stat-value" id="cash-display">$10,000</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label-wrap"><span class="stat-label">Portfolio value</span><button class="info-trigger" type="button" data-info="portfolioValue" aria-label="Info: Portfolio value">?</button></span>
+                                <span class="stat-value" id="portfolio-value">$10,000</span>
+                            </div>
+                            <canvas class="sparkline" id="portfolio-sparkline" width="280" height="40" role="img" aria-label="Portfolio value over recent days"></canvas>
+                            <div class="stat-row">
+                                <span class="stat-label-wrap" id="margin-label-wrap"><span class="stat-label">Margin</span><button class="info-trigger" type="button" data-info="margin" aria-label="Info: Margin status">?</button></span>
+                                <span class="stat-value margin-ok" id="margin-status">OK</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label-wrap"><span class="stat-label">Borrow cost</span><button class="info-trigger" type="button" data-info="borrowCost" aria-label="Info: Borrow cost">?</button></span>
+                                <span class="stat-value" id="borrow-cost">$0.00</span>
+                            </div>
+                            <div class="stat-row">
+                                <span class="stat-label-wrap"><span class="stat-label">Dividends</span><button class="info-trigger" type="button" data-info="dividends" aria-label="Info: Dividends">?</button></span>
+                                <span class="stat-value" id="dividend-income">$0.00</span>
+                            </div>
                         </div>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap">
-                                <span class="stat-label">Portfolio value</span>
-                                <button class="info-trigger" type="button" data-info="portfolioValue" aria-label="Info: Portfolio value">?</button>
-                            </span>
-                            <span class="stat-value" id="portfolio-value">$10,000</span>
+                        <div class="stat-group">
+                            <h3 class="col-h">Positions</h3>
+                            <div id="default-positions"><p class="panel-hint">No open positions.</p></div>
                         </div>
-                        <canvas class="sparkline rate-sparkline" id="portfolio-sparkline" width="280" height="40"></canvas>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap" id="margin-label-wrap">
-                                <span class="stat-label">Margin status</span>
-                                <button class="info-trigger" type="button" data-info="margin" aria-label="Info: Margin status">?</button>
-                            </span>
-                            <span class="stat-value margin-ok" id="margin-status">OK</span>
+                        <div class="stat-group">
+                            <h3 class="col-h">Strategy positions</h3>
+                            <div id="strategy-positions"><p class="panel-hint">No strategy positions.</p></div>
                         </div>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap">
-                                <span class="stat-label">Borrow cost</span>
-                                <button class="info-trigger" type="button" data-info="borrowCost" aria-label="Info: Borrow cost">?</button>
-                            </span>
-                            <span class="stat-value" id="borrow-cost">$0.00</span>
+                        <div class="stat-group">
+                            <h3 class="col-h">Pending orders</h3>
+                            <div id="pending-orders"><p class="panel-hint">No pending orders.</p></div>
                         </div>
-                        <div class="stat-row">
-                            <span class="stat-label-wrap">
-                                <span class="stat-label">Dividends</span>
-                                <button class="info-trigger" type="button" data-info="dividends" aria-label="Info: Dividends">?</button>
-                            </span>
-                            <span class="stat-value" id="dividend-income">$0.00</span>
+                        <div class="stat-group">
+                            <h3 class="col-h">Greeks</h3>
+                            <div id="greeks-aggregate" class="greeks">
+                                <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-delta">Delta</span><button class="info-trigger" type="button" data-info="delta" aria-label="Info: Delta">?</button></span><span class="stat-value" id="greek-delta">0.00</span></div>
+                                <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-gamma">Gamma</span><button class="info-trigger" type="button" data-info="gamma" aria-label="Info: Gamma">?</button></span><span class="stat-value" id="greek-gamma">0.00</span></div>
+                                <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-theta">Theta</span><button class="info-trigger" type="button" data-info="theta_greek" aria-label="Info: Theta">?</button></span><span class="stat-value" id="greek-theta">0.00</span></div>
+                                <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-vega">Vega</span><button class="info-trigger" type="button" data-info="vega" aria-label="Info: Vega">?</button></span><span class="stat-value" id="greek-vega">0.00</span></div>
+                                <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-rho">Rho</span><button class="info-trigger" type="button" data-info="rho_greek" aria-label="Info: Rho">?</button></span><span class="stat-value" id="greek-rho">0.00</span></div>
+                            </div>
                         </div>
-                    </div>
-                    <div class="stat-group">
-                        <div class="group-label">Positions</div>
-                        <div id="default-positions">
-                            <p class="panel-hint">No open positions.</p>
-                        </div>
-                    </div>
-                    <div class="stat-group">
-                        <div class="group-label">Strategy positions</div>
-                        <div id="strategy-positions">
-                            <p class="panel-hint">No strategy positions.</p>
-                        </div>
-                    </div>
-                    <div class="stat-group">
-                        <div class="group-label">Pending orders</div>
-                        <div id="pending-orders">
-                            <p class="panel-hint">No pending orders.</p>
-                        </div>
-                    </div>
-                    <div class="stat-group">
-                        <div class="group-label">Greeks</div>
-                        <div id="greeks-aggregate">
-                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-delta">Delta</span><button class="info-trigger" type="button" data-info="delta" aria-label="Info: Delta">?</button></span><span class="stat-value" id="greek-delta">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-gamma">Gamma</span><button class="info-trigger" type="button" data-info="gamma" aria-label="Info: Gamma">?</button></span><span class="stat-value" id="greek-gamma">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-theta">Theta</span><button class="info-trigger" type="button" data-info="theta_greek" aria-label="Info: Theta">?</button></span><span class="stat-value" id="greek-theta">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-vega">Vega</span><button class="info-trigger" type="button" data-info="vega" aria-label="Info: Vega">?</button></span><span class="stat-value" id="greek-vega">0.00</span></div>
-                            <div class="stat-row"><span class="stat-label-wrap"><span class="stat-label greek-label-rho">Rho</span><button class="info-trigger" type="button" data-info="rho_greek" aria-label="Info: Rho">?</button></span><span class="stat-value" id="greek-rho">0.00</span></div>
-                        </div>
-                    </div>
-                        <div id="convictions-section" class="convictions-section hidden">
-                            <div class="group-label">Convictions</div>
+                        <div id="convictions-section" class="stat-group convictions-section hidden">
+                            <h3 class="col-h">Convictions</h3>
                             <div id="convictions-list" class="convictions-list"></div>
                         </div>
+                    </div>
                 </div>
-                <!-- Strategy Tab -->
-                <div class="tab-panel" id="tab-strategy" role="tabpanel" aria-labelledby="tab-btn-strategy">
+            </aside>
+        </section>
+
+        <!-- Markets: every market is a curve, and the sandbox that trades across them -->
+        <section class="page page-markets" id="page-markets" role="tabpanel" aria-labelledby="folio-markets" hidden>
+            <div class="mk-main">
+                <header class="page-head">
+                    <h2 class="page-h">Every market is a curve</h2>
+                    <p class="page-dek" id="mk-dek">Six prices on one world, drawn the same way. The dashed line is each curve the day before the latest news.</p>
+                </header>
+                <div class="mk-grid" id="mk-grid"></div>
+                <p class="caption"><span class="caption-n">Fig. 2</span><span id="cap-markets"></span></p>
+            </div>
+            <section class="sandbox" id="sandbox" aria-labelledby="sb-h">
+                <div class="sb-left">
+                <h3 class="col-h" id="sb-h">The sandbox <span class="sub" id="sb-sub">· click a point on any curve</span></h3>
+                <table class="agate sb-book" aria-label="Sandbox legs">
+                    <thead><tr><th class="l">Contract</th><th>Side</th><th>Qty</th><th>Price</th><th><span class="vh">Remove</span></th></tr></thead>
+                    <tbody id="sb-book"></tbody>
+                </table>
+                <p class="panel-hint" id="sb-empty">No legs yet. Click a point on a curve, or focus a curve and use the arrow keys and Enter.</p>
+                <div class="sb-controls">
+                    <label class="ticket-qty" for="sb-qty"><span class="lbl">Each leg</span><input type="range" id="sb-qty" min="1" max="20" step="1" value="1"><span class="slider-value" id="sb-qty-val">1</span></label>
+                    <label class="chk" for="sb-mine"><input type="checkbox" id="sb-mine"> <span>Add my book</span></label>
+                </div>
+                <div class="sb-actions">
+                    <button class="ghost-btn" id="sb-clear" type="button">Clear</button>
+                    <button class="ghost-btn primary" id="sb-trade" type="button" disabled>Trade these legs</button>
+                </div>
+                </div>
+                <div class="sb-right">
+                <h3 class="col-h" id="sb-grid-h">Profit and loss at the horizon</h3>
+                <div class="sb-scen-wrap"><table class="sb-scen" id="sb-scen" aria-labelledby="sb-grid-h"></table></div>
+                <p class="sb-read" id="sb-read" aria-live="polite"></p>
+                <p class="sb-live vh" id="sb-live" aria-live="assertive"></p>
+                </div>
+            </section>
+        </section>
+
+        <!-- Race: the rung ladder, after Epoch's Capabilities Index -->
+        <section class="page page-race" id="page-race" role="tabpanel" aria-labelledby="folio-race" hidden>
+            <figure class="race-fig">
+                <header class="page-head">
+                    <h2 class="page-h">The race, as the market can see it</h2>
+                    <p class="page-dek" id="race-dek">Every public release placed on the rung it claims, by date. Ahead of today, Consensus prices when each rung is crossed.</p>
+                </header>
+                <div class="figure-box race-box"><canvas id="race-canvas" role="img" aria-label="The capability ladder from R1 to R5 over the four-year term: releases by lab, certifications, claims, the released frontier, and Consensus's distributions for when each rung ahead is crossed."></canvas></div>
+                <p class="caption"><span class="caption-n">Fig. 3</span><span id="cap-race"></span></p>
+            </figure>
+            <aside class="race-notes" aria-label="The ladder">
+                <h3 class="col-h">The ladder</h3>
+                <table class="agate race-tbl" aria-label="Rungs, claims, certifications and Consensus medians">
+                    <thead><tr><th class="l">Rung</th><th>Claimed</th><th>Certified</th><th>Median</th></tr></thead>
+                    <tbody id="race-tbody"></tbody>
+                </table>
+                <div class="race-key" id="race-key"></div>
+                <h3 class="col-h">Releases</h3>
+                <ol class="race-log" id="race-log"></ol>
+                <div class="race-actions">
+                    <button class="ghost-btn" id="race-reveal" type="button" aria-pressed="false" hidden>Show the hidden tracks</button>
+                    <button class="ghost-btn" id="race-epilogue" type="button" hidden>The last edition</button>
+                </div>
+            </aside>
+        </section>
+
+        <!-- Strategy: the payoff of a multi-leg book at expiry -->
+        <section class="page page-strategy" id="page-strategy" role="tabpanel" aria-labelledby="folio-strategy" hidden>
+            <figure class="payoff">
+                <div id="strategy-container" class="figure-box">
+                    <canvas id="strategy-canvas" role="img" aria-label="Options strategy payoff and Greek sensitivity diagram"></canvas>
+                </div>
+                <div id="time-slider-bar" class="time-slider-bar hidden">
+                    <label class="time-slider-row">
+                        <span class="time-slider-label">Time to expiry</span>
+                        <input type="range" id="time-slider" min="0" max="100" step="1" value="100">
+                        <span class="slider-value" id="time-slider-label">0 DTE</span>
+                    </label>
+                </div>
+                <p class="caption"><span class="caption-n">Fig. 4</span><span id="cap-strategy"></span></p>
+            </figure>
+            <aside class="rail" aria-label="Strategy builder">
+                <div class="tab-panel active" id="tab-strategy">
                     <div class="stat-group" id="strategy-builder">
-                        <div class="group-label">Build strategy <button class="info-trigger" type="button" data-info="strategies" aria-label="Info: Strategy builder">?</button></div>
+                        <h3 class="col-h">Build strategy <button class="info-trigger" type="button" data-info="strategies" aria-label="Info: Strategy builder">?</button></h3>
                         <div class="control-group">
                             <label for="strategy-qty">Quantity <span class="slider-value" id="strategy-qty-val">1</span></label>
                             <input type="range" id="strategy-qty" min="1" max="100" step="1" value="1">
@@ -507,12 +591,12 @@
                             <div class="chain-placeholder">Select an expiry to view the options chain.</div>
                         </div>
                         <p class="panel-hint trade-hint">Strategies save relative strikes &amp; expiries.</p>
-                        <div class="group-label">Legs</div>
+                        <h3 class="col-h">Legs</h3>
                         <div id="strategy-legs-list" class="strategy-legs-list">
                             <p class="panel-hint">No legs added. Click buttons above to build a strategy.</p>
                         </div>
                         <div id="strategy-summary" class="strategy-summary"></div>
-                        <div class="group-label">Greeks (at current price/time)</div>
+                        <h3 class="col-h">Greeks (at current price/time)</h3>
                         <div id="strategy-greeks">
                             <div class="stat-row"><span class="stat-label greek-label-delta">Delta</span><span class="stat-value" id="strat-greek-delta">0.00</span></div>
                             <div class="stat-row"><span class="stat-label greek-label-gamma">Gamma</span><span class="stat-value" id="strat-greek-gamma">0.00</span></div>
@@ -520,7 +604,7 @@
                             <div class="stat-row"><span class="stat-label greek-label-vega">Vega</span><span class="stat-value" id="strat-greek-vega">0.00</span></div>
                             <div class="stat-row"><span class="stat-label greek-label-rho">Rho</span><span class="stat-value" id="strat-greek-rho">0.00</span></div>
                         </div>
-                        <div class="group-label">Save strategy</div>
+                        <h3 class="col-h">Save strategy</h3>
                         <div class="control-group">
                             <label for="strategy-load-select">Strategy</label>
                             <select id="strategy-load-select" class="sim-select" aria-label="Load saved strategy">
@@ -540,10 +624,14 @@
                         </div>
                     </div>
                 </div>
-                <!-- Settings Tab -->
-                <div class="tab-panel" id="tab-settings" role="tabpanel" aria-labelledby="tab-btn-settings">
+            </aside>
+        </section>
+
+        <!-- Desk: the regime, the world, the firm's settings -->
+        <section class="page page-desk" id="page-desk" role="tabpanel" aria-labelledby="folio-desk" hidden>
+            <div class="desk" id="tab-settings">
                     <div class="stat-group">
-                        <div class="group-label">Market regime <button class="info-trigger" type="button" data-info="regime" aria-label="Info: Market regime">?</button></div>
+                        <h3 class="col-h">Market regime <button class="info-trigger" type="button" data-info="regime" aria-label="Info: Market regime">?</button></h3>
                         <select id="preset-select" class="sim-select" aria-label="Market preset">
                             <option value="0">Calm bull</option>
                             <option value="1">Sideways</option>
@@ -570,8 +658,12 @@
                         </div>
                         <canvas class="sparkline rate-sparkline" id="vxhcn-sparkline" width="280" height="40"></canvas>
                     </div>
+                    <div class="stat-group">
+                        <h3 class="col-h">Sound</h3>
+                        <label class="ticket-qty" for="volume-slider"><span class="lbl">Volume</span><input type="range" id="volume-slider" min="0" max="100" step="1" value="50"><span class="slider-value" id="volume-val">50%</span></label>
+                    </div>
                     <div id="llm-settings-section" class="stat-group hidden">
-                        <div class="group-label">LLM settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM integration">?</button></div>
+                        <h3 class="col-h">LLM settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM integration">?</button></h3>
                         <div class="ctrl-row">
                             <label class="stat-label" for="llm-provider">Provider</label>
                             <select id="llm-provider" class="sim-select" disabled>
@@ -594,11 +686,11 @@
                         </div>
                     </div>
                     <div id="event-log-section" class="stat-group hidden">
-                        <div class="group-label">Event log <button class="info-trigger" type="button" data-info="events" aria-label="Info: Event engine">?</button></div>
+                        <h3 class="col-h">Event log <button class="info-trigger" type="button" data-info="events" aria-label="Info: Event engine">?</button></h3>
                         <div id="event-log" class="event-log"></div>
                     </div>
                     <div id="congress-section" class="stat-group hidden">
-                        <div class="group-label">Congress</div>
+                        <h3 class="col-h">Congress</h3>
                         <div class="congress-diagrams">
                             <div class="congress-chamber">
                                 <div class="congress-chamber-label">Senate</div>
@@ -613,19 +705,19 @@
                         </div>
                     </div>
                     <div id="regulations-section" class="regulations-section">
-                        <div class="group-label">Active regulations</div>
+                        <h3 class="col-h">Active regulations</h3>
                         <div id="regulations-list" class="regulations-list">
                             <span class="text-muted" style="font-size:0.78rem">None</span>
                         </div>
                     </div>
                     <div id="standings-section" class="stat-group hidden">
-                        <div class="group-label">World state</div>
+                        <h3 class="col-h">World state</h3>
                         <div id="standings-world"></div>
-                        <div class="group-label" style="margin-top:8px">Your standing</div>
+                        <h3 class="col-h">Your standing</h3>
                         <div id="standings-factions"></div>
                     </div>
                     <div class="stat-group">
-                        <div class="group-label">Settings</div>
+                        <h3 class="col-h">Settings</h3>
                         <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn">Advanced parameters <span class="info-trigger" role="button" tabindex="0" data-info="gbm" aria-label="Info: Pricing models">?</span></button>
                         <div id="advanced-section" class="advanced-section hidden">
                             <div class="ctrl-row">
@@ -695,18 +787,16 @@
                             </div>
                         </div>
                     </div>
-                </div>
             </div>
-        </div>
-    </aside>
-
+        </section>
+    </main>
 
     <!-- Trade Dialog (buy/sell confirmation) -->
     <div id="trade-dialog" class="sim-overlay hidden" role="dialog" aria-label="Trade confirmation" aria-modal="true">
-        <div class="sim-overlay-panel glass trade-dialog-content">
+        <div class="sim-overlay-panel trade-dialog-content">
             <div class="stats-header">
                 <h2 class="stats-title" id="trade-dialog-title">Trade</h2>
-                <button id="trade-dialog-close" class="tool-btn" aria-label="Close trade dialog" data-icon="close" data-icon-size="16"></button>
+                <button id="trade-dialog-close" class="hbtn x-btn" type="button" aria-label="Close trade dialog" data-icon="close" data-icon-size="16"></button>
             </div>
             <div class="sim-overlay-body">
                 <div id="trade-dialog-body" class="trade-form"></div>
@@ -719,8 +809,9 @@
     </div>
 
     <!-- Popup Decision Event Overlay -->
-    <div id="popup-event-overlay" class="sim-overlay hidden" role="dialog" aria-label="Event decision" aria-modal="true">
-      <div class="sim-overlay-panel glass popup-event-body">
+    <div id="popup-event-overlay" class="sim-overlay dispatch hidden" role="dialog" aria-labelledby="popup-event-headline" aria-modal="true">
+      <div class="sim-overlay-panel popup-event-body">
+        <p class="dispatch-head"><span class="dispatch-word">Dispatch</span><span class="dispatch-date" id="dispatch-date"></span></p>
         <div class="sim-overlay-body">
           <h2 id="popup-event-headline" class="popup-headline"></h2>
           <p id="popup-event-context" class="popup-context"></p>
@@ -732,8 +823,10 @@
 
     <!-- Epilogue Overlay -->
     <div id="epilogue-overlay" class="sim-overlay hidden" role="dialog" aria-label="Epilogue" aria-modal="true">
-        <div class="sim-overlay-panel glass epilogue-panel">
+        <div class="sim-overlay-panel epilogue-panel">
             <div class="epilogue-header">
+                <p class="epilogue-mast">The Meridian Brief</p>
+                <p class="epilogue-ears"><span>Last edition</span><span id="epilogue-folio">Page 1 of 5</span></p>
                 <h2 class="epilogue-title"></h2>
             </div>
             <div class="sim-overlay-body epilogue-body scrollbar-thin"></div>
@@ -749,6 +842,7 @@
                     <button id="epilogue-back" class="ghost-btn hidden">Back</button>
                     <button id="epilogue-next" class="ghost-btn">Next</button>
                     <button id="epilogue-restart" class="ghost-btn hidden">Restart</button>
+                    <button id="epilogue-race" class="ghost-btn hidden" type="button">The race, revealed</button>
                     <button id="epilogue-keep" class="ghost-btn hidden">Keep playing</button>
                 </div>
             </div>
@@ -757,16 +851,14 @@
 
     <!-- Reference Overlay -->
     <div id="reference-overlay" class="sim-overlay" hidden>
-        <div class="sim-overlay-panel glass">
+        <div class="sim-overlay-panel">
             <div class="stats-header">
                 <h2 id="reference-title" class="stats-title">Reference</h2>
-                <button id="reference-close" class="tool-btn" aria-label="Close reference" data-icon="close" data-icon-size="16"></button>
+                <button id="reference-close" class="hbtn x-btn" type="button" aria-label="Close reference" data-icon="close" data-icon-size="16"></button>
             </div>
             <div id="reference-body" class="sim-overlay-body scrollbar-thin"></div>
         </div>
     </div>
-
-    <script src="/shared/tabs.js"></script>
     <link rel="modulepreload" href="main.js">
     <script type="module" src="main.js"></script>
     <details class="edu-content">
@@ -785,7 +877,7 @@
     <h3>Narrative framework</h3>
     <p>The simulation is set at Meridian Capital during the Barron administration. The event registry combines Poisson arrivals, scheduled pulses, portfolio triggers, one-shot conditions, and followup chains. Eighteen permanent traits, six dynamic reputation tags, and eight institutional-standing dimensions shape later eligibility and consequences. Beneath them, a hidden race model (three labs on a capability ladder, incidents that surface only on detection, weight thefts, and a ratcheting control regime) resolves into one of six terminal families with a five-page adaptive epilogue.</p>
     <h3>Accessibility</h3>
-    <p>Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market and portfolio readouts, and focus trapping for narrative popups and the epilogue. The live candlestick chart, sparklines, typewriter treatment, and other animated feedback create continuous motion.</p>
+    <p>Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market and portfolio readouts, and focus trapping for narrative popups and the epilogue. The live tape, the markets page's easing after news, sparklines, the typewriter treatment, and other animated feedback create continuous motion; with reduced motion the desk opens paused on a complete edition.</p>
     <p><em>See also: <a href="/worldline">Worldline</a> for particle physics, <a href="/lumen">Lumen</a> for cellular metabolism, <a href="/miasma">Miasma</a> for epidemics.</em></p>
 <h3>Learning outcomes</h3>
 <p>After using Shoals, students should be able to: explain why American exercise is handled with a binomial tree; interpret delta, gamma, theta, vega, and rho for single options and multi-leg positions; distinguish spot volatility, term volatility, skew, and VXHCN futures; connect margin and execution impact to position sizing; and trace how market events and institutional decisions propagate into portfolio value.</p>

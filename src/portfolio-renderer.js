@@ -7,6 +7,7 @@
    ===================================================== */
 
 import { computePositionPnl, computePositionValue } from './position-value.js';
+import { drawSparkline } from './sparkline.js';
 import { fmtDollar, fmtQty, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
 
 // ---------------------------------------------------------------------------
@@ -303,8 +304,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     $.portfolioValue.className = 'stat-value ' + benchCls;
 
     // Portfolio value sparkline
-    if ($.portfolioSparkCtx && portfolioHistory && portfolioHistory.count >= 2
-        && typeof drawSparkline !== 'undefined') {
+    if ($.portfolioSparkCtx && portfolioHistory && portfolioHistory.count >= 2) {
         const c = $.portfolioSparkCanvas;
         const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
         drawSparkline($.portfolioSparkCtx, portfolioHistory, c.width, c.height, color, color + '44');

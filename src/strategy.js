@@ -37,12 +37,14 @@ const GREEK_META = {
     rho:   { label: 'Rho' },
 };
 
+// Gains take viridian and losses the one red (the accent); the spot marker is
+// the paper's own ink, so red is never spent on anything but a loss.
 function _colors() {
     const pal = _themePalette(), k = pal.inks;
     return {
         up:     k.viridian,
-        down:   k.madder,
-        accent: pal.accent,
+        down:   pal.accent,
+        accent: pal.textSecondary,
         delta:  k.prussian,
         gamma:  k.sienna,
         theta:  k.verdigris,
@@ -961,10 +963,10 @@ export class StrategyRenderer {
         const ly = MARGIN.top + 4;
 
         const isDark = this._cachedTheme === 'dark';
-        ctx.fillStyle   = _r(themeClrs.canvas, isDark ? 0.55 : 0.75);
+        ctx.fillStyle   = _r(themeClrs.canvas, isDark ? 0.9 : 0.92);
         ctx.strokeStyle = _r(themeClrs.text, isDark ? 0.13 : 0.12);   // the --border hairline
         ctx.lineWidth   = 1;
-        _roundRect(ctx, lx + 0.5, ly + 0.5, boxW, legendH, 2);
+        _roundRect(ctx, lx + 0.5, ly + 0.5, boxW, legendH, 0);
         ctx.fill();
         ctx.stroke();
 

@@ -1,21 +1,17 @@
 /* ===================================================
-   chart.js — Canvas 2D candlestick chart renderer
-   for the Shoals trading simulator.
-
-   Renders OHLC candles, axes, grid, crosshair,
-   position entry markers, and option strike lines.
-   Uses the shared camera module for horizontal
-   zoom/pan; Y-axis auto-scales to visible range.
+   chart.js — The tape: HCN drawn after Tufte on
+   Canvas 2D. Each day's range is a band, the close a
+   line over it; news days are ticked on the band and
+   the most recent carry their heads. Position entries,
+   held strikes and a crosshair with the day's agate
+   line complete it. The shared camera pans and zooms
+   horizontally; the log Y axis fits the visible days.
    =================================================== */
 
-import { fmtRelDay } from './format-helpers.js';
 import {
     CHART_Y_AXIS_W, CHART_Y_LABEL_W, CHART_X_AXIS_H, CHART_PADDING_T,
     CHART_SLOT_PX, CHART_BODY_RATIO,
 } from './config.js';
-
-// Canvas type: Newsreader at 12px for every label (lining tabular figures by default).
-const LABEL_FONT = () => `12px ${_FONT.text}`;
 
 export class ChartRenderer {
     /**
@@ -48,6 +44,9 @@ export class ChartRenderer {
         this._repaint = 0;
         this._repaintDirty = false;
 
+        // News days for the tape (setNews): [{ day, head, major }]
+        this._news = [];
+
         // Axis gutter sizes (CSS px) — from config.js
         this.Y_AXIS_W  = CHART_Y_AXIS_W;
         this.Y_LABEL_W = CHART_Y_LABEL_W;
@@ -57,14 +56,6 @@ export class ChartRenderer {
         // Candle sizing — from config.js
         this.SLOT_PX    = CHART_SLOT_PX;
         this.BODY_RATIO = CHART_BODY_RATIO;
-
-        // Theme color cache — invalidated when data-theme changes
-        this._cachedTheme = null;
-        this._gridColor = '';
-        this._textMuted = '';
-        this._textSec = '';
-        this._accent = '';
-        this._onAccent = '';
 
         this.resize();
     }
@@ -215,482 +206,299 @@ export class ChartRenderer {
     }
 
     /* -----------------------------------------------
+       setNews(items)
+       News days for the tape: [{ day, head, major }],
+       oldest first. Marked on the range band; the
+       most recent carry their heads along the top.
+    ----------------------------------------------- */
+    setNews(items) {
+        this._news = items || [];
+    }
+
+    /* -----------------------------------------------
        draw(history, positions, mouseX, mouseY, latestBar)
 
-       @param {Object[]} history     Array of OHLC bar objects
-                                     { day, open, high, low, close, v, r }
-       @param {Object[]} positions   Portfolio positions array
-                                     { type, side, qty, entryDay, strike?, expiryDay?, … }
-       @param {number}   mouseX      Mouse X in CSS px, or <0 to hide crosshair
-       @param {number}   mouseY      Mouse Y in CSS px, or <0 to hide crosshair
-       @param {Object}   [latestBar] The most-recently-added bar (used for current-price line)
+       The tape, after Tufte: each day's range is a
+       band, the close a line over it. News days are
+       ticked on the band, positions marked where they
+       were entered, option strikes ruled across.
+
+       @param {Object[]} history     OHLC bars { day, open, high, low, close }
+       @param {Object[]} positions   Portfolio positions
+       @param {number}   mouseX      CSS px, or <0 to hide the crosshair
+       @param {number}   mouseY      CSS px
+       @param {Object}   [latestBar] The live bar
     ----------------------------------------------- */
     draw(history, positions, mouseX, mouseY, latestBar) {
         const ctx = this.ctx;
-        const dpr = this._dpr;
-
-        // Resolve theme-sensitive colors (cached per theme)
-        const currentTheme = document.documentElement.dataset.theme || 'light';
-        if (currentTheme !== this._cachedTheme) {
-            this._cachedTheme = currentTheme;
-            const t = _themePalette();
-            this._textMuted = t.textMuted;
-            this._textSec   = t.textSecondary;
-            this._gridColor = _r(t.text, 0.06);
-            // Crosshair tags: accent fill with --text-on-accent (the theme's
-            // elevated surface) — white on oxblood, near-black on the dark red.
-            this._accent    = t.accent;
-            this._onAccent  = t.elevated;
-        }
-        const textMuted = this._textMuted;
-        const textSec = this._textSec;
-        const palette   = _themePalette();
-        // Layout constants
-        const W   = this.width;
-        const H   = this.height;
-        const yAW = this.Y_AXIS_W;    // Y-axis gutter on right
-        const yLW = this.Y_LABEL_W;   // Y-axis label on left
-        const xAH = this.X_AXIS_H;    // X-axis gutter at bottom
-        const pT  = this.PADDING_T;   // top padding
-
-        // Chart plot area (in CSS px, within the full canvas)
-        const plotX = yLW;
-        const plotY = pT;
-        const plotW = W - yAW - yLW;
-        const plotH = H - pT - xAH;
-
-        // Clear (DPR transform already set by resize())
+        const pal = _themePalette();
+        const ink = pal.inks;
+        const text = pal.text, muted = pal.textMuted, sec = pal.textSecondary, red = pal.accent;
+        const W = this.width, H = this.height;
+        const yAW = this.Y_AXIS_W, xAH = this.X_AXIS_H, pT = this.PADDING_T + 22;
+        const plotX = 0, plotY = pT, plotW = W - yAW, plotH = H - pT - xAH;
         ctx.clearRect(0, 0, W, H);
 
-        if (!history || history.length === 0 || history.size === 0) {
-            ctx.fillStyle = textMuted;
-            ctx.font      = `14px ${_FONT.text}`;
+        if (!history || history.size === 0 || history.length === 0) {
+            ctx.fillStyle = muted;
+            ctx.font = `italic 14px ${_FONT.text}`;
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillText('Awaiting market data\u2026', W / 2, H / 2);
+            ctx.fillText('Awaiting the first session…', W / 2, H / 2);
             return;
         }
 
-        // ── 1. Compute visible day range from camera ──────────────
-        // Camera's world X corresponds to day index (day 0 = world X 0,
-        // each day is 1 world unit wide). The camera's worldToScreen maps
-        // world X to screen pixel X within plotW.
-        // We use screenToWorld to find the left/right visible world X,
-        // then clamp to [0, history.length-1].
-
+        // ── Visible days (camera: 1 world unit = 1 day) ──
         const cam = this.camera;
-
-        // Camera zoom = pixels per world unit (1 world unit = 1 day).
-        // Candle body is BODY_RATIO of the slot width.
-        const zoom = (cam && isFinite(cam.zoom) && cam.zoom > 0) ? cam.zoom : this.SLOT_PX;
-        const candleWidthRaw = Math.max(2, Math.min(40, zoom * this.BODY_RATIO));
-
-        // Map between screen X and day index.
-        // We place day `d` candle centered at screen X:  plotX + (d * slotPx) + offset
-        // where offset comes from camera pan.
-        // Using camera: screenX for day d center:
-        //   worldToScreen(d + 0.5)  → gives screen px in viewport coords
-        // But camera was sized to the full canvas (W x H). The plot area
-        // starts at plotX=0 so screen coords are directly usable in plotX range.
-
-        // Buffer bounds (works for both HistoryBuffer and plain array)
         const hMinDay = history.minDay != null ? history.minDay : 0;
         const hMaxDay = history.maxDay != null ? history.maxDay : history.length - 1;
-
-        let firstDay, lastDay;
-
+        const X = (d) => cam ? cam.worldToScreenX(d) : plotX + ((d - hMinDay) / (hMaxDay - hMinDay + 1)) * plotW;
+        let firstDay = hMinDay, lastDay = hMaxDay;
         if (cam) {
-            const worldLeft  = cam.screenToWorldX ? cam.screenToWorldX(plotX) : cam.screenToWorld(plotX, 0).x;
-            const worldRight = cam.screenToWorldX ? cam.screenToWorldX(plotX + plotW) : cam.screenToWorld(plotX + plotW, 0).x;
-            firstDay = Math.max(hMinDay, Math.floor(worldLeft)   - 1);
-            lastDay  = Math.min(hMaxDay, Math.ceil(worldRight));
-        } else {
-            firstDay = hMinDay;
-            lastDay  = hMaxDay;
+            firstDay = Math.max(hMinDay, Math.floor(cam.screenToWorldX(plotX)) - 1);
+            lastDay = Math.min(hMaxDay, Math.ceil(cam.screenToWorldX(plotX + plotW)));
         }
-
         if (firstDay > lastDay) return;
+        const _get = typeof history.get === 'function' ? (d) => history.get(d) : (d) => history[d];
 
-        // Collect visible bars via .get() (ring buffer) or direct index (array)
-        const _get = typeof history.get === 'function'
-            ? (d) => history.get(d)
-            : (d) => history[d];
-
-        // ── 2. Auto-scale Y (logarithmic) ──────────────────────────
-        let minPrice =  Infinity;
-        let maxPrice = -Infinity;
+        // The live day draws from the interpolated close; the one-frame wrong
+        // print (P7-1) rides on it and is consumed below.
+        const liveDay = this._lerp.day, repaint = this._repaint;
+        const bars = [];
+        let lo = Infinity, hi = -Infinity;
         for (let d = firstDay; d <= lastDay; d++) {
-            const bar = _get(d);
-            if (!bar) continue;
-            if (bar.low  < minPrice) minPrice = bar.low;
-            if (bar.high > maxPrice) maxPrice = bar.high;
+            const b = _get(d);
+            if (!b) continue;
+            let h = b.high, l = b.low, c = b.close;
+            if (d === liveDay && liveDay >= 0) {
+                c = this._lerp.close + repaint;
+                h = Math.max(this._lerp.high, c);
+                l = Math.min(this._lerp.low, c);
+            }
+            bars.push({ d, o: b.open, h, l, c, x: X(d + 0.5) });
+            if (l < lo) lo = l;
+            if (h > hi) hi = h;
+        }
+        if (!bars.length) return;
+        if (lo <= 0) lo = 0.01;
+        if (hi <= lo) hi = lo * 1.02;
+
+        // ── Log scale with a little air ──
+        const lLo0 = Math.log(lo), lHi0 = Math.log(hi), span = lHi0 - lLo0;
+        const lLo = lLo0 - span * 0.08, lHi = lHi0 + span * 0.1, lD = lHi - lLo;
+        const Y = (p) => plotY + plotH - ((Math.log(Math.max(p, 1e-9)) - lLo) / lD) * plotH;
+        const pLo = Math.exp(lLo), pHi = Math.exp(lHi);
+        const step = _niceInterval(pHi - pLo, 5);
+        const font = (px, it) => `${it ? 'italic ' : ''}${px}px ${_FONT.text}`;
+
+        // ── Price rules: hairlines, labels at the right ──
+        ctx.lineWidth = 1;
+        ctx.strokeStyle = _r(text, 0.06);
+        ctx.beginPath();
+        for (let p = Math.ceil(pLo / step) * step; p <= pHi; p += step) {
+            const y = Math.round(Y(p)) + 0.5;
+            ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW + 4, y);
+        }
+        ctx.stroke();
+        ctx.font = font(12);
+        ctx.fillStyle = muted;
+        ctx.textAlign = 'left';
+        ctx.textBaseline = 'middle';
+        for (let p = Math.ceil(pLo / step) * step; p <= pHi; p += step) {
+            const y = Y(p);
+            if (y < plotY + 6 || y > plotY + plotH - 4) continue;
+            ctx.fillText(_tickPrice(p, step), plotX + plotW + 8, y);
         }
 
-        // Floor to avoid log(0)
-        if (minPrice <= 0) minPrice = 0.01;
-        if (maxPrice <= minPrice) maxPrice = minPrice * 1.02;
-
-        const logMin = Math.log(minPrice);
-        const logMax = Math.log(maxPrice);
-        const logRange = logMax - logMin;
-        const padFrac  = 0.10;
-        const logLo    = logMin - logRange * padFrac;
-        const logHi    = logMax + logRange * padFrac;
-        const logDelta = logHi - logLo;
-
-        // Actual price bounds for labels/grid (exponentiated back)
-        const priceLo = Math.exp(logLo);
-        const priceHi = Math.exp(logHi);
-
-        // Convert price → Y pixel (logarithmic scale)
-        const priceToY = (price) => {
-            const lp = Math.log(Math.max(price, 1e-10));
-            return plotY + plotH - ((lp - logLo) / logDelta) * plotH;
-        };
-
-        // ── 3. Draw grid ─────────────────────────────────────────
         ctx.save();
         ctx.beginPath();
-        // Clip grid lines to plot area
-        ctx.rect(plotX, plotY, plotW, plotH);
+        ctx.rect(plotX, plotY - 2, plotW, plotH + 4);
         ctx.clip();
 
-        // Horizontal grid lines at nice price intervals (log-aware)
-        const linearRange = Math.exp(logHi) - Math.exp(logLo);
-        const priceInterval = _niceInterval(linearRange, 6);
-        const priceStart    = Math.ceil(priceLo / priceInterval) * priceInterval;
+        // ── Option strikes held: dashed rules, call and put inks ──
+        const strikes = new Map();
+        for (const pos of positions || []) {
+            if ((pos.type !== 'call' && pos.type !== 'put') || pos.strike == null) continue;
+            const e = strikes.get(pos.strike) || { call: false, put: false };
+            e[pos.type] = true;
+            strikes.set(pos.strike, e);
+        }
+        ctx.font = font(12, true);
+        ctx.textBaseline = 'bottom';
+        for (const [K, f] of strikes) {
+            const y = Math.round(Y(K)) + 0.5;
+            if (y < plotY || y > plotY + plotH) continue;
+            const col = f.call && f.put ? sec : f.call ? (pal.call || ink.indigo) : (pal.put || ink.sienna);
+            ctx.strokeStyle = _r(col, 0.7);
+            ctx.setLineDash([5, 4]);
+            ctx.beginPath(); ctx.moveTo(plotX, y); ctx.lineTo(plotX + plotW, y); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.fillStyle = col;
+            ctx.textAlign = 'left';
+            ctx.fillText(`${K} ${f.call && f.put ? 'call and put' : f.call ? 'call' : 'put'}`, plotX + 6, y - 2);
+        }
 
-        const gridColor = this._gridColor;
-
-        ctx.strokeStyle = gridColor;
-        ctx.lineWidth   = 1;
+        // ── The day's range: one band through every high and low ──
+        const half = Math.max(0.5, Math.min(6, (cam ? cam.zoom : 8) * 0.36));
         ctx.beginPath();
+        for (let i = 0; i < bars.length; i++) {
+            const b = bars[i];
+            if (i === 0) ctx.moveTo(b.x - half, Y(b.h)); else ctx.lineTo(b.x - half, Y(b.h));
+            ctx.lineTo(b.x + half, Y(b.h));
+        }
+        for (let i = bars.length - 1; i >= 0; i--) {
+            const b = bars[i];
+            ctx.lineTo(b.x + half, Y(b.l));
+            ctx.lineTo(b.x - half, Y(b.l));
+        }
+        ctx.closePath();
+        ctx.fillStyle = _r(text, document.documentElement.dataset.theme === 'dark' ? 0.13 : 0.09);
+        ctx.fill();
 
-        for (let p = priceStart; p <= priceHi + priceInterval * 0.01; p += priceInterval) {
-            const py = Math.round(priceToY(p)) + 0.5;
-            if (py < plotY || py > plotY + plotH) continue;
-            ctx.moveTo(plotX, py);
-            ctx.lineTo(plotX + plotW, py);
+        // ── News days: a tick on the band; recent heads along the top ──
+        const news = this._news || [];
+        const newsByDay = new Map();
+        for (const n of news) if (n.day >= firstDay && n.day <= lastDay) newsByDay.set(n.day, n);
+        ctx.strokeStyle = sec;
+        ctx.lineWidth = 1;
+        for (const [d, n] of newsByDay) {
+            const b = bars.find(z => z.d === d);
+            if (!b) continue;
+            const x = Math.round(b.x) + 0.5, y = Y(b.h) - 5;
+            ctx.beginPath(); ctx.moveTo(x, y); ctx.lineTo(x, y - (n.major ? 9 : 5)); ctx.stroke();
+        }
+        ctx.restore();
+
+        // Heads, newest first, in two rows above the plot, leader lines to their days.
+        ctx.font = font(12.5, true);
+        ctx.textBaseline = 'alphabetic';
+        const taken = [];
+        const recent = [...newsByDay.values()].sort((a, b) => b.day - a.day).slice(0, 8);
+        for (const n of recent) {
+            const b = bars.find(z => z.d === n.day);
+            if (!b) continue;
+            const x = Math.round(b.x) + 0.5;
+            const label = n.head.length > 54 ? n.head.slice(0, 52).replace(/\s+\S*$/, '') + '…' : n.head;
+            const w = ctx.measureText(label).width;
+            const right = x > plotW * 0.55;
+            const x0 = right ? x - 4 - w : x + 4;
+            if (x0 < plotX || x0 + w > plotX + plotW) continue;
+            let row = 0;
+            while (row < 2 && taken.some(t => t.row === row && x0 < t.x1 + 10 && x0 + w > t.x0 - 10)) row++;
+            if (row > 1) continue;
+            taken.push({ row, x0, x1: x0 + w });
+            const ty = 14 + row * 16;
+            ctx.strokeStyle = _r(text, 0.22);
+            ctx.beginPath(); ctx.moveTo(x, ty + 3); ctx.lineTo(x, Y(b.h) - 6); ctx.stroke();
+            ctx.fillStyle = n.major ? text : muted;
+            ctx.textAlign = 'left';
+            ctx.fillText(label, x0, ty);
         }
 
-        // Vertical grid lines — adaptive interval targeting ~5–8 lines
-        const visibleDays = lastDay - firstDay + 1;
-        const _daySteps = [1, 3, 7, 21, 42, 63, 84, 252];
-        const rough = visibleDays / 7;
-        let dayInterval = _daySteps[_daySteps.length - 1];
-        for (let i = 0; i < _daySteps.length; i++) {
-            if (_daySteps[i] >= rough) { dayInterval = _daySteps[i]; break; }
-        }
-        const dayStart = Math.ceil(firstDay / dayInterval) * dayInterval;
+        ctx.save();
+        ctx.beginPath();
+        ctx.rect(plotX, plotY - 2, plotW, plotH + 4);
+        ctx.clip();
 
-        if (cam) {
-            for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
-                const sx = Math.round(cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x) + 0.5;
-                if (sx < plotX || sx > plotX + plotW) continue;
-                ctx.moveTo(sx, plotY);
-                ctx.lineTo(sx, plotY + plotH);
-            }
+        // ── The close: one line ──
+        ctx.strokeStyle = text;
+        ctx.lineWidth = 1.4;
+        ctx.lineJoin = 'round';
+        ctx.beginPath();
+        bars.forEach((b, i) => { if (i) ctx.lineTo(b.x, Y(b.c)); else ctx.moveTo(b.x, Y(b.c)); });
+        ctx.stroke();
+
+        // ── Entries: a triangle under the band for long, over it for short ──
+        for (const pos of positions || []) {
+            const b = bars.find(z => z.d === pos.entryDay);
+            if (!b) continue;
+            const col = pal[pos.type] || text;
+            if (pos.qty > 0) _drawTriangle(ctx, b.x, Y(b.l) + 12, 4.5, 'up', col);
+            else _drawTriangle(ctx, b.x, Y(b.h) - 12, 4.5, 'down', col);
+        }
+        ctx.restore();
+
+        // ── Today: the last close, red if the session is down ──
+        const last = bars[bars.length - 1];
+        const lastBar = latestBar || (typeof history.last === 'function' ? history.last() : null);
+        if (lastBar && last.d === lastBar.day) {
+            const prev = _get(last.d - 1);
+            const down = last.c < (prev ? prev.close : last.o);
+            const y = Y(last.c);
+            ctx.strokeStyle = _r(text, 0.3);
+            ctx.lineWidth = 1;
+            ctx.setLineDash([1, 3]);
+            ctx.beginPath(); ctx.moveTo(last.x + 5, Math.round(y) + 0.5); ctx.lineTo(plotX + plotW + 4, Math.round(y) + 0.5); ctx.stroke();
+            ctx.setLineDash([]);
+            ctx.beginPath(); ctx.arc(last.x, y, 3, 0, Math.PI * 2);
+            ctx.fillStyle = down ? red : text; ctx.fill();
+            ctx.font = `600 12.5px ${_FONT.text}`;
+            const lbl = last.c.toFixed(2), lw = ctx.measureText(lbl).width;
+            ctx.fillStyle = pal.canvas;
+            ctx.fillRect(plotX + plotW + 4, y - 9, lw + 8, 18);
+            ctx.fillStyle = down ? red : text;
+            ctx.textAlign = 'left';
+            ctx.textBaseline = 'middle';
+            ctx.fillText(lbl, plotX + plotW + 8, y);
+        }
+
+        // ── Calendar: month ticks, year and quarter names ──
+        const vis = lastDay - firstDay + 1;
+        const tick = vis > 400 ? 63 : vis > 150 ? 42 : 21;
+        ctx.font = font(12);
+        ctx.fillStyle = muted;
+        ctx.strokeStyle = _r(text, 0.25);
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'top';
+        const o = this.dayOrigin;
+        const yAxis = plotY + plotH + 4;
+        ctx.beginPath();
+        for (let d = Math.ceil((firstDay - o) / tick) * tick + o; d <= lastDay + 1; d += tick) {
+            const x = Math.round(X(d)) + 0.5;
+            if (x < plotX + 18 || x > plotX + plotW - 18) continue;
+            ctx.moveTo(x, yAxis); ctx.lineTo(x, yAxis + 4);
+            const rel = d - o;
+            ctx.fillText(rel < 0 ? `${rel} days` : rel % 252 === 0 ? `Year ${rel / 252 + 1}` : `day ${rel}`, x, yAxis + 7);
         }
         ctx.stroke();
 
-        ctx.restore();
-
-        // ── 4. Draw candles ──────────────────────────────────────
-        ctx.save();
-        ctx.beginPath();
-        ctx.rect(plotX, plotY, plotW, plotH);
-        ctx.clip();
-
-        const upWicks = [], downWicks = [], upBodies = [], downBodies = [];
-        const liveDay = this._lerp.day;
-        // One-frame wrong print (P7-1). Consumed below, after the price line.
-        const repaint = this._repaint;
-
-        for (let i = firstDay; i <= lastDay; i++) {
-            const bar = _get(i);
-            if (!bar) continue;
-            let bHigh, bLow, bClose;
-            if (i === liveDay && liveDay >= 0) {
-                bClose = this._lerp.close + repaint;
-                bHigh = Math.max(this._lerp.high, bClose);
-                bLow  = Math.min(this._lerp.low, bClose);
-            } else {
-                bHigh = bar.high; bLow = bar.low; bClose = bar.close;
-            }
-            const isUp = bClose >= bar.open;
-            let cx;
-            if (cam) { cx = cam.worldToScreenX ? cam.worldToScreenX(i + 0.5) : cam.worldToScreen(i + 0.5, 0).x; }
-            else { cx = plotX + ((i + 0.5) / history.length) * plotW; }
-            const yHigh = priceToY(bHigh), yLow = priceToY(bLow);
-            const yOpen = priceToY(bar.open), yClose = priceToY(bClose);
-            const yTop = Math.min(yOpen, yClose), yBot = Math.max(yOpen, yClose);
-            const bodyH = Math.max(1, yBot - yTop);
-            const bodyLeft = cx - candleWidthRaw / 2;
-            (isUp ? upWicks : downWicks).push(cx, yHigh, yLow);
-            (isUp ? upBodies : downBodies).push(bodyLeft, yTop, candleWidthRaw, bodyH);
-        }
-
-        for (const [wicks, bodies, color] of [[upWicks, upBodies, palette.up], [downWicks, downBodies, palette.down]]) {
-            if (wicks.length === 0) continue;
-            ctx.strokeStyle = color; ctx.lineWidth = 1; ctx.beginPath();
-            for (let j = 0; j < wicks.length; j += 3) {
-                ctx.moveTo(wicks[j], wicks[j + 1]); ctx.lineTo(wicks[j], wicks[j + 2]);
-            }
-            ctx.stroke();
-            ctx.fillStyle = color;
-            const r = Math.min(candleWidthRaw * 0.25, 3);
-            for (let j = 0; j < bodies.length; j += 4) {
-                const bx = bodies[j], by = bodies[j + 1], bw = bodies[j + 2], bh = bodies[j + 3];
-                ctx.beginPath();
-                ctx.roundRect(bx, by, bw, bh, bh > r * 2 ? r : bh / 2);
-                ctx.fill();
-            }
-        }
-
-        ctx.restore();
-
-        // ── 5. Current price line ─────────────────────────────────
-        const lastBar = latestBar
-            || (typeof history.last === 'function' ? history.last() : history[history.length - 1]);
-        if (lastBar) {
-            // Use lerped close for the live candle's price line
-            const priceLineClose = (liveDay >= 0 && lastBar.day === liveDay)
-                ? this._lerp.close + repaint
-                : lastBar.close;
-            const yLast = priceToY(priceLineClose);
-            if (yLast >= plotY && yLast <= plotY + plotH) {
-                ctx.save();
-                ctx.strokeStyle = this._accent;
-                ctx.lineWidth   = 1;
-                ctx.setLineDash([4, 4]);
-                ctx.beginPath();
-                ctx.moveTo(plotX, yLast);
-                ctx.lineTo(plotX + plotW, yLast);
-                ctx.stroke();
-                ctx.setLineDash([]);
-                ctx.restore();
-            }
-        }
-
-        // ── 6. Position entry markers ─────────────────────────────
-        // Draw small triangles at each position's entry candle
-        if (positions && positions.length > 0) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(plotX, plotY, plotW, plotH);
-            ctx.clip();
-
-            for (const pos of positions) {
-                const d = pos.entryDay;
-                if (d < hMinDay || d > hMaxDay) continue;
-                const bar = _get(d);
-                if (!bar) continue;
-
-                let cx;
-                if (cam) {
-                    cx = cam.worldToScreenX ? cam.worldToScreenX(d + 0.5) : cam.worldToScreen(d + 0.5, 0).x;
-                } else {
-                    cx = plotX + ((d + 0.5) / history.length) * plotW;
-                }
-                if (cx < plotX - 6 || cx > plotX + plotW + 6) continue;
-
-                const isLong = pos.qty > 0;
-                const markerColor = palette[pos.type] || palette.stock;
-
-                if (isLong) {
-                    // Upward triangle below the low
-                    const baseY = priceToY(bar.low) + 10;
-                    _drawTriangle(ctx, cx, baseY, 5, 'up', markerColor);
-                } else {
-                    // Downward triangle above the high
-                    const baseY = priceToY(bar.high) - 10;
-                    _drawTriangle(ctx, cx, baseY, 5, 'down', markerColor);
-                }
-            }
-
-            ctx.restore();
-        }
-
-        // ── 7. Strike lines for open option positions ─────────────
-        const openOptions = positions
-            ? positions.filter(p => (p.type === 'call' || p.type === 'put') && p.strike != null)
-            : [];
-
-        if (openOptions.length > 0) {
-            ctx.save();
-            ctx.beginPath();
-            ctx.rect(plotX, plotY, plotW, plotH);
-            ctx.clip();
-
-            const strikeDash = [6, 3];
-            ctx.lineWidth   = 1;
-            ctx.font        = LABEL_FONT();
-            ctx.textBaseline = 'bottom';
-
-            // Collect colors per strike: track whether green/rose appear
-            const strikeColors = new Map(); // strike -> { green, rose }
-            const green = palette.call || palette.up;
-            const rose  = palette.put  || palette.down;
-
-            for (const pos of openOptions) {
-                const strike = pos.strike;
-                if (!strikeColors.has(strike)) strikeColors.set(strike, { green: false, rose: false });
-                const entry = strikeColors.get(strike);
-                const isShort = pos.qty < 0;
-                if ((pos.type === 'call') !== isShort) entry.green = true;
-                else entry.rose = true;
-            }
-
-            for (const [strike, flags] of strikeColors) {
-                const ys = priceToY(strike);
-                if (ys < plotY || ys > plotY + plotH) continue;
-
-                const py = Math.round(ys) + 0.5;
-
-                const lineColor = (flags.green && flags.rose)
-                    ? palette.inks.ochre
-                    : flags.green ? green : rose;
-                ctx.strokeStyle = lineColor + '99'; // semi-transparent
-                ctx.setLineDash(strikeDash);
-                ctx.beginPath();
-                ctx.moveTo(plotX, py);
-                ctx.lineTo(plotX + plotW, py);
-                ctx.stroke();
-                ctx.setLineDash([]);
-
-                // Label
-                ctx.fillStyle  = lineColor;
-                ctx.textAlign  = 'left';
-                ctx.fillText(`$${strike.toFixed(2)}`, plotX + 4, py - 2);
-            }
-
-            ctx.restore();
-        }
-
-        // ── 8. Y-axis labels ──────────────────────────────────────
-        ctx.save();
-        ctx.font        = LABEL_FONT();
-        ctx.fillStyle   = textSec;
-        ctx.textAlign   = 'right';
-        ctx.textBaseline = 'middle';
-
-        for (let p = priceStart; p <= priceHi + priceInterval * 0.01; p += priceInterval) {
-            const py = priceToY(p);
-            if (py < plotY - 8 || py > plotY + plotH + 8) continue;
-            const label = _formatPrice(p);
-            ctx.fillText(label, W - 4, py);
-        }
-
-        ctx.restore();
-
-        // ── 8b. Y-axis rotated label "Price ($)" ────────────────
-        ctx.save();
-        ctx.fillStyle    = textMuted;
-        ctx.font         = LABEL_FONT();
-        ctx.textAlign    = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.translate(10, plotY + plotH / 2);
-        ctx.rotate(-Math.PI / 2);
-        ctx.fillText('Price ($)', 0, 0);
-        ctx.restore();
-
-        // ── 9. X-axis labels ──────────────────────────────────────
-        ctx.save();
-        ctx.font        = LABEL_FONT();
-        ctx.fillStyle   = textMuted;
-        ctx.textAlign   = 'center';
-        ctx.textBaseline = 'top';
-
-        const xAxisY = plotY + plotH + 6;
-
-        if (cam) {
-            for (let d = dayStart; d <= lastDay + dayInterval; d += dayInterval) {
-                const sx = cam.worldToScreenX ? cam.worldToScreenX(d) : cam.worldToScreen(d, 0).x;
-                if (sx < plotX + 20 || sx > plotX + plotW - 20) continue;
-                ctx.fillText(fmtRelDay(d, this.dayOrigin), sx, xAxisY);
-            }
-        }
-
-        ctx.restore();
-
-        // ── 10. Crosshair ─────────────────────────────────────────
-        const inPlot = mouseX >= 0
-            && mouseX >= plotX && mouseX <= plotX + plotW
-            && mouseY >= plotY && mouseY <= plotY + plotH;
-
-        if (mouseX >= 0 && inPlot) {
-            const crossColor = _r(_themePalette().text, 0.25);
-
-            ctx.save();
-            ctx.strokeStyle = crossColor;
-            ctx.lineWidth   = 1;
-            ctx.setLineDash([3, 3]);
-
-            // Vertical line
-            const vx = Math.round(mouseX) + 0.5;
-            ctx.beginPath();
-            ctx.moveTo(vx, plotY);
-            ctx.lineTo(vx, plotY + plotH);
-            ctx.stroke();
-
-            // Horizontal line
-            const hy = Math.round(mouseY) + 0.5;
-            ctx.beginPath();
-            ctx.moveTo(plotX, hy);
-            ctx.lineTo(plotX + plotW, hy);
-            ctx.stroke();
-
+        // ── Crosshair and the day's agate line ──
+        const inPlot = mouseX >= plotX && mouseX <= plotX + plotW && mouseY >= plotY && mouseY <= plotY + plotH;
+        if (mouseX >= 0 && inPlot && cam) {
+            const hd = Math.floor(cam.screenToWorldX(mouseX));
+            const hb = bars.find(z => z.d === hd);
+            ctx.strokeStyle = _r(text, 0.25);
+            ctx.setLineDash([2, 3]);
+            const vx = Math.round(hb ? hb.x : mouseX) + 0.5, hy = Math.round(mouseY) + 0.5;
+            ctx.beginPath(); ctx.moveTo(vx, plotY); ctx.lineTo(vx, plotY + plotH); ctx.stroke();
+            ctx.beginPath(); ctx.moveTo(plotX, hy); ctx.lineTo(plotX + plotW, hy); ctx.stroke();
             ctx.setLineDash([]);
-
-            // Price label on Y-axis (log scale: invert priceToY)
-            const hoverLogP = logLo + ((plotY + plotH - mouseY) / plotH) * logDelta;
-            const hoverPrice = Math.exp(hoverLogP);
-            const priceLabelW = yAW - 4;
-            const priceLabelH = 18;
-            const priceLabelX = plotX + plotW;
-            const priceLabelY = Math.round(mouseY) - priceLabelH / 2;
-
-            ctx.fillStyle = this._accent;
-            ctx.fillRect(priceLabelX, priceLabelY, priceLabelW, priceLabelH);
-            ctx.fillStyle = this._onAccent;
-            ctx.font        = LABEL_FONT();
-            ctx.textAlign   = 'center';
-            ctx.textBaseline = 'middle';
-            ctx.fillText(
-                _formatPrice(hoverPrice),
-                priceLabelX + priceLabelW / 2,
-                priceLabelY + priceLabelH / 2
-            );
-
-            // Day label on X-axis
-            let hoverDay = -1;
-            if (cam) {
-                hoverDay = Math.floor(cam.screenToWorldX ? cam.screenToWorldX(mouseX) : cam.screenToWorld(mouseX, 0).x);
+            const hp = Math.exp(lLo + ((plotY + plotH - mouseY) / plotH) * lD);
+            ctx.font = font(12);
+            const pl = _formatPrice(hp), pw = ctx.measureText(pl).width;
+            ctx.fillStyle = pal.canvas; ctx.fillRect(plotX + plotW + 4, mouseY - 9, pw + 8, 18);
+            ctx.strokeStyle = _r(text, 0.3); ctx.strokeRect(plotX + plotW + 4.5, mouseY - 8.5, pw + 7, 17);
+            ctx.fillStyle = text; ctx.textAlign = 'left'; ctx.textBaseline = 'middle';
+            ctx.fillText(pl, plotX + plotW + 8, mouseY);
+            if (hb) {
+                const rel = hd - o;
+                const n = newsByDay.get(hd);
+                let line = `${rel >= 0 ? 'Edition ' + (rel + 1) : rel + ' days'} · open ${hb.o.toFixed(2)}, high ${hb.h.toFixed(2)}, low ${hb.l.toFixed(2)}, close ${hb.c.toFixed(2)}`;
+                ctx.font = font(12.5, true);
+                ctx.textAlign = 'left'; ctx.textBaseline = 'alphabetic';
+                const rows = [line];
+                if (n) rows.unshift(n.head.length > 96 ? n.head.slice(0, 94).replace(/\s+\S*$/, '') + '…' : n.head);
+                rows.forEach((t, k) => {
+                    const y = plotY + plotH - 8 - (rows.length - 1 - k) * 17;
+                    const tw = Math.min(plotW - 4, ctx.measureText(t).width + 8);
+                    ctx.fillStyle = pal.canvas;
+                    ctx.fillRect(plotX, y - 13, tw, 17);
+                    ctx.fillStyle = k === rows.length - 1 ? sec : text;
+                    ctx.fillText(t, plotX + 3, y);
+                });
             }
-
-            if (hoverDay >= hMinDay && hoverDay <= hMaxDay) {
-                const dayText = fmtRelDay(hoverDay, this.dayOrigin);
-
-                ctx.font        = LABEL_FONT();
-                const dayLabelW = ctx.measureText(dayText).width + 10;
-                const dayLabelH = 18;
-                const dayLabelX = Math.round(mouseX) - dayLabelW / 2;
-                const dayLabelY = plotY + plotH;
-
-                ctx.fillStyle = this._accent;
-                ctx.fillRect(dayLabelX, dayLabelY, dayLabelW, dayLabelH);
-                ctx.fillStyle = this._onAccent;
-                ctx.textAlign   = 'center';
-                ctx.textBaseline = 'middle';
-                ctx.fillText(dayText, dayLabelX + dayLabelW / 2, dayLabelY + dayLabelH / 2);
-            }
-
-            ctx.restore();
         }
 
-        // ── 11. Consume the one-frame wrong print (P7-1) ──────────
-        // Drawn exactly once; `_repaintDirty` makes main.js schedule the
-        // corrective redraw even if nothing else is animating.
         if (this._repaint !== 0) {
             this._repaint = 0;
             this._repaintDirty = true;
@@ -725,6 +533,11 @@ function _niceInterval(range, targetCount) {
     else                       nice = 10;
 
     return nice * base;
+}
+
+/** An axis price at the precision its tick step needs, without a currency sign. */
+function _tickPrice(p, step) {
+    return p.toFixed(step >= 1 ? 0 : step >= 0.1 ? 1 : 2);
 }
 
 /**

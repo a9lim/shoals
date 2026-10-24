@@ -4,7 +4,8 @@ Shoals is the AI race played from a derivatives desk, at a9l.im/shoals. The play
 trades Halcyon (HCN) stock, bonds, VXHCN volatility futures and American options.
 In the Dynamic modes they also trade Consensus milestone binaries and Cambria
 compute futures, while a hidden race model runs underneath and ends each run in one
-of six terminal families. It is vanilla ES modules with Canvas 2D charts and Web
+of six terminal families. The interface is *The Meridian Brief*, the firm's morning
+note (see "The Brief" below). It is vanilla ES modules with Canvas 2D charts and Web
 Audio synthesis. KaTeX for the reference panels loads from jsDelivr, and the
 Dynamic (LLM) mode calls the Anthropic API from the browser.
 It is a submodule of the a9l.im repository (`a9lim.github.io`, at `projects/shoals`); the
@@ -21,7 +22,9 @@ too.
 
 ## Running and checking
 
-Preview through the parent build (root `AGENTS.md`), then open `/shoals/`.
+Preview through the parent build (root `AGENTS.md`), then open `/shoals/`. Without a
+build, `node docs/sim-overhaul/serve.mjs PORT` from the repo root serves `shared/` and
+the projects live from the working tree.
 
 ```bash
 for f in main.js colors.js src/*.js src/events/*.js src/race/*.js tools/*.mjs; do node --check "$f"; done
@@ -42,8 +45,13 @@ stage `tools/`.
 ## Layout
 
 ```
-index.html, styles.css, colors.js  page, styles, project color tokens (--up/--down, Greeks, --vxhcn)
-main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~3.9k lines)
+index.html, styles.css, colors.js  the Brief: masthead, five pages, overlays; styles; data hues on the inks
+main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~4.1k lines)
+src/pages.js       the five pages (folios) and the front page's Quotes/Book rail tabs
+src/brief.js       masthead, editions and extras, the lead item and "In brief"
+src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard
+src/sandbox.js     the sandbox: legs from curve points, the scenario grid, the reading
+src/race-page.js   the race page: public release/claim/certification record, Consensus laws, epilogue reveal
 src/config.js      named constants and PRESETS
 src/simulation.js  GBM + Merton + Heston stock, Vasicek rate, 16 substeps/day; history-buffer.js ring buffer
 src/pricing.js     CRR binomial American pricing, Heston term/skew vol, VXHCN spot/futures, Vasicek bond
@@ -51,7 +59,8 @@ src/chain.js, chain-renderer.js       option chain skeleton/pricing and its tabl
 src/position-value.js  unitPrice() for every position type
 src/price-impact.js    square-root impact overlays, MM rehedge flow, Layer-3 exposure param shifts
 src/portfolio.js       positions, orders, margin, expiry, borrow, liquidation, binary/compute settlement
-src/portfolio-renderer.js, ui.js, chart.js, strategy.js, reference.js  DOM and canvas rendering, info/reference panels
+src/chart.js       the tape: HCN after Tufte (range band, close line, news days, entries, strikes)
+src/portfolio-renderer.js, ui.js, strategy.js, reference.js  DOM and canvas rendering, info/reference panels
 src/strategy-store.js  built-in and saved (localStorage) strategies
 src/market.js          shared market snapshot, written only by main.js `_syncAll()`
 src/events.js          EventEngine: Poisson draw, pulses, one-shots, followups, triggers, impulse dispatch
@@ -199,6 +208,58 @@ them headless.
   decree ⊃ force-majeure ⊃ ordinary). `intel.js` samples reliability-bucketed reads of
   Tianxia velocity for prose.
 
+### The Brief (interface)
+
+The page is the firm's morning note. The shared colophon (seal, name, play, step,
+theme, help; `shared/colophon.js`) sits in the masthead's corner; Shoals loads neither
+`shared/toolbar.js` nor `shared/hud.css` and styles its own hairline controls. The theme
+key is `shoals-theme`.
+
+- **Editions.** `brief.js` numbers each live trading day as an edition (day 0 is
+  Edition 1) and sets the dateline (day, regime, HCN, VXHCN, rate, book). `markExtra`
+  flags an extra edition for a control-regime change, a Taiwan blockade, a superevent
+  or a crisis (`compound`) event; main.js calls it after the day's events fire.
+- **The wire.** Every event-log refresh goes through main.js `_updateWire()`, which
+  also sets the front page's lead (the newest log entry, split at its first clause
+  break by `splitHeadline`; the text is quoted, never rewritten), the "In brief"
+  column and the tape's news days. Event toasts show only off the front page, where
+  the lead carries them. A quiet first edition leads with the tape.
+- **Pages.** `pages.js` shows one of Front page, Markets, Race, Strategy and Desk
+  (`[` `]`, and F, M, G). Entering Strategy is the old strategy mode (it pauses the
+  desk). Hidden pages do no drawing. The old sidebar's contents are distributed: Quotes
+  and Book in the front page's rail (`#tab-trade`, `#tab-portfolio`, ids unchanged),
+  the builder in the Strategy page's rail, the Info tab on the Desk page.
+- **Opening.** The desk opens playing on Edition 1 unless the platform asks for reduced
+  motion, which opens paused on a complete frame. The day-0 forecast lock is queued at
+  boot and arrives as a dispatch when day 0 closes (the popup barrier holds the day, so
+  it is still a day-0 lock).
+- **Dispatches and the last edition.** Popups keep their single path
+  (`_queuePopup`/`_processPopupQueue`/`showPopupEvent`); only the markup and styles
+  changed. The epilogue overlay is the last edition, with a "The race, revealed" button
+  that opens the race page; the race page's "The last edition" reopens it.
+- **Markets.** `takeSnapshot` samples six curves from the engines once per day
+  (`marketsDayClose`, after the day's events) and prices each tradeable point through
+  `unitPrice` or the books' quotes. On a news day the previous snapshot is the ghost
+  and the curves ease from it. Consensus curves come from `binaryProb` (belief B) and
+  the compute curve from `computeCurveFromBelief` on the public view: public state
+  only, the quoters' own inputs.
+- **Sandbox.** Legs are curve points (a click or Enter cycles long, short, removed).
+  `renderSandbox` revalues every leg 63 trading days out across HCN moves and, in
+  Dynamic, how far the race gets (in Classic, volatility). The scenario model is the
+  display's, not the engine's, and unratified: Heston mean reversion with a leverage
+  shock on variance, the capex channel's +0.005 on `b` per newly certified rung, the
+  next rung's median pulled forward by `RUNG_SPACING` as belief does, and compute
+  repriced by `placeholderCurve` at the new certified rung. "Trade these legs" sends
+  each leg through the manual paths (`_deferManual`, `executeMarketOrder`,
+  `executeBinaryTrade`), so the latency ladder and spreads apply.
+- **Race page.** `recordRaceDay` (after the day's events) appends public records to
+  `_pub` (releases with the rung they claim, released-rung claims, certifications, the
+  open ecosystem's rung, the Fixedpoint Index's publication day) and the continuous
+  tracks to `_hid`. During play only `_pub`, belief B and the listed contracts are
+  drawn; `_hid` and the internal crossing days are drawn only after `endRacePage()`
+  (game over). The Fixedpoint Index has no numeric series in the model, so its strip
+  shows publication only.
+
 ### Endings, Act III, audio, LLM
 
 - In a Dynamic run, natural resolution and early ejection (rogue trading, margin
@@ -238,7 +299,9 @@ them headless.
   `EPILOGUE_SLOTS` cells are HTML and use entities.
 - **Public state only.** Quotes, curves, act3 and the bridge's capex latch read only
   public views (`buildPublicView`, `buildComputePublicView`, the `world.ai` mirrors).
-  No hidden capability, latent or τ reaches a price. The harnesses corrupt every
+  No hidden capability, latent or τ reaches a price. The markets page, the sandbox and
+  the race page during play hold to the same rule; the race page's hidden tracks are
+  drawn only after the run ends. The harnesses corrupt every
   hidden field and assert the quotes are unchanged.
 - **Bit-identity is a test invariant.** The harnesses assert bit-identical race
   trajectories for no-player runs, stage-0 export controls and substream isolation,
@@ -292,11 +355,17 @@ them headless.
   `weight` breaks ties among same-day siblings and is not a probability. Choice-level
   `factionShifts` add to the base value.
 - **Display.** Internal money is at $10,000 scale, and `fmtDollar()` appends "k" for
-  portfolio amounts while per-unit prices show raw `$X.XX`. Greeks color by their own
-  CSS vars (`--delta` …), VXHCN by `--vxhcn`, and P&L by `pnl-up`/`pnl-down`.
+  portfolio amounts while per-unit prices show raw `$X.XX`. The accent is the one red
+  and is spent on losses and down moves (`--down`, `pnl-down`, a down session's last
+  close); gains take viridian (`--up`). A short position is not a loss and is never
+  red. Instruments have inks (`colors.js`: stock ochre, bond prussian, call verdigris,
+  put sienna, VXHCN violet, binary indigo, compute umber), and the Greeks match the
+  strategy diagram (`--delta` …).
   Portfolio value is colored against buy-and-hold. All UI and canvas text is
   `--font-text`/`_FONT.text`; `--font-code` is used only for the API-key input. The
-  canvas redraws once `_loadTextFonts()` resolves.
+  canvas redraws once `_loadTextFonts()` resolves. Live captions use
+  `_colophon.caption()`; the tape's first write is forced, because the helper skips a
+  write that falls within its interval of time zero.
 - **Labels.** UI labels, presets, built-in strategies, traits and epilogue labels are
   sentence case in source, so code finds a preset by `/\(offline\)/i`. The chain
   table is rebuilt on every update, with one delegated listener (`_chainClicksBound`).
@@ -316,5 +385,6 @@ them headless.
     the race.
 - `lobbying.js` still has the prototype menu (party PACs, fundraiser, broker a deal,
   leak, counsel the Fed). The AI-policy menu in `03-market-mechanics.md` is unbuilt.
+- The sandbox's scenario model is first-pass and display-only (see "The Brief").
 - `tick()` in `main.js` is dead code. The `/` shortcut and `#step-btn` say "Step
   forward one day", but `step()` advances one substep.

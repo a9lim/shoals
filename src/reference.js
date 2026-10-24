@@ -314,7 +314,7 @@ This creates a locally risk-free position (for small moves), but the hedge
 must be rebalanced as the stock moves (because $\\Delta$ itself changes &mdash; see Gamma).</p>
 
 <h3>Portfolio delta</h3>
-<p>The aggregate delta displayed in the Portfolio tab sums delta across all
+<p>The aggregate delta displayed in the Book rail sums delta across all
 option positions, weighted by quantity and multiplied by the option multiplier (1 in this sim).
 A portfolio delta of $+50$ means $+\\$50$ P&amp;L per $\\$1$ stock move.</p>
 `,
@@ -751,7 +751,7 @@ may be worse than the trigger level if the price gaps through.</p>
 
 <h3>Order lifecycle</h3>
 <p>Pending limit and stop orders are checked at every sub-step (16 per day). They appear
-in the &ldquo;Pending orders&rdquo; section of the Portfolio tab and can be cancelled via the
+in the &ldquo;Pending orders&rdquo; section of the Book rail and can be cancelled via the
 &ldquo;&times;&rdquo; button. Orders are cancelled automatically if their associated option expires.</p>
 `,
     },
@@ -810,7 +810,7 @@ calls, puts, stock, and bonds into a single package with unified execution.</p>
 
 <h3>Building a strategy</h3>
 <ol>
-<li>Switch to the <strong>Strategy tab</strong> in the sidebar.</li>
+<li>Switch to the <strong>Strategy</strong> page.</li>
 <li>Select a <strong>quantity</strong> per leg using the slider.</li>
 <li>Choose an <strong>expiry</strong> from the dropdown.</li>
 <li><strong>Left-click</strong> any chain cell to add a long leg; <strong>right-click</strong> for a short leg.</li>
@@ -827,7 +827,7 @@ partial fills that could leave you with unintended exposure.</p>
 
 <h3>Saved strategies</h3>
 <p>Click &ldquo;Save&rdquo; to name and store the strategy. Saved strategies appear as
-grouped positions in the Portfolio tab under &ldquo;Strategy positions.&rdquo;
+grouped positions in the Book rail under &ldquo;Strategy positions.&rdquo;
 Individual legs can be closed independently, but the grouping helps you
 track the strategy as a whole.</p>
 
@@ -1623,7 +1623,7 @@ The system prompt contains the full universe lore:</p>
 <p>Events are pre-fetched in batches of 3&ndash;5 to minimise API calls and latency.</p>
 
 <h3>Configuration</h3>
-<p>Set your Anthropic API key in the Info tab (stored in <code>localStorage</code>,
+<p>Set your Anthropic API key on the Desk page (stored in <code>localStorage</code>,
 never sent anywhere except the Anthropic API). Choose between:</p>
 <ul>
 <li><strong>Haiku 4.5</strong>: faster, cheaper, good for routine events</li>

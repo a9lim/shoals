@@ -7,6 +7,7 @@
 
 import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD, BOND_FACE_VALUE } from './src/config.js';
 import { fmtDollar } from './src/format-helpers.js';
+import { createSparkHistory, pushSparkSample } from './src/sparkline.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
 import {
@@ -33,7 +34,12 @@ import {
     updateStrategyDropdowns, updateCreditDebit,
     showPopupEvent,
 } from './src/ui.js';
-import { initTheme, toggleTheme } from './src/theme.js';
+import { initPages, showPage, cyclePage, currentPage, showRailTab } from './src/pages.js';
+import { initBrief, resetBrief, updateMasthead, renderWire, markExtra, splitHeadline } from './src/brief.js';
+import { initMarkets, setMarketsVisible, marketsDayClose, resetMarkets, refreshMarkets, redrawMarkets } from './src/markets.js';
+import { initSandbox, pickPoint, legState, renderSandbox, resetSandbox } from './src/sandbox.js';
+import { initSurface, drawSurface } from './src/surface.js';
+import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace } from './src/race-page.js';
 import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
 import { LLMEventSource } from './src/llm.js';
 import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
@@ -168,6 +174,8 @@ let _savedImpulse = {};   // event-impulse overlay saved originals (restored at 
 let _lastForecastLockDay = -1;   // race-day of the last forecast-lock prompt (avoids double-firing)
 let _fundLive = false;    // P7-3 fund-as-actor latch (monotone; mirrored to world.ai.fundLive)
 let _roomFired = false;   // P7-3: the room is a once-per-run branch point, gate open or shut
+let _capFront = null;
+let _epilogueReopen = null;   // reopens the last edition after a visit to the race page     // the tape's live caption setter (shared/colophon.js caption())
 
 const _popupQueue = [];
 const playerChoices = {};
@@ -425,7 +433,7 @@ function _fireSubstepArrival() {
     }
     if (fired.length > 0 || popups.length > 0) {
         syncSettingsUI($, _simSettingsObj());
-        updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+        _updateWire();
         updateCongressDiagrams($, eventEngine.world);
         updateStandings($, eventEngine.world, factions, getFactionDescriptor);
         chainDirty = true;
@@ -740,11 +748,9 @@ function _priceExpiry(idx) {
 // ---------------------------------------------------------------------------
 
 cacheDOMElements($);
-$.settingsBtn = document.getElementById('settings-btn');
 $.convictionsSection = document.getElementById('convictions-section');
 $.convictionsList = document.getElementById('convictions-list');
 $.regulationsList = document.getElementById('regulations-list');
-initTheme();
 init();
 
 // ---------------------------------------------------------------------------
@@ -752,6 +758,23 @@ init();
 // ---------------------------------------------------------------------------
 
 function init() {
+    // 0. The colophon (play, step, theme, help) and the Brief's pages. Reduced
+    //    motion opens on a still, complete frame; otherwise the desk is already
+    //    trading when the page appears.
+    const _reduced = typeof matchMedia === 'function' && matchMedia('(prefers-reduced-motion: reduce)').matches;
+    playing = !_reduced;
+    let _about = null;
+    _colophon.mount({
+        themeKey: 'shoals-theme',
+        playing,
+        onPlay: () => { togglePlay(); return playing; },
+        onStep: () => step(),
+        onTheme: () => _onThemeChange(),
+        onHelp: () => { if (_about) _about.show(); },
+    });
+    initPages(_onPageChange);
+    initBrief();
+
     // 1. Create renderers
     chart    = new ChartRenderer($.chartCanvas);
     strategy = new StrategyRenderer($.strategyCanvas);
@@ -807,9 +830,6 @@ function init() {
         }
     });
 
-    // 7. Init sidebar (toggle, close, swipe dismiss)
-    _toolbar.initSidebar($.panelToggle, $.sidebar, $.closePanel);
-
     // 8. Init keyboard shortcuts
 
     var _shortcuts = [
@@ -820,18 +840,21 @@ function init() {
         { key: ',', label: 'Slow down',            group: 'Simulation', action: () => decycleSpeed() },
         { key: '/', label: 'Step forward one day', group: 'Simulation', action: () => step() },
         { key: 'r', label: 'Reset simulation',    group: 'Simulation', action: () => resetSim() },
-        { key: 's', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); _haptic('light'); } },
-        { key: 't', label: 'Toggle sidebar',       group: 'View',       action: () => { _toolbar.toggleSidebar($.panelToggle, $.sidebar); _haptic('light'); } },
-        { key: '[', label: 'Previous tab',         group: 'View',       action: () => cycleTab(-1) },
-        { key: ']', label: 'Next tab',             group: 'View',       action: () => cycleTab(1) },
-        { key: 'Escape', label: 'Close sidebar',   group: 'View',       action: () => { if ($.sidebar.classList.contains('open')) _toolbar.toggleSidebar($.panelToggle, $.sidebar); } },
+        { key: 's', label: 'Show or hide the rail', group: 'View',     action: () => _toggleRail() },
+        { key: 't', label: 'Quotes or book',       group: 'View',       action: () => _toggleRailTab() },
+        { key: '[', label: 'Previous page',        group: 'View',       action: () => cyclePage(-1) },
+        { key: ']', label: 'Next page',            group: 'View',       action: () => cyclePage(1) },
+        { key: 'f', label: 'Front page',           group: 'View',       action: () => showPage('front') },
+        { key: 'm', label: 'Markets',              group: 'View',       action: () => showPage('markets') },
+        { key: 'g', label: 'Race',                 group: 'View',       action: () => showPage('race') },
         { key: '=', label: 'Zoom in',              group: 'View',       action: () => { if (camera) camera.zoomBy(1.2); } },
         { key: '-', label: 'Zoom out',             group: 'View',       action: () => { if (camera) camera.zoomBy(1 / 1.2); } },
         { key: '0', label: 'Reset zoom',           group: 'View',       action: () => { if (camera) { camera.zoom = CHART_SLOT_PX; _repositionCamera(); } } },
         { key: 'b', label: 'Buy / sell stock',     group: 'Trade',      action: () => handleBuyStock() },
         { key: 'n', label: 'Buy / sell bond',      group: 'Trade',      action: () => handleBuyBond() },
         { key: 'x', label: 'Toggle buy / sell',    group: 'Trade',      action: () => document.getElementById('mode-btn').click() },
-        { key: 'Enter', label: 'Execute strategy', group: 'Trade',      action: () => handleTradeExecStrategy() },
+        { key: 'Enter', label: 'Execute strategy', group: 'Trade',      action: () => handleTradeExecStrategy(),
+          when: () => !document.activeElement || document.activeElement === document.body },
         { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
         { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
         { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
@@ -846,20 +869,21 @@ function init() {
     }
 
     if (typeof initAboutPanel === 'function') {
-        initAboutPanel({
+        _about = initAboutPanel({
             title: 'Shoals',
-            lastUpdated: '2026-09-08',
+            lastUpdated: '2026-10-24',
             description: 'Trade stock, bonds, VXHCN volatility futures, and American options in a stochastic market simulator. Build multi-leg strategies, manage a margin portfolio, and navigate branching institutional events during a volatile political term.',
             controls: [
                 { label: 'Buy / sell stock', value: 'Click the HCN price or press B' },
                 { label: 'Buy / sell bond', value: 'Click the bond price or press N' },
-                { label: 'Trade options', value: 'Click a chain price in the Trade tab' },
+                { label: 'Trade options', value: 'Click a price in the agate on the front page' },
                 { label: 'Execute strategy', value: 'Enter key or Execute strategy button' },
-                { label: 'Build strategy', value: 'Add legs in the Strategy tab' },
-                { label: 'Pan / zoom chart', value: 'Drag to pan, = / - / 0 to zoom' },
-                { label: 'Cycle tabs', value: '[ previous, ] next' },
+                { label: 'Build strategy', value: 'Add legs on the Strategy page' },
+                { label: 'Sandbox', value: 'Click a curve point on Markets, or focus a curve and press Enter' },
+                { label: 'Pan / zoom the tape', value: 'Drag to pan, = / - / 0 to zoom' },
+                { label: 'Pages', value: '[ previous, ] next; F, M, G for front, markets, race' },
                 { label: 'Speed', value: '. faster, , slower, / step' },
-                { label: 'Load preset', value: 'Info tab or keys 1\u20137' },
+                { label: 'Load preset', value: 'Desk page or keys 1\u20137' },
             ],
             shortcuts: _shortcuts,
             repo: 'https://github.com/a9lim/shoals',
@@ -868,11 +892,8 @@ function init() {
 
     // 9. Bind UI events
     bindEvents($, {
-        onTogglePlay:     () => togglePlay(),
-        onStep:           () => step(),
         onSpeedUp:        () => cycleSpeed(),
         onSpeedDown:      () => decycleSpeed(),
-        onToggleTheme:    () => { toggleTheme(); updateUI(); dirty = true; },
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
@@ -1139,7 +1160,10 @@ function init() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
-        _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
+        // Day 0 is a real prompted lock (belief.day === 0). At boot it is queued, not
+        // shown: the first edition opens trading, and the dispatch arrives as day 0
+        // closes (the popup barrier holds the day for it, so the lock stays on day 0).
+        _promptDay0Lock(false);
     } else {
         deactivateConsensus();
         deactivateComputeMarket();
@@ -1150,7 +1174,7 @@ function init() {
         _unwireBeliefQuoters();
     }
     updateDynamicSections($, DEFAULT_PRESET);
-    updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
+    _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
     if ($.lobbyBar) $.lobbyBar.style.display = eventEngine ? '' : 'none';
@@ -1179,6 +1203,8 @@ function init() {
 
     updateUI();
 
+    _syncMasthead(true);
+
     // 15. Position camera so latest candle is visible
     _repositionCamera();
 
@@ -1190,6 +1216,7 @@ function init() {
     const chartContainer = document.getElementById('chart-container');
     let prevViewW = $.chartCanvas.clientWidth || $.chartCanvas.offsetWidth || 800;
     function handleResize() {
+        if (!chartContainer.clientWidth) return;   // the front page is hidden
         chart.resize();
         if (strategyMode) strategy.resize();
         const newW = $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800;
@@ -1224,51 +1251,40 @@ function init() {
         if (!strategyMode) dirty = true;
     });
 
-    // 18. Wire tab switching to strategy mode
-    document.querySelectorAll('.tab-btn').forEach(btn => {
-        btn.addEventListener('click', () => {
-            activeTab = btn.dataset.tab || 'trade';
-            const isStrategy = activeTab === 'strategy';
-            if (isStrategy !== strategyMode) {
-                strategyMode = isStrategy;
-                mouseX = -1; mouseY = -1;
-                toggleStrategyView($, strategyMode);
-                if (strategyMode) {
-                    strategy.resize();
-                    // Pause sim when entering strategy mode
-                    if (playing) {
-                        playing = false;
-                        updatePlayBtn($, playing);
-                    }
-                } else {
-                    // Chart canvas was hidden — re-sync buffer size
-                    chart.resize();
-                    _repositionCamera();
-                }
-                dirty = true;
-            }
-            if (isStrategy) {
-                // Invalidate caches so chart/summary reprice with current impact state
-                strategy._cache = null;
-                strategy._summaryCache = null;
-                rebuildStrategyDropdown($, chainSkeleton);
-                const stratPriced = _priceExpiry(_strategyExpiryIdx());
-                updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
-                updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-                updateTimeSliderRange();
-                if (strategyLegs.length > 0) updateStrategyBuilder();
-            }
-        });
-    });
+    // 18. Strategy page resizes with its own container; the rail tabs are pages.js's.
+    const strategyContainer = document.getElementById('strategy-container');
+    if (strategyContainer && typeof ResizeObserver !== 'undefined') {
+        new ResizeObserver(() => {
+            if (!strategyMode) return;
+            strategy.resize();
+            renderCurrentView();
+        }).observe(strategyContainer);
+    }
 
-    // Settings dropdown (volume)
-    if ($.settingsBtn) {
-        _settings.create($.settingsBtn, [
-            { type: 'slider', label: 'Volume', min: 0, max: 100, step: 1,
-              value: Math.round(getVolume() * 100),
-              format: v => Math.round(v) + '%',
-              onChange: v => setVolume(v / 100) }
-        ]);
+    // The markets page and its sandbox read the engines through one context.
+    const _mkCtx = {
+        sim,
+        expiries: () => chainSkeleton,
+        race: () => raceState,
+        geo: () => (eventEngine ? eventEngine.world.geopolitical : null),
+        origin: () => chart.dayOrigin,
+        positions: () => portfolio.positions,
+    };
+    initSandbox(_mkCtx, { onChange: () => redrawMarkets(), onTrade: (legs) => _tradeSandbox(legs) });
+    initMarkets(_mkCtx, { onPick: (pt) => pickPoint(pt), legState });
+    marketsDayClose(null);
+    renderSandbox();
+    initSurface();
+    initRacePage({ race: () => raceState, world: () => (eventEngine ? eventEngine.world : null) });
+    resetRacePage();
+    document.getElementById('race-epilogue').addEventListener('click', () => { if (_epilogueReopen) _epilogueReopen(); });
+
+    // Volume (Desk page)
+    const _vol = document.getElementById('volume-slider');
+    if (_vol) {
+        _vol.value = Math.round(getVolume() * 100);
+        document.getElementById('volume-val').textContent = _vol.value + '%';
+        _forms.bindSlider(_vol, document.getElementById('volume-val'), v => setVolume(v / 100), v => Math.round(v) + '%');
     }
 
     // 19. Debug console API — use window._debug in the browser console
@@ -1284,7 +1300,7 @@ function init() {
             if (!eventEngine) { console.error('eventEngine is null (not in Dynamic mode)'); return; }
             const result = eventEngine._fireEvent(ev, sim, sim.day, 0, 0);
             if (result.queued) { _queuePopup(result.event); _processPopupQueue(); }
-            else { updateEventLog($, eventEngine.eventLog, chart.dayOrigin); updateCongressDiagrams($, eventEngine.world); updateStandings($, eventEngine.world, factions, getFactionDescriptor); }
+            else { _updateWire(); updateCongressDiagrams($, eventEngine.world); updateStandings($, eventEngine.world, factions, getFactionDescriptor); }
             console.log('Fired:', ev.id, result);
             return result;
         },
@@ -1315,16 +1331,170 @@ function init() {
 // frame — rAF loop
 // ---------------------------------------------------------------------------
 
+/** A page switch (pages.js). The Strategy page is the old strategy mode: it
+ *  pauses the desk on entry and reprices its builder; the front page re-syncs the
+ *  tape's buffer, which was zero-sized while hidden. */
+function _onPageChange(page) {
+    const isStrategy = page === 'strategy';
+    if (isStrategy !== strategyMode) {
+        strategyMode = isStrategy;
+        mouseX = -1; mouseY = -1;
+        toggleStrategyView($, strategyMode);
+        if (strategyMode && playing) {
+            playing = false;
+            updatePlayBtn($, playing);
+        }
+    }
+    if (isStrategy) {
+        strategy.resize();
+        // Invalidate caches so chart/summary reprice with current impact state
+        strategy._cache = null;
+        strategy._summaryCache = null;
+        rebuildStrategyDropdown($, chainSkeleton);
+        const stratPriced = _priceExpiry(_strategyExpiryIdx());
+        updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
+        updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
+        updateTimeSliderRange();
+        if (strategyLegs.length > 0) updateStrategyBuilder();
+    } else if (page === 'front') {
+        chart.resize();
+        _repositionCamera();
+        drawSurface();
+    }
+    setMarketsVisible(page === 'markets');
+    if (page === 'markets') renderSandbox();
+    setRaceVisible(page === 'race');
+    dirty = true;
+}
+
+/** Theme flipped (colophon): canvases re-read the palette on their next draw. */
+function _onThemeChange() {
+    updateUI();
+    redrawMarkets();
+    if (currentPage() === 'markets') renderSandbox();
+    drawRace();
+    drawSurface();
+    dirty = true;
+}
+
+/**
+ * Trade the sandbox's legs through the desk's own paths: each leg is a manual
+ * market order (the latency ladder and spread apply, as to any click), binaries
+ * through executeBinaryTrade, compute through the compute chokepoint. Legs are
+ * independent; the toast reports what filled.
+ */
+function _tradeSandbox(legs) {
+    if (_blockedByRestriction()) return;
+    let ok = 0, deferred = 0;
+    const failed = [];
+    for (const L of legs) {
+        const side = L.side > 0 ? 'long' : 'short';
+        let res = null;
+        if (L.type === 'binary') {
+            if (!raceState || !consensus.active) { failed.push(L.desc); continue; }
+            if (_deferManual('binary', { key: L.key, side, qty: L.qty })) { deferred++; continue; }
+            res = executeBinaryTrade(L.key, side, L.qty);
+        } else if (L.type === 'computefuture') {
+            if (!raceState || !computeMarket.active) { failed.push(L.desc); continue; }
+            if (_deferManual('compute', { key: L.key, side, qty: L.qty })) { deferred++; continue; }
+            res = executeMarketOrder(sim, 'computefuture', side, L.qty, sim.S, market.sigma, sim.r, sim.day, L.key, L.key, undefined, sim.q);
+        } else {
+            if (_deferManual('market', { type: L.type, side, qty: L.qty, strike: L.strike, expiryDay: L.expiryDay })) { deferred++; continue; }
+            res = executeMarketOrder(sim, L.type, side, L.qty, sim.S, market.sigma, sim.r, sim.day, L.strike, L.expiryDay, undefined, sim.q);
+            if (res && L.type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, L.qty, 'Stock trade');
+        }
+        if (res) ok++; else failed.push(L.desc);
+    }
+    const parts = [];
+    if (ok) parts.push(`${ok} leg${ok > 1 ? 's' : ''} filled`);
+    if (deferred) parts.push(`${deferred} working`);
+    if (failed.length) parts.push(`rejected: ${failed.join(', ')}`);
+    _toast('Sandbox: ' + (parts.join('; ') || 'nothing traded') + '.', failed.length ? 5000 : 3000);
+    _haptic(failed.length ? 'error' : 'success');
+    chainDirty = true;
+    updateUI();
+    renderSandbox();
+    dirty = true;
+}
+
+/** S: hide or show the rail beside the tape (the tape takes the width). */
+function _toggleRail() {
+    document.body.classList.toggle('rail-off');
+    _haptic('light');
+}
+
+/** T: flip the front page's rail between Quotes and Book. */
+function _toggleRailTab() {
+    const onBook = document.getElementById('tab-portfolio').classList.contains('active');
+    showRailTab(onBook ? 'trade' : 'portfolio');
+}
+
+/** The run-relative day of the edition being traded (day 0 is Edition 1). */
+function _relDay() { return sim.day - chart.dayOrigin; }
+
+/** The dateline's regime: the Classic preset, or the race's control regime. */
+function _regimeLabel() {
+    const idx = $.presetSelect.selectedIndex;
+    if (!_isDynamicPreset(idx)) return PRESETS[idx] ? PRESETS[idx].name : '';
+    const reg = raceState ? raceState.controlRegime : 'private';
+    return 'Dynamic, ' + reg;
+}
+
+function _tapeSnapshot() {
+    const prev = sim.history.get(sim.day - 1);
+    return { S: sim.S, prevClose: prev ? prev.close : sim.S, vx: market.vxhcn || 0, rate: sim.r, rel: _relDay() };
+}
+
+/** Repaint the masthead's dateline (cheap; brief.js writes only on change) and
+ *  the tape's caption. */
+function _syncMasthead(force = false) {
+    const t = _tapeSnapshot();
+    if (!_capFront) _capFront = _colophon.caption(document.getElementById('cap-front'), 400);
+    const bar = sim.history.last();
+    if (bar) {
+        const ch = t.prevClose > 0 ? (t.S / t.prevClose - 1) * 100 : 0;
+        const mv = Math.abs(ch) < 0.05 ? 'flat on the session' : `${ch > 0 ? 'up' : 'down'} ${Math.abs(ch).toFixed(1)}% on the session`;
+        _capFront(`HCN at ${t.S.toFixed(2)}, ${mv}; today's range ${bar.low.toFixed(2)} to ${bar.high.toFixed(2)}. `
+            + 'The band is each day\u2019s range and the line its close; ticks mark news days.', force);
+    }
+    updateMasthead({
+        rel: _relDay(), regime: _regimeLabel(), S: t.S, prevClose: t.prevClose,
+        vx: _publishVxhcn(), rate: t.rate, equity: _portfolioEquity(), initial: portfolio.initialCapital,
+    });
+}
+
+/** The wire: the Desk's event log and the front page's lead and briefs. */
+function _updateWire() {
+    const log = eventEngine ? eventEngine.eventLog : [];
+    updateEventLog($, log, chart.dayOrigin);
+    renderWire(log, chart.dayOrigin, _tapeSnapshot());
+    chart.setNews(log.map(e => ({ day: e.day, head: splitHeadline(e.headline).head, major: e.magnitude === 'major' })));
+    dirty = true;
+}
+
+let _capStrategy = null;
+
+/** The payoff page's caption: what the diagram shows, with its live values. */
+function _strategyCaption() {
+    if (!_capStrategy) _capStrategy = _colophon.caption(document.getElementById('cap-strategy'), 300);
+    const n = strategyLegs.length;
+    if (!n) { _capStrategy('Add legs from the chain at right: the payoff of the book against HCN appears here, gains in green and losses in red.'); return; }
+    const dte = Math.max(0, Math.round(_sliderFallbackDte()));
+    _capStrategy(`Profit and loss of the ${n}-leg book against HCN, ${dte ? dte + ' trading days before expiry' : 'at expiry'}; `
+        + `HCN is at ${sim.S.toFixed(2)} (dashed). Gains are green, losses red; the key toggles each Greek.`);
+}
+
 /** Redraw the active canvas view. Called from frame() and handleResize(). */
 function renderCurrentView() {
     if (strategyMode) {
+        _strategyCaption();
         strategy.draw(
             strategyLegs, sim.S,
             market.sigma,
             sim.r, _sliderFallbackDte(), greekToggles,
             _sliderEvalDay(), sim.day, sim.q
         );
-    } else {
+    } else if (currentPage() === 'front') {
         chart.draw(
             sim.history, portfolio.positions,
             mouseX, mouseY,
@@ -1641,7 +1811,7 @@ function _interceptByStandingOrder(event) {
     if (!choice) return false;
     _applyPopupChoice(event, choice);
     _toast(STANDING_COPY.tip_autosit, 5000);
-    updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+    _updateWire();
     updateStandings($, eventEngine.world, factions, getFactionDescriptor);
     dirty = true;
     return true;
@@ -1688,6 +1858,8 @@ function _processPopupQueue() {
         factions.equityAtLastReview = _portfolioEquity();
         factions.lastReviewDay = sim.day;
     }
+    const _dd = document.getElementById('dispatch-date');
+    if (_dd) _dd.textContent = `Edition ${Math.max(1, _relDay() + 1)} · day ${Math.max(0, _relDay())}`;
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
         if (isSuperevent) stopMusic(2000);
         _applyPopupChoice(event, event.choices[idx]);
@@ -2196,7 +2368,7 @@ function _checkRoom() {
         // The room fires AFTER the day's maybeFire/bridge display pass, so repaint
         // the feed here (the interception precedent) -- the beat is in the log the
         // day it happened, not at some later unrelated refresh.
-        updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+        _updateWire();
     }
 }
 
@@ -2235,11 +2407,11 @@ function _runScrutiny() {
 /** Prompt the day-0 forecast lock at game start (a REAL lock, belief.day === 0):
  *  shown immediately, pausing the game, so the player sets their initial thesis
  *  before the first day advances. Never a manufactured market-prior forecast. */
-function _promptDay0Lock() {
+function _promptDay0Lock(drainNow = true) {
     if (!raceState || !belief.active) return;
     _lastForecastLockDay = 0;
     _promptForecastLock();
-    _processPopupQueue();
+    if (drainNow) _processPopupQueue();
 }
 
 function _promptForecastLock() {
@@ -2393,6 +2565,8 @@ function _blockedByRestriction() {
 }
 
 function _showInterjection(text) {
+    // On the front page the interjection is already the lead (it is on the wire).
+    if (currentPage() === 'front') return;
     const container = document.getElementById('toast-container');
     _toast(text, 6000);
     requestAnimationFrame(() => {
@@ -2718,11 +2892,24 @@ function _onDayComplete() {
         }
         for (const ev of popups) _queuePopup(ev);
         const hasSupereventPopups = popups.some(ev => ev.superevent);
+        // An extra edition: a regime change, a blockade, a superevent or a crisis.
+        const _tr = raceState ? raceState.lastTransitions : null;
+        if (hasSupereventPopups || fired.some(ev => ev.category === 'compound' || ev.superevent)
+            || (_tr && (_tr.regimeChange || (_tr.strait && _tr.strait.blockadeStart)))) {
+            markExtra(_relDay());
+        }
+        // The race page records the day's public ledger (and, for the epilogue, the hidden tracks).
+        if (raceState) recordRaceDay(raceState, eventEngine.world);
+        // The markets page keeps the curves from before today's news as its ghost.
+        const _lead = fired.find(ev => !ev.interjection) || popups[0];
+        marketsDayClose(_lead ? splitHeadline(_lead.headline).head : null);
+        if (currentPage() === 'front') drawSurface();
+        if (currentPage() === 'markets') renderSandbox();
         if (hasSupereventPopups) {
             sim.recomputeK();
             _syncAll();
             syncSettingsUI($, _simSettingsObj());
-            updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+            _updateWire();
             updateCongressDiagrams($, eventEngine.world);
             updateStandings($, eventEngine.world, factions, getFactionDescriptor);
         }
@@ -2730,7 +2917,7 @@ function _onDayComplete() {
             sim.recomputeK();
             _syncAll();
             syncSettingsUI($, _simSettingsObj());
-            updateEventLog($, eventEngine.eventLog, chart.dayOrigin);
+            _updateWire();
             updateCongressDiagrams($, eventEngine.world);
             updateStandings($, eventEngine.world, factions, getFactionDescriptor);
             for (let i = 0; i < fired.length; i++) {
@@ -2751,7 +2938,8 @@ function _onDayComplete() {
                 }
                 const duration = ev.magnitude === 'major' ? 8000
                     : ev.magnitude === 'moderate' ? 5000 : 3000;
-                setTimeout(function() { _toast(headline, duration); }, i * 1500);
+                // On the front page the item leads the edition; elsewhere it arrives as a wire toast.
+                setTimeout(function() { if (currentPage() !== 'front') _toast(headline, duration); }, i * 1500);
                 setTimeout(function() {
                     const _mu = ev.params?.mu || 0;
                     if (_mu > 0.02) playStinger('positive');
@@ -2760,6 +2948,14 @@ function _onDayComplete() {
                 }, i * 1500 + 200);
             }
         }
+    }
+
+    // Classic has no wire: the tape leads each edition, and the markets page
+    // still takes its daily snapshot.
+    if (!eventEngine) {
+        _updateWire();
+        marketsDayClose(null);
+        if (currentPage() === 'front') drawSurface();
     }
 
     // Portfolio-triggered popup events
@@ -2977,6 +3173,7 @@ function updateUI(precomputedMargin) {
     if (strategyMode && strategyLegs.length > 0) {
         updateStrategyBuilder();
     }
+    _syncMasthead();
 }
 
 /** Lightweight UI update called every substep — reprices visible expiry only. */
@@ -3021,6 +3218,7 @@ function updateSubstepUI(marginInfo) {
         _updateTradeCreditDebit();
     }
 
+    _syncMasthead();
     chainDirty = false;
 }
 
@@ -3169,6 +3367,9 @@ function decycleSpeed() {
 }
 
 function _resetCore(index) {
+    resetBrief();
+    resetMarkets();
+    resetSandbox();
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     document.getElementById('fraud-overlay')?.classList.add('hidden');
     document.getElementById('popup-event-overlay')?.classList.add('hidden');
@@ -3279,13 +3480,16 @@ function loadPreset(index) {
         deactivateLedger();
         _unwireBeliefQuoters();
     }
-    updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
+    _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
     if ($.lobbyBar) $.lobbyBar.style.display = eventEngine ? '' : 'none';
 
     updateUI();
     _repositionCamera();
+    marketsDayClose(null);
+    renderSandbox();
+    resetRacePage();
     dirty = true;
     _haptic('medium');
 }
@@ -3317,12 +3521,15 @@ function resetSim() {
         _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     }
     if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
-    updateEventLog($, eventEngine ? eventEngine.eventLog : [], chart.dayOrigin);
+    _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
 
     updateUI();
     _repositionCamera();
+    marketsDayClose(null);
+    renderSandbox();
+    resetRacePage();
     dirty = true;
     _haptic('heavy');
 }
@@ -3807,6 +4014,7 @@ function _showEpilogue(pages, terminal = false) {
             body.scrollTop = 0;
             body.style.opacity = '1';
             dots.forEach((d, i) => d.classList.toggle('active', i === currentPage));
+            document.getElementById('epilogue-folio').textContent = `Page ${currentPage + 1} of ${pages.length}`;
             backBtn.classList.toggle('hidden', currentPage === 0);
             nextBtn.classList.toggle('hidden', currentPage === pages.length - 1);
             restartBtn.classList.toggle('hidden', currentPage !== pages.length - 1);
@@ -3846,6 +4054,23 @@ function _showEpilogue(pages, terminal = false) {
         _cleanupEpilogue();
         _toast('Event storyline complete. Market simulation continues.');
     };
+    // The race page shows what the labs had in house; the last edition stays a click away.
+    const raceBtn = overlay.querySelector('#epilogue-race');
+    raceBtn.classList.toggle('hidden', !raceState);
+    raceBtn.onclick = () => {
+        overlay.classList.add('hidden');
+        _cleanupEpilogue();
+        showPage('race');
+    };
+    _epilogueReopen = () => {
+        _epiloguePrevFocus = document.activeElement;
+        overlay.classList.remove('hidden');
+        if (typeof trapFocus === 'function') _epilogueTrapCleanup = trapFocus(overlay);
+        render();
+    };
+    const reBtn = document.getElementById('race-epilogue');
+    if (reBtn) reBtn.hidden = false;
+    if (raceState) { endRacePage(); revealRace(true); }
 
     overlay.classList.remove('hidden');
     if (typeof trapFocus === 'function') _epilogueTrapCleanup = trapFocus(overlay);

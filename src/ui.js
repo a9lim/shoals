@@ -6,7 +6,8 @@
    Pure functions -- no internal state.
    ===================================================== */
 
-import { fmtNum, pnlClass, fmtDte, fmtRelDay, fmtQty, posTypeLabel } from './format-helpers.js';
+import { fmtNum, pnlClass, fmtDte, fmtQty, posTypeLabel } from './format-helpers.js';
+import { drawSparkline } from './sparkline.js';
 import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, posKey } from './chain-renderer.js';
 import { vasicekBondPrice, computeVXHCNFuturePrice } from './pricing.js';
@@ -56,10 +57,7 @@ export function cacheDOMElements($) {
     $.playBtn     = document.getElementById('play-btn');
     $.speedBtn    = document.getElementById('speed-btn');
     $.stepBtn     = document.getElementById('step-btn');
-    $.themeBtn    = document.getElementById('theme-btn');
-    $.panelToggle = document.getElementById('panel-toggle');
     $.sidebar    = document.getElementById('sidebar');
-    $.closePanel = document.getElementById('close-panel');
     $.tradeExpiry    = document.getElementById('trade-expiry');
     $.chainTable    = document.getElementById('chain-table');
     $.stockPriceCell = document.getElementById('stock-price-cell');
@@ -174,7 +172,7 @@ export function cacheDOMElements($) {
 
 export function bindEvents($, handlers) {
     const {
-        onTogglePlay, onStep, onSpeedUp, onSpeedDown, onToggleTheme,
+        onSpeedUp, onSpeedDown,
         onPresetChange, onReset, onSliderChange, onTimeSlider,
         onBuyStock, onShortStock, onBuyBond, onShortBond, onBuyVxhcn, onShortVxhcn,
         onChainCellClick, onExpiryChange,
@@ -183,11 +181,9 @@ export function bindEvents($, handlers) {
         onTradeClose,
     } = handlers;
 
-    $.playBtn.addEventListener('click', onTogglePlay);
-    $.stepBtn.addEventListener('click', onStep);
+    // Play, step and theme live in the colophon (shared/colophon.js), wired by main.js.
     $.speedBtn.addEventListener('click', onSpeedUp);
     $.speedBtn.addEventListener('contextmenu', (e) => { e.preventDefault(); onSpeedDown(); });
-    $.themeBtn.addEventListener('click', onToggleTheme);
     $.presetSelect.addEventListener('change', () => {
         onPresetChange($.presetSelect.selectedIndex);
     });
@@ -235,18 +231,14 @@ export function bindEvents($, handlers) {
     });
 
     // Buy/sell mode toggle button
+    // The ticket's side: one button that reads Buy or Sell (X), the red when selling.
     const modeBtn = document.getElementById('mode-btn');
-    const modeIconBuy  = document.getElementById('mode-icon-buy');
-    const modeIconSell = document.getElementById('mode-icon-sell');
     if (modeBtn) {
         modeBtn.addEventListener('click', () => {
             sellMode = !sellMode;
             modeBtn.setAttribute('aria-pressed', String(sellMode));
-            modeBtn.setAttribute('aria-label', sellMode ? 'Sell mode' : 'Buy mode');
-            modeBtn.title = sellMode ? 'Sell mode (X)' : 'Buy mode (X)';
-            modeIconBuy.style.display  = sellMode ? 'none' : '';
-            modeIconSell.style.display = sellMode ? '' : 'none';
-            modeBtn.style.color = sellMode ? 'var(--accent)' : '';
+            modeBtn.textContent = sellMode ? 'Sell' : 'Buy';
+            modeBtn.classList.toggle('selling', sellMode);
         });
     }
 
@@ -391,7 +383,7 @@ export function bindEvents($, handlers) {
                 }
             });
         };
-        _wireTooltipDelegation($.sidebar);
+        _wireTooltipDelegation(document.getElementById('pages'));
     }
 }
 
@@ -441,8 +433,7 @@ export function updateGreeksDisplay($, greeks) {
 
 export function updateRateDisplay($, rate, rateHistory) {
     if ($.rateDisplay) $.rateDisplay.textContent = (rate * 100).toFixed(2) + '%';
-    if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2
-        && typeof drawSparkline !== 'undefined') {
+    if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2) {
         const c = $.rateSparkCanvas;
         const color = getComputedStyle(document.documentElement).getPropertyValue('--rho').trim() || '#000000';
         drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, color, color + '44');
@@ -455,8 +446,7 @@ export function updateRateDisplay($, rate, rateHistory) {
 
 export function updateVxhcnDisplay($, vxhcn, vxhcnHistory) {
     if ($.vxhcnDisplay) $.vxhcnDisplay.textContent = vxhcn.toFixed(2);
-    if ($.vxhcnSparkCtx && vxhcnHistory && vxhcnHistory.count >= 2
-        && typeof drawSparkline !== 'undefined') {
+    if ($.vxhcnSparkCtx && vxhcnHistory && vxhcnHistory.count >= 2) {
         const c = $.vxhcnSparkCanvas;
         const color = getComputedStyle(document.documentElement).getPropertyValue('--vxhcn').trim() || '#000000';
         drawSparkline($.vxhcnSparkCtx, vxhcnHistory, c.width, c.height, color, color + '44');
@@ -587,19 +577,8 @@ export function syncSettingsUI($, sim) {
 // ---------------------------------------------------------------------------
 
 export function toggleStrategyView($, active) {
-    if (active) {
-        $.chartCanvas.classList.add('hidden');
-        $.strategyCanvas.classList.remove('hidden');
-        if ($.zoomControls) $.zoomControls.classList.add('hidden');
-        if ($.lobbyBar) $.lobbyBar.classList.add('hidden');
-    } else {
-        $.chartCanvas.classList.remove('hidden');
-        $.strategyCanvas.classList.add('hidden');
-        $.timeSliderBar.classList.add('hidden');
-        if ($.zoomControls) $.zoomControls.classList.remove('hidden');
-        if ($.lobbyBar) $.lobbyBar.classList.remove('hidden');
-    }
-    if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
+    // The payoff lives on its own page (pages.js); only the time slider is shared state.
+    if (!active) $.timeSliderBar.classList.add('hidden');
 }
 
 // ---------------------------------------------------------------------------
@@ -607,11 +586,13 @@ export function toggleStrategyView($, active) {
 // ---------------------------------------------------------------------------
 
 export function updatePlayBtn($, playing) {
-    _toolbar.updatePlayBtn($.playBtn, playing);
+    _colophon.setPlayIcon($.playBtn, playing);
 }
 
 export function updateSpeedBtn($, speed) {
-    _toolbar.updateSpeedBtn($.speedBtn, speed);
+    const t = (speed < 1 ? String(speed).replace(/^0/, '') : String(speed)) + '\u00d7';
+    $.speedBtn.textContent = t;
+    $.speedBtn.setAttribute('aria-label', 'Speed ' + t + ' (. faster, , slower)');
 }
 
 // ---------------------------------------------------------------------------
@@ -1125,7 +1106,6 @@ export function updateConsensusPanel($, consensus, portfolio, day) {
         cPos.className = 'chain-cell';
         if (pos) {
             cPos.textContent = (pos.qty > 0 ? '+' : '−') + fmtQty(pos.qty);
-            cPos.classList.add(pos.qty > 0 ? 'pnl-up' : 'pnl-down');
         } else {
             cPos.textContent = '—';
         }
@@ -1192,7 +1172,6 @@ export function updateComputePanel($, computeMarket, portfolio, day) {
         cPos.className = 'chain-cell';
         if (pos) {
             cPos.textContent = (pos.qty > 0 ? '+' : '−') + fmtQty(pos.qty);
-            cPos.classList.add(pos.qty > 0 ? 'pnl-up' : 'pnl-down');
         } else {
             cPos.textContent = '—';
         }
@@ -1284,9 +1263,9 @@ export function updateEventLog($, eventLog, dayOrigin) {
         $.eventLog.appendChild(empty);
         return;
     }
-    // Show last 5, newest first
+    // The wire's archive, newest first
     $.eventLog.textContent = '';
-    const recent = eventLog.slice(-5).reverse();
+    const recent = eventLog.slice(-40).reverse();
     for (const e of recent) {
         const row = document.createElement('div');
         row.className = 'event-log-entry';
@@ -1294,7 +1273,7 @@ export function updateEventLog($, eventLog, dayOrigin) {
 
         const daySpan = document.createElement('span');
         daySpan.className = 'event-log-day';
-        daySpan.textContent = fmtRelDay(e.day, dayOrigin || 0);
+        daySpan.textContent = 'Ed. ' + Math.max(1, e.day - (dayOrigin || 0) + 1);
 
         const headlineSpan = document.createElement('span');
         headlineSpan.className = 'event-log-headline';
@@ -1322,26 +1301,44 @@ function _drawParliament(canvas, segments, total) {
     const ctx = canvas.getContext('2d');
     const { width: w, height: h } = resizeCanvasDPR(canvas, ctx);
     ctx.clearRect(0, 0, w, h);
+    if (!total) return;
 
-    const cx = w / 2;
-    const cy = h - 4;
-    const outerR = Math.min(cx - 4, h - 8);
-    const innerR = outerR * 0.45;
-
-    // Single solid semicircle per segment (no rows, no gaps)
-    let startAngle = Math.PI; // left (180 deg)
-    for (const seg of segments) {
-        const sweep = (seg.count / total) * Math.PI;
-        if (sweep <= 0) continue;
-
+    // A hemicycle of seats, one dot each, in rows whose seat counts grow with
+    // their radius. Seats fill left to right by party; the first party's are
+    // filled, the second's are rings (pattern before hue), vacancies faint.
+    const cx = w / 2, cy = h - 5;
+    const R = Math.min(cx - 6, h - 10), r0 = R * 0.4;
+    const rows = total > 200 ? 9 : 5;
+    const radii = Array.from({ length: rows }, (_, i) => r0 + (R - r0) * (i + 0.5) / rows);
+    const sumR = radii.reduce((a, b) => a + b, 0);
+    const counts = radii.map(r => Math.round(total * r / sumR));
+    counts[rows - 1] += total - counts.reduce((a, b) => a + b, 0);
+    const seats = [];
+    radii.forEach((r, i) => {
+        const n = counts[i];
+        for (let j = 0; j < n; j++) {
+            const a = Math.PI * (1 - (n === 1 ? 0.5 : j / (n - 1)));
+            seats.push({ a, x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) });
+        }
+    });
+    seats.sort((p, q) => q.a - p.a);
+    const dot = Math.max(1.3, Math.min(5, (R - r0) / rows * 0.36));
+    const muted = _themePalette().textMuted;
+    let k = 0;
+    segments.forEach((seg, si) => {
+        for (let n = 0; n < seg.count && k < seats.length; n++, k++) {
+            const p = seats[k];
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, si === 0 ? dot : dot - 0.5, 0, Math.PI * 2);
+            if (si === 0) { ctx.fillStyle = seg.color; ctx.fill(); }
+            else { ctx.strokeStyle = seg.color; ctx.lineWidth = 1; ctx.stroke(); }
+        }
+    });
+    for (; k < seats.length; k++) {
         ctx.beginPath();
-        ctx.arc(cx, cy, outerR, startAngle, startAngle + sweep, false);
-        ctx.arc(cx, cy, innerR, startAngle + sweep, startAngle, true);
-        ctx.closePath();
-        ctx.fillStyle = seg.color;
+        ctx.arc(seats[k].x, seats[k].y, dot * 0.6, 0, Math.PI * 2);
+        ctx.fillStyle = _r(muted, 0.4);
         ctx.fill();
-
-        startAngle += sweep;
     }
 }
 
@@ -1356,6 +1353,7 @@ function _updateLegend(el, segments, majority) {
         const dot = document.createElement('span');
         dot.className = 'congress-legend-dot';
         dot.style.background = seg.color;
+        dot.style.borderColor = seg.color;
 
         const label = document.createElement('span');
         label.textContent = seg.label + ' ' + seg.count;
