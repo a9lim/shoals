@@ -41,7 +41,6 @@ import { initSandbox, pickPoint, legState, renderSandbox, resetSandbox } from '.
 import { initSurface, drawSurface } from './src/surface.js';
 import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace } from './src/race-page.js';
 import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
-import { LLMEventSource } from './src/llm.js';
 import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
 import { posKey } from './src/chain-renderer.js';
@@ -166,7 +165,6 @@ let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let raceState = null;    // hidden AI-race state machine (null when not in Dynamic mode; nothing reads it yet)
 let _gameOver = false;   // P6-3 DURABLE terminal latch: desk locked, book closed out, epilogue shown. Never auto-releases (unlike portfolio.restricted); cleared only by _resetCore.
 let _pendingEpilogue = null;   // P6-3: epilogue pages built at game-over, rendered only AFTER the resolution-day beat drains from the popup queue (the treaty superevent reaches the player first).
-let llmSource = null;     // LLMEventSource singleton
 let rateHistory = null;   // sparkline ring buffer for risk-free rate
 let vxhcnHistory = null;    // sparkline ring buffer for VX
 let portfolioHistory = null; // sparkline ring buffer for portfolio value
@@ -759,6 +757,9 @@ init();
 // ---------------------------------------------------------------------------
 
 function init() {
+    // The retired LLM mode stored an API key here; a stale key should not linger in the browser.
+    try { localStorage.removeItem('shoals_llm_key'); localStorage.removeItem('shoals_llm_model'); } catch { /* storage unavailable */ }
+
     // 0. The colophon (play, step, theme, help) and the Brief's pages. Reduced
     //    motion opens on a still, complete frame; otherwise the desk is already
     //    trading when the page appears.
@@ -862,7 +863,6 @@ function init() {
         { key: '4', label: PRESETS[3].name,   group: 'Presets',    action: () => loadPreset(3) },
         { key: '5', label: PRESETS[4].name,   group: 'Presets',    action: () => loadPreset(4) },
         { key: '6', label: PRESETS[5].name,   group: 'Presets',    action: () => loadPreset(5) },
-        { key: '7', label: PRESETS[6].name,   group: 'Presets',    action: () => loadPreset(6) },
     ];
 
     if (typeof initShortcuts !== 'undefined') {
@@ -990,8 +990,6 @@ function init() {
                 updateCreditDebit($, null);
             }
         },
-        onLLMKeyChange:   (key) => { if (llmSource) llmSource.setApiKey(key); },
-        onLLMModelChange: (model) => { if (llmSource) llmSource.setModel(model); },
     });
 
     _refreshStrategyDropdowns();
@@ -1133,13 +1131,7 @@ function init() {
 
     // 14b. Initialize event engine for dynamic presets
     if (_isDynamicPreset(DEFAULT_PRESET)) {
-        if (_isLLMPreset(DEFAULT_PRESET)) {
-            llmSource = new LLMEventSource();
-            eventEngine = new EventEngine('llm', llmSource);
-            eventEngine.prefetch(sim);
-        } else {
-            eventEngine = new EventEngine('offline');
-        }
+        eventEngine = new EventEngine();
         // Faction state lives in faction-standing.js; attach by reference so events can read it
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
@@ -3460,13 +3452,7 @@ function loadPreset(index) {
     _resetCore(index);
 
     if (_isDynamicPreset(index)) {
-        if (_isLLMPreset(index)) {
-            if (!llmSource) llmSource = new LLMEventSource();
-            eventEngine = new EventEngine('llm', llmSource);
-            eventEngine.prefetch(sim);
-        } else {
-            eventEngine = new EventEngine('offline');
-        }
+        eventEngine = new EventEngine();
         // Attach faction reference (faction-standing.js is the source of truth)
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
@@ -3538,7 +3524,6 @@ function resetSim() {
         refreshComputeQuotes(raceState, eventEngine ? eventEngine.world.geopolitical : null);
         _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     }
-    if (_isLLMPreset(index) && eventEngine) eventEngine.prefetch(sim);
     _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
@@ -3553,7 +3538,6 @@ function resetSim() {
 }
 
 function _isDynamicPreset(index) { return index >= 5; }
-function _isLLMPreset(index) { return index >= 6; }
 
 function syncSliderToSim(param, value) {
     sim[param] = value;
@@ -4055,7 +4039,7 @@ function _showEpilogue(pages, terminal = false) {
     restartBtn.onclick = () => {
         overlay.classList.add('hidden');
         _cleanupEpilogue();
-        // Find the Dynamic (offline) preset index. Restart goes through the FULL
+        // Restart the Dynamic preset. Restart goes through the FULL
         // preset load, not the bare `_resetCore` (review fix, 2026-09-08):
         // `_resetCore` resets the chassis but leaves the OLD raceState -- already
         // resolved and (on the timeout path) extrapolated to day ~2800 -- plus the
@@ -4064,8 +4048,7 @@ function _showEpilogue(pages, terminal = false) {
         // retained `race.resolution` would terminate the new desk on its first
         // day-complete. `loadPreset` calls `_resetCore` first and then builds the
         // fresh race, engine and instrument books -- one authoritative new-run path.
-        const offlineIdx = PRESETS.findIndex(p => /\(offline\)/i.test(p.name));
-        if (offlineIdx >= 0) loadPreset(offlineIdx);
+        loadPreset(DEFAULT_PRESET);
     };
     keepBtn.onclick = () => {
         overlay.classList.add('hidden');

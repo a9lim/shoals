@@ -543,7 +543,7 @@ let decayTowardNoOK = false, decayReachesFloorOK = false;
 
 let followupImpulseOK = false, singleSeedOK = false, dispatchNoSimMutateOK = false;
 {
-    const engine = new EventEngine('offline');
+    const engine = new EventEngine();
     const sim = { mu: 0.06, xi: 0.4, theta: 0.04, lambda: 0.5, recomputeK() {}, _recomputeRhoDerived() {} };
 
     // incident_postmortem is followupOnly -- it fires through _fireEvent, NOT the

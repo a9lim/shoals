@@ -183,7 +183,7 @@
           "name": "What market events does Shoals simulate?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "In the Dynamic modes, an offline registry of more than 400 curated events covers the Federal Reserve, macro, markets and sectors, Congress, investigations, media, the firm, the labs, China and the Taiwan Strait, incidents, thefts, policy, and treaties. Events may change price-process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups."
+            "text": "In Dynamic mode, a registry of more than 400 curated events covers the Federal Reserve, macro, markets and sectors, Congress, investigations, media, the firm, the labs, China and the Taiwan Strait, incidents, thefts, policy, and treaties. Events may change price-process parameters, world state, institutional standing, followup eligibility, or player choices; decision events are queued as popups."
           }
         },
         {
@@ -191,7 +191,7 @@
           "name": "What is the AI race in Shoals?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "In the Dynamic modes, a hidden race model runs beneath the market. Three labs (Halcyon, Polaris, and China's Tianxia) climb a capability ladder, incidents surface only when they are detected, model weights can be stolen, and a government control regime ratchets. Consensus binaries settle on capability milestones and Cambria compute futures track the hardware, so a correct read of the race pays. Each run ends in one of six terminal families."
+            "text": "In Dynamic mode, a hidden race model runs beneath the market. Three labs (Halcyon, Polaris, and China's Tianxia) climb a capability ladder, incidents surface only when they are detected, model weights can be stolen, and a government control regime ratchets. Consensus binaries settle on capability milestones and Cambria compute futures track the hardware, so a correct read of the race pays. Each run ends in one of six terminal families."
           }
         },
         {
@@ -207,7 +207,7 @@
           "name": "Does Shoals collect any personal data?",
           "acceptedAnswer": {
             "@type": "Answer",
-            "text": "Offline modes keep simulation state in the browser. Dynamic (LLM) mode stores the supplied Anthropic key in browser local storage and sends generated market/world context directly to Anthropic's API; the portfolio site may also record aggregate page-view metadata separately."
+            "text": "Shoals keeps simulation state in the browser and sends none of it to a server; the portfolio site may also record aggregate page-view metadata separately."
           }
         },
         {
@@ -238,11 +238,11 @@
       "@type": "HowTo",
       "name": "How to price options with Shoals",
       "step": [
-        {"@type": "HowToStep", "position": 1, "name": "Choose a market preset", "text": "Select one of five fixed regimes, Dynamic (offline), or Dynamic (LLM), then adjust the exposed stock, volatility, jump, rate, and dividend parameters if desired."},
+        {"@type": "HowToStep", "position": 1, "name": "Choose a market preset", "text": "Select one of five fixed regimes or Dynamic, then adjust the exposed stock, volatility, jump, rate, and dividend parameters if desired."},
         {"@type": "HowToStep", "position": 2, "name": "Open the live market", "text": "Run or single-step the 16-substep trading day while the Heston/Merton stock process, Vasicek rate process, VXHCN index, and rolling expiries update."},
         {"@type": "HowToStep", "position": 3, "name": "Build and execute a strategy", "text": "Trade stock, bonds, VXHCN futures, or individual options, or use the multi-leg builder for a saved or custom strategy with payoff and Greek overlays."},
         {"@type": "HowToStep", "position": 4, "name": "Manage orders and margin", "text": "Use market, limit, or stop orders; monitor cash, buying power, margin, borrow costs, price impact, and pending orders."},
-        {"@type": "HowToStep", "position": 5, "name": "Read the race", "text": "In a Dynamic mode, trade Consensus milestone binaries and compute futures on your read of the hidden race, respond to queued decisions, and watch how market parameters, standing, traits, regulations, and the race's resolution change."}
+        {"@type": "HowToStep", "position": 5, "name": "Read the race", "text": "In Dynamic mode, trade Consensus milestone binaries and compute futures on your read of the hidden race, respond to queued decisions, and watch how market parameters, standing, traits, regulations, and the race's resolution change."}
       ]
     }
     </script>
@@ -638,8 +638,7 @@
                             <option value="2">Volatile</option>
                             <option value="3">Crisis</option>
                             <option value="4">Rate hike</option>
-                            <option value="5" selected>Dynamic (offline)</option>
-                            <option value="6">Dynamic (LLM)</option>
+                            <option value="5" selected>Dynamic</option>
                         </select>
                         <div class="stat-row">
                             <span class="stat-label-wrap">
@@ -661,29 +660,6 @@
                     <div class="stat-group">
                         <h3 class="col-h">Sound</h3>
                         <label class="ticket-qty" for="volume-slider"><span class="lbl">Volume</span><input type="range" id="volume-slider" min="0" max="100" step="1" value="50"><span class="slider-value" id="volume-val">50%</span></label>
-                    </div>
-                    <div id="llm-settings-section" class="stat-group hidden">
-                        <h3 class="col-h">LLM settings <button class="info-trigger" type="button" data-info="llm" aria-label="Info: LLM integration">?</button></h3>
-                        <div class="ctrl-row">
-                            <label class="stat-label" for="llm-provider">Provider</label>
-                            <select id="llm-provider" class="sim-select" disabled>
-                                <option value="anthropic">Anthropic</option>
-                            </select>
-                        </div>
-                        <div class="ctrl-row">
-                            <label class="stat-label" for="llm-api-key">API key</label>
-                            <div class="key-input-wrap">
-                                <input type="password" id="llm-api-key" class="sim-input" placeholder="sk-ant-...">
-                                <button type="button" id="llm-key-toggle" class="tool-btn key-toggle" aria-label="Toggle key visibility" data-icon="eye" data-icon-size="14"></button>
-                            </div>
-                        </div>
-                        <div class="ctrl-row">
-                            <label class="stat-label" for="llm-model">Model</label>
-                            <select id="llm-model" class="sim-select">
-                                <option value="claude-haiku-4-5-20251001">Haiku 4.5</option>
-                                <option value="claude-sonnet-4-20250514">Sonnet 4</option>
-                            </select>
-                        </div>
                     </div>
                     <div id="event-log-section" class="stat-group hidden">
                         <h3 class="col-h">Event log <button class="info-trigger" type="button" data-info="events" aria-label="Info: Event engine">?</button></h3>
@@ -865,7 +841,7 @@
       <summary>About this simulation</summary>
       <article>
         <h2>What is Shoals?</h2>
-        <p>Shoals is a derivatives trading game set in the last years of the AI race. Stock prices evolve with stochastic volatility and jump diffusion while, in the Dynamic modes, a hidden race between three labs drives a narrative event engine, connecting abstract pricing theory to the question of what the market can and cannot see.</p>
+        <p>Shoals is a derivatives trading game set in the last years of the AI race. Stock prices evolve with stochastic volatility and jump diffusion while, in Dynamic mode, a hidden race between three labs drives a narrative event engine, connecting abstract pricing theory to the question of what the market can and cannot see.</p>
         <h3>Pricing models</h3>
         <p>The underlying stock follows geometric Brownian motion with optional Merton jump diffusion (sudden large moves) and Heston stochastic volatility (time-varying vol that mean-reverts). Interest rates follow a Vasicek process. American options are priced on a 128-step CRR binomial tree with term-structure volatility and moneyness skew adjustments.</p>
         <h3>Strategy builder</h3>

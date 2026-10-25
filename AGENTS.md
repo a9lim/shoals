@@ -2,12 +2,11 @@
 
 Shoals is the AI race played from a derivatives desk, at a9l.im/shoals. The player
 trades Halcyon (HCN) stock, bonds, VXHCN volatility futures and American options.
-In the Dynamic modes they also trade Consensus milestone binaries and Cambria
+In Dynamic mode they also trade Consensus milestone binaries and Cambria
 compute futures, while a hidden race model runs underneath and ends each run in one
 of six terminal families. The interface is *The Meridian Brief*, the firm's morning
 note (see "The Brief" below). It is vanilla ES modules with Canvas 2D charts and Web
-Audio synthesis. KaTeX for the reference panels loads from jsDelivr, and the
-Dynamic (LLM) mode calls the Anthropic API from the browser.
+Audio synthesis. KaTeX for the reference panels loads from jsDelivr.
 It is a submodule of the a9l.im repository (`a9lim.github.io`, at `projects/shoals`); the
 root `AGENTS.md` covers the shared layer, design system, build, and deployment.
 
@@ -71,7 +70,6 @@ src/endings.js         ending triggers, family/overlay selection, slot-based 5-p
 src/race/              hidden race model and its markets (DOM-free; see below)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
 src/audio.js           all music and SFX, synthesized
-src/llm.js             Dynamic (LLM) event source
 tools/*.mjs            the six headless harnesses
 docs/design/, docs/lore.md, docs/art-prompts.md, docs/horizons.md
 ```
@@ -81,12 +79,11 @@ docs/design/, docs/lore.md, docs/art-prompts.md, docs/horizons.md
 ### Modes
 
 `PRESETS` (`src/config.js`) lists five fixed regimes, collectively "Classic" (Calm
-bull, Sideways, Volatile, Crisis, Rate hike), plus Dynamic (offline), which is the
-default at index 5, and Dynamic (LLM) at index 6. `loadPreset` creates `eventEngine`
-and `raceState` only for index ≥ 5. In Classic both are null, and the race, its
-markets, belief, Act III and standing orders are all inert, so Classic is the pure
-trading sim. `resetSim` re-rolls the race in place with a fresh seed, while a mode
-change creates or nulls it.
+bull, Sideways, Volatile, Crisis, Rate hike), plus Dynamic, the default at index 5.
+`loadPreset` creates `eventEngine` and `raceState` only for index ≥ 5. In Classic
+both are null, and the race, its markets, belief, Act III and standing orders are all
+inert, so Classic is the pure trading sim. `resetSim` re-rolls the race in place with
+a fresh seed, while a mode change creates or nulls it.
 
 ### The trading day
 
@@ -260,7 +257,7 @@ key is `shoals-theme`.
   (game over). The Fixedpoint Index has no numeric series in the model, so its strip
   shows publication only.
 
-### Endings, Act III, audio, LLM
+### Endings, Act III, audio
 
 - In a Dynamic run, natural resolution and early ejection (rogue trading, margin
   deficit, compliance) share one atomic terminal path. It freezes the ledger,
@@ -281,11 +278,6 @@ key is `shoals-theme`.
   the same form with less humanity plus a machine bus. `glitchAudio` and
   `silenceDesk()` (the terminal cut) round it out. `initAudio()` waits for the first
   user gesture.
-- `llm.js` (`LLMEventSource`) fetches event batches through forced tool use. Settings
-  persist in localStorage (`shoals_llm_key`, `shoals_llm_model`; the default is
-  `claude-haiku-4-5-20251001`). In LLM mode only the discretionary draw comes from the
-  queue, and it falls back to the authored pool when the queue is empty. Race shells
-  and latches stay authored, and `SYSTEM_PROMPT` still describes the pre-race world.
 
 ## Conventions
 
@@ -362,13 +354,12 @@ key is `shoals-theme`.
   put sienna, VXHCN violet, binary indigo, compute umber), and the Greeks match the
   strategy diagram (`--delta` …).
   Portfolio value is colored against buy-and-hold. All UI and canvas text is
-  `--font-text`/`_FONT.text`; `--font-code` is used only for the API-key input. The
-  canvas redraws once `_loadTextFonts()` resolves. Live captions use
-  `_colophon.caption()`; the tape's first write is forced, because the helper skips a
-  write that falls within its interval of time zero.
+  `--font-text`/`_FONT.text`. The canvas redraws once `_loadTextFonts()` resolves. Live
+  captions use `_colophon.caption()`; the tape's first write is forced, because the
+  helper skips a write that falls within its interval of time zero.
 - **Labels.** UI labels, presets, built-in strategies, traits and epilogue labels are
-  sentence case in source, so code finds a preset by `/\(offline\)/i`. The chain
-  table is rebuilt on every update, with one delegated listener (`_chainClicksBound`).
+  sentence case in source. The chain table is rebuilt on every update, with one
+  delegated listener (`_chainClicksBound`).
 
 ## Open work
 
@@ -389,8 +380,6 @@ key is `shoals-theme`.
     built.
   - The post-theft "why slow down if it can be stolen" margin burn is still missing
     (see the header of `src/events/china.js`).
-  - LLM mode has no race-era event source, and `llm.js`'s `SYSTEM_PROMPT` predates
-    the race.
 - `lobbying.js` still has the prototype menu (party PACs, fundraiser, broker a deal,
   leak, counsel the Fed). The AI-policy menu in `03-market-mechanics.md` is unbuilt.
 - The sandbox's scenario model is first-pass and display-only (see "The Brief").

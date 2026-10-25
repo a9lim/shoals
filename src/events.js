@@ -2,8 +2,8 @@
    events.js -- Dynamic event engine for Shoals.
    Pulse-scheduled and Poisson-drawn events that shift
    simulation parameters and mutate world state.
-   Supports offline (curated) and LLM event sources,
-   with MTTH-style followup chains.
+   Draws from the authored event registry, with
+   MTTH-style followup chains.
    =================================================== */
 
 import {
@@ -18,7 +18,6 @@ import { createWorldState, congressHelpers, applyStructuredEffects, validateCong
 import { ALL_EVENTS, PARAM_RANGES, getEventById } from './events/index.js';
 import { getTraitEffect, getActiveTraitIds } from './traits.js';
 import { firmCooldownMult, shiftFaction } from './faction-standing.js';
-import { getRegulationPipeline } from './regulations.js';
 import { addEventImpulse } from './race/impulse.js';
 import { applyRaceEffects } from './race/ledger.js';
 import { intelRead } from './race/intel.js';
@@ -114,31 +113,11 @@ function _hashId(s) {
     return h >>> 0;
 }
 
-// -- Inline followup vs. authored ID reference ---------------------------
-// Authored followups are ID REFERENCES: `{ id, mtth, weight }`, resolved against
-// the authored pool (all 108 in `src/events/` are this shape). A generated
-// (Dynamic-LLM) followup is a COMPLETE INLINE EVENT: FOLLOWUP_SCHEMA requires
-// `id` + `headline` + `params`, and the id is model-chosen, so an id that happens
-// to match an authored event's must NOT resolve to that event -- doing so would
-// swap the generated prose for an authored shell and apply the authored shell's
-// deltas out of nowhere (the `rates_capex_wave` case: a permanent b / sigmaR step
-// landing with no rung behind it and no latch touched). One rule for both
-// scheduling paths: if it carries its own headline AND params, it IS the event.
-function _isInlineFollowup(fu) {
-    return !!fu && typeof fu === 'object'
-        && typeof fu.headline === 'string'
-        && !!fu.params && typeof fu.params === 'object';
-}
-
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
-    constructor(source, llmSource = null) {
-        this.source = source;           // 'offline' | 'llm'
-        this._llm = llmSource;          // LLMEventSource instance (or null)
+    constructor() {
         this.eventLog = [];             // { day, headline, magnitude, params }
-        this._queue = [];               // pre-fetched LLM events
         this._pendingFollowups = [];    // { event, chainId, targetDay, weight, depth }
-        this._prefetching = false;
 
         // World state
         this.world = createWorldState();
@@ -309,10 +288,7 @@ export class EventEngine {
         const scale = this._baseRateScale || 1;
         if (Math.random() >= Math.min(0.95, NON_FED_POISSON_RATE * scale)) return null;
 
-        const event = this.source === 'llm'
-            ? this._drawLLM(sim)
-            : this._drawRandom(sim);
-
+        const event = this._drawRandom(sim);
         if (!event) return null;
 
         // Set cooldown after successful random draw (compressed by the base-rate scale)
@@ -374,12 +350,6 @@ export class EventEngine {
         const r = this._fireEvent(event, sim, day, 0, netDelta);
         if (!r) return { fired: [], popups: [] };
         return r.queued ? { fired: [], popups: [r.event] } : { fired: [r], popups: [] };
-    }
-
-    /** Kick off initial LLM batch fetch. */
-    prefetch(sim) {
-        if (this.source !== 'llm' || !this._llm) return;
-        this._fetchBatch(sim);
     }
 
     /** Apply param deltas to sim, clamp to PARAM_RANGES. */
@@ -448,9 +418,7 @@ export class EventEngine {
     reset() {
         this.world = createWorldState();
         this.eventLog = [];
-        this._queue = [];
         this._pendingFollowups = [];
-        this._prefetching = false;
         this._randomCooldown = 0;
         this._consecutiveMinor = 0;
         this._epilogueFired = false;
@@ -540,10 +508,7 @@ export class EventEngine {
         for (const fu of event.followups) {
             const delay = this._followupDelay(fu.mtth);
             this._pendingFollowups.push({
-                // An INLINE followup is the event; only an ID REFERENCE is looked up
-                // (see _isInlineFollowup). The `|| fu` tail keeps the pre-existing
-                // fallback for an ID reference whose target no longer exists.
-                event: _isInlineFollowup(fu) ? fu : (getEventById(fu.id) || fu),
+                event: getEventById(fu.id) || fu,
                 chainId,
                 targetDay: day + Math.max(1, delay),
                 weight: fu.weight ?? 1,
@@ -806,41 +771,6 @@ export class EventEngine {
         return fresh.length || strict ? fresh : eligible;
     }
 
-    _drawLLM(sim) {
-        if (this._queue.length > 0) return this._queue.shift();
-
-        // Queue empty -- trigger fetch, return offline fallback
-        if (!this._prefetching) this._fetchBatch(sim);
-        return this._drawRandom(sim);
-    }
-
-    async _fetchBatch(sim) {
-        if (!this._llm || this._prefetching) return;
-        this._prefetching = true;
-        try {
-            const events = await this._llm.generateBatch(
-                sim, this.eventLog, this._pendingFollowups, this.world,
-                {
-                    factions: this._playerCtx.factions,
-                    traitIds: this._playerCtx.traitIds,
-                    regulations: getRegulationPipeline(),
-                    playerChoices: this._playerCtx.playerChoices,
-                    lobbyCount: this._playerCtx.lobbyCount || 0,
-                    lastLobbyDay: this._playerCtx.lastLobbyDay || 0,
-                }
-            );
-            if (Array.isArray(events)) {
-                for (const ev of events) {
-                    if (ev && ev.headline && ev.params) this._queue.push(ev);
-                }
-            }
-        } catch (e) {
-            if (typeof showToast !== 'undefined')
-                showToast('LLM event generation failed; using offline events.');
-        }
-        this._prefetching = false;
-    }
-
     // -- Fixed pulse handlers ---------------------------------------------
 
     _onCampaignSeason(sim, day, netDelta = 0) {
@@ -949,11 +879,7 @@ export class EventEngine {
         const id = typeof followup === 'string' ? followup : followup.id;
         const mtth = typeof followup === 'object' ? (followup.mtth ?? 20) : 20;
         const delay = Math.max(1, Math.round(mtth + (Math.random() - 0.5) * mtth * 0.3));
-        // Same rule as _scheduleFollowups: an INLINE followup object IS the event and
-        // is never looked up, so a generated followup that happens to reuse an
-        // authored id can no longer become the authored shell and apply its deltas.
-        // An ID reference with no target is still dropped (pre-existing behaviour).
-        const event = _isInlineFollowup(followup) ? followup : getEventById(id);
+        const event = getEventById(id);
         if (!event) return;
         this._pendingFollowups.push({
             event,

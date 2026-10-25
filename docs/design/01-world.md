@@ -179,5 +179,4 @@ regulation pipeline at once.
 The race arcs, event tempo, and Act III machinery key on the public
 released frontier rung (`frontierRung`, [02a](02a-tuning.md)), not the
 calendar, so the day ranges are the calibrated expectation rather than a
-schedule; the political event pool and the LLM mode's era prompt still
-read the day ranges.
+schedule; the political event pool still reads the day ranges.

@@ -3,7 +3,7 @@
    the Shoals event system. Tracks congressional
    control, geopolitical
    escalation, Fed credibility, ongoing investigations,
-   and election state. Provides LLM effect validation
+   and election state. Provides effect validation
    and application via structured path mutations.
    =================================================== */
 
@@ -117,12 +117,12 @@ export function validateCongress(world) {
     house.farmerLabor = 435 - house.federalist;
 }
 
-// -- LLM effect validation ranges (whitelist) ----------------------------
+// -- Effect validation ranges (whitelist) --------------------------------
 // Numeric: { min, max, type: 'number' }
 // Boolean: { type: 'boolean' }
 // Enum:    { type: 'enum', values: [...] } — set-only, value must be in list
 // Null/string fields (midtermResult, presidentialResult) are omitted —
-// the LLM cannot set them via structured effects.
+// an event cannot set them via structured effects.
 
 const WORLD_STATE_RANGES = {
     // congress.senate
@@ -188,7 +188,7 @@ const WORLD_STATE_RANGES = {
     'ai.wonderCount':                   { min: 0,   max: 100, type: 'number' },
 };
 
-// -- Apply structured effects from LLM -----------------------------------
+// -- Apply structured effects --------------------------------------------
 // effects: [{ path, op, value }, ...]
 // op: 'add' | 'set'
 // Skips unknown paths and unknown ops. Clamps numbers, coerces booleans.

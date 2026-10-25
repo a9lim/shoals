@@ -152,13 +152,13 @@ nesting becalms the sea itself — and nobody agrees on where the rocks are.
 
 - **Two modes, one chassis.** Classic mode is the pure trading sim:
   the race is inert and the market is the GBM+Merton+Heston / Vasicek
-  chassis alone. The Dynamic modes run the race underneath the same
+  chassis alone. The Dynamic mode runs the race underneath the same
   chassis; the political event pool survives from the earlier
   politics-satire version of the game as the satire register's
   background texture.
-- **Dynamic (LLM) mode stays.** A game about the race, narrated by a
-  frontier model: the resonance is a feature, worth one knowing line
-  in about.md and nothing more.
+- **Dynamic (LLM) mode was removed (2026-10-24).** It was built for the
+  earlier version of the game and had no race-era content: its prompt
+  predates the race and its story. One Dynamic mode remains.
 - **Deliberate cuts** (choices, not oversights):
   - *No endogenous macro sim.* Automated labor share, wage collapse,
     and fiscal capacity are not linked stocks; the agent economy stays

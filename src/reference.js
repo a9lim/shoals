@@ -1478,14 +1478,10 @@ market environments. Changing the preset resets the simulation and portfolio.</p
 <tr><td style="padding:4px 8px">Rate hike</td><td style="padding:4px 8px">0.04</td><td style="padding:4px 8px">0.06</td><td style="padding:4px 8px">1.0</td><td style="padding:4px 8px">8%</td><td style="padding:4px 8px">High rates, moderate vol</td></tr>
 </table>
 
-<h3>Dynamic presets</h3>
-<p>The two dynamic presets add a narrative event engine:</p>
-<ul>
-<li><strong>Dynamic (offline)</strong>: draws from 88 curated events via weighted random selection.
-Events shift simulation parameters, creating evolving market conditions.</li>
-<li><strong>Dynamic (LLM)</strong>: uses the Claude API to generate contextual events based on
-the simulation&rsquo;s current state and narrative history. Requires an API key.</li>
-</ul>
+<h3>Dynamic preset</h3>
+<p>The Dynamic preset adds a narrative event engine. It draws from a registry of more than
+400 authored events via weighted random selection, and events shift simulation parameters,
+creating evolving market conditions.</p>
 <p>In dynamic mode, parameters change over time as events fire &mdash; the initial preset
 values are just the starting point.</p>
 
@@ -1565,7 +1561,7 @@ political events to profit from vol expansion.</li>
     events: {
         title: 'Event engine',
         body: `
-<p>The dynamic regime modes generate narrative market events that shift simulation
+<p>The Dynamic preset generates narrative market events that shift simulation
 parameters in real time, creating evolving market conditions and storylines.</p>
 
 <h3>Scheduling</h3>
@@ -1602,47 +1598,6 @@ followups up to 5 levels deep, creating multi-step narrative arcs (e.g., investi
 <p>After 3 consecutive minor/neutral events, the engine boosts the probability of
 a significant event firing on the next check, preventing long stretches of
 uneventful market action.</p>
-`,
-    },
-
-    llm: {
-        title: 'LLM integration',
-        body: `
-<p>The Dynamic (LLM) mode uses Claude to generate contextual market events based on
-the simulation&rsquo;s current state, narrative history, and a rich fictional universe.</p>
-
-<h3>How it works</h3>
-<p>The simulation calls the Anthropic API directly from the browser using structured
-tool use (<code>emit_events</code> tool with forced <code>tool_choice</code>).
-The system prompt contains the full universe lore:</p>
-<ul>
-<li>President John Barron (Federalist) vs. Robin Clay (Farmer-Labor)</li>
-<li>Fed Chair Hayden Hartley&rsquo;s independence and credibility</li>
-<li>Geopolitical landscape, congressional composition, ongoing investigations</li>
-</ul>
-<p>Events are pre-fetched in batches of 3&ndash;5 to minimise API calls and latency.</p>
-
-<h3>Configuration</h3>
-<p>Set your Anthropic API key on the Desk page (stored in <code>localStorage</code>,
-never sent anywhere except the Anthropic API). Choose between:</p>
-<ul>
-<li><strong>Haiku 4.5</strong>: faster, cheaper, good for routine events</li>
-<li><strong>Sonnet 4</strong>: more creative narratives and complex multi-step storylines</li>
-</ul>
-
-<h3>Context window</h3>
-<p>Each API call includes:</p>
-<ul>
-<li>Current simulation state (prices, vol, rates, day)</li>
-<li>The last 10 events fired (narrative continuity)</li>
-<li>Pending followups (plot threads to resolve)</li>
-<li>World state (congress, factions, investigations)</li>
-</ul>
-
-<h3>Fallback</h3>
-<p>If the API call fails (network error, invalid key, rate limit), the engine
-automatically falls back to the offline event pool for that batch. The simulation
-continues seamlessly &mdash; you just get curated events instead of generated ones.</p>
 `,
     },
 };

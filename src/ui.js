@@ -143,13 +143,8 @@ export function cacheDOMElements($) {
     $.triggerPriceGroup = document.getElementById('trigger-price-group');
     $.triggerPrice     = document.getElementById('trigger-price');
     $.triggerPriceVal  = document.getElementById('trigger-price-val');
-    $.llmSettingsSection = document.getElementById('llm-settings-section');
     $.eventLogSection    = document.getElementById('event-log-section');
     $.eventLog           = document.getElementById('event-log');
-    $.llmApiKey          = document.getElementById('llm-api-key');
-    $.llmKeyToggle       = document.getElementById('llm-key-toggle');
-    $.llmModel           = document.getElementById('llm-model');
-    $.llmProvider        = document.getElementById('llm-provider');
     $.congressSection    = document.getElementById('congress-section');
     $.senateDiagram      = document.getElementById('senate-diagram');
     $.houseDiagram       = document.getElementById('house-diagram');
@@ -177,7 +172,6 @@ export function bindEvents($, handlers) {
         onBuyStock, onShortStock, onBuyBond, onShortBond, onBuyVxhcn, onShortVxhcn,
         onChainCellClick, onExpiryChange,
         onTradeSubmit,
-        onLLMKeyChange, onLLMModelChange,
         onTradeClose,
     } = handlers;
 
@@ -187,30 +181,6 @@ export function bindEvents($, handlers) {
     $.presetSelect.addEventListener('change', () => {
         onPresetChange($.presetSelect.selectedIndex);
     });
-
-    // LLM key show/hide toggle
-    if ($.llmKeyToggle) {
-        $.llmKeyToggle.addEventListener('click', () => {
-            const isPassword = $.llmApiKey.type === 'password';
-            $.llmApiKey.type = isPassword ? 'text' : 'password';
-        });
-    }
-
-    // LLM API key persistence
-    if ($.llmApiKey) {
-        $.llmApiKey.value = localStorage.getItem('shoals_llm_key') || '';
-        $.llmApiKey.addEventListener('change', () => {
-            if (onLLMKeyChange) onLLMKeyChange($.llmApiKey.value);
-        });
-    }
-
-    // LLM model persistence
-    if ($.llmModel) {
-        $.llmModel.value = localStorage.getItem('shoals_llm_model') || 'claude-haiku-4-5-20251001';
-        $.llmModel.addEventListener('change', () => {
-            if (onLLMModelChange) onLLMModelChange($.llmModel.value);
-        });
-    }
 
     $.resetBtn.addEventListener('click', onReset);
 
@@ -870,10 +840,9 @@ export function wireInfoTips() {
         strategies:   { title: 'Strategy builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
         sharedExpiry: { title: 'Shared expiry', body: 'On: all legs share the expiry dropdown selection. Off: each leg keeps its own DTE offset (for calendar spreads).' },
         // --- Settings ---
-        regime:       { title: 'Market regime', body: '5 static presets (Calm bull to Rate hike) plus 2 dynamic modes with narrative events. Changing preset resets the simulation.' },
+        regime:       { title: 'Market regime', body: '5 static presets (Calm bull to Rate hike) plus the Dynamic mode with narrative events. Changing preset resets the simulation.' },
         riskFreeRate: { title: 'Risk-free rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },
         events:       { title: 'Event engine', body: 'Generates narrative events that shift parameters. Fed ~every 32 days, non-Fed Poisson ~1/30 days. Followup chains create storylines.' },
-        llm:          { title: 'LLM integration', body: 'Dynamic (LLM) uses Claude to generate contextual events. Set your API key in the Info tab. Falls back to offline events on failure.' },
         gbm:          { title: 'Pricing models', body: 'GBM + Merton jumps + Heston stochastic vol + Vasicek rates. American options priced via 128-step CRR binomial tree.' },
     };
     registerInfoTips(data);
@@ -884,13 +853,8 @@ export function wireInfoTips() {
 // ---------------------------------------------------------------------------
 
 export function updateDynamicSections($, presetIndex) {
-    const isLLM = presetIndex >= 6;
-    const isOffline = presetIndex === 5;
-    const isDynamic = isLLM || isOffline;
+    const isDynamic = presetIndex >= 5;
 
-    if ($.llmSettingsSection) {
-        $.llmSettingsSection.classList.toggle('hidden', !isLLM);
-    }
     if ($.eventLogSection) {
         $.eventLogSection.classList.toggle('hidden', !isDynamic);
     }

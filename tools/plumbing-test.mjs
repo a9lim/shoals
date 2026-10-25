@@ -69,13 +69,10 @@
       firing with the exact +0.005 b / +0.001 sigmaR delta,
       hold / same-day-replay / two-rung-jump semantics, the
       <= 4-per-run ceiling over a seed sweep, and latch reset.
-      Plus the two review fixes (2026-09-08): the day-1008
+      Plus the review fix (2026-09-08): the day-1008
       TIMEOUT EXTRAPOLATION prints no waves once the bridge is
       handed the live-day rung (O5, seed 15: R1 at the horizon,
-      day 2864 / R3 after), and an INLINE generated followup
-      that reuses an authored id no longer resolves to the
-      authored shell (O6, both scheduling paths + the llm.js
-      namespace guard).
+      day 2864 / R3 after).
    P. Concealment vs. detection: the lagMult algebra and its
       exact-1 identities, the constructed hide/expose cases,
       the GLOBAL-frontier denominator over a multi-lab state
@@ -177,7 +174,6 @@ import { market, syncMarket } from '../src/market.js';
 import { eventBaseRateScale, BASE_RATE_MAX_MULT, EventEngine } from '../src/events.js';
 import { runRaceBridge, resetRaceBridge } from '../src/events/race-bridge.js';
 import { getEventById } from '../src/events/index.js';
-import { _deconflictId } from '../src/llm.js';
 import { NON_FED_POISSON_RATE, PRESETS } from '../src/config.js';
 import { createWorldState, applyStructuredEffects } from '../src/world-state.js';
 
@@ -975,7 +971,7 @@ let discRows = 0, discEligible = 0, discThefts = 0;
     }
     // Poisson exclusion asserted through the ENGINE's real pool (not a copy of the
     // category set): a 'theft' shell must never be random-drawable.
-    const randomPool = new EventEngine('offline')._pools.random;
+    const randomPool = new EventEngine()._pools.random;
     check('I5: both theft-disclosure shells exist and are category theft (Poisson-excluded)',
         getEventById('theft_disclosed')?.category === 'theft'
         && getEventById('theft_disclosed_frontier')?.category === 'theft'
@@ -1032,7 +1028,7 @@ let laneOffRate = 0, laneOnRate = 0, laneArrivalSpread = 0;
     const PROBE = { id: 'p71_probe', category: 'neutral', headline: 'probe', params: {}, magnitude: 'minor' };
     const STUB_SIM = {};
     function laneRun(lane, days, scale) {
-        const eng = new EventEngine('offline');
+        const eng = new EventEngine();
         eng._pulses = [];                 // silence pulses (they preempt the discretionary pass)
         eng._pools.random = [];           // silence the one-shot pre-pass
         eng._drawRandom = () => PROBE;    // deterministic draw
@@ -1083,13 +1079,13 @@ let laneOffRate = 0, laneOnRate = 0, laneArrivalSpread = 0;
     // construction. Asserted through the ENGINE's real pool, not a copy of the set.
     const EXCLUDED = ['fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
         'strait', 'regime', 'dispute', 'theft', 'polaris', 'insider', 'conversion', 'summit'];
-    const realPool = new EventEngine('offline')._pools.random;
+    const realPool = new EventEngine()._pools.random;
     check('J3: the lane\'s source pool carries no bridge/ledger/pulse-fired category',
         realPool.length > 0 && realPool.every(e => !EXCLUDED.includes(e.category)),
         `${realPool.length} discretionary events`);
     // A pulse still fires AT the day boundary with the lane live.
     {
-        const eng = new EventEngine('offline');
+        const eng = new EventEngine();
         eng._pools.random = [];
         eng._pools.fed = [{ id: 'p71_fomc', category: 'fed', headline: 'fomc probe', params: {}, magnitude: 'moderate' }];
         eng._pulses = [{ type: 'recurring', id: 'fomc', interval: 5, jitter: 0, nextDay: -1, poolKey: 'fed' }];
@@ -1100,7 +1096,7 @@ let laneOffRate = 0, laneOnRate = 0, laneArrivalSpread = 0;
             dayFired > 0 && eng.pendingArrival() === null, `${dayFired} pulse fires`);
     }
     check('J3: a fresh engine has the lane closed (Classic / Act I default)',
-        new EventEngine('offline').substepLaneLive() === false);
+        new EventEngine().substepLaneLive() === false);
 }
 
 // =====================================================================
@@ -1804,9 +1800,9 @@ const soFiredRules = new Set();
     // `fired` entry and neither is a superevent, so no day-boundary repaint happens
     // and `_interceptByStandingOrder` must repaint itself.
     {
-        const eng = new EventEngine('offline');
+        const eng = new EventEngine();
         const tipShell = { ...getEventById('insider_tip') };
-        const ordinary = new EventEngine('offline')._pools.random
+        const ordinary = new EventEngine()._pools.random
             .find(e => e.popup && e.choices && !e.superevent && e.id !== 'insider_tip');
         const log0 = eng.eventLog.length;
         const rTip = eng._fireEvent(tipShell, { day: 10 }, 10, 0, 0);
@@ -2121,7 +2117,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
             race.capability.labs[lead === 'halcyon' ? 'tianxia' : 'halcyon'].C_internal = 4.0;
             const trigger = roomTrigger(race);
             const show = roomPresentation(trigger.leaderLab);
-            const eng = new EventEngine('offline');
+            const eng = new EventEngine();
             eng.race = race;
             // The event main.js builds, verbatim in shape.
             const ev = {
@@ -2144,7 +2140,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
     }
 
     check('N2: category room is Poisson-EXCLUDED and NOT terminal-safe',
-        !new EventEngine('offline')._pools.random.some(e => e.category === 'room')
+        !new EventEngine()._pools.random.some(e => e.category === 'room')
         && isTerminalSafeBeat({ category: 'room' }) === false
         && isTerminalSafeBeat({ category: 'summit' }) === true);
     roomVoiceHist = [2, 3, 4, 5, 6].map(v => `v${v}:${amt(roomChoices(v, true), 'speed', 'S').toFixed(3)}`).join(' ');
@@ -2338,7 +2334,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
             && JSON.stringify(brief.params) === '{}' && JSON.stringify(briefGrave.params) === '{}');
         check('N5c: the brief shells are Poisson-excluded (category incident, bridge-fired only)',
             brief.category === 'incident' && briefGrave.category === 'incident'
-            && !new EventEngine('offline')._pools.random.some(e => e.id.startsWith('incident_brief_')));
+            && !new EventEngine()._pools.random.some(e => e.id.startsWith('incident_brief_')));
     }
 
     // -- N6. Treasury backchannel (fund-as-actor) -------------------------
@@ -2370,7 +2366,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
         check('N6: the room\'s sixth criterion reads the flag the accept choice writes',
             ROOM_FLAG_CRITERIA.treasury === accept.playerFlag);
         // Eligible through the ENGINE's real filter once the mirror is up.
-        const eng = new EventEngine('offline');
+        const eng = new EventEngine();
         eng._currentDay = 800;
         eng.world.ai.fundLive = false;
         const before = eng._filterEligible([ev], {}).length;
@@ -2438,7 +2434,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
             const race = createRaceState(5151);
             race.hidden.chinaTrue.velocity = 1.20;   // truth: faster
             initIntel(race);
-            const eng = new EventEngine('offline');
+            const eng = new EventEngine();
             eng.race = race;
             const shellIntel = getEventById('china_intel_estimate');
             const pools = shellIntel.headlinesByRead;
@@ -2463,7 +2459,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
             //     pool. Before the fix `_fireEvent` skipped intel resolution
             //     entirely without `this.race` and logged headline === undefined.
             {
-                const engNoRace = new EventEngine('offline');
+                const engNoRace = new EventEngine();
                 engNoRace.race = null;
                 const r = engNoRace._fireEvent({ ...shellIntel }, {}, 700, 0, 0);
                 const logged = engNoRace.eventLog[engNoRace.eventLog.length - 1];
@@ -2473,7 +2469,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
                     `headline ${typeof r.headline}`);
                 // Same for an attached race whose channel is inactive.
                 deactivateIntel();
-                const engInactive = new EventEngine('offline');
+                const engInactive = new EventEngine();
                 engInactive.race = createRaceState(5152);
                 const r2 = engInactive._fireEvent({ ...shellIntel }, {}, 701, 0, 0);
                 check('N7b: an inactive intel channel also falls back to matched (never headline-less)',
@@ -2551,7 +2547,7 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
 {
     const CAPEX_ID = 'rates_capex_wave';
     const shellDef = getEventById(CAPEX_ID);
-    const probeEngine = new EventEngine('offline');
+    const probeEngine = new EventEngine();
 
     // -- O1. Shell shape: the params are PERMANENT and additive, there is no
     //        impulse (the step IS the market effect, not a decaying reaction),
@@ -2574,13 +2570,13 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
 
     // -- Rig: a race whose PUBLIC released-frontier rung we drive by hand, a real
     //         EventEngine and a sim stand-in carrying only the two params. The
-    //         stand-in starts at the LIVE Dynamic (offline) preset's Vasicek
+    //         stand-in starts at the LIVE Dynamic preset's Vasicek
     //         parameters (Calm bull b = 0.04 / sigmaR = 0.005), not invented ones --
     //         the whole point of an exact-delta check is that it prices the curve the
     //         player actually gets, so four waves land on 0.06 / 0.009 here exactly
     //         as they would in a run.
-    const OFFLINE = PRESETS.find(p => /\(offline\)/i.test(p.name));
-    const B0 = OFFLINE.b, SR0 = OFFLINE.sigmaR;
+    const DYNAMIC = PRESETS.find(p => p.name === 'Dynamic');
+    const B0 = DYNAMIC.b, SR0 = DYNAMIC.sigmaR;
     const mkSim = () => ({ b: B0, sigmaR: SR0, _recomputeRhoDerived() {} });
     function capexRig(seed) {
         const race = createRaceState(seed >>> 0);
@@ -2590,7 +2586,7 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
         }
         cap.open.rungInternal = { 1: 0, 2: null, 3: null, 4: null, 5: null };
         race.lastTransitions = freshTransitions();
-        return { race, engine: new EventEngine('offline'), sim: mkSim() };
+        return { race, engine: new EventEngine(), sim: mkSim() };
     }
     const setPublicRung = (race, r) => {
         const m = race.capability.labs.halcyon.rungReleased;
@@ -2669,7 +2665,7 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
         for (let i = 0; i < CAPEX_N; i++) {
             resetRaceBridge();
             const race = createRaceState((BASE_SEED + 4400 + i) >>> 0);
-            const engine = new EventEngine('offline');
+            const engine = new EventEngine();
             const sim = mkSim();
             initConsensus(race); initBelief(race);
             let fires = 0, prevRung = 0, seeded = false;
@@ -2707,7 +2703,7 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
     {
         resetRaceBridge();
         const race = createRaceState(15);
-        const engine = new EventEngine('offline');
+        const engine = new EventEngine();
         const sim = mkSim();
         initConsensus(race); initBelief(race);
         let fires = 0, liveRungAtTimeout = null, rec = null, extrapDays = 0;
@@ -2738,53 +2734,6 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
             `${firesNoSnap} spurious wave(s), b ${simNoSnap.b.toFixed(6)}, sigmaR ${simNoSnap.sigmaR.toFixed(6)}`);
         deactivateConsensus(); deactivateBelief();
         resetRaceBridge();
-    }
-
-    // -- O6. The SECOND route into the static shell (review fix, 2026-09-08).
-    //        Dynamic (LLM) generates followups INLINE (FOLLOWUP_SCHEMA requires
-    //        id + headline + params) with a model-chosen id. Both scheduling paths
-    //        used to resolve `getEventById(fu.id)` FIRST, so a generated followup
-    //        that happened to pick an authored id became the AUTHORED shell and
-    //        applied its deltas -- for `rates_capex_wave` that is a permanent b /
-    //        sigmaR step with no rung behind it and the latch untouched. The rule
-    //        now: an inline object (own headline AND params) IS the event; only an
-    //        ID-ONLY reference is looked up. Plus the llm.js namespace guard, which
-    //        renames a colliding generated id before it reaches any of this.
-    {
-        const inlineFu = {
-            id: CAPEX_ID, headline: 'A generated followup that happens to pick an authored id.',
-            params: { mu: 0.01 }, magnitude: 'minor', mtth: 12, weight: 1,
-        };
-        // Path 1: the engine-internal chain scheduler (top-level + superevent path).
-        const e1 = new EventEngine('offline');
-        e1._scheduleFollowups({ id: 'generated_parent', followups: [inlineFu] }, 10, 0);
-        const got1 = e1._pendingFollowups[0] && e1._pendingFollowups[0].event;
-        check('O6: an INLINE generated followup named rates_capex_wave does NOT resolve to the static shell (_scheduleFollowups)',
-            !!got1 && got1 === inlineFu && got1.category !== 'rates'
-            && got1.params.mu === 0.01 && got1.params.b === undefined,
-            got1 ? `category ${got1.category}, params ${JSON.stringify(got1.params)}` : 'nothing scheduled');
-        // Path 2: the public choice-followup entry point.
-        const e2 = new EventEngine('offline');
-        e2.scheduleFollowup(inlineFu, 10);
-        const got2 = e2._pendingFollowups[0] && e2._pendingFollowups[0].event;
-        check('O6: same for the public scheduleFollowup (choice followups)',
-            !!got2 && got2 === inlineFu && got2.category !== 'rates'
-            && got2.params.mu === 0.01 && got2.params.b === undefined,
-            got2 ? `category ${got2.category}, params ${JSON.stringify(got2.params)}` : 'nothing scheduled');
-        // An ID-ONLY reference still resolves -- the 108 authored followups are all
-        // this shape, so the fix must not have moved them.
-        const e3 = new EventEngine('offline');
-        e3._scheduleFollowups({ id: 'authored_parent', followups: [{ id: CAPEX_ID, mtth: 12 }] }, 10, 0);
-        const got3 = e3._pendingFollowups[0] && e3._pendingFollowups[0].event;
-        check('O6: an ID-ONLY reference still resolves to the authored shell (authored chains unmoved)',
-            got3 === shellDef);
-        // llm.js namespace guard: a generated id colliding with ANY authored id is
-        // renamed before it can be scheduled or logged.
-        check('O6: llm.js renames a generated id that collides with an authored one',
-            _deconflictId(CAPEX_ID) === CAPEX_ID + '_llm'
-            && getEventById(_deconflictId(CAPEX_ID)) === null
-            && _deconflictId('llm_unique_beat') === 'llm_unique_beat',
-            _deconflictId(CAPEX_ID));
     }
 }
 
