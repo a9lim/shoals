@@ -527,16 +527,72 @@ processing, so events mutate baseline parameters and day-complete
 valuations never price through a transient overlay; permanent additive
 deltas on the race stream remain forbidden ([03](03-market-mechanics.md)).
 
-**Forecast locks:** lock days 0, 63, 126, … (quarterly, not
-event-relative — no waiting out late evidence). A lock is the full
-four-rung claim vector or nothing; skipping a lock day is allowed, scores
-no Brier, and stalls the credibility EMA (staleness is its own penalty —
-a player who never locks never clears the gates). Locks are immutable
-once accepted: no off-grid days, no retroactive edits, idempotent replay
-only. Day 0 is a real prompted lock, never a manufactured market-prior
-forecast. Brier is averaged over the vector; credibility = EMA(α = 0.25,
-init 0) of (1 − 2·Brier). Gates: memos > 0.55; fund-as-actor > 0.65 ∧
-`F` > 60. The lock UI is a three-preset popup.
+**The posterior** (ratified 2026-10-24; it replaces the three-preset
+lock and the Brier-on-settlement credibility, under which credibility
+stepped at most four times a run and topped out below the fund gate —
+`docs/horizons.md`). The player's timeline is held in the same form as
+`B`: for each tracked rung R2–R5, a logistic law `{m, w}` over the
+*certified* crossing day (R5: the terminal crossing). Bounds:
+`w ∈ [25, 400]`, `m ∈ [0, 2016]`, medians monotone
+`m₂ ≤ m₃ ≤ m₄ ≤ m₅` (dragging one pushes its neighbours), and a
+certified rung is frozen at its certification day. The player edits a
+standing **draft** at any time on the Markets page. Day 0's draft is a
+copy of `B`.
+
+**Locks** stay quarterly: days 0, 63, 126, …, on-grid, immutable, with
+idempotent replay only. Each lock day raises the lock dispatch, which
+holds the day (it counts in `_popupBarrier`) until a lock is recorded.
+The choices are *as drawn*, *the market's curves*, *earlier than the
+market* (`m_B − 0.5·w_B` on each uncertified rung, `w_B` kept), *later
+than the market* (`m_B + 0.5·w_B`), or *adjust first*. Adjust first
+dismisses the dispatch, opens the Markets page with the editor focused,
+and keeps the day held until the panel's Lock is pressed. Every lock
+stores the player's curves together with a snapshot of `B`'s `{m, w}`
+for the same rungs.
+
+**Scoring.** At each lock day `L_{q+1}`, every rung R ∈ {2, 3, 4} that
+was uncertified at `L_q` is scored for the quarter `[L_q, L_{q+1})`,
+under the lock recorded at `L_q`, for both the player and the snapshotted
+`B`. The quarter's crossing probability is
+`p = (F(L_{q+1}) − F(L_q)) / (1 − F(L_q))`, clamped to [0.02, 0.98], and
+`o = 1` if R was certified in the quarter. The skill increment is the
+log-likelihood ratio, in nats:
+`Δ = o·ln(p_P/p_M) + (1 − o)·ln((1 − p_P)/(1 − p_M))`. Cumulative skill
+is `S_P = ΣΔ`, and **credibility = tanh(S_P / K_CRED)**, with K_CRED set
+in calibration (start 2.5). R5 is not scored, because nothing certifies
+it.
+
+These properties are gated by the harness:
+
+- A player who locks the market's curves scores exactly 0 every quarter.
+- The score is proper: the expected Δ under the true law is maximized by
+  reporting that law.
+- A quarter without a crossing is information. The early caller pays a
+  little every quiet quarter and collects when the crossing lands, so
+  being early is indistinguishable from being wrong until it isn't.
+
+Credibility now moves up to sixteen times a run. The gates stay: memos >
+0.55, fund-as-actor > 0.65 ∧ `F` > 60. Calibration targets (gated by
+`forecast-test`):
+
+- An oracle that locks the true certification days (`w` 30) clears the
+  fund gate by day 756 in ≥ 80% of the worlds that certify a rung by
+  then.
+- An informed player halfway between `B` and the truth (`w = 0.7·w_B`)
+  clears the memo gate by day 882 in roughly half of worlds.
+- The market copier stays at 0.
+- No static preset (earlier or later) has a positive mean skill across
+  worlds.
+
+Consumers read the posterior through `lockedClaim(R)`, the latest lock's
+P(T_R ≤ D_R) at the contract deadline, so `playerPilled`, the scrutiny
+gap and the F conversion keep their meanings. Consensus settlement no
+longer scores credibility. Display: the Markets page's Consensus panel
+draws the draft over `B`, with a median handle per uncertified rung
+(drag for the median, vertical drag or ↑/↓ for the width, ←/→ moves the
+median 5 days and Shift+←/→ moves it 21). The Race page's ladder shows
+the locked medians beside the market's. The Desk shows the record:
+quarters scored, skill in nats, and credibility.
 
 **Firm belief `F`** lives on `race.F`: starts 15, clamped [0, 100]; wakes
 toward market pilledness at 0.08 of the gap per step, and converts toward
@@ -655,10 +711,7 @@ them.
   narrative flag.
 - Followup `weight` is a same-day tiebreak among pending siblings of one
   chain, not a firing probability.
-- Followup resolution prefers an inline object carrying its own
-  `headline`/`params` and resolves by id only for id-only references, and
-  LLM-generated ids that collide with authored ones are renamed — a
-  generated followup must never become an authored shell.
+- Followups are id references resolved against the authored pool.
 
 **Wonder cadence:** likelihoods are functions of the released rung (0
 below each act gate, then rising; the cascade at 2.5 from R4) — the
@@ -710,6 +763,62 @@ because the shell carries no `mu` delta for the coupling computation to
 key on. Invariants: at R1 nothing fires, so Act I and Classic are
 untouched; nothing under `src/race/` reads `sim`, so race trajectories
 are untouched by construction.
+
+## The valuation layer
+
+Ratified 2026-10-24. HCN's authoritative process price carries the
+market's valuation of the race **conditional on survival**: the market
+prices the worlds in which its claims can still be paid, and gives no
+weight to the worlds in which no one is left to collect. That is pillar
+2's "the market structurally cannot price extinction" written as a
+valuation rule. The systematic mispricing has a reason, and the doom
+short's non-settlement is the same fact seen from the other side.
+
+`V` is a survival-conditioned expected terminal multiple, read from
+public state only (`buildPublicView` and `belief`):
+
+```
+V = Π·[Λ·m_W + (1 − Λ)·m_C] + (1 − Π)·m_F
+```
+
+- `Π` is the survival-conditioned R5 quote, `binaryProb(5, 1000)`: will
+  the race finish this term. It is 0 after day 1000 without a crossing.
+- `Λ = σ((r_W − r_T)/0.75)` is the public lead. `r_W` is the highest
+  *claimed* released rung of Halcyon or Polaris, and `r_T` is Tianxia's
+  (below the ladder counts as 0).
+- `m_W = 1.40` (the family-1/2 blend of 1.60 and 1.25, weighted 14:21),
+  `m_C = 0.35` (family 4's recovery), and `m_F = 0.55` (the fizzle
+  centre).
+- Misalignment (family 3) is absent by construction; that is the
+  survival conditioning. The Deal is absent in this version, and a
+  public treaty term can join later.
+
+Day 0 reads Π 0.70 and Λ ≈ 0.79, so V ≈ 0.99.
+
+`V` is recomputed at day close, after `stepBelief` and the bridge pass.
+The authoritative price takes the change as a level gap before the next
+open: `S ← S·V_t/V_{t−1}`, with the daily ratio clamped to [0.75, 1.30].
+A Halcyon certification lifts Π and Λ, a Tianxia claim of parity cuts Λ,
+and a quiet approach to the deadline decays Π, so the AGI trade unwinds
+on the tape in the worlds that stall. The gap reaches every downstream
+mark the normal way (`_syncAll`), and the markets snapshot is taken
+after it. Classic has no `V`. The decaying impulses stay, as texture:
+vol, jump intensity and a hair of drift.
+
+Invariants (`belief-test`):
+
+- Corrupting every latent field leaves `V` bit-identical.
+- `V ∈ [m_C, m_W]`.
+- `V` is constant in Classic.
+- No-player race trajectories are untouched, because nothing under
+  `src/race/` reads `sim`.
+
+Terminal reconciliation replaces closeout cell 1's spot multiple:
+outside the conversion regimes, the HCN mark is `spot·m_f / V_T`. Here
+`m_f` is the realized family's multiple (1.60, 1.25, 0.35, 0.35, 1.00,
+or the fizzle draw) and `V_T` is the last valuation. The price already
+holds the market's expectation, so the reveal moves it by the ratio of
+realized to expected. The conversion regimes keep the frozen reference.
 
 ## Player influence and the ledger
 
@@ -780,6 +889,68 @@ input. Check-then-mutate, never mutate-then-fail-to-record: a race
 mutation without a ledger row is the corruption 09's freeze exists to
 prevent. After the latch, books are frozen and capital moves nothing that
 counts. The ledger's `B` channel is closed (see tip verbs).
+
+## Private rounds and primary offerings
+
+Ratified 2026-10-24. The primary market is where capital is literally
+not neutral (03): money in a round reaches the lab. There are two
+instruments, and neither has a price process of its own.
+
+**Polaris rounds.** Polaris stays private for the whole run. It raises
+at its founding (the spawn day) and then every 126 ± 21 days while it
+lives. Timing draws from a `rounds` substream outside `race.streams`, so
+a run nobody participates in is bit-identical to one without rounds. The
+founding round prices a unit at 1.00. Each later round prices at
+`P_k = P_{k−1}·clamp(exp(0.8·Δr + 1.0·ΔΠ − 0.15), 0.5, 3.0)`, where `Δr`
+is Polaris's claimed-rung gain since the last round and `ΔΠ` the change
+in the valuation layer's Π. A quiet half-year is a flat-to-down round.
+
+Meridian is offered an allocation of up to min(20% of equity, 2,000k)
+per round, by dispatch: take it all, take half, or pass.
+
+A stake (`privatestake`) has these properties:
+
+- It is cash-funded and carries no greeks.
+- It is not marginable collateral, though it counts toward equity at
+  its mark.
+- It is illiquid until the terminal.
+- It is marked at the last round price, the way a venture book marks.
+
+Participation is a ledgered `raceEffects` entry of
+`S[polaris] += 0.04 × (taken/offered)`, under the same ±0.15
+per-effect clamp. It is runway, which bites only in worlds where Polaris
+leads, the same rationale as `polaris_supplicant`.
+
+Terminal value (closeout cell 10) is units × last round price × a
+multiple:
+
+| Terminal | Multiple |
+|---|---|
+| Polaris leads a family-1 crossing | ×6 |
+| Polaris leads a family-2 crossing | ×3 |
+| Any other family-1/2 world (folded into the winner at the last round) | ×1.0 |
+| Family 5, the Deal | ×1.5 |
+| Family 6, the fizzle | ×0.3 |
+| Family 4 | ×0.1 |
+| Family 3 (a private claim on a world that ended) | 0 |
+| Conversion regimes | ×0.5 |
+
+**Halcyon follow-ons.** Each `rates_capex_wave` (a rise of the released
+rung, when somebody has to finance the compute) is also a Halcyon
+follow-on offering:
+
+- On announcement HCN gaps −2% for dilution, applied with that day's
+  valuation gap.
+- Meridian is offered up to min(15% of equity, 1,500k) of new shares at
+  a 3% discount to the post-gap price: take it all, take half, or pass.
+- The shares are ordinary `stock` positions.
+- The money reaches the lab. The allocation adds
+  `min(1, 3·allocation/equity)` to the cost-of-capital channel's daily
+  input for the 126 days after the offering (the capital's deployment
+  window), inside the channel's existing 0.05 cap.
+- It is ledgered on the C channel under the offering's id.
+
+Secondary fills still finance nothing.
 
 ## Resolution
 
@@ -898,6 +1069,13 @@ The nine closeout cells (`src/race/closeout.js`; the shape is
    happened: certifications inside the extrapolated trajectory before a
    contract's deadline settle it YES, exactly as if the player had been
    there to watch (desk-ends-before-world).
+10. **Private stakes** (Polaris rounds) settle at units × last round
+   price × the family multiple in "Private rounds and primary
+   offerings". They are never marked to a process, because there is
+   none.
+
+Since the valuation layer (2026-10-24), cell 1's family marks apply as
+realized over expected: `spot·m_f / V_T` (see "The valuation layer").
 
 The closeout draws from a `'closeout'` substream outside `race.streams`,
 so race trajectories are identical with closeout on or off.
