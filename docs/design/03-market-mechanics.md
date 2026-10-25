@@ -14,7 +14,12 @@ constants in [02a-tuning.md](02a-tuning.md).
   mechanic (options chain, jumps, vol surface) is load-bearing for the
   theme. Long-dated HCN options are the game's purest timeline
   instrument. Cambria has no equity book: its exposure is the compute
-  futures curve, which also carries the strait premium.
+  futures curve, which also carries the strait premium. Since
+  2026-10-24, HCN's level also carries the market's valuation of the
+  race, **conditional on survival**, repriced as gaps on legible news.
+  This is the valuation layer in [02a](02a-tuning.md): the market
+  prices the worlds where its claims can be paid and gives the others
+  no weight, which is pillar 2 written as a price.
 - **Milestone binaries** — prediction-market contracts on **Consensus
   Markets**. Prices *are* `B` made visible — the market's posterior on
   screen next to yours. Settlement is *certified* (audited evals, public
@@ -77,10 +82,13 @@ gap is available alpha; the gap closing is the world waking up. The
 player literally trades their distribution against the market's. This
 is the game's thesis as an interface.
 
-Built today: the quarterly lock is a popup showing the market's implied
-R3 and R4 days and offering three preset claim vectors. Designed, not
-built: the plotted dashboard of implied timeline against posterior, with
-the gap displayed as available alpha.
+Built (2026-10-24): the posterior is drawn, not chosen. On the Markets
+page the player draws per-rung crossing curves over the market's, and
+the draft is locked quarterly through the lock dispatch. Each quarter
+both curves are scored by log-likelihood against what certified, so
+credibility measures the player's edge over the market, in nats, and
+moves every quarter rather than at three deadlines ([02a](02a-tuning.md)).
+The gap between the two curves is the available alpha, on screen.
 
 ## The allocation stances (mechanical consequences)
 
@@ -102,9 +110,13 @@ itself. The table's race effects flow through governance and policy
 choices (board restraint, backing Polaris, export controls, the room)
 and a bounded, *lagged* cost-of-capital channel driven by persistent net
 HCN positioning, which heavy, sustained positioning (including shorts)
-can move; one fill finances nothing. Primary events (raises, PIPEs,
-converts) are a designed channel not yet built. The ledger records
-channels, not fills ([05-endings.md](05-endings.md)).
+can move; one fill finances nothing. Primary events are built as of
+2026-10-24 ([02a](02a-tuning.md), "Private rounds and primary
+offerings"). Each capex wave is a Halcyon follow-on offering whose
+allocation reaches the lab through the cost-of-capital channel. Polaris
+raises private rounds, and a stake in one is marked at the last round,
+illiquid until the end, and settled by what became of Polaris. The
+ledger records channels, not fills ([05-endings.md](05-endings.md)).
 
 **Incident coupling rule:** the detected-incident stream is high-volume
 by design (~80–160 events per run), so race-event market effects are
@@ -169,8 +181,8 @@ Designed, not built: "explain this thesis" popups and forced trims on a
 divergent drawdown.
 
 Credibility (track record of the player's explicit posterior vs. realized
-events — Brier-like, not just P&L) is the currency that converts `F` and
-unlocks agency.
+events, scored quarterly against the market's own curve, not just P&L)
+is the currency that converts `F` and unlocks agency.
 
 ## Fund-as-actor (late-game unlock)
 
@@ -183,7 +195,8 @@ surfaced as advice-to-higher-ups popups whose options the player earned:
   wire into Treasury is a wire.
 - **Back Polaris** — the wager expressed purest: fund the careful racer,
   possibly split the West's lead fatally. The game refuses to say which.
-  Built as an ungated Polaris popup (runway as `S[polaris]`).
+  Built as an ungated Polaris popup (runway as `S[polaris]`), and as
+  Polaris's private rounds, where the backing is a position.
 - **Governance on Halcyon** — restraint bought through the board.
   Built as an ungated board popup (`S[halcyon]`); a PIPE with governance
   terms is the designed fund-scale version.

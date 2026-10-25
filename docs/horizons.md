@@ -2,10 +2,33 @@
 
 A discussion draft from the 2026-10-24 review round: where Shoals stands
 after the Meridian Brief rebuild, what holds it back, what it could
-become, and which of the autumn's real events bear on the plot. **Nothing
-here is ratified.** The design record is `docs/design/`, and the numbers
-are in `02a`. A proposal below becomes design when a9 takes it, with its
-ruling recorded in 02a before any code is written.
+become, and which of the autumn's real events bear on the plot. The
+design record is `docs/design/`, and the numbers are in `02a`. A
+proposal below becomes design when a9 takes it, with its ruling recorded
+in 02a before any code is written.
+
+**Status, end of 2026-10-24.** a9 took these, and they are built (02a
+holds the rulings):
+
+- The posterior: drawn curves, locked quarterly, scored by
+  log-likelihood against the market's.
+- The survival-conditioned valuation layer. a9's verdict was "anthropic
+  bias 😉 this works".
+- Fundraising without an IPO: Polaris private rounds marked at the last
+  round, and Halcyon follow-ons at capex waves.
+- Dispatches that resume the desk, Paradox-style.
+- LLM mode removed.
+- The three bugs fixed, and the music rewritten.
+
+Still open:
+
+- Domains (below; a9 leans yes, and the scope needs a nod).
+- The calibrated public estimator, which would fix the valuation
+  layer's drift and B's early bias.
+- The Desk as the firm.
+- The wider Consensus.
+- The autumn's content mechanisms.
+- Event illustrations (parked).
 
 Method: a played Dynamic (offline) run to about day 300 with every
 dispatch answered, a read of all nine design docs and the code they
@@ -349,6 +372,46 @@ R3 in AI R&D. One answer is a *jagged* ladder (domain claims under a
 rung, certified separately). Another is that the game's world is its own
 draw from the distribution and day 0 stays where it is. This is a world
 anchor, not a stance question.
+
+## Domains: a proposal
+
+a9 asked on 2026-10-24 whether rungs should carry domains, as AI 2027
+did. My answer: yes, but as an **epistemic** layer rather than a
+kinematic one.
+
+AI 2027 tracked capability milestones (superhuman coder, superhuman AI
+researcher, superintelligent AI researcher) with an AI R&D progress
+multiplier, plus separate threat domains (hacking, bio, politics). Shoals
+already has the multiplier: it is the recursion term. What the autumn
+added is that capability shows up *jaggedly* in public. It arrives
+first and loudest wherever it is cheapest to verify. An internal model
+produced research mathematics at volume, Lean-checked, months before
+anyone could certify "autonomous researcher" in AI R&D, which is the
+domain that actually drives recursion.
+
+So keep one hidden scalar per lab (the race model, its calibration and
+its harnesses untouched) and let each rung be *observed* through domain
+channels with different verification costs:
+
+| Domain | How it certifies | Speed |
+|---|---|---|
+| Mathematics | formal proof (Lean, the demonstration channel) | fast, loud |
+| Software | benchmarks and shipped work | medium |
+| AI research | contested, empirical, internal; the one that drives recursion | slowest |
+| Cyber, bio | red-team reports and incidents; capability shows first as harm | by incident |
+| Persuasion | detected campaigns (the persuasion incident class already exists) | by detection |
+
+Consensus would list per-domain contracts on the same rung, and `B`
+would carry a per-domain offset. The rung contracts already listed
+settle on AI research. The Race page grows a domain grid. The player's
+edge is knowing that the loud domain leads the quiet one by a lag that
+is real but not fixed, so a certified R3 in mathematics is evidence
+about AI research and not a settlement of it. Later, cyber capability
+could feed theft and incident hazards, but that would touch kinematics
+and is a separate decision.
+
+Built after the posterior, so the player can hold a curve per domain;
+needs a9's yes on scope.
 
 ## What it lacks outright
 

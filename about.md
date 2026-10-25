@@ -15,6 +15,8 @@ The interface is *The Meridian Brief*, the firm's morning note. Each trading day
 
 The Markets page draws every market as a curve, as six small multiples: HCN through time, the Vasicek yield curve, the VXHCN futures term structure, the option smile, the Cambria compute forward curve, and Consensus's implied crossing curves. On a news day each keeps the previous day's curve as a dashed ghost, so what moved together is visible at a glance. Every point on a curve is a contract: clicking one (or focusing a curve and pressing Enter) adds it to the sandbox, again to go short, a third time to remove it. The sandbox revalues its legs, and optionally the live book, a quarter out across HCN moves and how far the race gets, says in one sentence what the book bets on, and can send the legs to the desk as market orders.
 
+The Consensus panel is also where the player states a timeline. Switching on "Your curves" draws the player's own crossing curve for each rung over the market's. A median is dragged along the timeline, and a curve tightened or loosened, by pointer or keyboard. Each quarter a forecast-lock dispatch records the draft, the market's curves, or a shift earlier or later. At the next quarter both are scored by log-likelihood against the rungs that certified and the quarters that passed quietly. Credibility is the player's demonstrated edge over the market, and it opens the firm's memo, the fund's agency and a seat in the room.
+
 The Race page follows Epoch's Capabilities Index: every public release placed by date on the rung it claims, claims and certifications on the rungs, the released frontier, and Consensus's implied crossing date as a distribution on each rung still ahead. It reads only public records. The self-graded Fixedpoint Index sits apart, unlisted, and the hidden internal tracks appear only once the run has ended.
 
 ## Pricing Models
@@ -31,7 +33,9 @@ The multi-leg strategy builder lets users construct spreads, straddles, strangle
 
 ## Instruments and Portfolio
 
-The trading surface includes HCN stock, bonds, VXHCN volatility futures, and American options; Dynamic mode adds Consensus milestone binaries and Cambria compute futures. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
+The trading surface includes HCN stock, bonds, VXHCN volatility futures, and American options; Dynamic mode adds Consensus milestone binaries and Cambria compute futures. It also adds the primary market. Halcyon sells new stock when it raises for compute, and Polaris, the safety lab, raises private rounds. A Polaris stake is marked at the last round, cannot be sold before the race ends, and settles by what became of Polaris.
+
+In Dynamic mode HCN's price also carries the market's valuation of the race, taken conditional on survival. The market weighs the worlds in which its claims can be paid, so it reprices on certifications, claims and rival releases as overnight gaps, and gives the outcomes in which no one is left to collect no weight at all. Positions share cash, margin, realized and unrealized P&L, Greeks, and price impact. Instrument-specific square-root impact overlays decay with cumulative volume; option market-maker rehedging adds stock flow, while very large gross exposure can temporarily shift selected process parameters.
 
 ## Institutional Narrative
 
@@ -44,6 +48,10 @@ Regulations, lobbying, congressional relationships, and monetary-policy choices 
 ## Educational Use
 
 The market layer makes option pricing, volatility, time decay, rates, portfolio Greeks, margin, and price impact tangible. The narrative layer adds the institutional question the equations leave out: who can act, under which rules, and what a financially successful decision costs elsewhere in the system.
+
+## Music
+
+The score is synthesized in the browser: "Halcyon", a 32-bar ballad in A minor for Rhodes, upright bass, brushes and Harmon-muted trumpet, played as a four-chorus set (head, a written Rhodes solo, a rhythm-section chorus, and the head again). Dispatches ring the wire bell. In the last act the same form is re-rendered with less humanity each pass: the swing straightens, the trumpet goes first, and a machine layer keeps its own time beneath the band.
 
 ## Accessibility
 

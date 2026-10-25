@@ -22,7 +22,10 @@ Kept distinct everywhere, because their divergence is content:
    regime-switch/execution wrapper that lets the process itself drift —
    *(not built)*). Never displayed directly.
    The impact overlay prices *execution*, never settlement — settlement
-   follows this mark, which player flow does not touch.
+   follows this mark, which player flow does not touch. In the Dynamic
+   mode its level carries the valuation layer ([02a](02a-tuning.md)): a
+   gap at each day's close computed from public state alone, so the
+   mark moves on legible news and never on latent truth.
 2. **Executable quote** — authoritative ± spread(η, impact). What a
    fill actually costs. Execution always refreshes against it or fails
    loudly; a fill never prints against a stale value.

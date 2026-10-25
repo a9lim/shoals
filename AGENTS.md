@@ -33,9 +33,12 @@ node tools/belief-test.mjs    # [N] [--seed S], N=300: belief B, quoters, credib
 node tools/compute-test.mjs   # [N] [--seed S], N=300: compute-futures lifecycle, conservation, integrity (~1 s)
 node tools/consensus-test.mjs # [N] [--seed S], N=500: binary settlement, regime split, accounting (~1 s)
 node tools/endings-test.mjs   # [N] [--seed S], N=2000: family distribution, player channels, closeout, terminal path (~8 s)
+node tools/forecast-test.mjs  # [N] [--seed S], N=500: the posterior: properness, the copier, K_CRED calibration, gate reachability (~1 s)
+node tools/valuation-test.mjs # [N] [--seed S], N=300: valuation layer: corruption invariance, no silent drift, reconciliation (~2 s)
+node tools/rounds-test.mjs    # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~16 s)
 ```
 
-The six harnesses import `src/` directly and exit 1 on any failure. They are the
+The nine harnesses import `src/` directly and exit 1 on any failure. They are the
 regression gate for anything that touches the Dynamic-mode systems. Run them at the
 default N, because their calibration bands are sized for it and small-N runs miss
 them legitimately. Each harness header lists its sections. The parent build doesn't
@@ -45,10 +48,10 @@ stage `tools/`.
 
 ```
 index.html, styles.css, colors.js  the Brief: masthead, five pages, overlays; styles; data hues on the inks
-main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~4.1k lines)
+main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~4.3k lines)
 src/pages.js       the five pages (folios) and the front page's Quotes/Book rail tabs
 src/brief.js       masthead, editions and extras, the lead item and "In brief"
-src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard
+src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard, the curve editor
 src/sandbox.js     the sandbox: legs from curve points, the scenario grid, the reading
 src/race-page.js   the race page: public release/claim/certification record, Consensus laws, epilogue reveal
 src/config.js      named constants and PRESETS
@@ -70,7 +73,7 @@ src/endings.js         ending triggers, family/overlay selection, slot-based 5-p
 src/race/              hidden race model and its markets (DOM-free; see below)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
 src/audio.js           all music and SFX, synthesized
-tools/*.mjs            the six headless harnesses
+tools/*.mjs            the nine headless harnesses
 docs/design/, docs/lore.md, docs/art-prompts.md, docs/horizons.md
 ```
 
@@ -108,8 +111,11 @@ Race-block order in `_onDayComplete`: `stepCoupling` → `advanceRace(race,
 {straitTension, playerCoupling, exportControlStage})` → `stepControlRegime` →
 `stepTreaty` → `_syncRaceToWorld()` (the mirrors) → `setBaseRateScale` →
 `_stepAct3()` → standing-order sync → `stepBelief` → Consensus and compute
-settlement → standing day rules → forecast lock, scrutiny and firm conversion →
-`checkResolution` → `_checkRoom`.
+settlement → standing day rules → on lock days, quarter scoring (`scoreQuarter`)
+then the forecast lock, scrutiny and firm conversion → `checkResolution` →
+`_checkRoom`. After the event engine and the bridge pass, `_stepRaceMarkets` applies
+the valuation gap (and any follow-on dilution) to the closed day, fills resting orders
+at the post-gap price and queues the round offers; `marketsDayClose` snapshots after it.
 
 ### Pricing, impact, portfolio
 
@@ -126,6 +132,16 @@ settlement → standing day rules → forecast lock, scrutiny and firm conversio
   cumulative volume per instrument feeds `getStockImpact(sigma)`,
   `getBondImpact(sigmaR)`, `getVxhcnImpact(xi)` and `getOptionImpact(…)`. Layer 3
   shifts selected process params temporarily when gross exposure is large.
+- The valuation layer (`race/valuation.js`, 02a): in Dynamic, HCN's level carries
+  V = Π·[Λ·m_W + (1−Λ)·m_C] + (1−Π)·m_F from public state only (B's unconditional
+  R5 CDF at day 1000, the public claim lead), applied as a clamped gap at each day's
+  close. Survival-conditioned by construction: misalignment gets no weight. The
+  closeout marks HCN at spot·m_f/V_T. Known bias and its successor are in 02a.
+- The primary market (`race/rounds.js`, `src/events/rounds.js`): Polaris private
+  rounds (`privatestake`: cash-funded, marked at the last round, zero collateral value,
+  illiquid, capped at cash and collateral headroom, settled by closeout cell 10) and a
+  Halcyon follow-on at each capex wave (dilution gap, discounted shares, a 126-day
+  primary input to the cost-of-capital channel). Offers are `rounds` dispatches.
 - Positions carry a signed `qty` (no `side`) and net on `type + strike + expiryDay +
   strategyName`. `portfolio` is a singleton that `resetPortfolio()` mutates in place.
   `executeWithRollback` (main.js) unwinds every leg of a strategy on partial failure.
@@ -197,8 +213,11 @@ them headless.
   and `ledger.js` (the append-only complicity ledger, with `raceChannelsLive()` as the
   shared gate) carry the player's influence, and `closeout.js` values the book at the
   terminal.
-- `belief.js` holds market belief B: per-rung hazards, survival-conditioned quotes,
-  quarterly forecast locks, credibility, and firm belief F with scrutiny. It feeds the
+- `belief.js` holds market belief B: per-rung hazards and survival-conditioned quotes;
+  the player's posterior (a drawn draft of per-rung `{m, w}` curves, quarterly locks
+  that snapshot B, `scoreQuarter`'s log-likelihood ratio against that snapshot, and
+  credibility = tanh(S_P/K_CRED)); and firm belief F with scrutiny, where
+  `playerPilled` mirrors `marketPilled`'s 252-day horizon. It feeds the
   real quoters into `consensus.js` (milestone binaries settled off certifications,
   disputes, R5 settled only at terminal closeout) and `compute-market.js` (the Cambria
   quarterly futures ladder, settled on race-day maturities through
@@ -239,7 +258,10 @@ key is `shoals-theme`.
   `unitPrice` or the books' quotes. On a news day the previous snapshot is the ghost
   and the curves ease from it. Consensus curves come from `binaryProb` (belief B) and
   the compute curve from `computeCurveFromBelief` on the public view: public state
-  only, the quoters' own inputs.
+  only, the quoters' own inputs. The Consensus panel is also the posterior's editor
+  ("Your curves"): the draft draws over B, median handles drag or take arrows, and
+  edit mode suspends sandbox picks. The lock dispatch's "Adjust first" holds the
+  quarter (`_lockPending`): play and step refuse until the panel's Lock is pressed.
 - **Sandbox.** Legs are curve points (a click or Enter cycles long, short, removed).
   `renderSandbox` revalues every leg 63 trading days out across HCN moves and, in
   Dynamic, how far the race gets (in Classic, volatility). The scenario model is the
@@ -263,7 +285,8 @@ key is `shoals-theme`.
   deficit, compliance) share one atomic terminal path. It freezes the ledger,
   fires the resolution-day beat, runs the closeout at the resolution-time regime,
   then shows the epilogue. `_triggerGameOver` keeps only `TERMINAL_SAFE_CATEGORIES`
-  (`'summit'`) in the popup queue. `endings.js` composes nothing: pages come from
+  (`'summit'`, and `'catastrophe'`: an S4 resolves on the tick it self-discloses, and
+  the latch keeps its detection for the bridge) in the popup queue. `endings.js` composes nothing: pages come from
   `EPILOGUE_SLOTS[family][overlay][page]` with fallback [fam][ov] → [fam]['*'] →
   ['*']['*']. Five personal overlays follow the ending cause, and gray eminence vs
   bystander is decided by involvement in ledgered actions, never by traits or beliefs.
@@ -273,17 +296,20 @@ key is `shoals-theme`.
   display-only degradation latches. `standing-orders.js` holds six precommitment
   rules that unlock at released R3 and lock at R5. They execute as machinery, so they
   take no ladder lag and draw no RNG.
-- `audio.js` plays a 72 BPM jazz loop (16-bar Am form), an Am drone crossfaded by
-  `setAmbientMood`, stingers and superevent stabs. `setMachineIntensity(x)` re-renders
-  the same form with less humanity plus a machine bus. `glitchAudio` and
-  `silenceDesk()` (the terminal cut) round it out. `initAudio()` waits for the first
-  user gesture.
+- `audio.js` plays "Halcyon", a 32-bar AABA ballad in A minor at 72 BPM, as a
+  four-chorus set (head in on muted trumpet, a written Rhodes solo, a walking
+  rhythm chorus, head out), scheduled a bar at a time from its own PRNG (never
+  `Math.random`). An A drone crossfades by `setAmbientMood`. Dispatches ring the wire
+  bell; superevent cues (`playMusic`) ring the flash and quote the tune.
+  `setMachineIntensity(x)` re-renders the same form with less humanity plus a machine
+  bus. `glitchAudio` and `silenceDesk()` (the terminal cut) round it out.
+  `initAudio()` waits for the first user gesture.
 
 ## Conventions
 
 - **Authored voice work.** Player-facing prose (events, popup copy, epilogue slots)
-  and `src/audio.js` are authored and ratified by a9, not generated. Changes to either
-  go through a9. Lore and naming are in `docs/lore.md` and `06-naming.md`: real places
+  and `src/audio.js` are authored work, ratified by a9; changes to either go through
+  a9. The 2026-10-24 score was written by Claude at a9's request. Lore and naming are in `docs/lore.md` and `06-naming.md`: real places
   and public institutions, fictional people, companies and parties. Dead names
   (VXPNT, PNTH, Serica and the other invented polities) appear nowhere at runtime.
 - **Prose encoding.** Event headlines and contexts render via `textContent`, so they
@@ -325,7 +351,8 @@ key is `shoals-theme`.
   stay instant. Lag 0 bypasses the queue and `spreadMult === 1`
   short-circuits, because the general formula is not bit-exact at 1.
 - **Settlement chokepoints.** Every binary settlement row goes through
-  `portfolio.applyBinarySettlementRows` (cash, credibility scoring, exactly-once).
+  `portfolio.applyBinarySettlementRows` (cash, exactly-once). Credibility is scored
+  quarterly by `scoreQuarter`, never at settlement.
   Binary trades go through `executeBinaryTrade`, never `_fillPrice`. Equity decisions
   use `_portfolioEquity`/`portfolioValue`, which include reserved margin. A frozen leg
   restricts the book (`portfolio.restricted`) rather than force-filling it.
@@ -351,7 +378,7 @@ key is `shoals-theme`.
   and is spent on losses and down moves (`--down`, `pnl-down`, a down session's last
   close); gains take viridian (`--up`). A short position is not a loss and is never
   red. Instruments have inks (`colors.js`: stock ochre, bond prussian, call verdigris,
-  put sienna, VXHCN violet, binary indigo, compute umber), and the Greeks match the
+  put sienna, VXHCN violet, binary indigo, compute umber, private stake sap), and the Greeks match the
   strategy diagram (`--delta` …).
   Portfolio value is colored against buy-and-hold. All UI and canvas text is
   `--font-text`/`_FONT.text`. The canvas redraws once `_loadTextFonts()` resolves. Live
@@ -363,16 +390,18 @@ key is `shoals-theme`.
 
 ## Open work
 
-- `docs/horizons.md` is the 2026-10-24 review: an unratified discussion
-  draft with the proposed direction, the autumn's real-world mechanisms, and
-  an order of work. Its headline finding is that through the preset forecast
-  lock, credibility tops out at 0.481 in fast worlds and 0.649 in slow ones, so
-  the fund gate (0.65) never opens and the firm memo can't reach the player
-  before the term ends. It also records two confirmed bugs left for a ruling:
-  a natural S4 never fires its own shell, and `china_controls_backlash` carries
-  a permanent race-stream `mu`.
-- a9 is play-testing the reality-beats content (capex waves, concealment, the six
-  beats) and the feel of the capex rates channel.
+- `docs/horizons.md` holds the 2026-10-24 review and its status: what a9 took and
+  is now built (the posterior, the valuation layer, the primary market, dispatch
+  resume, LLM mode removed, the new score), and what is open.
+- a9's play-test: the posterior's feel (K_CRED 1.8 is calibrated against synthetic
+  players, not people), the size of the valuation gaps, the rounds' cadence, and the
+  new score. Earlier: the reality-beats content and the capex rates channel.
+- Known biases recorded in 02a: B's law runs early (a static "later" caller earns a
+  bounded edge), and V inherits B's drift. Both point at the next valuation round, a
+  calibrated public estimator plus a plateau mass in B.
+- Proposed, awaiting a nod: domains as certification channels over one hidden scalar
+  (horizons.md), the Desk page as the firm, a wider Consensus, the autumn's content
+  mechanisms, event illustrations (parked; the old art-prompt sheet predates the Brief).
 - The feel pass: the `ACT3_TUNING` magnitudes and ladder numbers are first-pass, and
   whether the standing-orders lock at R5 is right will be judged at feel.
 - Deferred seams:
@@ -382,6 +411,7 @@ key is `shoals-theme`.
     (see the header of `src/events/china.js`).
 - `lobbying.js` still has the prototype menu (party PACs, fundraiser, broker a deal,
   leak, counsel the Fed). The AI-policy menu in `03-market-mechanics.md` is unbuilt.
-- The sandbox's scenario model is first-pass and display-only (see "The Brief").
+- The sandbox's scenario model is first-pass and display-only (see "The Brief"); it
+  does not yet price legs under the player's curves.
 - `tick()` in `main.js` is dead code. The `/` shortcut and `#step-btn` say "Step
   forward one day", but `step()` advances one substep.
