@@ -20,6 +20,7 @@ for (const T of [_PALETTE.light, _PALETTE.dark]) {
   T.vxhcnfuture = k.violet;
   T.binary = k.indigo;       // Consensus
   T.computefuture = k.umber; // Cambria
+  T.privatestake = k.sap;    // Polaris rounds
   T.delta = k.prussian;
   T.gamma = k.sienna;
   T.theta = k.verdigris;
@@ -32,7 +33,7 @@ _freezeTokens();
 // --- CSS Variable Injection ---
 (function() {
   const P = _PALETTE, L = P.light, D = P.dark;
-  const fin = ['up', 'down', 'call', 'put', 'stock', 'bond', 'delta', 'gamma', 'theta', 'vega', 'rho', 'vxhcn', 'binary', 'computefuture'];
+  const fin = ['up', 'down', 'call', 'put', 'stock', 'bond', 'delta', 'gamma', 'theta', 'vega', 'rho', 'vxhcn', 'binary', 'computefuture', 'privatestake'];
   const gen = (T) => fin.map(k => `  --${k}: ${T[k]};`).join('\n');
   _injectProjectVars(gen(L), gen(D));
 })();

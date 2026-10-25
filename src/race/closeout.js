@@ -44,6 +44,7 @@ import { createRng, deriveSeed } from './rng.js';
 import { getNationalizationReference } from './compute-market.js';
 import { vasicekBondPrice } from '../pricing.js';
 import { TRADING_DAYS_PER_YEAR } from '../config.js';
+import { privateTerminalMultiple } from './rounds.js';
 
 // ---- Family-mark magnitudes (02a "Terminal closeout and overlays") --------
 // Mutable so a headless calibration sweep can retune without a code edit.
@@ -143,11 +144,14 @@ export function adjustedStrike(pos, _ctx) {
  * from its own expiryDay, impact-free -- non-doom families carry the live MTM).
  *
  * @param {object} pos  position { type, qty, strike?, entryPrice, ... }
- * @param {object} ctx  { family, regime, hcnMark, varianceIndex, bondMark }
+ * @param {object} ctx  { family, regime, resolution, hcnMark, privateMark, varianceIndex, bond }
  * @returns {number|null} terminal unit value (>= 0), or null if routed elsewhere
  */
 export function closeoutUnitValue(pos, ctx) {
     switch (pos.type) {
+        case 'privatestake':
+            // 02a closeout cell 10: a claim on Polaris, never an HCN process mark.
+            return Math.max(0, ctx.privateMark * privateTerminalMultiple(ctx.resolution, ctx.regime));
         case 'stock':
             // HCN shares -> terminal HCN mark (family mark, or conversion reference).
             // RULING FLAGGED (coordinator): 09 models nationalized shares as signed
@@ -203,7 +207,7 @@ export function closeoutPosition(pos, ctx) {
     const reserved = pos._reservedMargin || 0;
     const cashChange = pos.qty > 0 ? pos.qty * u : reserved - absQty * u;
     const pnl = pos.qty * (u - (pos.entryPrice || 0));   // signedQty*(u - entry); the MARK leg is zero-sum across offsetting sides
-    const cell = ({ stock: 'stock', call: 'option', put: 'option', vxhcnfuture: 'vxhcn', bond: 'bond' })[pos.type];
+    const cell = ({ stock: 'stock', call: 'option', put: 'option', vxhcnfuture: 'vxhcn', bond: 'bond', privatestake: 'private' })[pos.type];
     return { id: pos.id, type: pos.type, qty: pos.qty, unitValue: u, cashChange, pnl, cell };
 }
 
@@ -219,7 +223,7 @@ export function closeoutPosition(pos, ctx) {
  * @param {Array}  positions  the player's positions
  * @param {object} resolution race.resolution (family + axes)
  * @param {object} race       race state
- * @param {object} marks      { spot, valuation?, varianceIndex, bond } -- IMPACT-FREE authoritative
+ * @param {object} marks      { spot, valuation?, privatePrice?, varianceIndex, bond } -- IMPACT-FREE authoritative
  * @returns {{ rows, ctx, totalCash, totalPnl }}
  */
 export function closeoutBook(positions, resolution, race, marks) {
@@ -227,8 +231,9 @@ export function closeoutBook(positions, resolution, race, marks) {
     const regime = resolution.axes ? resolution.axes.politicalControl : race.controlRegime;
     const hcn = hcnTerminalMark(family, regime, race, marks.spot, marks.valuation);
     const ctx = {
-        family, regime,
+        family, regime, resolution,
         hcnMark: hcn.mark, hcnConverted: hcn.converted, hcnCell: hcn.cell,
+        privateMark: marks.privatePrice ?? 0,
         varianceIndex: marks.varianceIndex, bond: marks.bond,
     };
     const rows = [];

@@ -245,7 +245,7 @@ export function standingLiquidationOrder(marginInfo) {
     // matrix owns the book, not this preference.
     if (_frozen || !_armed.has('bonds_first')) return null;
     if (!marginInfo) return null;
-    const eq = marginInfo.equity;
+    const eq = marginInfo.collateralEquity ?? marginInfo.equity;
     const util = eq > 0 ? marginInfo.required / eq : Infinity;   // no equity left => fully utilized
     if (!(util > STANDING_TUNING.marginUtilGate)) return null;
     return STANDING_TUNING.liquidationFirst;

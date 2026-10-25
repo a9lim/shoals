@@ -23,7 +23,7 @@ export const CATEGORY_LABEL = {
     regime: 'The state', halcyon: 'Halcyon', china: 'Beijing', polaris: 'Polaris',
     wonder: 'The wonders', policy: 'Washington', treaty: 'Geneva', summit: 'Reykjavik',
     insider: 'The channel', ghostwritten: 'Unsigned', interjection: 'The floor',
-    rates: 'Rates', dispute: 'Consensus', conversion: 'Meridian Capital', room: 'The room',
+    rates: 'Rates', rounds: 'The round', dispute: 'Consensus', conversion: 'Meridian Capital', room: 'The room',
 };
 
 export function categoryLabel(cat) {

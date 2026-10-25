@@ -459,8 +459,8 @@ function bridgeThefts(tr, emit, race) {
 
 /**
  * Fire the day's race transitions as narrative events through `engine._fireEvent`.
- * Returns { fired, popups } in the same shape EventEngine.maybeFire produces, so
- * main.js can merge them into its existing display path.
+ * Returns { fired, popups, capexWaves }; the count couples actual capex fires to
+ * primary issuance without inferring event identity from a headline log entry.
  *
  * @param {EventEngine} engine   the active event engine (Dynamic modes)
  * @param {object} race          race state; reads race.lastTransitions
@@ -474,8 +474,9 @@ function bridgeThefts(tr, emit, race) {
  */
 export function runRaceBridge(engine, race, sim, day, netDelta = 0, liveRung = null) {
     const tr = race.lastTransitions;
-    if (!tr) return { fired: [], popups: [] };
+    if (!tr) return { fired: [], popups: [], capexWaves: 0 };
     const fired = [], popups = [];
+    let capexWaves = 0;
     // eta from the RELEASED frontier (public view) drives Act-II alpha decay: a
     // fraction of every race impulse is treated as already pre-priced.
     const eta = marketEfficiency(buildPublicView(race));
@@ -489,6 +490,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0, liveRung = n
         // _fireEvent multiplies this by the player-net-delta coupling.
         if (ev.impulse) ev._impulseScale = prePrice;
         const r = engine._fireEvent(ev, sim, day, 0, netDelta);
+        if (r && ev.id === 'rates_capex_wave') capexWaves++;
         if (r && r.queued) popups.push(r.event);
         else if (r) fired.push(r);
     };
@@ -504,5 +506,5 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0, liveRung = n
     bridgeTips(tr, emit, engine.world, day);
     bridgeThefts(tr, emit, race);
 
-    return { fired, popups };
+    return { fired, popups, capexWaves };
 }

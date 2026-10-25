@@ -70,7 +70,7 @@ const _PULSE_CATEGORIES = new Set([
     // bridge-fired on the released-frontier rung RISE edge (<= 4 fires/run), never
     // Poisson -- a capex wave with no rung behind it is a rate move with no
     // issuance behind it. Excluded by DESIGN, not dormancy.
-    'rates',
+    'rates', 'rounds',
 ]);
 
 // -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------

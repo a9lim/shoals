@@ -9,6 +9,9 @@
 import { computePositionPnl, computePositionValue } from './position-value.js';
 import { drawSparkline } from './sparkline.js';
 import { fmtDollar, fmtQty, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
+import { lastPolarisRound } from './race/rounds.js';
+
+const PRIVATE_TIP = 'Private stakes are marked at the last round and cannot be sold before the race ends. At the end they settle by what happened to Polaris.';
 
 // ---------------------------------------------------------------------------
 // Margin display formatter (pure function -- no portfolio access)
@@ -36,11 +39,20 @@ function _computeMarginDisplay(equity, required) {
  */
 export function positionLabel(pos, day) {
     const absQty    = Math.abs(pos.qty);
+    if (pos.type === 'privatestake') return 'Polaris (private) x' + fmtQty(absQty);
     const typeLabel = posTypeLabel(pos.type, pos.qty);
     const isOption  = pos.type === 'call' || pos.type === 'put';
     const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
     const expiryStr = (pos.expiryDay != null && pos.type !== 'computefuture') ? ' ' + fmtDte(pos.expiryDay - day) : '';
     return typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
+}
+
+function _updatePrivateLabel(label, pos) {
+    const round = lastPolarisRound();
+    label.querySelector('.pos-private-name').textContent = positionLabel(pos);
+    label.querySelector('.pos-private-mark').textContent = '$' + (round?.price ?? 0).toFixed(2) + ' / unit';
+    label.querySelector('.pos-private-note').textContent = round && !round.founding
+        ? 'marked at the Series ' + round.letter + ' round' : 'marked at the founding round';
 }
 
 // ---------------------------------------------------------------------------
@@ -62,6 +74,16 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
     const labelEl = document.createElement('span');
     labelEl.className = 'pos-label stat-label';
     labelEl.textContent = labelStr;
+    if (pos.type === 'privatestake') {
+        labelEl.classList.add('pos-private-label');
+        labelEl.textContent = '';
+        for (const cls of ['pos-private-name', 'pos-private-mark', 'pos-private-note']) {
+            const part = document.createElement('span');
+            part.className = cls;
+            labelEl.appendChild(part);
+        }
+        _updatePrivateLabel(labelEl, pos);
+    }
 
     const valueEl = document.createElement('span');
     valueEl.className = 'pos-value stat-value';
@@ -75,16 +97,27 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
     const actions = document.createElement('div');
     actions.className = 'pos-actions';
 
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'ghost-btn pos-close-btn';
-    closeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
-    closeBtn.title = 'Close position';
-    closeBtn.setAttribute('aria-label', 'Close position');
-    closeBtn.addEventListener('click', () => {
-        closeBtn.dispatchEvent(new CustomEvent('shoals:closePosition', { detail: { id: pos.id }, bubbles: true }));
-        if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
-    });
-    actions.appendChild(closeBtn);
+    if (pos.type === 'privatestake') {
+        const info = document.createElement('button');
+        info.type = 'button';
+        info.className = 'info-trigger';
+        info.textContent = '?';
+        info.setAttribute('aria-label', 'Info: Polaris (private)');
+        info.title = PRIVATE_TIP;
+        if (typeof createInfoTip !== 'undefined') row._infoCleanup = createInfoTip(info, { title: 'Polaris (private)', body: PRIVATE_TIP });
+        actions.appendChild(info);
+    } else {
+        const closeBtn = document.createElement('button');
+        closeBtn.className = 'ghost-btn pos-close-btn';
+        closeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
+        closeBtn.title = 'Close position';
+        closeBtn.setAttribute('aria-label', 'Close position');
+        closeBtn.addEventListener('click', () => {
+            closeBtn.dispatchEvent(new CustomEvent('shoals:closePosition', { detail: { id: pos.id }, bubbles: true }));
+            if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+        });
+        actions.appendChild(closeBtn);
+    }
 
     if (isOption && pos.qty > 0) {
         const exBtn = document.createElement('button');
@@ -202,6 +235,7 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
         const posId = row.dataset.posId;
         if (!currentIds.has(posId)) {
             rowMap.delete(posId);
+            if (row._infoCleanup) row._infoCleanup();
             row.remove();
         }
     }
@@ -241,7 +275,10 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
             // Update label (DTE changes each day) -- shared source of truth.
             const labelStr = positionLabel(pos, day);
             const labelEl = existing.querySelector('.pos-label');
-            if (labelEl) labelEl.textContent = labelStr;
+            if (labelEl) {
+                if (pos.type === 'privatestake') _updatePrivateLabel(labelEl, pos);
+                else labelEl.textContent = labelStr;
+            }
         } else {
             const row = _buildPositionRow(pos, S, vol, rate, day, q);
             rowMap.set(posId, row);
@@ -312,7 +349,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 
     // Margin display from pre-computed values
     const marginDisplay = marginInfo
-        ? _computeMarginDisplay(marginInfo.equity, marginInfo.required)
+        ? _computeMarginDisplay(marginInfo.collateralEquity ?? marginInfo.equity, marginInfo.required)
         : { label: 'OK', cls: 'margin-ok' };
     $.marginStatus.textContent = marginDisplay.label;
     $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;

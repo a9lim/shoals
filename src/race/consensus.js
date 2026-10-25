@@ -459,8 +459,8 @@ export function openDispute(key, day, regime = 'private') {
  *     here (same consequence-bundle philosophy as setControlRegime) -- marked
  *     consensus.settled now, so no later fallback path (regime or deadline) can
  *     override it. The row is stashed in the `pendingRows` outbox AND returned;
- *     the caller applies it via portfolio.applyBinarySettlementRows (cash +
- *     credibility, exactly-once), and the daily pass drains any unconsumed
+ *     the caller applies it via portfolio.applyBinarySettlementRows (cash,
+ *     exactly-once), and the daily pass drains any unconsumed
  *     stashed row -- a dropped return still pays exactly once (R3).
  * `outcome` is 'YES' or 'NO'. Returns the settlement row (settleBinaries-shaped),
  * or null if rejected.
@@ -624,14 +624,14 @@ export function frontierCertifiedDay(cap, rung) {
 /**
  * TERMINAL FINALIZER (P6-3): settle EVERY not-yet-cash-settled Consensus contract
  * ONCE against the resolved world, and return the durable settlement rows for
- * applyBinarySettlementRows (cash + credibility, exactly-once). Stateful and
+ * applyBinarySettlementRows (cash, exactly-once). Stateful and
  * idempotent -- it records `consensus.settled` and clears pending/dispute markers,
  * so a second call returns [] (the P6-2 interim's "bar new trades" is replaced by
  * real settlement). Called by the ONE terminal finalizer for both the day-1008
  * timeout and player-terminal ejection.
  *
  * A pure row-builder cannot do exactly-once (applyBinarySettlementRows only
- * deduplicates the same row OBJECT, and re-enumeration would re-score credibility);
+ * deduplicates the same row OBJECT, and re-enumeration would repay the cash);
  * this function owns the settled-state, so re-calls are no-ops.
  *
  * Precedence (09): nationalized/classified fallback settles EVERYTHING at

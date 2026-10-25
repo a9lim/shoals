@@ -12,13 +12,14 @@ import { getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact } from '
 import { market } from './market.js';
 import { getBinaryMark, BINARY_NOTIONAL } from './race/consensus.js';
 import { getComputeMark } from './race/compute-market.js';
+import { lastPolarisRound } from './race/rounds.js';
 
 let _tree = null;
 
 /**
  * Compute the fair (mid) unit price for a single unit of an instrument.
  *
- * @param {string} type       - 'stock'|'bond'|'vxhcnfuture'|'computefuture'|'binary'|'call'|'put'
+ * @param {string} type       - 'stock'|'bond'|'vxhcnfuture'|'computefuture'|'binary'|'privatestake'|'call'|'put'
  * @param {number} S          - Current spot price
  * @param {number} vol        - Current implied volatility (annualized)
  * @param {number} rate       - Current risk-free rate
@@ -34,6 +35,7 @@ export function unitPrice(type, S, vol, rate, day, strike, expiryDay, q) {
         : 0;
     switch (type) {
         case 'stock': return S + getStockImpact(vol);
+        case 'privatestake': return lastPolarisRound()?.price ?? 0;
         case 'bond': {
             const bondMid = market.a >= 1e-8
                 ? vasicekBondPrice(BOND_FACE_VALUE, rate, dte, market.a, market.b, market.sigmaR)

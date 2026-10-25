@@ -17,7 +17,7 @@ import {
     liquidateAll, placePendingOrder, cancelOrder, cancelAllOrders,
     computeNetDelta, computeGrossNotional, portfolioValue,
     executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows, applyCloseoutRows,
-    isExpiredForTrading,
+    isExpiredForTrading, allocatePrivateStake, allocatePrimaryStock,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
 import { StrategyRenderer } from './src/strategy.js';
@@ -102,6 +102,7 @@ import {
     roomVoice, roomInvited, roomChoices, roomPresentation, resetRoomRotation,
 } from './src/events/room.js';
 import { runRaceBridge, resetRaceBridge } from './src/events/race-bridge.js';
+import { roundDispatch } from './src/events/rounds.js';
 import { applyReportingRegime, forceLeakDetection } from './src/race/incidents.js';
 import { straitTension } from './src/race/strait.js';
 import { stepTreaty } from './src/race/treaty-track.js';
@@ -117,6 +118,11 @@ import {
     finalizeComputeTerminal,
 } from './src/race/compute-market.js';
 import { closeoutBook } from './src/race/closeout.js';
+import { initValuation, stepValuation, lastValuation, resetValuation, r5ProbabilityFromBelief } from './src/race/valuation.js';
+import {
+    ROUNDS_TUNING, initRounds, resetRounds, stepRounds, lastPolarisRound,
+    roundAllocation, halcyonOfferPrice, recordPrimaryAllocation, primaryInputs,
+} from './src/race/rounds.js';
 import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief,
     binaryQuoteFromBelief, computeCurveFromBelief,
@@ -129,7 +135,7 @@ import {
     decayEventImpulses,
     applyEventImpulseOverlay, removeEventImpulseOverlay, resetEventImpulses,
 } from './src/race/impulse.js';
-import { stepCoupling, resetCoupling, deactivateCoupling } from './src/race/coupling.js';
+import { stepCoupling, couplingAttribution, resetCoupling, deactivateCoupling } from './src/race/coupling.js';
 import {
     resetLedger, deactivateLedger, applyRaceEffects, appendLedger, ledgerTotals,
     raceChannelsLive,
@@ -208,6 +214,23 @@ function _haptic(pattern) {
 function _syncAll() {
     syncMarket(sim);
     market.vxhcn = computeVXHCNSpot(sim.v, sim.kappa, sim.theta, sim.xi);
+}
+/** The closed day's public level and primary-market announcements. The only
+ *  caller is after the bridge and before marketsDayClose in _onDayComplete. */
+function _stepRaceMarkets(capexWaves) {
+    if (!raceState || raceState.resolution || _gameOver) return;
+    if (dayInProgress) throw new Error('Race-market gaps require a closed trading day');
+    const { ratio } = stepValuation(raceState);
+    sim.S *= ratio * Math.pow(ROUNDS_TUNING.halcyonDilution, capexWaves);
+    _syncAll();
+    for (let i = 0; i < capexWaves; i++) {
+        _queuePopup({ category: 'rounds', _roundOffer: {
+            kind: 'halcyon', id: `halcyon_followon_${raceState.day}_${i}`, day: raceState.day,
+            price: halcyonOfferPrice(sim.S),
+        } });
+    }
+    const pi = r5ProbabilityFromBelief(belief.rungs[5], belief.day);
+    for (const round of stepRounds(raceState, pi)) _queuePopup({ category: 'rounds', _roundOffer: round });
 }
 /** Install / restore the belief-backed Consensus + compute quote sources (P4).
  *  The swapped-in quoters read the `belief` singleton (public-derived) + the
@@ -1150,6 +1173,8 @@ function init() {
         initComputeMarket(raceState, eventEngine.world.geopolitical);
         // Market belief B + belief-backed quoters + player/firm belief (phase 4).
         initBelief(raceState);
+        initValuation(raceState);
+        initRounds(raceState);
         // chinaTrue intel reliability stream (P7-3): its own module-local RNG,
         // seeded OUTSIDE race.streams so intel beats cannot perturb the race.
         initIntel(raceState);
@@ -1834,6 +1859,14 @@ function _processPopupQueue() {
 
     const event = _popupQueue.shift();
     if (event._forecastLock) _composeLockDispatch(event);   // the draft may have moved since it was queued
+    if (event._roundOffer) {
+        // Allocation caps and all prose tokens are public show-time values. The
+        // offer price is fixed at announcement; another dispatch may move cash.
+        event._offered = roundAllocation(event._roundOffer.kind, _portfolioEquity());
+        Object.assign(event, roundDispatch(event._roundOffer, event._offered));
+        eventEngine?._logEvent(sim.day, event, {}, event.magnitude);
+        _updateWire();
+    }
     if (playing) _resumeAfterDispatch = true;
     playing = false;
     updatePlayBtn($, playing);
@@ -1900,6 +1933,30 @@ function _resumeAfterDispatches() {
  */
 function _applyPopupChoice(event, choice) {
     if (!choice) return;
+    if (choice.round) {
+        if (!raceState || _gameOver || raceState.resolution || !raceChannelsLive()
+            || event._roundApplied || event._roundOffer?.id !== choice.round.id) return;
+        // Popup subscriptions are instant primary allocations, never secondary
+        // fills or latency-ladder orders. Every queued offer can be answered once.
+        event._roundApplied = true;
+        const round = event._roundOffer;
+        const equity = _portfolioEquity();
+        const requested = event._offered * Math.max(0, Math.min(1, choice.round.take));
+        const result = round.kind === 'polaris'
+            ? allocatePrivateStake(round, requested, sim.day)
+            : allocatePrimaryStock(round.price, requested, sim.day);
+        if (requested > 0 && !result) {
+            _toast('Allocation rejected — insufficient cash or account restricted.', 3500);
+            return;
+        }
+        if (result && round.kind === 'polaris' && event._offered > 0) {
+            applyRaceEffects(raceState, [{ dial: 'S', lab: 'polaris', amount: ROUNDS_TUNING.polarisSafety * result.allocated / event._offered }], round.id, sim.day);
+        } else if (result) {
+            recordPrimaryAllocation(round.id, raceState.day, result.allocated, equity);
+        }
+        chainDirty = true;
+        updateUI();
+    }
     if (choice.deltas && eventEngine) {
         // P7-1: a substep-lane popup can be answered MID-DAY, with the day's
         // overlays still installed -- apply the deltas against the true
@@ -2073,12 +2130,13 @@ function _applyPopupChoice(event, choice) {
             _applyRestriction(stuck, closedBefore);
             chainDirty = true;
             updateUI();
-            // Assess deficit on CANONICAL equity, never raw cash -- and only
-            // when the book is fully flat (a legal frozen book is restricted,
-            // not insolvent).
-            if (stuck.length === 0 && _portfolioEquity() < 0) {
+            // Assess lending-eligible equity once exchange legs are flat. Private
+            // marks cannot repay a margin debit; frozen exchange claims restrict
+            // the book rather than declaring an unsettled account insolvent.
+            const eligible = checkMargin(sim.S, vol, sim.r, sim.day, sim.q).collateralEquity;
+            if (stuck.every(p => p.type === 'privatestake') && eligible < 0) {
                 _showGameOver('Forced liquidation left your account in deficit by '
-                    + fmtDollar(Math.abs(_portfolioEquity()))
+                    + fmtDollar(Math.abs(eligible))
                     + '. Regulators have flagged the account for review.',
                     'margin_call_liquidation', 'Account liquidation');
             }
@@ -2100,7 +2158,8 @@ function _applyPopupChoice(event, choice) {
                 _applyRestriction(stuck, closedBefore);
                 chainDirty = true;
                 updateUI();
-                if (stuck.length === 0 && _portfolioEquity() < 0) {
+                const eligible = checkMargin(sim.S, vol, sim.r, sim.day, sim.q).collateralEquity;
+                if (stuck.every(p => p.type === 'privatestake') && eligible < 0) {
                     _showGameOver('Forced liquidation left your account in deficit.',
                         'margin_call_liquidation', 'Account liquidation');
                 }
@@ -2281,7 +2340,8 @@ function _runTerminalCloseout(resolution, geo) {
     // the impact-free Vasicek price (02a "Terminal closeout and overlays" -- non-doom families mark at MTM,
     // doom recovers on face inside closeout.js).
     const book = closeoutBook(portfolio.positions, resolution, raceState, {
-        spot: sim.S, varianceIndex: market.vxhcn,
+        spot: sim.S, valuation: lastValuation(), privatePrice: lastPolarisRound()?.price,
+        varianceIndex: market.vxhcn,
         bond: { rate: sim.r, a: market.a, b: market.b, sigmaR: market.sigmaR, day: sim.day, face: BOND_FACE_VALUE },
     });
     applyCloseoutRows(book.rows);   // credit cash + remove positions by id (preserves borrow accrual)
@@ -2562,17 +2622,20 @@ function _portfolioEquity() {
  * Apply a real trading restriction after a forced liquidation that could not
  * flatten every leg (frozen Consensus contracts). Sets the persistent flag,
  * cancels ALL pending orders (liquidateAll only visits positions), and reports
- * the TRUE outcome (n closed, m frozen). No stuck legs -> no restriction, plain
- * "liquidated" toast.
+ * the TRUE outcome (n closed, m frozen). Funded private stakes remain illiquid
+ * without imposing a restriction on ordinary trading by themselves.
  */
 function _applyRestriction(stuck, closedBefore) {
     const closed = closedBefore - stuck.length;
-    if (stuck.length > 0) {
+    const frozen = stuck.filter(p => p.type !== 'privatestake');
+    if (frozen.length > 0) {
         portfolio.restricted = true;
         const cancelled = cancelAllOrders();
-        _toast(`Liquidation: ${closed} closed, ${stuck.length} frozen leg${stuck.length > 1 ? 's' : ''} remain`
+        _toast(`Liquidation: ${closed} closed, ${frozen.length} frozen leg${frozen.length > 1 ? 's' : ''} remain`
             + (cancelled ? `; ${cancelled} pending order${cancelled > 1 ? 's' : ''} cancelled` : '')
             + '. Account restricted until they clear.', 5000);
+    } else if (stuck.length) {
+        _toast(`${closed} position${closed !== 1 ? 's' : ''} liquidated; private stakes remain until terminal.`, 4000);
     } else {
         _toast(`All ${closed} position${closed !== 1 ? 's' : ''} liquidated.`, 4000);
     }
@@ -2755,7 +2818,7 @@ function _onDayComplete() {
         // advances for instrument settlement; that is settlement mechanics, not a
         // second act. The resolving tick itself completes normally (resolution latches
         // later this tick), so its live coupling still applies.
-        const _playerCoupling = raceState.resolution ? 0 : stepCoupling(_hcnPositioning());
+        const _playerCoupling = raceState.resolution ? 0 : stepCoupling(_hcnPositioning(), primaryInputs(raceState.day + 1));
         // Export controls (evidence machinery round): the third orchestrator-passed
         // input. Binds Tianxia's COMPUTE leg only (the fast-follower distillation term
         // is untouched -- controls bind chips, never weights already released), and is
@@ -2768,7 +2831,9 @@ function _onDayComplete() {
         });
         // Ledger the day's player-attributable dC to Halcyon (C channel; drops zero,
         // and the frozen ledger drops it outright post-latch -- belt and suspenders).
-        appendLedger(sim.day, 'C', 'cost_of_capital', raceState.lastTransitions.playerDeltaC, 'Halcyon velocity');
+        for (const row of couplingAttribution(raceState.lastTransitions.playerDeltaC)) {
+            appendLedger(sim.day, 'C', row.source, row.amount, 'Halcyon velocity');
+        }
         // controlRegime ratchet (overhaul phase 5a): evaluate + advance the regime
         // through the canonical setControlRegime writer BEFORE any settlement reads
         // it (a mobilized/nationalized regime freezes / fallback-settles below). A
@@ -2829,7 +2894,6 @@ function _onDayComplete() {
         // refresh the curve. `geo` (world-state geopolitical) is present whenever
         // raceState is (both are Dynamic-only).
         const _geo = eventEngine ? eventEngine.world.geopolitical : null;
-        stepNationalizationRef(raceState, sim.S);
         const cSettlements = computeFutureSettlements(raceState, _geo);
         if (cSettlements.length) {
             const cSettled = settleComputeFutures(cSettlements, raceState);
@@ -2936,11 +3000,16 @@ function _onDayComplete() {
         // same _fireEvent path, merging into the existing display arrays. Dynamic
         // modes only (raceState is null in Classic); may add toasts/popups but
         // must not crash. Runs right after advanceRace's ledger was produced.
+        let capexWaves = 0;
         if (raceState) {
             const bridged = runRaceBridge(eventEngine, raceState, sim, sim.day, netDelta, _liveRung);
+            capexWaves = bridged.capexWaves;
             for (const f of bridged.fired) fired.push(f);
             for (const p of bridged.popups) popups.push(p);
         }
+        _stepRaceMarkets(capexWaves);
+        // The protected reference records the post-gap authoritative close.
+        if (raceState && !raceState.resolution) stepNationalizationRef(raceState, sim.S);
         for (const ev of popups) _queuePopup(ev);
         const hasSupereventPopups = popups.some(ev => ev.superevent);
         // An extra edition: a regime change, a blockade, a superevent or a crisis.
@@ -3089,12 +3158,13 @@ function _onDayComplete() {
     const margin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
     if (margin.triggered) {
         portfolio.marginCallCount++;
-        const shortfall = margin.required - margin.equity;
+        const collateral = margin.collateralEquity ?? margin.equity;
+        const shortfall = margin.required - collateral;
         _queuePopup({
             category: 'margin',
             magnitude: 'major',
             headline: 'Margin call',
-            context: `Portfolio equity ${fmtDollar(margin.equity)} is below the maintenance requirement of ${fmtDollar(margin.required)}. Shortfall: ${fmtDollar(shortfall)}. The risk desk is on the line.`,
+            context: `Portfolio equity ${fmtDollar(collateral)} is below the maintenance requirement of ${fmtDollar(margin.required)}. Shortfall: ${fmtDollar(shortfall)}. The risk desk is on the line.`,
             choices: [
                 {
                     label: 'Liquidate all positions',
@@ -3443,6 +3513,8 @@ function _resetCore(index) {
     resetAudio();
     resetAct3();   // P7-1: x -> 0, substep clock zeroed, working orders dropped, latches cleared
     resetStandingOrders();   // P7-2: precommitments are authored per RUN -- nothing armed, nothing locked, no episode remembered
+    resetValuation();
+    resetRounds();
     // Reset the race->narrative bridge's per-run latches (variant-rotation
     // counters, the tip throttle, the capex-wave rung latch) so same-seed
     // playback doesn't depend on process history. UNCONDITIONAL (02a
@@ -3513,6 +3585,8 @@ function loadPreset(index) {
         initComputeMarket(raceState, eventEngine.world.geopolitical);
         // Market belief B + belief-backed quoters + player/firm belief (phase 4).
         initBelief(raceState);
+        initValuation(raceState);
+        initRounds(raceState);
         initIntel(raceState);   // P7-3 intel reliability stream (outside race.streams)
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
@@ -3563,6 +3637,8 @@ function resetSim() {
         // Rebuild belief for the fresh world + re-install the belief-backed quoters
         // (resetConsensus/resetComputeMarket reset the source to the placeholder).
         resetBelief(raceState);
+        initValuation(raceState);
+        initRounds(raceState);
         resetIntel(raceState);   // P7-3: fresh intel stream for the fresh world
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
@@ -3844,6 +3920,10 @@ function handleSaveStrategy() {
  *  Returns false when the bundle was DROPPED before any leg touched the book.
  */
 function executeWithRollback(resolvedLegs, strategyName, execMult, spreadMult) {
+    if (resolvedLegs.some(l => l.type === 'privatestake')) {
+        _toast('Private stakes cannot be traded in a strategy.', 2500);
+        return false;
+    }
     // BUNDLE PREFLIGHT (P7-1 fix round). A per-leg reject inside the fill loop below
     // cannot keep a bundle atomic: by the time leg 2 is refused, leg 1 has already
     // run `_fillPrice` and recorded price impact, and the rollback restores cash,

@@ -43,24 +43,50 @@ const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 export const COUPLING_TUNING = { halflife: 50, cap: 0.05 };
 
 export const coupling = { ema: 0, active: false };
+const _primaryEma = new Map();
 
 /** In-place reset (singleton-reset convention; Dynamic-mode init/reset). */
-export function resetCoupling() { coupling.ema = 0; coupling.active = true; }
+export function resetCoupling() { coupling.ema = 0; coupling.active = true; _primaryEma.clear(); }
 
 /** Classic / no-race: channel inert. */
-export function deactivateCoupling() { coupling.ema = 0; coupling.active = false; }
+export function deactivateCoupling() { coupling.ema = 0; coupling.active = false; _primaryEma.clear(); }
 
 /**
  * Fold one day's player positioning into the EMA and return the bounded velocity
  * multiplier. `positioning` is the signed, normalized net persistent HCN stance in
  * [-1, +1] (long +, short -); it is clamped defensively. Called once per completed
- * day by the orchestrator (main.js); the returned multiplier is passed to
- * advanceRace as `playerCoupling`.
+ * day by the orchestrator (main.js); `primary` carries the active offerings'
+ * {id,input} deployment terms. Their sum shares the SAME input clamp and EMA.
+ * The returned multiplier is passed to advanceRace as `playerCoupling`.
  */
-export function stepCoupling(positioning) {
+export function stepCoupling(positioning, primary = []) {
     const alpha = 1 - Math.pow(0.5, 1 / COUPLING_TUNING.halflife);
-    coupling.ema = coupling.ema * (1 - alpha) + clamp(positioning || 0, -1, 1) * alpha;
+    const secondary = positioning || 0;
+    const raw = secondary + primary.reduce((sum, p) => sum + p.input, 0);
+    const input = clamp(raw, -1, 1);
+    coupling.ema = coupling.ema * (1 - alpha) + input * alpha;
+    // 02a primary offerings: attribute the SAME clipped input and EMA, rather
+    // than ledgering an extra dC on top of the already-integrated channel.
+    const scale = raw ? input / raw : 1;
+    for (const [id, ema] of _primaryEma) _primaryEma.set(id, ema * (1 - alpha));
+    for (const p of primary) _primaryEma.set(p.id, (_primaryEma.get(p.id) || 0) + p.input * scale * alpha);
     return couplingMultiplier();
+}
+
+/** Partition the day's actual integrated dC by offering id and the secondary
+ *  residual. Deployment inputs expire after 126 days; their EMA tails retain
+ *  their source. Rows sum to the existing channel amount, never double-count it. */
+export function couplingAttribution(amount) {
+    if (!amount || !coupling.ema) return [];
+    const rows = [];
+    let attributed = 0;
+    for (const [source, ema] of _primaryEma) {
+        const share = amount * ema / coupling.ema;
+        if (share) { rows.push({ source, amount: share }); attributed += share; }
+    }
+    const residual = amount - attributed;
+    if (residual) rows.push({ source: 'cost_of_capital', amount: residual });
+    return rows;
 }
 
 /** The current bounded multiplier (cap * clamp(ema, -1, 1)); read-only. */

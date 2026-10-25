@@ -95,6 +95,72 @@ export function cancelAllOrders() {
     return n;
 }
 
+/** Cash-funded primary allocations (02a "Private rounds and primary offerings").
+ *  These are issuer fills: no bid/ask, secondary impact, or margin debit. */
+export function allocatePrivateStake(round, allocation, currentDay = market.day) {
+    if (portfolio.restricted || !round || !(round.price > 0) || !Number.isFinite(round.price)
+        || !(allocation > 0) || !Number.isFinite(allocation)) return null;
+    const allocated = Math.min(allocation, Math.max(0, portfolio.cash));
+    if (!allocated) return null;
+    const qty = allocated / round.price;
+    let position = portfolio.positions.find(p => p.type === 'privatestake' && p.lab === 'polaris');
+    if (position) {
+        position.entryPrice = (position.entryPrice * position.qty + allocated) / (position.qty + qty);
+        position.qty += qty;
+        position.fillPrice = round.price;
+    } else {
+        position = { id: _nextPositionId++, type: 'privatestake', lab: 'polaris', qty,
+            entryPrice: round.price, fillPrice: round.price, entryDay: currentDay, strategyName: null };
+        portfolio.positions.push(position);
+    }
+    portfolio.cash -= allocated;
+    portfolio.totalTrades++;
+    return { allocated, qty, position };
+}
+
+/** Ordinary HCN netting at the issuer's offer price. Keep the chassis first-entry
+ *  basis on extensions/reductions; a short-to-long flip re-stamps the basis. */
+export function allocatePrimaryStock(price, allocation, currentDay = market.day) {
+    if (portfolio.restricted || !(price > 0) || !Number.isFinite(price)
+        || !(allocation > 0) || !Number.isFinite(allocation)) return null;
+    const allocated = Math.min(allocation, Math.max(0, portfolio.cash));
+    if (!allocated) return null;
+    const qty = allocated / price;
+    const idx = portfolio.positions.findIndex(p => p.type === 'stock' && !p.strategyName && p.strike == null && p.expiryDay == null);
+    let position;
+    portfolio.cash -= allocated;
+    if (idx < 0) {
+        position = { id: _nextPositionId++, type: 'stock', qty, entryPrice: price,
+            fillPrice: price, entryDay: currentDay, strategyName: null };
+        portfolio.positions.push(position);
+    } else {
+        position = portfolio.positions[idx];
+        const oldQty = position.qty;
+        position.qty += qty;
+        position.fillPrice = price;
+        if (oldQty < 0) {
+            const reserved = position._reservedMargin || 0;
+            const returned = reserved * Math.min(1, qty / -oldQty);
+            portfolio.cash += returned;
+            if (position.qty < 0) position._reservedMargin = reserved - returned;
+            else {
+                delete position._reservedMargin;
+                if (position.borrowCost) {
+                    portfolio.closedBorrowCost += position.borrowCost;
+                    position.borrowCost = 0;
+                }
+                if (position.qty > 0) {
+                    position.entryPrice = price;
+                    position.entryDay = currentDay;
+                }
+            }
+        }
+        if (position.qty === 0) portfolio.positions.splice(idx, 1);
+    }
+    portfolio.totalTrades++;
+    return { allocated, qty, position };
+}
+
 // ---------------------------------------------------------------------------
 // Internal helpers
 // ---------------------------------------------------------------------------
@@ -185,6 +251,7 @@ export function computeNetDelta() {
         if (p.type === 'bond')  continue;
         if (p.type === 'binary') continue;   // binaries carry no delta
         if (p.type === 'computefuture') continue;   // compute futures carry no delta (public-index process)
+        if (p.type === 'privatestake') continue;   // private rounds carry no greeks
         const sv = _optionSigma(p);
         if (!sv) continue;
         _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
@@ -201,6 +268,7 @@ export function computeGrossNotional() {
         if (p.type === 'bond')  continue;
         if (p.type === 'binary') continue;   // binaries carry no delta/notional here
         if (p.type === 'computefuture') continue;   // compute futures: no delta/gross-notional (like VXHCN futures)
+        if (p.type === 'privatestake') continue;
         const sv = _optionSigma(p);
         if (!sv) continue;
         _gt = prepareGreekTrees(sv.T, market.r, sv.sigma, market.q, market.day, _gt);
@@ -229,7 +297,7 @@ function _checkInitialMarginDebit(cashDelta, currentPrice, currentVol, currentRa
 
     // Equity ≈ cash + positions MTM. A buy adds position value ≈ cost, so
     // equity is roughly unchanged. Compute current equity as the baseline.
-    const equity = portfolioValue(currentPrice, currentVol, currentRate, currentDay, q);
+    const equity = collateralEquity(currentPrice, currentVol, currentRate, currentDay, q);
 
     // Initial margin: equity must cover REG_T_MARGIN of the debit (scaled by capital allocation)
     return equity >= REG_T_MARGIN * Math.abs(newCash) / capitalMultiplier();
@@ -318,6 +386,7 @@ function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
     for (let i = 0; i < portfolio.positions.length; i++) {
         if (i === skipIdx) continue;
         const pos = portfolio.positions[i];
+        if (pos.type === 'privatestake') continue;   // private marks cannot collateralize borrowing
         equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
         if (pos._reservedMargin) equity += pos._reservedMargin;
 
@@ -401,6 +470,7 @@ export function executeMarketOrder(
     strike, expiryDay, strategyName, q, spreadMult
 ) {
     if (portfolio.restricted) return null;   // account restricted -> no order entry
+    if (type === 'privatestake') return null;   // issuer allocations only; never a market/strategy leg
     // Compute-future lifecycle gate: only an active/listed/open/unfrozen/unsettled
     // contract is tradeable (rejects fabricated + settled keys and a frozen book).
     if (type === 'computefuture' && !isComputeTradeable(strike)) return null;
@@ -630,6 +700,7 @@ export function placePendingOrder(
     strike, expiryDay, strategyName, legs, execMult
 ) {
     if (portfolio.restricted) return null;   // account restricted -> no order entry
+    if (type === 'privatestake' || legs?.some(leg => leg.type === 'privatestake')) return null;
     const order = {
         id:           _nextOrderId++,
         type,
@@ -675,6 +746,7 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
     const remaining = [];
 
     for (const order of portfolio.orders) {
+        if (order.type === 'privatestake' || order.legs?.some(leg => leg.type === 'privatestake')) continue;
         const { orderType, side, triggerPrice } = order;
         let triggered = false;
 
@@ -787,6 +859,7 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
     if (idx === -1) return false;
 
     const pos = portfolio.positions[idx];
+    if (pos.type === 'privatestake') return false;   // illiquid until terminal closeout, including liquidation
 
     // Binaries close through the canonical binary quote/netting op -- NEVER the
     // option-impact _fillPrice path. Returns false if the contract is
@@ -1113,6 +1186,18 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
     return total;
 }
 
+/** Equity eligible to collateralize borrowing. Private marks remain in total
+ *  NAV, but have zero lending value (02a private-stake contract). */
+export function collateralEquity(currentPrice, currentVol, currentRate, currentDay, q) {
+    let total = portfolio.cash;
+    for (const pos of portfolio.positions) {
+        if (pos.type === 'privatestake') continue;
+        total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
+        if (pos._reservedMargin) total += pos._reservedMargin;
+    }
+    return total;
+}
+
 // ---------------------------------------------------------------------------
 // marginRequirement
 // ---------------------------------------------------------------------------
@@ -1129,7 +1214,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
     let total = 0;
 
     for (const pos of portfolio.positions) {
-        if (pos.qty >= 0) continue; // Only short positions
+        if (pos.qty >= 0 || pos.type === 'privatestake') continue; // Private stakes cannot be shorted
         // Binary shorts are fully collateralized (reserved = full notional, held
         // in _reservedMargin): no separate maintenance requirement -- the
         // collateral already covers the entire max loss.
@@ -1169,11 +1254,16 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
  */
 export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q) {
     let equity = portfolio.cash;
+    let privateValue = 0;
     let required = 0;
 
     for (const pos of portfolio.positions) {
         equity += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
         if (pos._reservedMargin) equity += pos._reservedMargin;
+        if (pos.type === 'privatestake') {
+            privateValue += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
+            continue;
+        }
 
         // Binary shorts are fully collateralized (reserved covers the whole max
         // loss); they add their MTM + reserved to equity above but nothing to the
@@ -1198,8 +1288,9 @@ export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q
     }
 
     required *= getRegulationEffect('marginMult', 1) / capitalMultiplier();
-    const triggered = required > 0 && equity < required;
-    return { triggered, equity, required };
+    const collateralEquity = equity - privateValue;
+    const triggered = required > 0 && collateralEquity < required;
+    return { triggered, equity, collateralEquity, required };
 }
 
 // ---------------------------------------------------------------------------

@@ -1407,6 +1407,7 @@ const _popupCategoryMeta = {
     halcyon:        { label: 'Halcyon',             color: 'var(--vxhcn)' },
     china:          { label: 'Beijing',             color: 'var(--accent)' },
     polaris:        { label: 'Polaris',             color: 'var(--ink-verdigris)' },
+    rounds:         { label: 'The round',           color: 'var(--ink-verdigris)' },
     wonder:         { label: 'The wonders',         color: 'var(--ink-sap)' },
     policy:         { label: 'Washington',          color: 'var(--ink-indigo)' },
     treaty:         { label: 'Geneva',              color: 'var(--ink-prussian)' },

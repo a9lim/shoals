@@ -379,6 +379,9 @@ body.rail-off .page-front .rail { display: none; }
 .sparkline { display: block; width: 100%; height: 40px; margin: 4px 0; }
 .data-row { align-items: center; }
 .pos-label, .order-label { flex: 1 1 auto; min-width: 0; color: var(--text); }
+.pos-private-label { display: flex; flex-direction: column; align-items: flex-start; gap: 0; }
+.pos-private-name { color: var(--privatestake); }
+.pos-private-mark, .pos-private-note { color: var(--text-muted); font-size: var(--font-sm); }
 .pos-nums { display: flex; flex-direction: column; align-items: flex-end; line-height: 1.25; }
 .pos-value { font-size: var(--font-sm); color: var(--text-muted); }
 .pos-actions { display: flex; gap: 4px; flex-shrink: 0; }
