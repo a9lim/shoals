@@ -50,7 +50,7 @@ const RECENCY_DAYS = 126;
 // bridgeTips (the trust-gated, throttled occurrence feed), conversion off
 // main.js's _checkFirmConversion (the F/credibility latches).
 const _PULSE_CATEGORIES = new Set([
-    'fed', 'midterm', 'interjection', 'release', 'incident', 'certification',
+    'fed', 'midterm', 'interjection', 'release', 'incident', 'catastrophe', 'certification',
     'strait', 'regime', 'dispute',
     // 'theft' (evidence machinery round): theft disclosures fire from the
     // race ledger's OWN disclosure track (bridgeThefts), never Poisson --

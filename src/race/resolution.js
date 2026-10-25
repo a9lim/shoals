@@ -415,9 +415,16 @@ export function checkResolution(race, geo = null) {
 function _latch(race, rec) {
     freezeLedger();
     race.resolution = rec;
-    const outcome = race.lastTransitions ? race.lastTransitions.treatyOutcome : undefined;
+    const prev = race.lastTransitions;
+    const outcome = prev ? prev.treatyOutcome : undefined;
+    // An S4 resolves on the tick it self-discloses; keep its detection so the
+    // bridge still fires the catastrophe shell once, as the treaty stamp is kept.
+    // Not after extrapolation: that S4 happened years past the desk's last day.
+    const s4 = prev && prev.incidents && !rec.extrapolated
+        ? prev.incidents.detected.filter(d => (d.severity ?? 0) >= 4) : [];
     race.lastTransitions = freshTransitions();
     if (outcome) race.lastTransitions.treatyOutcome = outcome;
+    if (s4.length) race.lastTransitions.incidents.detected = s4;
     return rec;
 }
 

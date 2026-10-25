@@ -19,7 +19,7 @@ export const CATEGORY_LABEL = {
     political: 'Political', midterm: 'Election', macro: 'Macro', sector: 'Sector',
     market: 'Markets', compound: 'Crisis', desk: 'Meridian Capital', margin: 'Margin call',
     gameover: 'Meridian Capital', release: 'The race', certification: 'Consensus',
-    incident: 'Incident report', theft: 'Exfiltration', strait: 'The strait',
+    incident: 'Incident report', catastrophe: 'Incident report', theft: 'Exfiltration', strait: 'The strait',
     regime: 'The state', halcyon: 'Halcyon', china: 'Beijing', polaris: 'Polaris',
     wonder: 'The wonders', policy: 'Washington', treaty: 'Geneva', summit: 'Reykjavik',
     insider: 'The channel', ghostwritten: 'Unsigned', interjection: 'The floor',

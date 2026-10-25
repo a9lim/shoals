@@ -106,12 +106,13 @@ const OVERLAY_NAMES = {
 };
 
 // Terminal queue discipline (02a "Resolution"): once terminal closeout starts, only
-// terminal-SAFE beats survive in the popup queue -- TODAY exactly category 'summit'
-// (treaty_holds / treaty_resolution: effect-free acknowledgments by construction).
+// terminal-SAFE beats survive in the popup queue -- category 'summit'
+// (treaty_holds / treaty_resolution) and 'catastrophe' (incident_catastrophe, the
+// S4 that resolves its own run): effect-free acknowledgments by construction.
 // Every ordinary queued popup is discarded so no queued choice (cashPenalty,
 // factionShift, trade) can mutate the settled book or stale the epilogue. Later
 // terminal beats (P7's room) opt in by CATEGORY here, never by ad-hoc exemption.
-export const TERMINAL_SAFE_CATEGORIES = new Set(['summit']);
+export const TERMINAL_SAFE_CATEGORIES = new Set(['summit', 'catastrophe']);
 
 /** True if a queued popup is a terminal-safe beat (survives the game-over queue filter). */
 export function isTerminalSafeBeat(popup) {

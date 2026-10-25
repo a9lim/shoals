@@ -147,6 +147,7 @@ let chart, strategy;
 let camera;
 let chainSkeleton = [];
 let playing = false;
+let _resumeAfterDispatch = false;   // the desk was running when a dispatch paused it; resume once they are all answered
 let speedIndex = 2;
 let strategyMode = false;
 let dirty = true;
@@ -1835,6 +1836,7 @@ function _processPopupQueue() {
     }
 
     const event = _popupQueue.shift();
+    if (playing) _resumeAfterDispatch = true;
     playing = false;
     updatePlayBtn($, playing);
 
@@ -1873,7 +1875,20 @@ function _processPopupQueue() {
         // finished its substeps behind the barrier closes HERE, synchronously -- the
         // player does not press play to collect a day the world already finished.
         _closeCompletedDayIfPending();
+        _resumeAfterDispatches();
     }, popupCat, event.magnitude, isSuperevent);
+}
+
+/** Dispatches pause the desk the way a Paradox event pauses the map: once the
+ *  last one is answered, a desk that was running runs again. A manual play or
+ *  pause in between is the player's call and clears the latch (togglePlay). */
+function _resumeAfterDispatches() {
+    if (!_resumeAfterDispatch) return;
+    if (_gameOver || strategyMode || _popupBarrier()) return;
+    _resumeAfterDispatch = false;
+    playing = true;
+    lastTickTime = _resumeClockOrigin();
+    updatePlayBtn($, playing);
 }
 
 /**
@@ -2186,6 +2201,7 @@ function _triggerGameOver(endingId) {
     if (raceState) silenceDesk();
     _gameOver = true;
     playing = false;
+    _resumeAfterDispatch = false;
     updatePlayBtn($, playing);
     // 0b. Partial-day abort (02a "Act III"): a terminal reached MID-DAY -- an
     //     intraday compliance choice, a rogue latch off a substep-lane popup --
@@ -3290,6 +3306,7 @@ function togglePlay() {
     // day marked closed with its partial bar standing in history and the sim clock
     // deliberately un-advanced. Resuming would open a SECOND bar on that same day.
     if (_gameOver) return;
+    _resumeAfterDispatch = false;
     playing = !playing;
     if (playing) {
         lastTickTime = _resumeClockOrigin();
@@ -3423,6 +3440,7 @@ function _resetCore(index) {
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     chainDirty = true;
     playing = false;
+    _resumeAfterDispatch = false;
     lastSpot = sim.S;
     strategyLegs.length = 0;
     currentStrategyHash = null;

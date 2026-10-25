@@ -196,7 +196,7 @@ export const RACE_EVENTS = [
     },
     {
         id: 'incident_catastrophe',
-        category: 'incident',
+        category: 'catastrophe',   // its own category: every S4 resolves in place, so this is a terminal-safe beat (endings.js)
         popup: true,
         superevent: true,
         magnitude: 'major',

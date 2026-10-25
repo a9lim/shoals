@@ -992,8 +992,40 @@ let tqOK = true, tqDetail = '';
     if (kept.length !== 1 || kept[0].id !== 'treaty_holds') fail(`filter kept ${kept.length} (expected 1 summit beat)`);
     // ...and the kept queue carries no residual effect at all.
     if (kept.some(effectful)) fail('a retained beat still carries a book effect');
+    // The S4 shell resolves its own run, so it is a terminal beat too: terminal-safe
+    // by its own category and effect-free like the summit beats.
+    const s4 = getEventById('incident_catastrophe');
+    if (!isTerminalSafeBeat({ ...s4 })) fail('incident_catastrophe not terminal-safe (the S4 beat is lost)');
+    if (effectful(s4)) fail('incident_catastrophe carries a book effect');
 }
-check('V: terminal queue discipline (effect popups discarded pre-closeout; only effect-free summit beats survive)', tqOK, tqDetail);
+check('V: terminal queue discipline (effect popups discarded pre-closeout; only effect-free terminal beats survive)', tqOK, tqDetail);
+
+// ---- V2: the S4 detection survives the resolution latch (in-horizon only) --
+// An S4 resolves on the tick it self-discloses, and the latch clears the per-tick
+// ledger before the bridge runs; the detection must survive so the catastrophe
+// shell fires once. An S4 found by the day-1008 extrapolation happened years past
+// the desk's last day and must NOT survive, or it would print as today's news.
+let s4OK = true, s4Detail = '';
+{
+    const fail = (m) => { if (s4OK) { s4OK = false; s4Detail = m; } };
+    let live = 0, extrap = 0;
+    for (let seed = 1; seed <= 4000 && (live < 3 || extrap < 3); seed++) {
+        const race = createRaceState(seed);
+        while (race.day < HORIZON) {
+            advanceRace(race, { straitTension: 0 }); stepControlRegime(race); stepTreaty(race, {});
+            if (checkResolution(race, null)) break;
+        }
+        if (!race.resolution) checkResolution(race, null);
+        const r = race.resolution;
+        if (!r || r.terminalCause !== 's4-incident') continue;
+        const kept = race.lastTransitions.incidents.detected.filter(d => (d.severity ?? 0) >= 4);
+        if (r.extrapolated) { extrap++; if (kept.length) fail(`seed ${seed}: extrapolated S4 left in the live ledger`); }
+        else { live++; if (kept.length !== 1) fail(`seed ${seed}: in-horizon S4 detection not preserved (${kept.length})`); }
+    }
+    if (live === 0) fail('probe vacuous: no in-horizon S4 resolution found');
+    if (s4OK) s4Detail = `${live} in-horizon kept, ${extrap} extrapolated dropped`;
+}
+check('V2: an in-horizon S4 detection survives the latch for the bridge; an extrapolated one does not', s4OK, s4Detail);
 
 // =========================================================================
 // Report

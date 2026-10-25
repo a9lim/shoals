@@ -139,8 +139,8 @@ export const CHINA_EVENTS = [
             world.geopolitical.tradeWarStage = Math.min(4, world.geopolitical.tradeWarStage + 1);
             world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
         },
-        params: { mu: -0.01, sigma: 0.01 },
-        impulse: { xi: 0.01 },   // decaying (P4): the tail thickens a hair
+        params: {},              // no permanent delta on the race stream (03 incident-coupling rule)
+        impulse: { mu: -0.01, xi: 0.01 },   // decaying (P4): a step of trade war, and the tail thickens a hair
     },
 
     // ---- The domestic constituency (proliferation with a lobby) -----------
