@@ -225,7 +225,7 @@ const TRAITS = [
         name: 'Deal-believer',
         permanent: true,
         description: 'You spent capital on the one lever that makes the treaty thinkable: compute reporting.',
-        condition: (ctx) => ctx.playerChoices.lobbied_compute_reporting || ctx.playerChoices.lobbied_verification,
+        condition: (ctx) => !!ctx.playerChoices.lobbied_compute_transparency,   // treaty_groundwork's backing choice
         effects: {},   // UNRATIFIED
     },
     {
