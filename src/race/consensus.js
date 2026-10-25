@@ -273,10 +273,12 @@ export function buildPublicView(race) {
     // is a discrete PUBLIC record (a released model claiming rung R), not the
     // latent continuous C_released.
     let releasedFrontierRung = 0;
+    const claimedRung = { halcyon: 0, tianxia: 0, polaris: 0 };
     for (const id of labs) {
         const lab = cap.labs[id];
         if (!lab.active) continue;
-        for (const r of RUNGS) if (lab.rungReleased[r] != null) releasedFrontierRung = Math.max(releasedFrontierRung, r);
+        for (const r of RUNGS) if (lab.rungReleased[r] != null) claimedRung[id] = Math.max(claimedRung[id], r);
+        releasedFrontierRung = Math.max(releasedFrontierRung, claimedRung[id]);
     }
     for (const r of RUNGS) if (cap.open.rungInternal[r] != null) releasedFrontierRung = Math.max(releasedFrontierRung, r);
 
@@ -294,6 +296,7 @@ export function buildPublicView(race) {
         day: race.day,
         certifiedFrontierRung,
         releasedFrontierRung,
+        claimedRung,
         releaseCount,
         lastReleaseDay,
         controlRegime: race.controlRegime,

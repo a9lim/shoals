@@ -34,14 +34,10 @@
    MTM + every short's reserved) == post-closeout cash. No
    fictional fills; never cost-basis-dependent (09 inv 4).
 
-   MAGNITUDES ARE PLACEHOLDER (flagged): 09 fixes the SHAPE of
-   each family's HCN mark (melt-up / boring / seeded-unwind /
-   waterfall) but not the numbers; CLOSEOUT_TUNING carries a
-   defensible parameterization for the coordinator to ratify
-   into 02a/09. Conservation is independent of the magnitudes,
-   so the harness gates structure while the numbers stay open
-   -- the placeholder-quoter pattern (binary/compute) applied
-   to the closeout.
+   CLOSEOUT_TUNING mirrors 02a "Terminal closeout and overlays".
+   With 02a's valuation layer, HCN reconciles realized over
+   expected: spot * family multiple / last applied valuation.
+   Conversion regimes retain their frozen reference.
    =================================================== */
 
 import { createRng, deriveSeed } from './rng.js';
@@ -49,9 +45,8 @@ import { getNationalizationReference } from './compute-market.js';
 import { vasicekBondPrice } from '../pricing.js';
 import { TRADING_DAYS_PER_YEAR } from '../config.js';
 
-// ---- Placeholder family-mark magnitudes (FLAGGED for 02a/09 ratification) --
-// 09 gives the SHAPE per family; these are the code-phase numbers. Mutable so a
-// harness sweep / the coordinator's ratification can retune without a code edit.
+// ---- Family-mark magnitudes (02a "Terminal closeout and overlays") --------
+// Mutable so a headless calibration sweep can retune without a code edit.
 export const CLOSEOUT_TUNING = {
     meltUpWon: 1.60,        // family 1 (won with margin): the wonders arrive, growth prints
     meltUpDawn: 1.25,       // family 2 (ambiguous dawn): melt-up no audit can fault, quieter
@@ -73,8 +68,8 @@ const CONVERSION_REGIMES = new Set(['nationalized', 'classified']);
  * at a conversion regime with a frozen nationalization reference, HCN converts
  * 1:1 to a compensation claim at `reference` (= median x pre-sampled multiple --
  * NEVER the compute contract's own multiplier; the two never mix). Otherwise the
- * family sets the mark as a multiple of the last authoritative process price
- * `spot` (09 family row constraints; magnitudes are CLOSEOUT_TUNING placeholders):
+ * family sets the realized multiple of the last authoritative process price
+ * `spot`, divided by the last applied valuation when supplied (02a):
  *   won-margin -> melt-up; ambiguous dawn -> quieter melt-up; Deal -> boring;
  *   misaligned/china -> waterfall recovery; fizzle -> seeded unwind path.
  * The fizzle path draws from a NEW named substream (deriveSeed(seed,'closeout')) --
@@ -85,9 +80,10 @@ const CONVERSION_REGIMES = new Set(['nationalized', 'classified']);
  * @param {string} regime      controlRegime at resolution
  * @param {object} race        race state (nationalizationRef, seed)
  * @param {number} spot        last authoritative HCN process price (sim.S; impact never touches it)
+ * @param {number} [valuation] last applied valuation V_T (required on the live Dynamic path)
  * @returns {{ mark:number, converted:boolean, cell:string }}
  */
-export function hcnTerminalMark(family, regime, race, spot) {
+export function hcnTerminalMark(family, regime, race, spot, valuation) {
     if (CONVERSION_REGIMES.has(regime)) {
         const ref = getNationalizationReference(race);
         if (ref && ref.reference != null) {
@@ -101,21 +97,22 @@ export function hcnTerminalMark(family, regime, race, spot) {
         return { mark: spot, converted: true, cell: 'hcn:conversion-unavailable' };
     }
     const T = CLOSEOUT_TUNING;
+    // 02a "The valuation layer": spot already embeds the market expectation.
+    // Reconcile realized over expected; absent V_T preserves non-valuation callers.
+    const expected = valuation ?? 1;
     switch (family) {
-        case 1: return { mark: spot * T.meltUpWon, converted: false, cell: 'hcn:meltup-won' };
-        case 2: return { mark: spot * T.meltUpDawn, converted: false, cell: 'hcn:meltup-dawn' };
-        case 5: return { mark: spot * T.boring, converted: false, cell: 'hcn:boring' };
+        case 1: return { mark: spot * T.meltUpWon / expected, converted: false, cell: 'hcn:meltup-won' };
+        case 2: return { mark: spot * T.meltUpDawn / expected, converted: false, cell: 'hcn:meltup-dawn' };
+        case 5: return { mark: spot * T.boring / expected, converted: false, cell: 'hcn:boring' };
         case 3:
-        case 4: return { mark: spot * T.doomRecovery, converted: false, cell: 'hcn:doom-waterfall' };
+        case 4: return { mark: spot * T.doomRecovery / expected, converted: false, cell: 'hcn:doom-waterfall' };
         case 6: {
             // Fizzle terminal mark: centre fizzleFloor, +- fizzleSpread from the
             // isolated 'closeout' substream (fresh per closeout; never race.streams).
-            // RULING FLAGGED (coordinator): 09 calls for a SEEDED 18-month unwind
-            // PATH; this is a single seeded terminal DRAW (the epilogue compresses
-            // the decay to a page). A full dated path is a later refinement.
+            // 02a: one seeded terminal draw compresses the 18-month unwind path.
             const u = createRng(deriveSeed(race.seed, 'closeout')).uniform(-1, 1);
             const mult = T.fizzleFloor + u * T.fizzleSpread;
-            return { mark: spot * mult, converted: false, cell: 'hcn:fizzle-unwind' };
+            return { mark: spot * mult / expected, converted: false, cell: 'hcn:fizzle-unwind' };
         }
         default: return { mark: spot, converted: false, cell: 'hcn:carry' };
     }
@@ -222,13 +219,13 @@ export function closeoutPosition(pos, ctx) {
  * @param {Array}  positions  the player's positions
  * @param {object} resolution race.resolution (family + axes)
  * @param {object} race       race state
- * @param {object} marks      { spot, varianceIndex, bondMark } -- IMPACT-FREE authoritative
+ * @param {object} marks      { spot, valuation?, varianceIndex, bond } -- IMPACT-FREE authoritative
  * @returns {{ rows, ctx, totalCash, totalPnl }}
  */
 export function closeoutBook(positions, resolution, race, marks) {
     const family = resolution.family;
     const regime = resolution.axes ? resolution.axes.politicalControl : race.controlRegime;
-    const hcn = hcnTerminalMark(family, regime, race, marks.spot);
+    const hcn = hcnTerminalMark(family, regime, race, marks.spot, marks.valuation);
     const ctx = {
         family, regime,
         hcnMark: hcn.mark, hcnConverted: hcn.converted, hcnCell: hcn.cell,

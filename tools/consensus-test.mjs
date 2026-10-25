@@ -408,7 +408,7 @@ let coincidentOK = false;
 
 let integrityOK = true;
 {
-    const PUBLIC_KEYS = ['day', 'certifiedFrontierRung', 'releasedFrontierRung', 'releaseCount', 'lastReleaseDay', 'controlRegime'].sort().join(',');
+    const PUBLIC_KEYS = ['day', 'certifiedFrontierRung', 'releasedFrontierRung', 'claimedRung', 'releaseCount', 'lastReleaseDay', 'controlRegime'].sort().join(',');
     // buildPublicView exposes ONLY the public projection (no continuous released capability).
     {
         const race = createRaceState((BASE_SEED + 9000) >>> 0);
