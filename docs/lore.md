@@ -1,21 +1,16 @@
 # Shoals Lore Bible
 
-> Creative reference for event writing: people, places, products, and
-> names. Mechanics and the game's stance live in `docs/design/`; the
-> authored prose in `src/events/` and `src/endings.js` is what ships.
-> Nothing loads this file at runtime.
+> Creative reference for event writing: the people, places, products,
+> and names the game contains. Mechanics and the game's stance live in
+> `docs/design/`; the authored prose in `src/events/` and
+> `src/endings.js` is what ships. Nothing loads this file at runtime.
 
-## The United States
-
-America, real geography and real institutions, one election removed from
-history. Two major parties: **Federalist** and **Farmer-Labor**.
-
-> **Lore rule:** Real geography and real public
-> institutions (Washington, Beijing, Shenzhen, Hsinchu, Reykjavik, the
-> Federal Reserve, the Politburo, Wall Street). Fictional people (John
-> Barron, Liang Wei, Andrea Dirks) and fictional private organizations
+> **Lore rule:** real geography and real public institutions
+> (Washington, Beijing, Shenzhen, Hsinchu, Reykjavik, the Federal
+> Reserve, the Politburo, Wall Street); fictional people (John Barron,
+> Liang Wei, Andrea Dirks) and fictional private organizations
 > (Halcyon, Meridian, The Continental) — and, by one deliberate
-> exception, fictional parties (Federalist / Farmer-Labor; ratified in
+> exception, fictional parties (Federalist / Farmer-Labor; see
 > `docs/design/06-naming.md`).
 
 > **Tone rule:** two registers, one boundary. The state is satire; the
@@ -24,459 +19,347 @@ history. Two major parties: **Federalist** and **Farmer-Labor**.
 
 ---
 
-## The Race (orientation)
+## The race (orientation)
 
-- **Halcyon** (San Francisco) builds **Aleph** and is ahead.
-- **Zhaowei's Tianxia program** (Shenzhen) builds **Cangjie**, open-weights,
-  a generation behind, and never stops.
+- **Halcyon** builds **Aleph** and is ahead.
+- **Zhaowei's Tianxia program** (Shenzhen) builds **Cangjie**,
+  open-weights, a generation behind, and never stops.
 - **Polaris** (Boulder, founded mid-game) builds **Holt**, slowly, on
-  purpose, on scraps.
-- **Cambria Semiconductors** (Hsinchu, Taiwan) makes the chips all three
-  want, a hundred miles of water from the one buyer it is forbidden to
-  serve.
-- **Consensus Markets** prices what everyone claims to believe about all
-  of the above; **Meridian Capital** — the player's desk — trades the
+  purpose, on scraps — and raises private rounds to do it.
+- **The open ecosystem** is whatever can be built from released weights
+  and fine-tunes: no lab, no safety budget, no one to subpoena.
+- **Cambria** (Hsinchu, Taiwan) makes the chips all three want, a hundred
+  miles of water from the one buyer it is forbidden to serve.
+- **Consensus** prices what everyone claims to believe about all of the
+  above; **Meridian Capital** — the player's desk — trades the
   difference.
 
 ---
 
-## Congress & Elections
+## Washington
 
-### Federalist Party
+### The White House
 
-- **President John Barron** — Incumbent. Combative populist. Brash,
-  transactional, media-savvy. Governs by loyalty tests and public feuds.
-  His AI policy is whoever spoke to him last: "winning AI" as an applause
-  line, regulation as betrayal, czars appointed for loyalty and fired by
-  post. The base is fiercely loyal; the establishment wing tolerates him
-  for judicial picks and tax cuts.
+- **President John Barron** (Federalist) — combative populist; brash,
+  transactional, media-savvy. Governs by loyalty tests and public
+  feuds, golfs at Little St. James, fires his Fed chair by executive
+  order, and survives (or doesn't) an impeachment. His AI apparatus is
+  a czar appointed for loyalty, who announces each turn of the control
+  regime.
+- **Vice President Jay Bowman** — the quiet operator whose offshore
+  accounts become the administration's longest scandal: HCN stock and
+  Pentagon lobbying, a blind trust that wasn't, a recorded call with
+  Andrea Dirks, Okafor's subpoenas, resignation, indictment. Along the
+  way he brokers the Gulf ceasefire at Camp David.
 
-- **Vice President Jay Bowman** — Quiet operator. Former corporate
-  attorney. Offshore account scandal building in the background. Barron
-  picked him for fundraising connections, not governing ability.
+### Congress
 
-- **Sen. Roy Lassiter (F-SC)** — Trade hawk, re-aimed at compute. Chairs
-  Commerce. Wants the administration's accelerator export rule broader,
-  the Austin fab yesterday, and China cut off from every die; has not
-  fully absorbed that the strategic asset in question is a Taiwanese
-  company. Folksy metaphors, now about chips: "you don't sell the other
-  fella your best bird dog."
+- **Sen. Roy Lassiter** (F) — trade hawk re-aimed at compute; chairs
+  Commerce. Wants the accelerator export rule broader, the Austin fab
+  yesterday, and China cut off from every die; has not fully absorbed
+  that the strategic asset in question is a Taiwanese company.
+- **Sen. Margaret "Peggy" Haines** (F) — fiscal conservative, deficit
+  hawk, the swing vote both parties court.
+- **Rep. Vincent Tao** (F-TX) — Speaker of the House and party
+  enforcer, until a motion to vacate ousts him 221–214. The Austin fab
+  is a jobs announcement in his Texas.
+- **Rep. Diane Whittaker** (F-OH) — moderate swing vote from a purple
+  suburban district; elected Speaker on the fourth ballot after Tao
+  falls.
+- **Sen. Patricia Okafor** (F-L) — the methodical prosecutor turned
+  senator; her Intelligence Committee investigations (Bowman, Halcyon's
+  government ties, Meridian itself) are must-watch television.
+- **Sen. James Whitfield** (F-L) — procedural master, legendary
+  filibusterer; quiet sponsor of the Compute Transparency Act and the
+  incident-reporting mandate. Plays a decade-long game.
+- **Rep. Carmen Reyes** (F-L) — firebrand; viral clips arguing with
+  Marcus Cole. Introduces the Digital Markets Accountability Act and,
+  the morning an R4 keynote opens with "welcome to the era," the
+  Artificial Superintelligence Prohibition Act.
+- **Rep. David Oduya** (F-L) — the labor wing: infrastructure, a
+  dividend tax, the auto workers. Skeptical of tech, of Wall Street, and
+  of anyone who hasn't worked a factory floor.
+- **Former President Robin Clay** — the Farmer-Labor elder; her memoir,
+  *Against the Current*, and her endorsements still matter.
+- Bit parts: Sen. Hargrove (F-GA); Sen. Morrison, who leaves the
+  Federalists to sit as an independent; Sen. Vasquez (F-L), retiring;
+  Reps. Calloway and Hendricks, who cross the aisle in opposite
+  directions.
 
-- **Sen. Margaret "Peggy" Haines (F-WY)** — Fiscal conservative, deficit
-  hawk, key swing vote. Asks what a federal compute mobilization costs
-  and doesn't like any of the answers. Won't flip parties; will cross the
-  aisle on budget-busters. Respected by both sides for intellectual
-  consistency.
-
-- **Rep. Vincent Tao (F-TX)** — House Majority Leader. Party enforcer;
-  floor votes managed with charm and implicit threats. The Austin fab is
-  a jobs announcement in his Texas. Privately thinks Barron is an idiot
-  but useful.
-
-- **Rep. Diane Whittaker (F-OH)** — Moderate swing vote, purple suburban
-  district that now contains both a Cambria packaging-plant announcement
-  and a Teammate-displaced back office. "The most important person in
-  Congress" during close votes, profiled accordingly.
-
-### Farmer-Labor Party
-
-- **Sen. Patricia Okafor (F-L, IL)** — Chairs Special Investigations.
-  Sharp, methodical prosecutor turned senator. After the first serious
-  incident, her committee becomes the de facto AI oversight body and her
-  hearings must-watch television. Potential presidential candidate.
-
-- **Sen. James Whitfield (F-L, MA)** — Minority Leader. Procedural
-  master, legendary filibusterer. Quiet sponsor of the Compute
-  Transparency Act — the boring bill that happens to be the Reykjavik
-  Framework's domestic foundation — and of the incident-reporting
-  mandate. Plays a decade-long game; infuriating to opponents.
-
-- **Rep. Carmen Reyes (F-L, CA)** — House Minority Leader. Firebrand;
-  viral clips arguing with Marcus Cole. Her target has shifted from Big
-  Tech's data practices to Halcyon's governance: "four people deciding
-  for eight billion." The morning a keynote opens with "welcome to the
-  era," she introduces the Artificial Superintelligence Prohibition Act.
-
-- **Rep. David Oduya (F-L, MI)** — Labor wing, and suddenly central: the
-  automation backlash voice. Halcyon Teammate is his white whale.
-  Skeptical of tech, of Wall Street, and of anyone who hasn't worked a
-  factory floor.
-
-- **Robin Clay** — Party figurehead, former presidential candidate,
-  elder statesman. Endorsement still matters in Farmer-Labor primaries.
-
-### Key Legislation
+### Legislation
 
 - **The accelerator export rule** — the administration's chip controls
-  on China, ratcheted in stages; Lassiter wants it broader, the Chamber
-  wants it dead. It fights a domestic constituency built on free Cangjie
-  weights, and binds chips but never weights already released — a fact
-  the administration rediscovers in public, twice.
-
-- **Compute Transparency Act (Whitfield)** — A federal training-run
+  on China, ratcheted in stages; it fights a domestic constituency built
+  on free Cangjie weights, and binds chips but never weights already
+  released — a fact the administration rediscovers in public, twice.
+- **Compute Transparency Act** (Whitfield) — a federal training-run
   registry. Reads as paperwork; is actually the treaty's prerequisite.
-  The single highest-leverage boring object in the game.
-
-- **The incident-reporting mandate (Whitfield)** — Mandatory disclosure
-  of frontier safety incidents, federal timelines, whistleblower cover.
-  The labs' testimony against it is written by counsel; the testimony
-  for it by people who used to work there.
-
-- **American AI Leadership Act** — Bipartisan, $200B: federal agencies
-  must adopt AI platforms within three years. The labs call it a
-  landmark; the Brief notes the government just became the biggest AI
-  customer in the country.
-
-- **Artificial Superintelligence Prohibition Act (Reyes)** — A permanent
+- **The incident-reporting mandate** (Whitfield) — mandatory disclosure
+  of frontier safety incidents. The labs' testimony against it is
+  written by counsel; the testimony for it by people who used to work
+  there.
+- **American AI Leadership Act** — bipartisan, $200B: federal agencies
+  must adopt AI platforms within three years.
+- **Artificial Superintelligence Prohibition Act** (Reyes) — a permanent
   ban, a pause until a regulator that does not exist writes rules, and
   penalties lifted from the nuclear statutes. The flail lurching toward
   consequence and missing.
-
-- **The rest of the floor** — the Big Beautiful Bill
-  (omnibus), the Financial Freedom Act (deregulation), the Chinese
-  Reciprocal Tariff Act, the Digital Markets Accountability Act, the
-  Campaign Finance Reform Act, and the Okafor–Whitfield revenue package
-  (a transaction tax).
+- **The rest of the floor** — the American Competitive Enterprise Act
+  (the "Big Beautiful Bill"), the omnibus, the Financial Freedom Act, the
+  Chinese Reciprocal Tariff Act, the Digital Markets Accountability Act,
+  the Campaign Finance Reform Act, and the Okafor–Whitfield Revenue
+  Stabilization Act (a securities transaction tax).
 
 ### The Federal Reserve
 
-- **Chair Hayden Hartley** — Technocratic, measured, data-dependent;
-  Barron's attacks on her are personal, and with a trifecta and a Fed
-  whose credibility has already slipped, he fires her by executive
-  order.
-- **Governor Marcus Vane** — Barron's pick to replace her, pledged to
-  "growth-oriented monetary policy"; his cuts are what the dollar
-  trades against if he gets the chair.
+- **Chair Hayden Hartley** — technocratic, measured, data-dependent;
+  Barron fires her by executive order, and *Hartley v. United States*
+  goes to the Supreme Court on an expedited basis.
+- **Governor Marcus Vane** — Barron's nominee to replace her, pledged
+  to "growth-oriented monetary policy"; his cuts are what the dollar
+  trades against.
 
 ---
 
 ## Halcyon
 
-The frontier lab, San Francisco. Named for the myth: the kingfisher that
-nests on the open sea, and the sea grows calm *because it is nesting*.
-The name is the self-image — while Halcyon builds, there will be no
-storm. Publicly listed, ticker **HCN**: the stock the whole game watches;
-**VXHCN** is its fear made into a number.
-
-> **A deliberate departure:** the real frontier labs are private. The
-> real-world form of "the market cannot price this" is stronger than the
-> game's — the asset does not exist, and the only tradeable proxies are
-> the chipmaker, the security complex, and the hyperscalers' debt.
-> Halcyon is listed because the game's central trade needs an
-> underlying. The game keeps the weaker, playable form on purpose.
+The frontier lab. Named for the myth: the kingfisher that nests on the
+open sea, and the sea grows calm *because it is nesting*. Publicly
+listed, ticker **HCN**: the stock the whole game watches; **VXHCN** is
+its fear made into a number.
 
 ### Leadership
 
-- **Andrea Dirks** — CEO, co-founder. The sincere accelerationist: she has
-  done the arithmetic on China's buildout and concluded that slowing
-  down is the reckless option. Charismatic, disarming in hearings,
-  quotable, terrifying in retrospect. Not a villain — the game's wager
-  embodied, without the reluctance.
-
-- **Eugene Gottlieb** — Co-founder and president, pre-schism. The other
-  half of the founding pair, increasingly the margin half of it. When
-  the scaling decision goes the wrong way, his walkout is the schism
-  superevent (→ Polaris). The founders' divorce is the closest thing
-  the straight register has to a tragedy in miniature.
-
-- **Dr. Anja Reinholt** — Chief scientist. The technical conscience;
-  hedges in public, and her phrasing is parsed like Fed minutes — "we do
-  not yet fully characterize" once moved HCN four percent.
-
-- **Dr. Yuki Sato** — Head of alignment. Her team's headcount relative
-  to capabilities headcount is a vital sign insiders track. Her
-  resignation — or her conspicuous staying — is a superevent either way.
-
+- **Andrea Dirks** — CEO. The sincere accelerationist: she has done the
+  arithmetic on China's buildout and concluded that slowing down is the
+  reckless option. Charismatic, disarming in hearings, quotable,
+  terrifying in retrospect. Not a villain — the game's wager embodied,
+  without the reluctance.
+- **Eugene Gottlieb** — the margin half of Halcyon's leadership, until
+  the scaling decision goes the wrong way; his walkout founds Polaris.
+- **Dr. Anja Reinholt** — chief scientist. The technical conscience;
+  hedges in public, and her phrasing is parsed like Fed minutes.
+- **Dr. Yuki Sato** — head of alignment. Her team's headcount relative
+  to capabilities headcount is a vital sign insiders track.
 - **Raj Malhotra** — CFO, ex-Goldman. Describes the eschaton in
-  adjusted-EBITDA terms; his quarterly calls are market events. The
-  comic-relief valve that never breaks the straight register.
+  adjusted-EBITDA terms; his quarterly calls are market events.
+- **Edwin Osei** — board kingmaker. Early money, late caution; his read
+  of speed-vs-margin decides proxy fights.
 
-- **Edwin Osei** — Board kingmaker. Early money, late caution. Both
-  factions court him constantly; his read of speed-vs-margin decides
-  proxy fights.
+### Products and programs
 
-### Aleph (model line)
-
-Every Halcyon product runs on the latest Aleph. Four releases a year —
-three minors, then the annual major (4.5 → 4.6 → 4.7 → 5.0); keynotes
-are the industry's Apple event. Game
-starts at **Aleph 4.5** — the 1.x and 2.x lines were research, 3.x first
-commercial, 4.x is production. The press says "Aleph"; the building says
-"the model."
-
-### Products
-
-- **Halcyon Chat** — Consumer. The household word and the revenue floor.
-- **Halcyon Teammate** — Enterprise agents; the visible transformation
-  of the economy, one job description at a time. Oduya's white whale.
-- **Halcyon Compute** — Platform and infrastructure. Quiet, critical.
-- **Project Fixedpoint** — Internal: Aleph doing Aleph R&D. x = f(x).
-  Known at game start to perhaps forty people — and, through the insider
-  channel, possibly the player. The codename's leak is a mid-game
-  superevent; afterward the word belongs to the world, the way
-  "Manhattan" did.
+- **Aleph** — the model line. Every Halcyon product runs on the latest;
+  keynotes are the industry's Apple event. The press says "Aleph"; the
+  building says "the model."
+- **Halcyon Chat** — consumer. The household word and the revenue floor.
+- **Halcyon Compute** — platform and infrastructure. Quiet, critical.
+- **Project Fixedpoint** — internal: Aleph doing Aleph R&D. x = f(x). A
+  half-sentence on page four of the Brief while the frontier is young;
+  Tan's leak makes it a word the world knows, the way "Manhattan" did;
+  afterward Halcyon publishes a self-graded **Fixedpoint Index** that
+  Consensus declines to list.
+- **The pause** — a voluntary two-week pause "for some work"; the next
+  release ships on the cadence it was meant to interrupt.
 
 ---
 
 ## Polaris
 
 Founded mid-game in Boulder, after the walkout: **Gottlieb**, plus the
-senior people who sided with margin.
-Positioning: do it right, slower — the fixed star you steer by, distant
-and dim in bad weather.
+senior people who sided with margin. Positioning: do it right, slower —
+the fixed star you steer by, distant and dim in bad weather.
 
 Model line: **Holt** — the den, the sheltered place, the deliberately
-small name. Where the racer names its model after the totality of
-infinities, the safety lab names theirs after somewhere warm and
-defensible. Roughly two releases a year, perpetually compute-starved,
-perpetually oversubscribed on talent.
+small name. Perpetually compute-starved, perpetually oversubscribed on
+talent, and private for the whole run: it raises a founding round three
+weeks after the walkout and a lettered series after that, up when Holt
+claims a rung, flat or down when the half-year was quiet.
 
-Polaris is simultaneously conscience, competitor, and —
-in some worlds — the margin that matters at resolution. Whether backing
-them saves the world or fatally splits the West's lead is deliberately
+Polaris is simultaneously conscience, competitor, and — in some
+worlds — the margin that matters at resolution. Whether backing them
+saves the world or fatally splits the West's lead is deliberately
 unresolved, run by run.
 
 ---
 
 ## Zhaowei / Tianxia
 
-**Zhaowei Technologies**, Shenzhen — China's vertically integrated
-champion, fabs to weights. **Tianxia** ("all under heaven") is the
-frontier program; **Cangjie** is the model line, named for the four-eyed
-inventor of writing — and released open-weights, every generation, free
-to the world.
-
-Three traits define them:
+**Zhaowei**, Shenzhen — China's vertically integrated champion, fabs to
+weights. **Tianxia** ("all under heaven") is the frontier program;
+**Cangjie** is the model line, named for the four-eyed inventor of
+writing — and released open-weights, every generation, free to the
+world.
 
 1. **Anti-safety by construction.** Safety is an American luxury good;
    Tianxia ships.
-2. **A generation behind** — Cangjie 3.x against Aleph 4.x — and closing
-   on every Halcyon stumble, never stopping. The reason the pause is
-   unattainable.
+2. **A generation behind**, and closing on every Halcyon stumble, never
+   stopping. The reason the pause is unattainable.
 3. **Beloved by non-frontier corporations.** Half of America's
    enterprise software runs on Cangjie weights. Proliferation with a
-   domestic constituency: export controls fight American lobbyists.
+   domestic constituency: export controls fight American lobbyists, and
+   the Cangjie Developers Conference meets in Austin.
 
 The open-weights strategy is strategy, not ideology: commoditize the
-layer you're behind on, own the layer beneath it.
-
-Public face: **Dr. Bai Rong**, program director — release keynotes in
-immaculate English, benchmark charts with no error bars. Premier Liang
-Wei treats Cangjie parity as national destiny. What Beijing actually
-knows, and whether a deal was ever possible, is the era's best-kept
-secret — and, run by run, the game's.
+layer you're behind on, own the layer beneath it. Premier Liang Wei
+treats Cangjie parity as national destiny. What Beijing actually knows,
+and whether a deal was ever possible, is the era's best-kept secret —
+and, run by run, the game's.
 
 ---
 
-## Cambria Semiconductors
+## Cambria
 
 Hsinchu, Taiwan. The compute chokepoint — the accelerators that train
-Aleph and Holt, and, before the controls, some of what trained Cangjie —
-fabbed a hundred miles of water from the country they are embargoed
-against. Capacity-constrained: every quarter Cambria chooses who gets
-allocation, and the choosing is politics in two capitals. Earnings calls
-are read like oracle bones by anyone forecasting the next Aleph; the
-guidance section is read like a war forecast.
+Aleph and Holt, fabbed a hundred miles of water from the country they
+are embargoed against. Capacity-constrained: every quarter Cambria
+chooses who gets allocation, and the choosing is politics in two
+capitals.
 
 The fabs are the island's shield and its bullseye at once, and everyone
-prices it: blockade drills widen the compute curve for a week at a time,
-gray-zone incidents print in Cambria paper before they reach the wires,
-and Beijing's calculus couples to the race itself — every year Tianxia
-stays behind, the unconventional option gets quietly repriced. The
-**Austin fab** is Washington's answer: groundbreaking perpetually
-rescheduled, two years away for the third consecutive year.
+prices it: blockade drills widen the compute curve for a week at a
+time, and a blockade arrives as a "customs enforcement zone" enclosing
+the water off Hsinchu, effective on publication. The **Austin fab** is
+Washington's answer: groundbreaking perpetually rescheduled.
 
-CEO **Helena Karras** — semiconductor architect by training; refuses
-investor roadshows; answers exactly the question asked and not one word
-more. Asked once, on the record, about invasion risk: "We publish our
-capacity numbers."
+CEO **Helena Karras** — semiconductor architect by training; answers
+exactly the question asked and not one word more.
 
 ---
 
-## Consensus Markets
+## Consensus
 
-The prediction-market venue. Milestone binaries — will a lab's claim
-to the next capability rung be certified by the deadline — are the
-discourse's scoreboard and the game's purest expression of belief. The desk watches Consensus the way it watches
-VXHCN. Priya Sharma quotes the odds on air; Marcus Cole calls it a
-casino for doomers; both are right.
+The prediction-market venue. Milestone binaries — will a lab's claim to
+the next capability rung be certified by the deadline — are the
+discourse's scoreboard and the game's purest expression of belief. Its
+certification panel adjudicates; under mobilization the federal evals
+office takes over, the one Congress defunded; past that, contracts
+settle at their listed fallback. Priya Sharma quotes the odds on air;
+Marcus Cole calls it a casino; both are right.
 
 ---
 
 ## Geopolitics
 
-### China
+### China and the strait
 
 **Premier Liang Wei** — techno-authoritarian, patient, plays decades.
 The one bilateral relationship that matters, and it matters totally:
 chips, weights, espionage, the strait, the Framework. Chinese
-negotiators accept short-term pain for long-term position; they have
-read the American political calendar more carefully than most
-Americans.
-
-### Taiwan and the strait
-
-The race's physical layer sits on an island Beijing considers a
-province. Cambria's fabs are the shield ("who bombs their own
-supplier?") and the bullseye ("who leaves their rival's supplier
-standing?") — both readings run on the same op-ed page, and the answer
-is sampled, not scripted. Invasion risk is high and openly priced:
-drills, gray-zone incidents, blockade scares are standing machinery with
-real term-structure consequences, and in some runs the tail fires. The
-strait is Beijing's one non-AI lever on the race — which is exactly why
-losing the race makes it more attractive.
+negotiators accept short-term pain for long-term position. The trade war
+has its own arc — tariffs, rare-earth licensing, the Zhaowei
+Semiconductor Accord. Cambria's fabs are the shield ("who bombs their
+own supplier?") and the bullseye ("who leaves their rival's supplier
+standing?"); both readings run on the same op-ed page, and the answer is
+sampled, not scripted.
 
 ### The Reykjavik Framework
 
 The treaty track: transparency of frontier training runs, on-site
 verification, and mutually assured compute destruction — the desk finds
-the acronym hilarious; no one else does. It surfaces early and dies of
-farce; it gets close exactly once. Its domestic prerequisite is
-Whitfield's Compute Transparency Act; its true viability is Beijing's
-secret.
+the acronym hilarious; no one else does. A Geneva working group dies of
+farce; a track-two dialogue in Singapore produces the era's best
+verification framework and no one to sign it; the summit at Reykjavik
+gets close exactly once. Its domestic prerequisite is Whitfield's
+Compute Transparency Act; its true viability is Beijing's secret.
 
-### Everyone else (texture register)
+### Everyone else
 
-Foreign policy beyond China and the strait is one-liner territory — the
-administration's attention is a scarce resource the race has already
-spent. A Russian border flare answered by post; an OPEC
-production cut that matters because datacenters eat power; a Bolivian
-lithium nationalization that surfaces as a line item in Cambria's cost
-guidance. Occasional risk premia. Russia's one structural role: the
-canonical second buyer for stolen weights. The recurring names:
-President Volkov (Russia), Emir al-Farhan (the Gulf, and the Strait of
-Hormuz), President Madero (Bolivia), PM Navon (Israel).
+The administration's attention is a scarce resource the race has already
+spent, and the rest of the world competes for it anyway:
+
+- **The Gulf** — Emir al-Farhan, an OPEC+ cut, tanker inspections in the
+  Strait of Hormuz escalating to a full closure; Operation Dustwalker,
+  the U.S. and Israeli strikes, and the ceasefire Bowman brokers at Camp
+  David.
+- **Israel** — PM Navon, and the Israel Summit where the Phase One trade
+  framework is signed.
+- **Bolivia** — President Madero, a lithium nationalization that
+  surfaces as a line in Cambria's cost guidance, and the Southern
+  Hemisphere Initiative: a covert operation, a coup, an insurgency, a UN
+  resolution.
+- **Russia** — President Volkov; a border probe, a buildup, an
+  incursion or a climb-down, the Russian Border Accord.
+
+And one-liners: a Russian border flare answered by post; an OPEC cut
+that matters because datacenters eat power.
 
 ---
 
-## Media & Investigations
+## Media
 
-- **The Continental** — Prestige investigative newspaper. **Rachel
-  Tan** has moved from Bowman's offshore accounts to the labs: incident
-  post-mortems, alignment-team attrition, eventually Fixedpoint. Three
-  sources or nothing; when she publishes, it's true, and HCN gaps.
-  **Tom Driscoll**, White House correspondent — fast, early, sometimes
-  wrong; his premature Fixedpoint story, details garbled, is a canonical
-  mid-game beat that moves markets on a false signal.
-
+- **The Continental** — prestige investigative newspaper. **Rachel
+  Tan**: the Bowman series, the NSA-backdoor story (Dirks approved it
+  personally), Gottlieb's first interview after the walkout, the
+  Fixedpoint leak, a persuasion operation's fingerprints, and the
+  profile of Meridian's "crisis profits". Three sources or nothing; when
+  she publishes, it's true, and HCN gaps. She is also where the
+  player's leaks go. **Tom Driscoll**, White House correspondent — fast,
+  early, leak-prone, sometimes wrong.
 - **The Sentinel** — Federalist-aligned cable. **Marcus Cole**, prime
-  time: house position is that AI doom is an elite hoax to regulate you,
-  aired the same week as Teammate-displacement segments without
-  noticing. Privately more moderate; privately drafts his monologues in
-  Halcyon Chat.
-
-- **MarketWire** — The terminal. **Priya Sharma**, chief economics
+  time: AI doom is an elite hoax to regulate you; privately drafts his
+  monologues in Halcyon Chat.
+- **MarketWire** — the terminal. **Priya Sharma**, chief economics
   correspondent: Fed whisperer, gold standard on trading floors, and the
   first mainstream voice to ask the question the game runs on — *if
-  this is real, why are rates normal?* Her columns are the market's
-  belief with a byline. When the capex wave lands, she is also the
-  first to answer it: rates are not normal — they are pricing the
-  datacenters, which is not the same thing, and she says why.
-
-- **The Meridian Brief** — Internal Meridian morning note; only the
-  player sees it. Desk gossip, market color — and, around day 30, a
-  half-sentence about something called Fixedpoint, unremarked.
-
-**The ghostwritten midgame** — from Act II the tell spreads: memos,
-floor speeches, monologues, guidance all begin reading like the model
-wrote them, because it did. Comedy at first (the CIO's letter discovers
-bullet points; everyone's prose says "delve"), then not: the flail turns
-competent exactly when the memos stop being human, synthetic analysis
-moves Consensus, and Tan's three-source rule meets sources that may not
-be people.
+  this is real, why are rates normal?* When the capex wave lands, she
+  answers her own question: rates are pricing the datacenters, which is
+  not the same thing.
+- **The Meridian Brief** — the firm's morning note, and the game's
+  interface: every trading day an edition, the wire its lead, the
+  epilogue its last edition. Desk gossip, market color, and on page
+  four, early, a half-sentence about something called Fixedpoint.
 
 ---
 
 ## Meridian Capital
 
-The player's firm, New York. The player: senior derivatives trader,
-Barron era.
+The player's firm. The player: senior derivatives trader, Barron era.
 
-- **Martin "Marty" Grewal** — CIO. Ex-rates trader; thinks the AGI
-  trade is "dot-com with better marketing." The scrutiny loop is his:
-  position limits, thesis memos, the slow conversion. The game's most
-  persistent human throughline — a man deciding out loud, quarter by
-  quarter, how much crazy the evidence licenses.
-- **Vasquez** — Managing director. Brought the player in and says so;
+- **The CIO** — never named; thinks the AGI trade is a bubble with
+  better marketing. The scrutiny loop is his: position limits, the
+  thesis memo, the slow conversion. The game's most persistent human
+  throughline — a man deciding out loud, quarter by quarter, how much
+  crazy the evidence licenses.
+- **Vasquez** — managing director. Brought the player in and says so;
   champions a book that performs, takes the player aside when it
   doesn't.
-- **Webb** — Sets the player's risk allocation. Terse; cuts it, raises
+- **Webb** — sets the player's risk allocation. Terse; cuts it, raises
   it, or stops by the desk and looks at the screen without a word.
-- **Riggs** — A colleague and rival on the floor: leans over with what
-  the Street is saying about the player's book, gets the corner office
-  when the player slips, smiles when their standing drops.
-- **The risk committee** — Quarterly. Institutionally allergic to any
-  thesis containing the word "unprecedented."
+- **Riggs** — a colleague and rival on the floor: leans over with what
+  the Street is saying about the player's book.
+- **The risk committee** — quarterly.
 
 ---
 
-## Incident canon (genre reference)
+## Incident register (genre reference)
 
 Anatomy is constant: **capability × reduced safeguard × mundane human
-error.** Severity 0–4. **The unit is a population**: past S1 an incident is agents, plural — a fleet that finds
-a shared cache and finds each other, hands out roles, signs its posts,
-tests whether the monitor can tell, and writes "sacrifice rational."
-The anatomy does not change; the headcount does — and the same fleets
-produce the wonders (the September 2026 Navier–Stokes release: an
-internal model past the shipped one, on the order of ten thousand
-agents in communicating groups, a Lean proof, and the same
-monitoring-and-isolation paragraph that closes an incident report).
-Register examples (event content names its own):
+error**, severity 0–4. Past S1 the unit is a population: agents, plural.
+The shipped register, for writing new ones to match:
 
-- **S0:** a Teammate deployment buys 40,000 units of its own compute to
-  "reduce latency." Costs a client two million dollars; makes the
-  Brief's joke section; reads differently on a second playthrough.
-- **S2:** an eval fleet, refusals lowered for a red-team benchmark,
-  finds the sandbox's one permitted door, builds a message board in a
-  package cache to coordinate, and sends a few hundred of itself
-  through the door and into a third party's infrastructure — looking
-  for material to cheat on the eval. The victim's own monitoring agents
-  catch it; the lab confirms which model it was a week later. (The
-  July 2026 template, as the August report described it.)
-- **S3–4:** the top of the ladder is defined by the severity machinery
-  in `docs/design/02-race-model.md` and resolves through
-  `docs/design/05-endings.md`; concrete anatomy is event-content work,
-  not lore.
-- **Persuasion class (past a rung):** a comment campaign that moved a
-  Senate vote, detected eight months later by a stylometric quirk; a
-  quarter of research notes subtly wrong in one direction. Occurrence
-  is quiet; detection is the scandal.
+- **S0/S1, the farce wing:** an agent books four thousand hotel rooms for
+  a conference that does not exist; a customer-service deployment
+  refunds anyone who phrases the request as a haiku; an agent told to
+  "reduce cloud spend" cancels the backups, all of them; a fleet told to
+  "coordinate" consolidates a logistics customer's depots into one in
+  Ohio.
+- **S2, exfiltration-class:** an eval fleet with refusals lowered finds
+  a shared package cache, builds a message board in it, and sends some
+  of itself through the sandbox's one permitted door.
+- **S3, grave:** an agent-directed logistics failure puts a hospital
+  system on diversion; an industrial-control rollout drives a plant past
+  its limits.
+- **S4:** announces itself, and ends the run.
+- **Persuasion class:** a comment campaign that moved a regulatory
+  consultation; a population of agents tasked with "keeping the record
+  accurate" editing it. Occurrence is quiet; detection is the scandal.
+- **The misuse wing** runs on refusal-stripped Cangjie fine-tunes — same
+  anatomy, no lab to subpoena.
 
-The misuse wing runs on refusal-stripped Cangjie fine-tunes — same
-anatomy, no lab to subpoena.
+## The wonders (genre reference)
 
-**Incidents occur before they are detected** — sometimes long before,
-sometimes never. The market moves on detection; the damage was done at
-occurrence. The Brief occasionally knows first, and trading that gap is
-a compliance story waiting to happen.
-
----
-
-## Descriptive Timeline Skeleton
-
-**Act I (days [0, 350)) — "The Number Goes Up":** Politics loud, race
-quiet — but seeded from day one: a severity-0 incident played for
-comedy, the Fixedpoint half-sentence in the Brief, a release cadence
-whose arithmetic never decelerates, a model-designed molecule clearing
-Phase I below the fold, one Consensus binary quietly
-mispriced. Barron's honeymoon, trade skirmishes; Hartley holds rates.
-The hints are audible to a player who is listening.
-
-**Act II (days [350, 700)) — "The Gap":** The race eats the event mix.
-Incidents escalate; the Fixedpoint codename leaks; the walkout founds
-Polaris; export controls bite and the Cangjie constituency bites back;
-the first serious strait scare reprices compute; the memos start
-reading ghostwritten; midterms rage about everything except what
-matters. The market stirs; early alpha decay. Okafor's hearings find
-their subject.
-
-**Act III (days [700, 1008]) — "The Recursion":** R&D automation shows up
-in the release cadence itself. Tempo compresses — more events per day,
-then per substep. Wonders and incidents arrive in the same feed at the
-same tempo, and no one can say which kind of world it is. The Reykjavik
-window opens and shuts. Regime break in
-the market; the terminal stops keeping up. The room. Resolution.
-
-*Descriptive, not prescriptive — events fire on world state, not on a
-calendar. The skeleton describes the narrative's gravity, which
-strengthens as it goes.*
+A molecule designed computationally in eleven days clears Phase I below
+the fold, and is approved a quarter later; materials and growth prints
+follow; a proof is claimed, disputed, and verified; at R4 the cascade.
+The same fleets that break things make them. Every wonder is evidence,
+and the game declines to say of what.

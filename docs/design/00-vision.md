@@ -1,8 +1,8 @@
 # 00 — Vision
 
 The design record for Shoals: what the game is, why, and the numbers it
-runs on. The code implements these documents; where a design element is
-specified but not yet built, the doc says so in place.
+runs on. These documents describe the game as built; designed-but-unbuilt
+work lives in [ROADMAP.md](../ROADMAP.md) until it is taken.
 
 | Doc | Covers |
 |---|---|
@@ -13,7 +13,7 @@ specified but not yet built, the doc says so in place.
 | [03-market-mechanics.md](03-market-mechanics.md) | How the race reaches the desk: instruments, stances, alpha decay, scrutiny, fund-as-actor, policy levers |
 | [04-arcs.md](04-arcs.md) | Narrative arcs, act tempo, standing orders, the room, cross-domain wiring |
 | [05-endings.md](05-endings.md) | Resolution families, personal overlays, the complicity ledger, epilogue tone |
-| [06-naming.md](06-naming.md) | Naming principles, the settled slate, cast, dead names |
+| [06-naming.md](06-naming.md) | Naming principles, the slate, cast, retired names |
 | [09-market-integrity.md](09-market-integrity.md) | Marks, oracle discipline, instrument lifecycles, closeout, fairness invariants |
 
 People, places, products, and legislation live in the lore bible,
@@ -51,8 +51,9 @@ The game maintains a distribution over its own premise.
 **1. Your alpha is your timeline.** The market does not price the race — the
 real-world EMH-vs-AGI anomaly (if transformative AI were near, rates and term
 structures should say so; they don't) becomes the game's core inefficiency.
-The player trades the gap between the market's implied timeline and their own
-posterior, built from tips, evals, incidents, and release cadence. Taking
+The player draws their own timeline against the market's, from tips,
+incidents, intelligence and release cadence, and trades the gap; each
+quarter both are scored against what happened. Taking
 x-risk seriously and getting rich are the same act. The tension cuts both
 ways institutionally: too AGI-pilled at a skeptical firm draws scrutiny and
 pressure to knock it off; not AGI-pilled enough and you underperform — and the
@@ -62,9 +63,10 @@ firm's own belief drifts over the game, so the pressure eventually inverts.
 is deliberately rigged the way reality rigs it:
 
 - **Long + accelerate** — the money is real; so is the marginal doom.
-- **Long + restraint** (activist position) — worse returns, small safety
-  gains, and the lab resents you for it.
-- **Sit it out** (bonds) — not a real option. The world proceeds without you;
+- **Long + restraint** — restraint bought through Halcyon's board and the
+  careful lab's private rounds: smaller returns, small safety gains, and
+  stakes you cannot sell.
+- **Sit it out** (bonds) — no way out. The world proceeds without you;
   you've only surrendered influence. And the risk-free rate is itself a
   derivative of the world staying normal.
 - **Short** — enough volume genuinely slows the lab, and it is a losing
@@ -75,15 +77,17 @@ is deliberately rigged the way reality rigs it:
 
 Transmission is honest ([03-market-mechanics.md](03-market-mechanics.md)):
 a secondary fill wires nobody money. Capital moves the race through
-governance and policy choices and a lagged cost-of-capital channel — the
-ledger records channels, not fills.
+governance and policy choices, a lagged cost-of-capital channel, and the
+primary market — a follow-on allocation or a private round reaches the
+lab. The ledger records channels, not fills.
 
 **3. Takeoff arrives through the sim, not a cutscene.** As frontier
-capability rises, AI enters the market itself: spreads tighten, events get
-priced before they fire, the player's edge decays, and finally the regime
-breaks — correlations to one, vol term structure inverted, the underlying
-process itself drifting. **Alpha decay is the felt sense of the
-singularity.** The market wakes up precisely when waking up stops mattering.
+capability rises, AI enters the market itself: the market's reaction to
+each headline damps, its valuation catches up with every certification,
+the tempo compresses until history arrives mid-day, the player's own
+orders slow behind machinery they configured, and the terminal stops
+keeping up. **Alpha decay is the felt sense of the singularity.** The
+market wakes up precisely when waking up stops mattering.
 
 ## The Landian thread
 
@@ -136,8 +140,8 @@ theater.
 - **Early:** be right, get paid. (Act I: the trading game alone.)
 - **Mid:** complicity. Your book finances the thing. The ledger remembers.
 - **Late:** agency. Your P&L is your credibility; credibility converts the
-  firm; the fund becomes an actor — anchor investments, backing the splinter
-  lab, the desk Treasury calls to ask what the market thinks. Whether you're
+  firm; the fund becomes an actor — backing the splinter lab, the desk
+  Treasury calls to ask what the market thinks. Whether you're
   *in the room* at the end is a function of everything you accumulated.
 - **End:** accounting. What was the money for?
 
@@ -153,41 +157,37 @@ nesting becalms the sea itself — and nobody agrees on where the rocks are.
 - **Two modes, one chassis.** Classic mode is the pure trading sim:
   the race is inert and the market is the GBM+Merton+Heston / Vasicek
   chassis alone. The Dynamic mode runs the race underneath the same
-  chassis; the political event pool survives from the earlier
-  politics-satire version of the game as the satire register's
-  background texture.
-- **Dynamic (LLM) mode was removed (2026-10-24).** It was built for the
-  earlier version of the game and had no race-era content: its prompt
-  predates the race and its story. One Dynamic mode remains.
+  chassis, with the political event pool as the satire register's
+  background texture. Every event is authored; nothing is generated at
+  runtime.
 - **Deliberate cuts** (choices, not oversights):
   - *No endogenous macro sim.* Automated labor share, wage collapse,
     and fiscal capacity are not linked stocks; the agent economy stays
     legible through events, sector prints, and the rates channel.
-    Revisit only if the wonders track feels weightless in play.
-  - *No compute stock-flow ledger.* Compute stays a per-lab scalar
-    stock moved by events (Cambria allocation, export controls, theft
-    integration, mobilization); the compute-futures curve is its
+  - *No compute stock-flow ledger.* Compute is a per-lab sampled growth
+    path that export controls bend; the compute-futures curve is its
     market shadow, which is the desk's view anyway.
   - *Doom shorts never settle.* Terminal wealth in the doom families is
     priced by the epilogue as what it is: a claim on a counterparty
     that no longer exists ([05](05-endings.md), [09](09-market-integrity.md)).
-  - *No provenance economy.* Superpersuasion is mechanized minimally
-    (campaigns as persuasion-class incidents, attackable source trust);
-    a full provenance/verification-budget economy would be a second
-    game.
+  - *No provenance economy.* Superpersuasion is mechanized minimally,
+    as persuasion-class incidents; a full provenance/verification-budget
+    economy would be a second game.
   - *Two capability tracks, not a pipeline.* Internal vs. released
     buys most of the fantasy; a four-stage pipeline is overkill.
-  - *Security levels, not a compromise simulation.* Discrete levels
-    with costs and tells; no compromise-state model.
+  - *Security levels, not a compromise simulation.* A lab's security
+    is a discrete level; there is no compromise-state model.
 - **Real-world events are calibration, never content.** The world's
   own news is one draw from the game's distribution, so it never
-  retunes the stance or the outcome priors. Readings held deliberately
-  against it: HCN stays listed (the central trade needs an underlying;
-  the real-world form of "the market cannot price this" — the asset
-  does not exist — is stronger than the game's, and the game keeps the
-  weaker, playable one); Polaris is founded mid-game (the schism and
-  the fund-as-actor wager need the founding inside the run); the race
-  stays bilateral (a quiet Beijing is not evidence against the wager —
-  `chinaTrue` is sampled); Fixedpoint stays secret until the leak (the
-  leak superevent beats a published index, which arrives as post-leak
-  texture).
+  retunes the stance or the outcome priors. Four choices stand against
+  it on purpose:
+  - *Halcyon is listed.* The central trade needs an underlying. The
+    real-world form of "the market cannot price this" — the asset does
+    not exist — is stronger than the game's, and the game keeps the
+    weaker, playable one.
+  - *Polaris is founded mid-game,* because the schism and the backing
+    wager need the founding inside the run.
+  - *The race stays bilateral.* A quiet Beijing is not evidence against
+    the wager; `chinaTrue` is sampled.
+  - *Fixedpoint stays secret until the leak.* The leak superevent beats
+    a published index, which arrives as post-leak texture.

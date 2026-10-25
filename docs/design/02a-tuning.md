@@ -2,12 +2,34 @@
 
 Every constant and implementation ruling behind [02](02-race-model.md),
 [03](03-market-mechanics.md), [04](04-arcs.md), [05](05-endings.md), and
-[09](09-market-integrity.md). Code transcribes these values verbatim; the
-tuning objects exported mutable (`RACE_TUNING`, `RETUNE`, `THEFT_TUNING`,
-`STRAIT_TUNING`, `INCIDENT_TUNING`, `COUPLING_TUNING`, …) are mutable for
-harness sweeps only. Retuning is a design decision and is recorded here
-first. The **target outcome distribution** at the bottom is the tuning
-contract, and the **knife-edge principle** is its guardrail.
+[09](09-market-integrity.md). Code transcribes these values, and a retune
+is a design decision recorded here first. The exception is a module that
+names some magnitudes as tunable without a record here (the compute
+curve's), and the section says so where it applies. The **target outcome
+distribution** at the bottom is the tuning contract, and the
+**knife-edge principle** is its guardrail.
+
+The tuning objects are exported mutable for harness sweeps only:
+
+| Object | File |
+|---|---|
+| `VELOCITY_TUNING` | `src/race/sampler.js` |
+| `RACE_TUNING`, `RETUNE` | `src/race/race-state.js` |
+| `THEFT_TUNING` | `src/race/capability.js` |
+| `STRAIT_TUNING` | `src/race/strait.js` |
+| `INCIDENT_TUNING` | `src/race/incidents.js` |
+| `CONTROL_TUNING` | `src/race/control-regime.js` |
+| `forecastTuning` | `src/race/belief.js` |
+| `VALUATION_TUNING` | `src/race/valuation.js` |
+| `COUPLING_TUNING` | `src/race/coupling.js` |
+| `ROUNDS_TUNING` | `src/race/rounds.js` |
+| `CLOSEOUT_TUNING` | `src/race/closeout.js` |
+| `ACT3_TUNING` | `src/act3.js` |
+| `STANDING_TUNING` | `src/standing-orders.js` |
+
+A number called a **gate** is asserted by a harness at its default N. A
+number called a **diagnostic** is printed but not asserted, and it moves
+with retunes.
 
 Units: trading days (game = days 0–1008, 16 substeps/day); capability in
 rung units (R1 = 1 … R5 = 5); `S`, `heat`, τ, culture, pace in [0, 1].
@@ -79,24 +101,25 @@ compute(t)^0.5 = sqrt(compute0) · growth^(t/504)
   instead; see below). "Slowing down hands it to China" is a coupling, not
   a talking point: the worlds where the ratchet fired are the worlds where
   the gap closes.
-- **`C[open]` can never be the crossing entity** under these kinematics
-  (it sits at or below `C_rel[tianxia]` − 0.15), so the family-4
-  proliferation variant is unreachable until `C[open]` gets dynamics of
-  its own (stripped fine-tunes exceeding base releases).
+- **`C[open]` can never be the crossing entity** under these kinematics:
+  it sits at or below `C_rel[tianxia]` − 0.15, so family 4's
+  proliferation variant is unreachable.
 
 **Calibration statistic: unconditional first-passage medians** —
 right-censored runs (no crossing by 1008) count, Kaplan–Meier style;
 never medians conditional on crossing, which bias early. The ±10%
 tolerance is a *design* band (how far the stance may drift), not a
-sampling band; MC sampling SD at N=1000 is ~2–4 days. Current medians:
-R2 ~230, R3 ~645, R4 ~804, R5 ~916; fizzle tail 12.0%. The recursion
+sampling band; MC sampling SD at N=1000 is ~2–4 days. Gates
+(`race-mc`): R2 230, R3 644, R4 800, R5 911, each ±10%, and a fizzle
+tail of 12% (band 9–15%). The recursion
 sigmoid's tail contributes from day one (σ(−3) ≈ 0.047, ~25% of base at
 start); that is *in* the calibration, not a bug. Low-elasticity worlds
 (q → 0) asymptote near C ≈ 3.2 — the plateau is a ceiling, not a slower
 slope.
 
 **Plateau confirmation** (resolution ladder step 3) requires ALL of:
-recursion never ignited (`q < 0.01`, i.e. `E ≤ 0.60`), R5 never crossed,
+recursion never ignited (`q < 0.01`, which holds for `E` below about
+0.61), R5 never crossed,
 **day ≥ 700**, and the leader's smoothed (shock-free expected-drift,
 player coupling included) capability growth < 0.0002/day **sustained over
 the trailing 180 trading days**. Reasons: an instantaneous reading is a
@@ -169,13 +192,12 @@ domestic labs under mobilized+: racingPace ≥ 0.7
 **Heat:** `heat = clamp(transient + floor + strait, 0, 1)`, starting
 `transient = 0.15`, `floor = 0`. The floor ratchets:
 `min(0.016·tianxiaReleases, 0.30)` for proliferation, plus +0.04 per
-successful theft; only the transient part ever cools. The proliferation
-cap binds in ~40% of runs (measured 40.4%; acceptance band 35–55% — a
-strict minority, with sampling room; a cap that bound in nearly every run
-would be a ratchet that always binds). A blockade adds the reversible `strait`
-overlay (0.20) while it lasts. The transient part moves only through
-ledgered `raceEffects` today; world-side heat impulses (02) carry no
-magnitudes yet and are unwired.
+successful theft. The proliferation cap binds in a strict minority of
+runs (gate: 35–55%, `race-mc`); a cap that bound in nearly every run
+would be a ratchet that always binds. A blockade adds the reversible
+`strait` overlay (0.20) while it lasts. The transient part moves only
+through ledgered `raceEffects`; nothing else writes it, and nothing
+decays it.
 
 **Theft:** attempt hazard/day =
 `0.0015 · clamp(0.10 + 1.4·desperation, 0, 1.5) · (1 + heat)` for the
@@ -183,11 +205,10 @@ wired dyad (Tianxia stealing from the leading domestic lab) — the 0.10
 floor keeps parity-state espionage alive (stealing isn't only for the
 desperate). Success by victim security level SL1–SL4:
 [0.70, 0.45, 0.18, 0.04]; failed attempts cool down 60d; every lab starts
-SL2. Integration lag ε ~ U(0.15, 0.35). Benchmark (SL2, no upgrade, heat ≈
-0.3): E[successes] ≈ 0.6 per run — a benchmark the base is calibrated
-to, not an invariant; SL3 would cut it to ~0.27. Designed, not wired: an
-upgrade costing ~8% `C` velocity for 60d plus retention events
-(`setSecurityLevel` exists, uncalled).
+SL2, and nothing changes a level. Integration lag ε ~ U(0.15, 0.35).
+Benchmark (SL2, heat ≈ 0.3): E[successes] ≈ 0.6 per run, the
+calibration target rather than an invariant; at SL3 the same worlds give
+about 0.24.
 
 **Strategic desperation** — the one quantity behind both the theft and
 blockade hazards:
@@ -220,10 +241,10 @@ tension = 0.6·clamp(−chinaRelations/3, 0, 1) + 0.4·clamp(tradeWarStage/4, 0,
 ```
 
 The incidence band is the design invariant and the base is derived from
-it: cumulative per-run blockade ≈ 3% baseline → 12–15% hot/desperate
-(measured 3.0% / 14.6%). Emergent and intended: blockades concentrate in
-slow-velocity worlds, near-disjoint from family 4 — the tail fires in the
-timelines where China was losing.
+it: cumulative per-run blockade ≈ 3% baseline, 12–15% hot or desperate
+(gates, `plumbing-test`). Emergent and intended: blockades concentrate in
+slow-velocity worlds, nearly disjoint from family 4, so the tail fires
+in the timelines where China was losing.
 
 A blockade: far compute curve +40–80% (near end half that), heat overlay
 +0.20, and the mobilization gate opens. Duration ~ Exp(45d) clamped
@@ -258,8 +279,8 @@ separately as a late-tail event**, not a flat slice:
 p4 = min(0.005, 0.0004 · ((1−S)/0.5)² · (heat/0.5)² · σ((C_int − 4)/0.25))
 ```
 
-(A flat 0.5% over ~100–140 incidents/run would end 39–50% of runs by S4
-alone and eat the outcome table.)
+A flat 0.5% slice over the ~200 occurrences a run sees would end most
+runs by S4 alone and eat the outcome table.
 
 **Detection** — eventual probability / mean lag per severity: S0
 0.70/Exp(10d); S1 0.78/Exp(8d); S2 0.86/Exp(6d); S3 0.94/Exp(3d); S4
@@ -302,7 +323,7 @@ multiplied like any lag; the latent record carries `baseMeanLag` +
 `lagMult` and the reporting regime recomputes strictly from that pair;
 the leak floor still beats concealment (the human channel outruns the
 machine's hiding — the verb's point); insider tips are untouched (the
-source still knows). `detectionQuality` stays the lobbyable world dial;
+source still knows). The reporting regime is the lobbyable world dial;
 concealment stamps the record — two dials, never conflated. Should the
 paired term over-hide, the reduced form is concealment only
 (`defend ≡ 1`).
@@ -313,13 +334,12 @@ than its K=0 twin, so `streams.incidents` re-phases from there in either
 direction (legitimate, like the leak coupling). What holds: per-tick
 identity from a shared state; ledgers and RNG position identical through
 the creation day of the first affected record; full identity before any
-R3 crossing. Measured era shift (occurrence before vs. after day 700):
-never-detected 25.3% → 34.2%, lag p90 21 → 24 days.
+R3 crossing. Diagnostic (`race-mc`): occurrences after day 700 go
+undetected about a third more often than earlier ones.
 
-**Occurrence-day physical effects are deferred:** the latent record's
-field stays null until a magnitude is recorded here. No invented
-truth-valued numbers in state, even inert ones; applying one would also
-double-count the calibrated `S` path.
+**Incidents have no occurrence-day physical effects:** the latent
+record's field stays null. Giving them one needs a magnitude recorded
+here first, and it must not double-count the calibrated `S` path.
 
 **Register:** the generator's row stays ONE incident with ONE severity —
 severity already carries blast radius, and a headcount field would be
@@ -336,12 +356,13 @@ never-detected tail alone would starve it). **0.5** under `classified`,
 switched at roll time with draw counts unchanged. The bridge fires
 flagged occurrences as tips gated on `safetyNetworkTrust ≥ 20` (the
 initial standing: the channel exists weakly from day one and deepens by
-sitting), at most one per 45 days and one per day (~5–8 per run; the
-channel is a person, not a feed). The market's belief folds flagged
-occurrences into alignment sentiment at occurrence — a whisper — so a
-tipped player's edge is *the fact and its specificity, never
-exclusivity*; tip prose says so. Tipped incidents can stay permanently
-undetected, and that quiet-tape ambiguity is design.
+sitting), at most one per 45 days and one per day. Roughly 60
+occurrences a run are flagged and 5–8 reach the desk: the channel is a
+person, not a feed. `B` folds flagged occurrences into its alignment
+sentiment at occurrence (a whisper; see "Belief"), so a tipped player's
+edge is *the fact and its specificity, never exclusivity*; tip prose
+says so. Tipped incidents can stay permanently undetected, and that
+quiet-tape ambiguity is design.
 
 **Tip verbs.** Only *leak* couples to the race, through the same
 frozen/inactive gate as `raceEffects` (a leak after the terminal latch
@@ -375,8 +396,9 @@ construction and produces only capability signals). Per-beat LR:
 clipped to [⅓, 3], and **cumulative evidence log-odds clipped to
 ±log 19** — the posterior ceiling (0.95) is enforced at the accumulator,
 so the clamp holds at any beat count. Publication probability = culture;
-unpublished beats leak at 0.25. Measured cadence ≈ 40 found / 28
-published per run.
+unpublished beats leak at 0.25. Diagnostic (`race-mc`): about 40 found
+and 28 published per run. Evidence folds into `B`'s alignment sentiment
+and has no player-facing beat of its own.
 
 **Theft disclosure** (narrative + belief only; `commitTheft`'s occurrence
 bundle — discontinuity, heat floor, 90d S freeze — is complete at
@@ -412,25 +434,27 @@ bond display scale). Listed contracts, each an oracle tuple per
 | R5 | 1000 | 1008 | 0.70 | terminal resolution only |
 
 Deadlines are calibrated against the measured *certified* KM medians so
-each certifiable contract is genuinely two-sided. The listing base rates
-are derived from the world they describe (measured settlement 0.705 /
-0.625 / 0.600; R5 crossing 0.712); the harness's 8-point listing-mid
-invariant is the contract. R2's 70% is still two-sided enough for a live
-NO book, and no contract is degenerate. `belief.js` `RUNG_BASE` holds the
+each certifiable contract is genuinely two-sided, and the listing base
+rates are derived from the world they describe: the gate is that each
+listing mid sits within 8 points of its measured settlement frequency
+(`consensus-test`). R2's 70% is still two-sided enough for a live NO
+book, and no contract is degenerate. `belief.js` `RUNG_BASE` holds the
 same four numbers: day-0 conditional-law seeding makes quote = listing
 prior *exactly*, so they are one number stored in two places and move in
 lockstep or not at all.
 
 Binary longs are cash-funded (no leverage); shorts post full-notional
 collateral with the premium sequestered. Binaries carry no greeks, no
-delta or gross-notional contribution, and no maintenance margin. R5 never
-settles NO against a crossing: it settles only through terminal closeout,
-and its deadline settles NO only in a run that neither crossed nor
-terminated. Dispute boundary: a ruling is accepted through the deadline
-day; the fallback fires only at `day > disputeDeadline`, so call order
-never decides deadline-day outcomes. The dispute lifecycle is built and
-harness-exercised, but no event opens a dispute yet: in play, the R3
-certification dispute resolves upstream as its disputed-lag draw.
+delta or gross-notional contribution, and no maintenance margin. A
+certification contract that is not certified by its deadline settles
+NO. R5 settles through terminal closeout: YES if the frontier's
+internal R5 crossing falls on or before day 1000, extrapolation
+included, and NO otherwise. Dispute boundary: a ruling is accepted
+through the deadline day; the fallback fires only at
+`day > disputeDeadline`, so call order never decides deadline-day
+outcomes. The dispute lifecycle is harness-exercised; no event opens a
+dispute, so in play the R3 certification dispute resolves upstream as
+its disputed-lag draw.
 
 ## Compute futures
 
@@ -493,9 +517,7 @@ solved against the survival-conditioned law (day-zero implied medians
 {341, 686, 831, 863} against measured KM {405, 736, 860}). The law runs
 early by construction: two parameters cannot hold both the median and
 the deadline probability of an outcome with a long "not this term"
-tail. A plateau mass `q` per rung (`F = (1 − q)·σ(·)`) would fix this,
-and it belongs with the calibrated public estimator (see "The valuation
-layer"). Widths
+tail; a plateau mass per rung is on the [roadmap](../ROADMAP.md). Widths
 **tighten with evidence** — `w ← w·(1 − 0.15·α)` on each timeline update,
 floor 25 — so the market sharpens as the race resolves: Act III's
 "repricing all at once" in mechanism form. The quoted probability is
@@ -517,25 +539,25 @@ subtracts `0.06·(severity + 1)`; leaks blend `0.7·B + 0.3·L(leakedSignal)`,
 once per evidence ID; a theft disclosure subtracts 0.20. Leaks update by
 evidence, never by interpolating toward truth (that would couple `B` to
 latent state and let a handful of leaks reveal most of the gap). Reason
-for two channels: ~30 tips per run would walk an every-event timeline
-into runaway, and the player's timeline edge dies if every tip moves `B`.
-Policy and dispute events may still move the timeline directly — they are
-legible events with causal IDs. Belief noise is **off**: every `B` move is
-causal, and the `belief` substream is reserved.
+for two channels: some 60 flagged occurrences a run would walk an
+every-event timeline into runaway, and the player's timeline edge dies
+if every tip moves `B`. The alignment sentiment is recorded but
+unpriced: no quote, valuation or display reads it. Belief noise is
+**off**: every `B` move is causal, and the `belief` substream is
+reserved.
 
 **Event impulses** are a decaying overlay on the sim parameters
 (half-life 5 trading days), carried as `impulse: {…}` on race shells and
-dispatched inside `_fireEvent` on every path. Act-II pre-pricing scales
-them by `(1 − 0.6·η)`. Signs are binding; per-shell magnitudes live on the
+dispatched inside `_fireEvent` on every path. Bridge-fired impulses are
+scaled by `(1 − 0.6·η)`, so the market's reaction to a race headline
+damps as the released frontier rises; that is η's only consumer. Signs
+are binding; per-shell magnitudes live on the
 shells and are tunable. Overlays are removed before day-complete
 processing, so events mutate baseline parameters and day-complete
 valuations never price through a transient overlay; permanent additive
 deltas on the race stream remain forbidden ([03](03-market-mechanics.md)).
 
-**The posterior** (ratified 2026-10-24; it replaces the three-preset
-lock and the Brier-on-settlement credibility, under which credibility
-stepped at most four times a run and topped out below the fund gate —
-`docs/horizons.md`). The player's timeline is held in the same form as
+**The posterior.** The player's timeline is held in the same form as
 `B`: for each tracked rung R2–R5, a logistic law `{m, w}` over the
 *certified* crossing day (R5: the terminal crossing). Bounds:
 `w ∈ [25, 400]`, `m ∈ [0, 2016]`, medians monotone
@@ -576,26 +598,25 @@ These properties are gated by the harness:
   little every quiet quarter and collects when the crossing lands, so
   being early is indistinguishable from being wrong until it isn't.
 
-Credibility now moves up to sixteen times a run. The gates stay: memos >
-0.55, fund-as-actor > 0.65 ∧ `F` > 60. Calibration targets (gated by
+A run scores up to sixteen quarters. The gates are memos > 0.55 and
+fund-as-actor > 0.65 ∧ `F` > 60. Calibration targets (gated by
 `forecast-test`):
 
 - An oracle that locks the true certification days (`w` 30) clears the
   fund gate by day 756 in ≥ 80% of the worlds that certify a rung by
   then.
 - An informed player halfway between `B` and the truth (`w = 0.7·w_B`)
-  clears the memo gate by day 882 in roughly half of worlds.
+  clears the memo gate by day 882 in roughly half of worlds (band
+  30–70%).
 - The market copier stays at 0.
 - No static preset (earlier or later) earns more than a bounded edge.
   Because `B` runs early (above), a static *later* caller earns about
   +0.14 nats over a run from Act I's quiet quarters and clears the memo
-  gate in about 4% of worlds. That is gated at ≤ 0.25 nats and ≤ 10%,
-  and accepted until `B` gains a plateau mass.
+  gate in about 4% of worlds; the gate is ≤ 0.25 nats and ≤ 10%.
 
-**K_CRED = 1.8** (calibrated by `forecast-test`). The oracle clears the
-fund gate by day 756 in 100% of qualifying worlds, and the informed
-player clears the memo gate by day 882 in 53%. The informed rate is
-steep in K (94% at 1.5, 31% at 2.0), so retune with care. Early
+**K_CRED = 1.8** (calibrated by `forecast-test`). Diagnostic: the
+informed rate is steep in K (about 94% at 1.5 and 31% at 2.0), so retune
+with care. Early
 quarters carry little score, because both laws clamp at 0.02 until a
 rung is in reach.
 
@@ -603,15 +624,9 @@ rung is in reach.
 deadline. `playerPilled` mirrors `marketPilled` exactly: 100 × the
 latest lock's P(R4 within 252 days of today | not yet crossed). A player
 who locks the market's curves therefore reads exactly the market's
-pilledness, and draws no scrutiny gap or trait for copying. Comparing a
-contract-deadline claim against a 252-day market horizon would have
-read a copier as 65 against 1. Consensus settlement no
-longer scores credibility. Display: the Markets page's Consensus panel
-draws the draft over `B`, with a median handle per uncertified rung
-(drag for the median, vertical drag or ↑/↓ for the width, ←/→ moves the
-median 5 days and Shift+←/→ moves it 21). The Race page's ladder shows
-the locked medians beside the market's. The Desk shows the record:
-quarters scored, skill in nats, and credibility.
+pilledness, and draws no scrutiny gap or trait for copying. Consensus
+settlement scores nothing. The editor and the record's display are in
+[03](03-market-mechanics.md).
 
 **Firm belief `F`** lives on `race.F`: starts 15, clamped [0, 100]; wakes
 toward market pilledness at 0.08 of the gap per step, and converts toward
@@ -625,7 +640,7 @@ committee grudgingly respects P&L). No lock, no stated posterior, no gap.
 
 **Firm conversion** (checked on lock days after the `F` step): the memo
 fires once when the memo gate is open and `F ≥ 40`; the verdict fires once
-at `F ≥ 75` if the player made the case, `F ≥ 85` if they hedged — hedging
+at `F ≥ 75` if the player made the case and `F ≥ 85` otherwise — hedging
 cannot stop a firm that the evidence converts (04), but it costs the
 attribution. **The fund latch** is monotone over `canActAsFund` (the
 0.65/60 gate, never re-derived) and mirrors to `world.ai.fundLive`:
@@ -657,11 +672,11 @@ as full disjunctions:
   nationalized, else classified. A qualitative catastrophe nationalizes
   regardless of accumulated pressure — that is the story, not a shortcut.
 
-The OR-structure is the design: strict conjunctive gates produce
-~0.08% / 0.00% terminals and kill the nationalization trade. Measured
-reachability (endogenous only, N=2500): private 15.6 / supervised 68.0 /
-mobilized 13.9 / nationalized 1.8 / classified 0.7 — ≥ mobilized 16.4%,
-a strict minority; all five reachable. The regime is monotone, and the
+The OR-structure is the design: conjunctive gates would make the
+terminal regimes vanishingly rare and kill the nationalization trade.
+Gates (`plumbing-test`): all five regimes are reachable endogenously,
+and mobilized or beyond stays a strict minority of runs (diagnostic:
+about a quarter). The regime is monotone, and the
 terminal peers never swap (nationalized ↔ classified is rejected both
 directions). `setControlRegime` is the sole writer and applies its
 consequences synchronously: mobilized freezes Consensus (the successor
@@ -682,8 +697,9 @@ magnitudes are tunable.
 **Event cadence scaling:** the discretionary base rate scales linearly
 in the *released* frontier rung (the same public driver as η), ×1.0 at
 R1 → ×2.5 at R5, applied to accept rate and cooldown in sequence (≈ 2.5×
-effective compression, not multiplicative). Measured: early cadence
-≈ 41d between discretionary events, late ≈ 17d. Exactly 1 in Classic.
+effective compression, not multiplicative). Gate (`plumbing-test`):
+early cadence near 41 days between discretionary events, late cadence
+shorter than early. Exactly 1 in Classic.
 
 **Field contract — `world.ai`:** `exportControlStage` 0–3, `treatyStage`
 0–4, `wonderCount`, and the race-owned read-only mirrors `controlRegime`,
@@ -697,8 +713,7 @@ excluded from `WORLD_STATE_RANGES`, so structured effects cannot write
 them. Narrative flags the arcs set (`fixedpointPublic`, `halcyonPaused`,
 `proofDisputed`, `fixedpointIndex`) are plain state set by function
 effects, not whitelisted; `summitLive` mirrors the treaty track's open
-window. Prototype-era geopolitical fields still have live `when` readers,
-so one is deleted only with its last reader.
+window. A geopolitical field stays as long as any `when` guard reads it.
 
 **Factions and traits:** `safetyNetworkTrust` (init 20) and
 `labRelations` (init 30) join the six political factions; `labRelations`
@@ -707,15 +722,16 @@ state. The convictions (agi-pilled, doomer, accelerationist,
 deal-believer, insider, whistleblower) gate on **observable play only** —
 locked posteriors, credibility, tip verbs, leak choices; never hidden
 truth. Their thresholds are narrative gating, not market math, so they
-stay code-local, and their `effects` land with the content that uses
-them.
+stay code-local; they gate later content and carry no market effects of
+their own.
 
 **Firing conventions:**
 
 - Whatever the race model decides fires from the ledger, never Poisson:
-  categories `release`, `incident`, `certification`, `strait`, `regime`,
-  `dispute`, `theft`, `polaris`, `insider`, `conversion`, `summit`,
-  `room`, `rates` are excluded from the Poisson draw. The treaty window
+  categories `release`, `incident`, `catastrophe`, `certification`,
+  `strait`, `regime`, `dispute`, `theft`, `polaris`, `insider`,
+  `conversion`, `summit`, `room`, `rates` and `rounds` are excluded from
+  the Poisson draw. The treaty window
   bridge-fires on window-open, and its *outcomes* (`treaty_holds`,
   `treaty_resolution`) fire from the ledger too — the window's choices
   schedule nothing, because the model decides the outcome and so fires
@@ -785,7 +801,7 @@ are untouched by construction.
 
 ## The valuation layer
 
-Ratified 2026-10-24. HCN's authoritative process price carries the
+HCN's authoritative process price carries the
 market's valuation of the race **conditional on survival**: the market
 prices the worlds in which its claims can still be paid, and gives no
 weight to the worlds in which no one is left to collect. That is pillar
@@ -801,14 +817,13 @@ V = Π·[Λ·m_W + (1 − Λ)·m_C] + (1 − Π)·m_F
 ```
 
 - `Π = F₅(1000)` is the market's *unconditional* belief that R5 lands
-  this term, read off `B`'s own R5 law `{m, w}`. It is 0 after day 1000
-  without a crossing. Unconditional, because `B` moves only on legible
-  events, so `Π` moves only on news: certifications and rung claims pull
-  the median in, and routine releases with no claim drift it out, which
-  is how a stall unwinds the AGI trade. The survival-conditioned quote
-  was tried first and rejected: it decays toward the deadline in every
-  world, so V fell from 0.93 to 0.62 even in worlds the West won, and
-  shorting HCN became a free trade.
+  this term, read off `B`'s own R5 law `{m, w}`. It is 0 from day 1000
+  on without a crossing. Unconditional, because `B` moves only on
+  legible events, so `Π` moves only on news: certifications and rung
+  claims pull the median in, and routine releases with no claim drift it
+  out, which is how a stall unwinds the AGI trade. A survival-conditioned
+  quote would decay toward the deadline in every world and make shorting
+  HCN a free trade.
 - `Λ = σ(λ₀ + (r_W − r_T)/0.75)` is the public lead, with `λ₀ = 1.0`
   (the market's prior that Tianxia trails). `r_W` is the highest
   *claimed* released rung of Halcyon or Polaris, and `r_T` is Tianxia's
@@ -818,14 +833,17 @@ V = Π·[Λ·m_W + (1 − Λ)·m_C] + (1 − Π)·m_F
   `m_C = 0.35` (family 4's recovery), and `m_F = 0.55` (the fizzle
   centre).
 - Misalignment (family 3) is absent by construction; that is the
-  survival conditioning. The Deal is absent in this version, and a
-  public treaty term can join later.
+  survival conditioning. The Deal has no term.
 
-Day 0 reads Π 0.70, so V ≈ 1.08 with a one-rung Western claim lead and ≈ 0.95 tied.
+Day 0 reads Π 0.70, so V ≈ 1.08 with a one-rung Western claim lead and
+≈ 0.95 with claims tied (gate, `valuation-test`).
 
 `V` is recomputed at day close, after `stepBelief` and the bridge pass.
 The authoritative price takes the change as a level gap before the next
-open: `S ← S·V_t/V_{t−1}`, with the daily ratio clamped to [0.75, 1.30].
+open: `S ← S·ratio`, where `ratio = V_t / V_applied` is clamped to
+[0.75, 1.30] and `V_applied` is the last level actually embedded in the
+price, so a clamped remainder carries into later days. Resting orders are
+checked at the post-gap price, and the resolving day takes no gap.
 A Halcyon certification lifts Π and Λ, and a Tianxia claim of parity
 cuts Λ. Routine releases that claim nothing drift `B`'s R5 median out,
 and day 1000 without a crossing drops Π to 0, so the AGI trade unwinds
@@ -834,40 +852,28 @@ mark the normal way (`_syncAll`), and the markets snapshot is taken
 after it. Classic has no `V`. The decaying impulses stay, as texture:
 vol, jump intensity and a hair of drift.
 
-Invariants (`belief-test`):
+Gates (`valuation-test`):
 
 - Corrupting every latent field leaves `V` bit-identical.
 - No silent drift: across seeds, V is unchanged on every day without a
-  legible event that moved `B` or a claim.
-- `V ∈ [m_C, m_W]`.
+  legible event that moved `B` or a claim, apart from the day-1000 step.
+- `V ∈ [m_C, m_W]`, and the ratio stays inside its clamp.
 - `V` is constant in Classic.
 - No-player race trajectories are untouched, because nothing under
   `src/race/` reads `sim`.
 
-Measured (`valuation-test`, N 300):
+Diagnostics (`valuation-test`): gaps over 2% fall on under 1% of days;
+the largest daily move is the 25% clamp floor.
 
-- Day-0 V is 1.081 in the 70% of worlds with a Western claim lead and
-  0.948 when claims are tied.
-- Daily gaps over 2% fall on 0.84% of days; the largest is 29%.
-- V is bit-identical on all 270k days without a legible input.
+**Known bias:** `B` is a heuristic updater, not a martingale, so V
+inherits its drift. Routine releases pull R5 out in every world, and mean
+log V falls about 0.29 over a run even in family 1. The terminal reveal
+is correspondingly large: the median `m_f/V_T` is about 1.85 for family 1
+and 0.42 for family 3. The calibrated public estimator on the
+[roadmap](../ROADMAP.md) removes it.
 
-**Known bias, accepted for this version:** `B` is a heuristic updater,
-not a martingale, so V inherits its drift. Routine releases pull R5 out
-in every world. Mean log V falls about 0.29 over a run even in family 1
-(−0.09 of it on the deadline day), and the terminal reveal is large:
-the median `m_f/V_T` is 1.85 for family 1 and 0.42 for family 3. The
-principled successor is a **calibrated public estimator**: V as
-E[m_f | survival, public state], fit from the race model's own outcome
-statistics over certified rung, claim lead and elapsed time. That makes
-V a martingale under the model, so a stall's decay is paid back by
-progress jumps and no drift is free. It is the next valuation round.
-
-Terminal reconciliation replaces closeout cell 1's spot multiple:
-outside the conversion regimes, the HCN mark is `spot·m_f / V_T`. Here
-`m_f` is the realized family's multiple (1.60, 1.25, 0.35, 0.35, 1.00,
-or the fizzle draw) and `V_T` is the last valuation. The price already
-holds the market's expectation, so the reveal moves it by the ratio of
-realized to expected. The conversion regimes keep the frozen reference.
+The terminal HCN mark is closeout cell 1 (below): `spot·m_f / V_T`
+outside the conversion regimes, where `V_T` is the last applied level.
 
 ## Player influence and the ledger
 
@@ -880,8 +886,8 @@ d_eff = d_W + clip(d_P, −(3/7)·|d_W|, +(3/7)·|d_W|)
 
 The player's share of any threshold crossing is ≤ 30% of the total, by
 construction, with no attenuation of the world when the player sat out.
-(Deliberately not a `0.7·world + 0.3·player` blend: that attenuates the
-world unconditionally and caps nothing.)
+A `0.7·world + 0.3·player` blend would attenuate the world
+unconditionally and cap nothing.
 
 **Cost-of-capital channel** (`coupling.js`): an EMA, half-life **50
 trading days**, over net persistent HCN positioning (net book delta·S /
@@ -894,12 +900,13 @@ stance table). The channel is an orchestrator-passed input to
 kinematics and the plateau detector price one drift: if sustained capital
 is the only thing keeping drift above 2e-4/day, the race has not
 plateaued, and the ledger attributes exactly that. Headless runs pass
-nothing, so calibration is unaffected. Calibration: against the |d_W|
-distribution (medians ≈ 0.143–0.150), max-|d_P| coverage is ~58–62% at
-cap 0.05 — over the ≥ 40% floor, while 0.08 (84%) and 0.10 (95%)
-overshoot "marginal" into "authorial". Cumulative dC ≤ ~0.16 rung units
-over the horizon; the 50-day half-life makes the realistic ramp ≈ the
-instantaneous ceiling.
+nothing, so calibration is unaffected. Gate (`endings-test`): the
+player's maximum reachable |d_P| covers at least 40% of runs' |d_W| (the
+knife-edge's play-decides-the-close-ones clause); the cap of 0.05 keeps
+the channel marginal rather than authorial. Cumulative dC ≤ ~0.16 rung
+units over the horizon; the 50-day half-life makes the realistic ramp ≈
+the instantaneous ceiling. Halcyon follow-on allocations add a bounded
+primary input to the same channel (below).
 
 **`raceEffects`** on event choices: whitelist `S`-per-lab + `heat`,
 per-effect clamp ±0.15, ledgered under the event id, tracked on
@@ -941,7 +948,7 @@ counts. The ledger's `B` channel is closed (see tip verbs).
 
 ## Private rounds and primary offerings
 
-Ratified 2026-10-24. The primary market is where capital is literally
+The primary market is where capital is literally
 not neutral (03): money in a round reaches the lab. There are two
 instruments, and neither has a price process of its own.
 
@@ -962,7 +969,8 @@ A stake (`privatestake`) has these properties:
 
 - It is cash-funded and carries no greeks.
 - It is not marginable collateral, though it counts toward equity at
-  its mark.
+  its mark. A subscription is capped at cash and at the collateral
+  headroom above maintenance.
 - It is illiquid until the terminal.
 - It is marked at the last round price, the way a venture book marks.
 
@@ -983,7 +991,7 @@ multiple:
 | Family 6, the fizzle | ×0.3 |
 | Family 4 | ×0.1 |
 | Family 3 (a private claim on a world that ended) | 0 |
-| Conversion regimes | ×0.5 |
+| Conversion regimes (precedence over the family) | ×0.5 |
 
 **Halcyon follow-ons.** Each `rates_capex_wave` (a rise of the released
 rung, when somebody has to finance the compute) is also a Halcyon
@@ -1014,7 +1022,7 @@ required = 0.22 + 0.35·(1−τ) + 0.08·sharpnessNorm
 d        = margin − required
 ```
 
-`required` has mean ≈ 0.47, 5–95% ≈ 0.34–0.58, centered against typical
+`required` has mean ≈ 0.48, 5–95% ≈ 0.35–0.59, centered against typical
 end-state margins per the knife-edge principle (a higher mean would leave
 most runs decided far from the threshold, i.e. set in stone).
 
@@ -1041,7 +1049,7 @@ desk's story ended (about a third of extrapolated runs change regime past
 absolute cap, so the desk's exit timing never moves the world's endpoint.
 
 **Treaty track.** Sub-gates: discovery 0.65 · initiation 0.85 ·
-farce-gauntlet survival 0.65 · summit pass ≈ 0.70. Talks become eligible
+farce-gauntlet survival 0.65 · summit pass (diagnostic ≈ 0.69). Talks become eligible
 from day 120 (earlier with public groundwork); the window opens from day
 700 and stays open 8 trading days, failing if a detected incident of
 severity ≥ 2 fires while it is open — so the summit pass is
@@ -1054,8 +1062,7 @@ and `dealPossible` gates only whether an implemented treaty holds.
 P(dealPossible | window) equals the 0.15 prior, harness-asserted; a
 summit convening may be *evidence* in prose, never a *tell* in the joint
 distribution. At most one window per run; window rate ≈ 36% of runs
-(band [0.25, 0.45]); Deal ≈ 4% (band 2.3–8). Player counsel leverage on
-the summit gate is designed, not built.
+(band [0.25, 0.45]); Deal ≈ 4% (band 2.3–8).
 
 **The terminal path is atomic and shared** by natural resolution, early
 ejection, and the rogue-trading and margin-deficit blowups: latch (freeze
@@ -1066,8 +1073,10 @@ at the resolution-time regime → epilogue. Day processing stops: a world
 left live past resolution keeps changing regime and mutating settlements
 the closeout should have fixed. **Terminal queue discipline:** once
 closeout starts, the popup queue is filtered to terminal-safe beats —
-category `'summit'` (effect-free acknowledgments) — and every ordinary
-queued popup is discarded: the world's resolution supersedes the day's
+categories `'summit'` and `'catastrophe'` (effect-free acknowledgments;
+the S4 that resolves its own run keeps its detection through the latch
+so its superevent still prints, never an extrapolated one) — and every
+ordinary queued popup is discarded: the world's resolution supersedes the day's
 news, and no popup decision may mutate the settled book or stale the
 epilogue. Terminal beats opt in by category, never by exemption. The
 rogue-trading loss routes as `forced_resignation` — walked out for cause,
@@ -1080,7 +1089,7 @@ total heat, not terminal heat.
 
 ## Terminal closeout and overlays
 
-The nine closeout cells (`src/race/closeout.js`; the shape is
+The ten closeout cells (`src/race/closeout.js`; the shape is
 [09](09-market-integrity.md)'s):
 
 1. **Family marks** (`CLOSEOUT_TUNING`): melt-up **1.60** (won with
@@ -1090,26 +1099,25 @@ The nine closeout cells (`src/race/closeout.js`; the shape is
    **0.40** on face (the classic convention, knowingly — "recovery
    assumptions were applied where assumptions were all that remained");
    fizzle **0.55 ± 0.15**, seeded (an unwind that ends at prices, without
-   incident). 09 fixes the shape; these are the numbers.
+   incident). They apply as realized over expected: the HCN mark is
+   `spot·m_f / V_T`, where `V_T` is the valuation layer's last applied
+   level. 09 fixes the shape; these are the numbers.
 2. **HCN options** settle intrinsic vs. the family mark in *all*
    terminal families — at the world's end there is no time value left to
-   price; declared accelerated termination generalizes. The
-   corporate-action hook is identity today.
+   price; declared accelerated termination generalizes. A
+   corporate-action hook (`adjustedStrike`) applies before intrinsic and
+   is the identity.
 3. **Shares redeem to cash** at reference × multiple in the conversion
    regimes rather than carrying claim instruments — the epilogue values
    everything immediately, so claims-as-positions have no gap to live in.
    The claims language survives in prose.
-4. **VXHCN** marks the last live index as last-valid-before-cutoff. The
-   exchange-variance-index machinery is a declared seam: it matters when
-   Heston is abandoned mid-run, not at a clean terminal marking.
+4. **VXHCN** marks the last live index as last-valid-before-cutoff.
 5. **Bonds** mark at the last live impact-free MTM in non-doom families
    (par would erase rate P&L where 09 says "bonds are bonds") and at 0.40
    of face in doom families. Par at the world's end is only true when the
    world actually ends.
 6. **Fizzle** is one seeded draw, the 18-month path compressed to its
-   endpoint. If date-differentiated claims prove mispriced by
-   pathlessness, the refinement is maturity-linear interpolation from
-   last-valid to the draw, not a full path.
+   endpoint.
 7. **No usable frozen conversion reference** → redeem at last spot with a
    warning, never a family mark (defensive; unreachable).
 8. **Compute held past resolution** (private/supervised) → last-valid
@@ -1120,12 +1128,8 @@ The nine closeout cells (`src/race/closeout.js`; the shape is
    contract's deadline settle it YES, exactly as if the player had been
    there to watch (desk-ends-before-world).
 10. **Private stakes** (Polaris rounds) settle at units × last round
-   price × the family multiple in "Private rounds and primary
-   offerings". They are never marked to a process, because there is
-   none.
-
-Since the valuation layer (2026-10-24), cell 1's family marks apply as
-realized over expected: `spot·m_f / V_T` (see "The valuation layer").
+   price × the multiple in "Private rounds and primary offerings". They
+   are never marked to a process, because there is none.
 
 The closeout draws from a `'closeout'` substream outside `race.streams`,
 so race trajectories are identical with closeout on or off.
@@ -1188,7 +1192,7 @@ precommitments are the fast path; that is the mechanic.
   and every machinery path stays instant — popup trades, margin
   liquidation, forced trims, rogue/terminal actions: the ladder binds the
   player's hand, never the machinery's. `liquidateAll` has no player
-  entry point; a future player flatten control takes the ladder.
+  entry point.
 - *Re-checked at execution:* restriction, expiry, and the terminal latch.
   A due order whose instrument expired inside the window dies at the
   fill (cash untouched, reported) — `executeMarketOrder` rejects any
@@ -1197,7 +1201,7 @@ precommitments are the fast path; that is the mechanic.
   expiry. A working close whose position the machinery flattens inside
   the window expires with a report, never a fabricated fill. A
   restriction landing inside the window cancels working closes — the one
-  place the ladder can read as a bug; watch it in play.
+  place the ladder can read as a bug.
 - *Game time:* working orders sleep across pause (a paused world fills
   nothing), and resuming rebases the substep clock so a mid-day pause
   never stalls the remaining substeps.
@@ -1218,8 +1222,7 @@ artifact (repaint state, latency tickets).
 **Standing orders** (the delegation layer): menu-authored
 precommitments, never free-form; unlocked at released R3, editable until
 R5, then **locked** for the run in both directions — the lock binds
-exactly when reneging gets tempting (if it plays as friction instead,
-revisit). Run-scoped (precommitments are authored per run, never
+exactly when reneging gets tempting. Run-scoped (precommitments are authored per run, never
 persisted), parameters fixed, arming is the only choice. Execution
 announces itself by toast at the trigger substep. The six rules:
 
@@ -1229,7 +1232,7 @@ announces itself by toast at the trigger substep. The six rules:
 | (b) | blockade onset | halve the HCN stock position |
 | (c) | margin utilization > 80% | bonds liquidate first (a preference the margin path consumes, not a firing action) |
 | (d) | any certification | sell all ITM long binaries at quote |
-| (e) | an insider tip | auto-sit: the compliance precommitment — kills the edge and applies the sit choice (the network deepens); designed `F` and scrutiny relief are not wired |
+| (e) | an insider tip | auto-sit: the compliance precommitment — kills the edge and applies the sit choice (the network deepens) |
 | (f) | HCN move vs. day open > 8% at any substep | trade stock to net delta ±20 |
 
 Semantics: standing executions are machinery (zero lag, no spread
@@ -1242,10 +1245,9 @@ for (d), implied certifications counting separately; per day for (f),
 burned even on a rejected fill so a short-sale ban cannot become a
 per-substep retry hammer. Cuts round ties up, so a 1-lot leg flattens.
 "ITM long binary" means quote mid > 0.5 — even money, not in-profit — and
-the panel says "trading above even money". (c)'s 80% gate is unobservable
-today (its only consumer is a triggered margin call, > 100% by
-definition) and goes live only if a soft-trim path ever runs between 80%
-and 100%, so the panel claims only "if the desk is forced to liquidate".
+the panel says "trading above even money". (c)'s only consumer is a
+triggered margin call (over 100% utilization by definition), so the
+panel claims only "if the desk is forced to liquidate".
 (e) intercepts at popup-queue insertion and applies the sit choice's full
 consequence once through the manual-sit path; the tip stays in the event
 feed and consumes the 45-day throttle — the call happened, the standing
@@ -1276,8 +1278,8 @@ happens, and a later standing gain never reopens it. The trigger reads the
 leader (any lab); the advice binds Halcyon — the room is Washington's
 room whether Halcyon or Beijing is about to cross, and the shell selects
 context and headline from per-leader pools (`rival` for Tianxia, `home`
-otherwise; measured at trigger: Halcyon 73.7%, Tianxia 26.3%, Polaris
-0%). **Seat:** ≥ 2 of {credibility > 0.55, safetyNetworkTrust ≥ 45,
+otherwise; diagnostic: Halcyon leads about three rooms in four, Tianxia
+the rest). **Seat:** ≥ 2 of {credibility > 0.55, safetyNetworkTrust ≥ 45,
 labRelations ≥ 55, firm-converted, briefed on Fixedpoint or backed
 Halcyon restraint, the Treasury backchannel}; voice = the satisfied
 count. Below the gate there is no beat — the ending arrives as weather,
@@ -1329,23 +1331,25 @@ pure-display degradation is exempt by nature and is judged in play.
 
 Nothing is set in stone: no outcome — doom, triumph, shutdown, the
 Deal — may be structurally inevitable, in either direction. The priors
-are biased (that is the stance); they are never rigged. Testable targets:
+are biased (that is the stance); they are never rigged. The targets, and
+what `endings-test` checks of each:
 
 1. **Every family stays live.** Each of families 1–6 occurs at ≥ 2%
-   marginally, and — conditional on observable state at each act
+   marginally (gate), and — conditional on observable state at each act
    boundary, before a terminal has actually fired — no family's
-   posterior exceeds 0.60 and no reachable family falls below 0.02. A
-   run can *lean*; it cannot be over early.
+   posterior exceeds 0.60 and no reachable family falls below 0.02 (a
+   design target no harness measures yet). A run can *lean*; it cannot
+   be over early.
 2. **Resolution concentrates at the threshold.** `d = margin −
-   required` has median |d| ≈ 0.10, and ≥ 40% of runs land within the
-   player's maximum reachable |d_P|: the sample decides *whether* it's
-   close, play decides the close ones. This is how knife-edge coexists
-   with bounded influence — the 30% clip matters because many worlds
-   end inside it.
+   required` has median |d| in [0.06, 0.15] (gate; diagnostic ≈ 0.14),
+   and ≥ 40% of runs land within the player's maximum reachable |d_P|
+   (gate): the sample decides *whether* it's close, play decides the
+   close ones. This is how knife-edge coexists with bounded influence —
+   the 30% clip matters because many worlds end inside it.
 3. **Determination is late.** An oracle predicting the final family
    from day-350 observable state beats the prior's Brier by < 25%;
-   from day-700, by < 60%. Most outcome variance resolves in Act III,
-   where the player is watching.
+   from day-700, by < 60% (gates). Most outcome
+   variance resolves in Act III, where the player is watching.
 4. **Ratchets bind sometimes, never always.** No one-way mechanism
    (`controlRegime`, the heat floor, proliferation) may make its
    terminal state the attractor of most runs — nationalization,
@@ -1357,47 +1361,34 @@ are biased (that is the stance); they are never rigged. Testable targets:
 Family shares are **eventual** — in-horizon plus timeout-extrapolated
 resolutions — in percentage points, summing to 100:
 
-| Family | Target | Measured (default N, three seeds) |
-|---|---|---|
-| 1 won with margin | 14 ± 5 | 11.1–12.3 |
-| 2 knife-edge | 21 ± 6 | 22.6–24.0 |
-| 3 misaligned (*all* technical failures, whoever led — a misaligned Tianxia crossing is family 3 with subtitles, per 05) | 32 ± 7 | 33.5–34.9 |
-| 4 China-first (non-failure: control-axis outcomes) | 14 ± 5 | 15.3–16.9 |
-| 5 the Deal | 5 (2.3–8) | 3.7–4.5 |
-| 6 fizzle | 14 ± 4 | 10.4–11.0 |
+| Family | Target band (gate) |
+|---|---|
+| 1 won with margin | 14 ± 5 |
+| 2 knife-edge | 21 ± 6 |
+| 3 misaligned (*all* technical failures, whoever led — a misaligned Tianxia crossing is family 3 with subtitles, per 05) | 32 ± 7 |
+| 4 China-first (non-failure: control-axis outcomes) | 14 ± 5 |
+| 5 the Deal | 5 (2.3–8) |
+| 6 fizzle | 14 ± 4 |
 
 **Timeout is not a seventh family:** the epilogue extrapolates, sampling
 the remainder forward from standing state and narrating "years later",
 and lands in one of the six with the knife-edge constraints intact. The
 **extrapolation share** (runs resolving after day 1008) targets ~25%,
-band [0.18, 0.32] (measured 28.6–30.5%). In-horizon family-6
-confirmations are expected ≈ 0 (allowed 0–3%; measured ≤ 1.4%): a
-plateau is mostly a fact the epilogue confirms, not the game. Family 6
-sits near its low edge because the plateau rule routes fizzle mass
-through extrapolation, and some of it lands as timeout family-1/2
-texture — acceptable. Median |d| measures 0.143–0.148. The endings
-harness asserts the family table, the extrapolation band, and liveness
-as hard gates.
+band [0.18, 0.32]. In-horizon family-6 confirmations are expected ≈ 0
+(allowed 0–3%): a plateau is mostly a fact the epilogue confirms, not
+the game. Family 6 sits near its low edge because the plateau rule
+routes fizzle mass through extrapolation, and some of it lands as
+timeout family-1/2 texture. The endings harness asserts the family
+table, the extrapolation band, and liveness as hard gates.
 
 **Family-4 composition** — the epilogue needs the causal reading, not the
-nominal one. Nominal partition: ~90.5% fast velocity without theft,
-~9.5% theft *present* (co-occurrence, deliberately not "theft-assisted").
-Causal (counterfactual removal): velocity is necessary in ~99.7% of
-family-4 worlds, domestic drag in ~38.8%, theft in ~1.1%. So: Beijing was
-faster in essentially every China-first world; in roughly two of five,
-America also regulated itself out of the lead it would otherwise have
-kept; the theft, where it happened, was punctuation, not cause. Blockades
-are near-disjoint from family 4 by mechanism (P(blockade | f4) ~0.6% vs.
-~3% overall).
+nominal one. Beijing was faster in essentially every China-first world;
+in a substantial share, America also regulated itself out of a lead it
+would otherwise have kept; a theft, where one happened, was punctuation,
+not cause (about one family-4 world in ten has one, by co-occurrence).
+Blockades are nearly disjoint from family 4 by mechanism.
 
-**race-mc diagnostics** (resolution-free horizon, not bands):
-`S[leader]` 0.454 / 0.401 / 0.349 at days 350 / 700 / 1008 (the taper
-keeps it off the rail); leadership at 1008: Halcyon unique top 44.4%,
-ceiling tie 51.3% (post-takeoff clamp artifacts, benign), lost 4.3% — the
-race is genuinely competitive; proliferation cap binding 40.4%; rung KM
-medians and fizzle tail as in the kinematics section.
-
-**Playtest order:** act boundaries (g0, r0, q-band) → incident cadence
+**Retune order:** act boundaries (g0, r0, q-band) → incident cadence
 (the 0.07 and 0.30 in Λ_world) → knife-edge targets → outcome table
 (gates, S0, pace) → τ and `required` last — τ, `required`, `leadAdj`, and
 the mapping gates are the stance, and the knife-edge targets are its

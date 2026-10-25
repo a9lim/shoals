@@ -16,8 +16,10 @@ rulings that code comments cite as "02a …", and the other files cover the worl
 race model (02), market mechanics (03), arcs (04), endings (05), naming (06) and
 market integrity (09). Constants in code mirror 02a, so a retune is recorded there
 too.
-`docs/lore.md` is the world bible (cast, places, products, legislation), and
-`docs/art-prompts.md` is an image-prompt sheet. No generated art ships.
+These docs describe only what is built. Everything designed but not built is in
+`docs/ROADMAP.md`, and an item's description moves into its design doc when it
+lands. `docs/lore.md` is the world bible (cast, places, products, legislation). No
+generated art ships.
 
 ## Running and checking
 
@@ -74,7 +76,7 @@ src/race/              hidden race model and its markets (DOM-free; see below)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
 src/audio.js           all music and SFX, synthesized
 tools/*.mjs            the nine headless harnesses
-docs/design/, docs/lore.md, docs/art-prompts.md, docs/horizons.md
+docs/design/, docs/lore.md, docs/ROADMAP.md
 ```
 
 ## How it works
@@ -390,28 +392,9 @@ key is `shoals-theme`.
 
 ## Open work
 
-- `docs/horizons.md` holds the 2026-10-24 review and its status: what a9 took and
-  is now built (the posterior, the valuation layer, the primary market, dispatch
-  resume, LLM mode removed, the new score), and what is open.
-- a9's play-test: the posterior's feel (K_CRED 1.8 is calibrated against synthetic
-  players, not people), the size of the valuation gaps, the rounds' cadence, and the
-  new score. Earlier: the reality-beats content and the capex rates channel.
-- Known biases recorded in 02a: B's law runs early (a static "later" caller earns a
-  bounded edge), and V inherits B's drift. Both point at the next valuation round, a
-  calibrated public estimator plus a plateau mass in B.
-- Proposed, awaiting a nod: domains as certification channels over one hidden scalar
-  (horizons.md), the Desk page as the firm, a wider Consensus, the autumn's content
-  mechanisms, event illustrations (parked; the old art-prompt sheet predates the Brief).
-- The feel pass: the `ACT3_TUNING` magnitudes and ladder numbers are first-pass, and
-  whether the standing-orders lock at R5 is right will be judged at feel.
-- Deferred seams:
-  - Terminal VXHCN marks last-valid. The exchange-variance-index machinery is not
-    built.
-  - The post-theft "why slow down if it can be stolen" margin burn is still missing
-    (see the header of `src/events/china.js`).
-- `lobbying.js` still has the prototype menu (party PACs, fundraiser, broker a deal,
-  leak, counsel the Fed). The AI-policy menu in `03-market-mechanics.md` is unbuilt.
-- The sandbox's scenario model is first-pass and display-only (see "The Brief"); it
-  does not yet price legs under the player's curves.
-- `tick()` in `main.js` is dead code. The `/` shortcut and `#step-btn` say "Step
-  forward one day", but `step()` advances one substep.
+`docs/ROADMAP.md` is the queue, in order. Next is domains as certification channels
+over one hidden scalar, together with `B`'s rebuild (a plateau mass per rung and a
+calibrated public estimator for the valuation layer). The event-illustration pilot is
+its own session, briefed there. a9's play-test covers the posterior's feel, the
+valuation gaps, the rounds' cadence, the score, the reality-beats content, the capex
+rates channel and the `ACT3_TUNING` first-pass numbers.

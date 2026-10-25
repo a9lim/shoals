@@ -18,7 +18,7 @@ The singularity, priced from a derivatives desk. You are a senior trader at Meri
 
 ## Controls
 
-Space plays or pauses, `/` steps forward one substep, `.` and `,` change the speed, and `r` resets. `b` and `n` trade stock and bonds, `x` toggles buy/sell, and Enter executes the loaded strategy. `1`–`7` pick a preset. `s` or `t` toggles the sidebar, `[` and `]` switch tabs, and `=`, `-`, and `0` zoom the chart.
+Space plays or pauses, `/` steps forward one substep, `.` and `,` change the speed, and `r` resets. `b` and `n` trade stock and bonds, `x` toggles buy/sell, and Enter executes the loaded strategy. `1`–`6` pick a preset. `[` and `]` turn the pages, and `f`, `m` and `g` open the front page, Markets and Race. `s` shows or hides the rail, `t` switches it between quotes and the book, and `=`, `-`, and `0` zoom the chart.
 
 ## Running locally
 
@@ -31,7 +31,7 @@ the parent site by absolute path. From a checkout of
 
 ## How it's built
 
-The app is vanilla HTML, CSS, and JavaScript ES modules with no bundler. Charts are Canvas 2D and the music is Web Audio synthesis. `main.js` orchestrates the simulation, pricing, portfolio, and UI modules in `src/`. The hidden race model and its markets live in `src/race/` and are DOM-free, so six headless Node harnesses in `tools/` can drive them. Design documents are in `docs/design/`. [AGENTS.md](AGENTS.md) has the detailed map.
+The app is vanilla HTML, CSS, and JavaScript ES modules with no bundler. Charts are Canvas 2D and the music is Web Audio synthesis. `main.js` orchestrates the simulation, pricing, portfolio, and UI modules in `src/`. The hidden race model and its markets live in `src/race/` and are DOM-free, so nine headless Node harnesses in `tools/` can drive them. Design documents are in `docs/design/`, and the queue of unbuilt work is `docs/ROADMAP.md`. [AGENTS.md](AGENTS.md) has the detailed map.
 
 ## License
 

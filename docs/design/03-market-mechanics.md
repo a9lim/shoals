@@ -2,102 +2,106 @@
 
 How the race reaches the desk. The race rides on the trading chassis
 (CRR trees, GBM+Merton+Heston equity, Vasicek rates, the Almgren–Chriss
-impact overlay, the vol-index machinery) without replacing it; clearing
-and settlement rules are in [09-market-integrity.md](09-market-integrity.md),
-constants in [02a-tuning.md](02a-tuning.md).
+impact overlay, the vol-index machinery) without replacing it. Clearing
+and settlement rules are in [09-market-integrity.md](09-market-integrity.md);
+constants are in [02a-tuning.md](02a-tuning.md).
 
 ## Instruments
 
-- **HCN — Halcyon common.** The game's single chart underlying is
-  Halcyon equity: GBM + Merton jumps + Heston vol with discrete quarterly
-  dividends, so the whole desk is an AI-complex desk and every chassis
-  mechanic (options chain, jumps, vol surface) is load-bearing for the
-  theme. Long-dated HCN options are the game's purest timeline
-  instrument. Cambria has no equity book: its exposure is the compute
-  futures curve, which also carries the strait premium. Since
-  2026-10-24, HCN's level also carries the market's valuation of the
-  race, **conditional on survival**, repriced as gaps on legible news.
-  This is the valuation layer in [02a](02a-tuning.md): the market
-  prices the worlds where its claims can be paid and gives the others
-  no weight, which is pillar 2 written as a price.
-- **Milestone binaries** — prediction-market contracts on **Consensus
-  Markets**. Prices *are* `B` made visible — the market's posterior on
-  screen next to yours. Settlement is *certified* (audited evals, public
-  demos — typically lagged behind the truth), never hidden truth; the
-  player's edge is the gap, twice over: posterior vs. `B`, and true vs.
-  certified. (Also the natural home for Brier-score humility: some of the
-  player's dooms won't fire.) Listed today: the rung crossings of
-  [02-race-model.md](02-race-model.md), which is what settlement
-  objectivity hangs on — R2, R3, R4 by certification, and R5 by terminal
-  resolution (no auditor certifies takeoff). Designed, not yet listed:
-  event contracts ("next Aleph major by Q3," "treaty framework signed,"
-  "severity-≥2 incident this year," "Fixedpoint confirmed," "first
-  model-designed drug approved"), with the alignment-sentiment channel as
-  the settlement basis for the incident-flavored ones.
+- **HCN — Halcyon common.** The game's single chart underlying:
+  GBM + Merton jumps + Heston vol with discrete quarterly dividends, so
+  the whole desk is an AI-complex desk and every chassis mechanic
+  (options chain, jumps, vol surface) is load-bearing for the theme.
+  In the Dynamic mode HCN's level also carries the market's valuation of
+  the race **conditional on survival** — the valuation layer
+  ([02a](02a-tuning.md)) — repriced as gaps at the day's close on
+  legible news: certifications and Western rung claims lift it, a
+  Tianxia claim of parity cuts it, a stall drifts it down. The market
+  prices the worlds where its claims can be paid and gives the others no
+  weight: pillar 2 written as a price. Long-dated HCN options are the
+  game's purest timeline instrument.
+- **The primary market.** Money that reaches a lab, unlike a fill on
+  the screen. Each rise of the released frontier rung is a Halcyon
+  follow-on offering: HCN gaps 2% for dilution and Meridian may take new
+  shares at a discount, and the allocation feeds the cost-of-capital
+  channel. Polaris, private for the whole run, raises rounds from three
+  weeks after the walkout; a stake is marked at the last round, cannot be
+  sold, and settles by what became of Polaris (six times the last round
+  if Polaris leads a won world, nothing in the doom families). Neither
+  has a price process of its own.
+- **Milestone binaries** — contracts on **Consensus**. Prices *are* `B`
+  made visible — the market's posterior on screen next to yours.
+  Settlement is *certified* (audited evals, public demos, typically
+  lagged behind the truth), never hidden truth, so the player's edge is
+  the gap twice over: posterior vs. `B`, and true vs. certified. Listed:
+  the rung crossings of [02-race-model.md](02-race-model.md) — R2, R3, R4
+  by certification, and R5 by terminal resolution (no auditor certifies
+  takeoff).
 - **Compute futures** — Cambria allocation-quarter contracts on a rolling
   four-maturity ladder. The race's physical layer as a term structure:
-  backwardation = scramble. With the fabs in Hsinchu, the far end carries
-  a standing **strait premium** — the only term structure in the game
-  where geography is a risk factor. Blockade scares print here first; the
-  desk reads the Taiwan tail off the compute curve the way it reads the
-  race off Cambria's earnings call.
+  backwardation is scramble. With the fabs in Hsinchu, the far end
+  carries a standing **strait premium** — the only term structure in the
+  game where geography is a risk factor. Blockade scares print here
+  first, and the curve takes a belief lift from the market's R5 curve.
 - **VXHCN** — single-name vol index on HCN, computed off the one Heston
-  process, with tradeable futures. Watched the way real single-stock vol
-  surfaces are watched for the giants. Late game its term structure is a
-  narrative device: the far end refusing to price a future it doesn't
-  believe in, then repricing all at once.
+  process, with tradeable futures priced off the forward variance curve.
+  In Act III its *publication* goes stale while settlement stays true.
 - **Bonds/rates** — the risk-free rate as a derivative of the world
   staying normal. The **capex channel** ([02a](02a-tuning.md)): each rise
   of the released frontier rung permanently steps the long-run rate —
   duration supply, not discount rate. Rates move with the race for a
-  reason that is not the race, legible and mundane and mistakable for the
-  market waking up; the implied timeline never reads rates, so the
-  channel moves `r` without moving `B`. In Act III "risk-free" becomes the
-  game's quietest joke.
+  reason that is not the race, legible and mundane and mistakable for
+  the market waking up; the implied timeline never reads rates, so the
+  channel moves `r` without moving `B`. In Act III "risk-free" becomes
+  the game's quietest joke.
 - **The `controlRegime` overlay** — every instrument above lives inside
-  the state's grip ([02-race-model.md](02-race-model.md)): supervision
-  adds disclosure and dampens gaps, mobilization freezes Consensus and
-  the compute curve, nationalization fixes HCN's compensation reference
-  and converts shares into it at terminal closeout — the nationalization
-  trade, positioning for the conversion, is a late-game thesis all by
-  itself. Lifecycle details: [09-market-integrity.md](09-market-integrity.md).
+  the state's grip ([02-race-model.md](02-race-model.md)). Supervision
+  drags domestic labs' capability drift. Mobilization freezes Consensus
+  (the successor adjudicator keeps settling) and the compute curve (held
+  at its decree or last mark), and floors domestic racing pace.
+  Nationalization and classification fallback-settle every open binary;
+  HCN converts at the terminal closeout at a frozen reference times a
+  pre-sampled multiple — the nationalization trade is a late-game thesis
+  of its own. Classification also blacks out incident detections. The
+  rules are in [09](09-market-integrity.md).
 - **Relative-value texture** — because non-frontier corporates build on
-  free Tianxia weights, a Tianxia release can *rally* broad tech while
-  hitting HCN. Divergence trades around release events are the game's
-  best expression of "the race has more than one winner per headline."
-  Wonders print the same way: a model-designed molecule clearing trials
-  rallies pharma before it moves HCN — upside evidence and risk evidence
-  are the same trade with different signs (the ambivalence rule,
-  [00-vision.md](00-vision.md)). With HCN the only equity book, this
-  lives in event prose and HCN's own impulses rather than a second chart.
+  free Tianxia weights, a Tianxia release rallies broad tech in the prose
+  while it hits HCN, and wonders rally pharma before they move HCN. With
+  HCN the only equity book, this lives in event prose and HCN's own
+  impulses, not a second chart.
 
-## The implied timeline and the player's posterior
+## The posterior and the implied timeline
 
-The **market's implied timeline** is derived from `B` (whose quotes are
-the binaries; the compute curve takes a belief lift from the same
-curve). The **player's own posterior** is set explicitly at locked,
-scheduled review points — quarterly, no retroactive edits — and
-credibility scores it against every matured claim, traded or not. The
-gap is available alpha; the gap closing is the world waking up. The
-player literally trades their distribution against the market's. This
-is the game's thesis as an interface.
+The **market's implied timeline** is `B`, per rung a crossing-date law
+whose quotes are the binaries. The **player's posterior** is the same
+object, drawn: on the Markets page's Consensus panel, "Your curves"
+draws the player's draft over the market's curves. A median handle per
+uncertified rung drags along the timeline and up or down for width;
+arrow keys move it 5 days (21 with Shift) and tighten or loosen it, and
+Tab moves between rungs. Edit mode suspends the panel's sandbox picks.
+The draft is locked each quarter through the forecast-lock dispatch — as
+drawn, the market's, earlier or later than the market, or "adjust
+first", which holds the quarter until the panel's Lock is pressed.
 
-Built (2026-10-24): the posterior is drawn, not chosen. On the Markets
-page the player draws per-rung crossing curves over the market's, and
-the draft is locked quarterly through the lock dispatch. Each quarter
-both curves are scored by log-likelihood against what certified, so
-credibility measures the player's edge over the market, in nats, and
-moves every quarter rather than at three deadlines ([02a](02a-tuning.md)).
-The gap between the two curves is the available alpha, on screen.
+At each quarter's close, every open rung is scored for the player and
+for the market's snapshot alike: the log-likelihood of what certified,
+and of the quiet quarters that didn't. Credibility is the player's
+demonstrated edge over the market (copying the market scores exactly
+zero), and it is the currency that converts the firm and unlocks
+agency. The Desk shows the track record and credibility; the Race page
+shows the locked medians beside the market's. The gap between the curves
+is available alpha; the gap closing is the world waking up. The player
+literally trades their distribution against the market's — the game's
+thesis as an interface.
 
 ## The allocation stances (mechanical consequences)
 
 | Stance | Returns | Race effect | Catch |
 |---|---|---|---|
-| Long + accelerate | Full | `C[halcyon]` ↑ | The ledger remembers; endings price it |
-| Long + restraint (activist) | Haircut | small `S[halcyon]` ↑ | CEO hostility, board-fight exposure, drift vs. benchmark |
-| Sit out (bonds, long vol, binaries) | Real — vol and binaries pay conviction | none, by construction | Financially live, existentially empty: expressive positions finance nothing and move nothing. The ledger stays blank, the room stays shut, rates are still a bet on normalcy — and bonds are downstream of the buildout: the capex channel steps the long-run rate on every released rung |
-| Short | Negative carry, occasional vindication | sustained volume slows `C[halcyon]` marginally | A losing battle vs. the trend — and the true doom-short never settles; no counterparty survives to pay |
+| Long + accelerate | Full; the survival-conditioned melt-up | sustained net long speeds Halcyon a little through the cost-of-capital channel (≤ 5%); follow-on allocations feed it directly | the ledger records the C channel; the endings price it |
+| Long + restraint | Board restraint, Polaris backing and Polaris rounds | `S[halcyon]` and `S[polaris]` rows, runway that bites only where that lab leads | Polaris stakes are illiquid, and worth nothing in the doom families |
+| Sit out (bonds, long vol, binaries) | Real — vol and binaries pay conviction | none from positions | expressive positions finance nothing and move nothing; and bonds are downstream of the buildout, since the capex channel steps the long rate on every released rung |
+| Short | Negative carry, occasional vindication | sustained net short slows Halcyon a little through the same channel | a losing battle against the trend; a doom-short is paid at the terminal mark in cash the epilogue prices as a claim on a counterparty that no longer exists |
 
 Sit-out is deliberately a real option: you can get rich on pure
 epistemics without touching the race. The game's answer to clean hands
@@ -106,128 +110,100 @@ asymmetric because reality's is, and the game never editorializes it in
 copy — the fills and the ledger do the talking.
 
 Transmission honesty: an ordinary secondary fill moves nothing by
-itself. The table's race effects flow through governance and policy
-choices (board restraint, backing Polaris, export controls, the room)
-and a bounded, *lagged* cost-of-capital channel driven by persistent net
-HCN positioning, which heavy, sustained positioning (including shorts)
-can move; one fill finances nothing. Primary events are built as of
-2026-10-24 ([02a](02a-tuning.md), "Private rounds and primary
-offerings"). Each capex wave is a Halcyon follow-on offering whose
-allocation reaches the lab through the cost-of-capital channel. Polaris
-raises private rounds, and a stake in one is marked at the last round,
-illiquid until the end, and settled by what became of Polaris. The
-ledger records channels, not fills ([05-endings.md](05-endings.md)).
+itself. Race effects flow through governance and policy choices (board
+restraint, backing Polaris, export controls, the room), a bounded,
+*lagged* cost-of-capital channel driven by persistent net HCN
+positioning, and the primary market, where a follow-on allocation or a
+Polaris round reaches the lab. The ledger records channels, not fills
+([05-endings.md](05-endings.md)).
 
 **Incident coupling rule:** the detected-incident stream is high-volume
-by design (~80–160 events per run), so race-event market effects are
-**decaying impulses or `B` moves, never permanent additive `sim`
-parameter deltas** — a hundred permanent deltas would walk every
-parameter to its clamp, and the clamps would become the market. Race
-shells carry `params: {}` and an `impulse` (half-life 5 trading days).
-Permanent additive deltas belong only to low-volume pools: the political
-events and the capex shell (at most four fires per run).
+by design (~80–160 per run), so race-event market effects are
+**decaying impulses, never permanent additive `sim` parameter deltas** —
+a hundred permanent deltas would walk every parameter to its clamp, and
+the clamps would become the market. Race shells carry `params: {}` and
+an `impulse` (half-life 5 trading days). Permanent additive deltas
+belong only to low-volume pools: the political events and the capex
+shell (at most four fires per run).
 
 ## Alpha decay and the regime break
 
-Market efficiency `η` rises with the *released* frontier (AI enters the
-market long before takeoff — quant shops license the models too, and
-only shipped models can be licensed):
+Market efficiency `η` rises with the *released* frontier — quant shops
+license the models too, and only shipped models can be licensed. It
+damps the market's reaction to race headlines: bridge-fired impulses
+scale by `1 − 0.6·η`. The market's waking itself is the valuation
+layer: as certifications and claims move `B`, HCN reprices in gaps, and
+a player whose curves ran ahead of `B` is paid on the front page as `B`
+catches up.
 
-- **Act I:** `η` low. Event-driven edges are fat.
-- **Act II:** edges thin — event impulses are pre-priced (the market
-  gaps before the headline the player used to front-run — always off
-  legible precursors with a recorded causal event, never off latent
-  truth; [09-market-integrity.md](09-market-integrity.md)), and the
-  effective cost of *information* trades rises through adverse selection
-  even as raw liquidity deepens. The player's informational edge migrates
-  to the insider channel and to model quality (their posterior vs. `B`).
-- **Act III:** regime break — **valence unsigned.** The melt-up and the
-  unraveling print the same tape, euphoria and terror the same vol
-  surface, and the player cannot tell which world they are in from
-  inside it. **The terminal itself degrades, diegetically**: quotes go
-  stale mid-tick, the chart stutters and repaints, sparklines flicker,
-  the VXHCN print holds stale — all presentation-layer: printed history
-  never mutates and fills stay honest. Not a shader party — a Bloomberg
-  failing to keep up with a market that has stopped being made of
-  humans. The player's own orders slow as their hands are replaced by
-  machinery they configured earlier (standing orders,
-  [04-arcs.md](04-arcs.md)). By the final days the player is trading an
-  instrument panel they no longer trust, which is the point.
-
-The design's full break — correlations converging, the underlying
-drifting away from the GBM+Heston its own tools assume, tree marks
-diverging from fills — needs the authoritative regime-switch wrapper
-specified in [09](09-market-integrity.md); it is not built. Today the
-underlying stays GBM+Merton+Heston moved by decaying event impulses, and
-the break is felt through `η`, tempo, latency, and display degradation.
+In Act III the tempo compresses (the discretionary event rate climbs to
+2.5× by R5, and from R4 events arrive mid-day), the player's own orders
+slow on a latency ladder and pay a wider spread at R5, and **the
+terminal degrades diegetically**: quotes go stale mid-tick, the tape
+repaints, sparklines skip, the VXHCN print holds stale — all
+presentation-layer, while printed history never mutates and fills stay
+honest. The band in the score loses its humanity a bar at a time. The
+player's hands are replaced by the machinery they configured earlier
+(standing orders, [04-arcs.md](04-arcs.md)). By the final days the
+player is trading an instrument panel they no longer trust, which is
+the point. Valence is unsigned: the melt-up and the unraveling print the
+same tape.
 
 ## The scrutiny loop (firm belief `F`)
 
-The risk committee watches the gap between the player's locked posterior
-and the firm's belief `F`:
+The risk committee watches the gap between the player's locked
+pilledness and the firm's belief `F` (both read on the same horizon, so
+a player who copies the market draws no heat):
 
-- **Player more pilled than firm** (early game default): an AGI-flavored
-  book draws committee heat.
-- **Player less pilled than firm** (late game, after `B` and `F` wake):
+- **Player more pilled than the firm** (the early default): an
+  AGI-flavored book draws committee heat.
+- **Player less pilled than the firm** (late, after `B` and `F` wake):
   the benchmark is AGI-loaded and a conventional book underperforms; the
   pressure inverts. The firm that laughed at you in Act I demands you
   out-doom it in Act III.
 
-Built: once the player has locked a forecast, a divergence beyond 20
-points nudges firm standing ±3 — down when the divergent book is
-underperforming, up when it is outperforming (the committee grudgingly
-respects P&L) — and firm standing scales the player's position limits.
-Designed, not built: "explain this thesis" popups and forced trims on a
-divergent drawdown.
+Mechanically, a gap beyond 20 points nudges firm standing by 3 — down
+when the divergent book is underperforming, up when it is outperforming
+(the committee grudgingly respects P&L) — and firm standing scales the
+player's position limits.
 
-Credibility (track record of the player's explicit posterior vs. realized
-events, scored quarterly against the market's own curve, not just P&L)
-is the currency that converts `F` and unlocks agency.
+## The firm and fund-as-actor
 
-## Fund-as-actor (late-game unlock)
-
-Gated on credibility high + `F` high (the fund latch, [02a](02a-tuning.md)),
-surfaced as advice-to-higher-ups popups whose options the player earned:
-
-- **The Treasury backchannel** (built): the desk as the state's
-  market-intelligence organ — accepting it is one of the room's seat
-  criteria in Act III, and costs regulatory exposure, because a standing
-  wire into Treasury is a wire.
+- **The firm conversion** — the memo (credibility > 0.55 and `F` ≥ 40)
+  and then the verdict (`F` ≥ 75 if the player made the case, 85
+  otherwise), checked on lock days. The conversion counts toward a seat
+  in the room and toward the gray-eminence overlay.
+- **The Treasury backchannel** — the fund-as-actor beat, gated on the
+  fund latch (credibility > 0.65 and `F` > 60): the desk as the state's
+  market-intelligence organ. Accepting it is one of the room's seat
+  criteria and costs regulatory exposure, because a standing wire into
+  Treasury is a wire.
 - **Back Polaris** — the wager expressed purest: fund the careful racer,
   possibly split the West's lead fatally. The game refuses to say which.
-  Built as an ungated Polaris popup (runway as `S[polaris]`), and as
-  Polaris's private rounds, where the backing is a position.
-- **Governance on Halcyon** — restraint bought through the board.
-  Built as an ungated board popup (`S[halcyon]`); a PIPE with governance
-  terms is the designed fund-scale version.
-- Designed, not built: anchor Cambria's Austin expansion (onshoring the
-  chokepoint — compute nationalism, `C` ↑ broadly, strait premium ↓
-  slowly); refuse participation in a government compute mobilization (or
-  don't).
+  An ungated Polaris popup buys runway (`S[polaris]`), and Polaris's
+  private rounds make the backing a position.
+- **Governance on Halcyon** — restraint bought through the board, an
+  ungated one-shot popup once the released frontier reaches R2
+  (`S[halcyon]`).
 
 ## Policy levers
 
-Overhauled policy moves `heat`, the regulation pipeline, the control
-regime, and treaty preconditions; politics is the medium, not the
-message. The lobby bar still carries the political PAC/fundraiser/deal
-actions; the AI-policy levers arrive as event choices:
+Policy moves `heat`, the regulation pipeline, the control regime, and
+the treaty's preconditions; politics is the medium, not the message.
+The AI-policy levers arrive as event choices:
 
-- **Export-control escalation** (built: the export-controls popup raises
+- **Export-control escalation** — the export-controls popup raises
   `exportControlStage`, which slows Tianxia's compute growth, and backing
-  it heats the race) — and it fights a *domestic* constituency: American
-  firms built on free Tianxia weights lobby back, loudly. Controls bind
-  chips, never weights already released — the asymmetry the
-  administration keeps rediscovering in public.
-- **Mandatory evals / incident reporting** (built: backing the reporting
-  bill pushes the regime toward supervision; the reporting regime raises
-  detection and halves lags, retroactively once — the player can lobby
-  their own alpha away). Halcyon's lobby fights back; farce risk in
-  implementation.
-- **Compute reporting & verification** (built as the treaty-groundwork
-  choice) — the treaty's domestic prerequisite, quietly the
-  highest-leverage pro-Deal action available.
-- Designed, not built: **liability shield / e/acc deregulation**
-  (`heat` ↑↑, near-term returns ↑) and the **frontier-lab
-  nationalization push** (the panic button; late-game only). The
-  regime evaluator already accepts supervision, mobilization,
-  nationalization, and classification pushes; nothing sets them yet.
+  it heats the race. It fights a *domestic* constituency (American firms
+  built on free Tianxia weights lobby back, loudly), and controls bind
+  chips, never weights already released.
+- **Incident reporting** — backing the reporting bill pushes the regime
+  toward supervision and turns on the reporting regime: detection rises,
+  lags halve, retroactively once. The player can lobby their own alpha
+  away.
+- **Compute reporting** — the treaty-groundwork choice puts the fund
+  behind the training-run registry, the treaty's domestic prerequisite:
+  it lets talks open earlier and never bypasses a gate.
+
+The lobby bar carries the political menu: party PACs, a fundraiser,
+brokering a deal, a leak to the press, counsel to the Fed.
