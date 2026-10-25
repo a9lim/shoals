@@ -100,8 +100,13 @@ export function cancelAllOrders() {
 export function allocatePrivateStake(round, allocation, currentDay = market.day) {
     if (portfolio.restricted || !round || !(round.price > 0) || !Number.isFinite(round.price)
         || !(allocation > 0) || !Number.isFinite(allocation)) return null;
-    const allocated = Math.min(allocation, Math.max(0, portfolio.cash));
-    if (!allocated) return null;
+    // A stake has no lending value, so moving cash into it spends collateral:
+    // cap the subscription at the headroom above maintenance as well as at cash,
+    // so a subscription can never leave a compliant book under-margined.
+    const m = checkMargin(market.S, market.sigma, market.r, market.day, market.q);
+    const headroom = Math.max(0, m.collateralEquity - m.required);
+    const allocated = Math.min(allocation, Math.max(0, portfolio.cash), headroom);
+    if (!(allocated > 0)) return null;
     const qty = allocated / round.price;
     let position = portfolio.positions.find(p => p.type === 'privatestake' && p.lab === 'polaris');
     if (position) {

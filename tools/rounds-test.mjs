@@ -362,7 +362,7 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
         portfolio: book.portfolio, market, syncMarket, computeVXHCNSpot,
         portfolioValue: book.portfolioValue,
         allocatePrivateStake: book.allocatePrivateStake, allocatePrimaryStock: book.allocatePrimaryStock,
-        cancelAllOrders: book.cancelAllOrders,
+        cancelAllOrders: book.cancelAllOrders, checkPendingOrders: book.checkPendingOrders,
         ROUNDS_TUNING, stepRounds, stepValuation, r5ProbabilityFromBelief, belief,
         halcyonOfferPrice, recordPrimaryAllocation, applyRaceEffects, raceChannelsLive,
         consensus: { active: false }, computeMarket: { active: false },
@@ -376,6 +376,9 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
             open(value) { dayInProgress = value; },
             gap: _stepRaceMarkets, choice: _applyPopupChoice,
             restrict: _applyRestriction, stuck: _hasStuckLegs,
+            hold(value) { _lockPending = value; },
+            playing() { return playing; }, isOpen() { return dayInProgress; },
+            play: togglePlay, step,
         };
     `, context, { filename: 'main.js (headless helpers)' });
     const api = context.mainTest;
@@ -399,6 +402,7 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     const pipeline = source.slice(source.indexOf('function _onDayComplete()'));
     check('H: bridge precedes gap; gap precedes snapshot', pipeline.indexOf('runRaceBridge(') < pipeline.indexOf('_stepRaceMarkets(capexWaves)')
         && pipeline.indexOf('_stepRaceMarkets(capexWaves)') < pipeline.indexOf('marketsDayClose('));
+
     api.open(true);
     let rejected = false;
     const closedSpot = api.sim.S;
@@ -430,6 +434,39 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     api.gap(1);
     api.choice({ ...event, _roundApplied: false }, event.choices[0]);
     check('H: terminal latch bars gaps and subscriptions', api.sim.S === closedSpot && api.queue.length === queueSize && JSON.stringify(book.portfolio) === beforeLatch);
+
+    // Gate regressions (2026-10-24 adversarial review).
+    // 1. A resting order sees the gap at the price it publishes.
+    book.resetPortfolio(10000); api.queue.length = 0; deactivateLedger();
+    const r2 = fixture(); api.race(r2); initBelief(r2); initValuation(r2); initRounds(r2);
+    api.sim.S = 100; syncMarket(api.sim); api.gap(0);
+    const stop = book.placePendingOrder('stock', 'long', 10, 'stop', 104);
+    r2.day += 1; belief.day = r2.day; r2.lastTransitions = freshTransitions();
+    r2.capability.labs.halcyon.rungReleased[3] = r2.day;   // a public claim lifts the lead
+    api.gap(0);
+    const filledAtGap = !book.portfolio.orders.includes(stop) && book.portfolio.positions.some(p => p.type === 'stock' && p.qty === 10);
+    check('H: a resting stop the gap jumps fills at the post-gap price, before the next substep',
+        api.sim.S > 104 ? filledAtGap : true, `S ${api.sim.S.toFixed(2)}`);
+    // 2. A subscription never spends collateral the book needs for maintenance
+    //    (the reviewer's case: cash 15,000 incl. short proceeds, 100 HCN short
+    //    with 5,000 reserved, spot 158: collateral 4,200 against 3,434.78).
+    book.resetPortfolio(15000);
+    syncMarket(Object.assign(api.sim, { S: 158 }));
+    book.portfolio.positions.push({ id: 9001, type: 'stock', qty: -100, entryPrice: 150, fillPrice: 150, entryDay: 0, strategyName: null, _reservedMargin: 5000 });
+    const before = book.checkMargin(158, Math.sqrt(0.04), 0.04, 283, 0);
+    const stake = book.allocatePrivateStake({ price: 1 }, 840, 283);
+    const after = book.checkMargin(158, Math.sqrt(0.04), 0.04, 283, 0);
+    check('H: a private subscription is capped at collateral headroom (never leaves the book under-margined)',
+        !before.triggered && !after.triggered && (!stake || stake.allocated <= before.collateralEquity - before.required + 1e-9),
+        `headroom ${(before.collateralEquity - before.required).toFixed(1)}, allocated ${stake ? stake.allocated.toFixed(1) : 0}`);
+    // 3. "Adjust first" holds the quarter: neither play nor step opens a day.
+    api.open(false); api.hold(true);
+    api.play();
+    const playBlocked = !api.playing();
+    api.step();
+    check('H: the adjust-first hold blocks play and step until the curves are locked',
+        playBlocked && !api.isOpen(), `playing ${api.playing()}, open ${api.isOpen()}`);
+    api.hold(false);
 }
 
 console.log(`\nRounds gate: N=${N}, base seed=${BASE_SEED}, ${((Date.now() - t0) / 1000).toFixed(2)}s`);

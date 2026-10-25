@@ -223,6 +223,9 @@ function _stepRaceMarkets(capexWaves) {
     const { ratio } = stepValuation(raceState);
     sim.S *= ratio * Math.pow(ROUNDS_TUNING.halcyonDilution, capexWaves);
     _syncAll();
+    // Resting orders see the gap at the price it publishes, not after the next
+    // substep has moved it again (a stop the gap jumped fills at the gap).
+    _fillPendingOrders();
     for (let i = 0; i < capexWaves; i++) {
         _queuePopup({ category: 'rounds', _roundOffer: {
             kind: 'halcyon', id: `halcyon_followon_${raceState.day}_${i}`, day: raceState.day,
@@ -1622,7 +1625,7 @@ function _abortPartialDay() {
 }
 
 function frame(now) {
-    if (playing) {
+    if (playing && !_lockPending) {
         const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
         const substepInterval = tickInterval / INTRADAY_STEPS;
 
@@ -1700,17 +1703,22 @@ function frame(now) {
     requestAnimationFrame(frame);
 }
 
-/** Called after each individual substep — orders, margin tracking, peak/drawdown. */
-function _onSubstepTick() {
-    const vol = market.sigma;
-
-    // Check pending orders at intraday price
-    const filledOrders = checkPendingOrders(sim, sim.S, vol, sim.r, sim.day, sim.q);
+/** Fill resting orders against the current authoritative price. */
+function _fillPendingOrders() {
+    const filledOrders = checkPendingOrders(sim, sim.S, market.sigma, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
         const side = pos.qty > 0 ? 'Bought' : 'Sold';
         _toast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         chainDirty = true;
     }
+}
+
+/** Called after each individual substep — orders, margin tracking, peak/drawdown. */
+function _onSubstepTick() {
+    const vol = market.sigma;
+
+    // Check pending orders at intraday price
+    _fillPendingOrders();
 
     // Track peak equity and drawdown for epilogue scorecard
     const substepMargin = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
@@ -2498,12 +2506,18 @@ function _composeLockDispatch(ev) {
     const draft = draftCurves(), mkt = presetCurves('market'), open = openRungs();
     let ctx = 'The desk logs your timeline for the record — no retroactive edits — and scores it '
         + 'against the market’s at every quarter’s close: the rungs that certify, and the quiet quarters that don’t.';
-    for (const R of [3, 4, 5]) {
-        if (!open.includes(R)) continue;
-        const dm = Math.round(draft[R].m), mm = Math.round(mkt[R].m);
-        ctx += dm === mm
-            ? ` Consensus has R${R} by day ${mm}, and so do you.`
-            : ` Consensus has R${R} by day ${mm}; your curve has it by day ${dm}.`;
+    const shown = [3, 4, 5].filter(R => open.includes(R));
+    const days = R => [Math.round(draft[R].m), Math.round(mkt[R].m)];
+    if (shown.length && shown.every(R => days(R)[0] === days(R)[1])) {
+        // One sentence when the draft is the market's: a list, not a chorus.
+        ctx += ' Your curves match Consensus: ' + shown.map((R, i) => `R${R} by ${i ? '' : 'day '}${days(R)[1]}`).join(', ') + '.';
+    } else {
+        for (const R of shown) {
+            const [dm, mm] = days(R);
+            ctx += dm === mm
+                ? ` Consensus has R${R} by day ${mm}, and so do you.`
+                : ` Consensus has R${R} by day ${mm}; your curve has it by day ${dm}.`;
+        }
     }
     const rec = forecastRecord();
     if (rec && rec.quarters > 0) {
@@ -3411,6 +3425,9 @@ function togglePlay() {
     // day marked closed with its partial bar standing in history and the sim clock
     // deliberately un-advanced. Resuming would open a SECOND bar on that same day.
     if (_gameOver) return;
+    // "Adjust first" holds the quarter until the curves are locked: no new day
+    // opens behind the hold, by play or by step.
+    if (_lockPending && !playing) { _toast('Lock your curves to open the next day.'); return; }
     _resumeAfterDispatch = false;
     playing = !playing;
     if (playing) {
@@ -3440,6 +3457,7 @@ function _resumeClockOrigin() {
 function step() {
     if (playing) return;
     if (_gameOver) return;   // same reason as togglePlay: never reopen an aborted day
+    if (_lockPending) { _toast('Lock your curves to open the next day.'); return; }
 
     // Start a new day if none in progress (installs overlays via the shared helper).
     if (!dayInProgress) {
