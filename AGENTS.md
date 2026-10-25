@@ -392,9 +392,14 @@ key is `shoals-theme`.
 
 ## Open work
 
-`docs/ROADMAP.md` is the queue, in order. Next is domains as certification channels
-over one hidden scalar, together with `B`'s rebuild (a plateau mass per rung and a
-calibrated public estimator for the valuation layer). The event-illustration pilot is
-its own session, briefed there. a9's play-test covers the posterior's feel, the
-valuation gaps, the rounds' cadence, the score, the reality-beats content, the capex
-rates channel and the `ACT3_TUNING` first-pass numbers.
+`docs/ROADMAP.md` is the queue, in order, and opens with the direction set on
+2026-10-25: know, commit, lose your grip, and an honest accounting, read through
+embedded agency. Next is the reader (a forecaster of the race fit on the simulator,
+public state only), with domains and `B` rebuilt as a designed inefficiency on top of
+it. Then come the decision chain (editions as evidence, dissemination, mandates,
+Meridian), influence bounded at the intervention with a replayable accounting, Act III
+taking the player's judgment, a price for alignment, and the run as an object. The
+event-illustration pilot is its own session, briefed there. a9's play-test covers the
+posterior's feel, the valuation gaps, the rounds' cadence, the score, the
+reality-beats content, the capex rates channel and the `ACT3_TUNING` first-pass
+numbers.
