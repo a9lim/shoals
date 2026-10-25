@@ -2,8 +2,8 @@
 /* ===================================================
    tools/belief-test.mjs -- Correctness + integrity harness
    for market belief `B`, the belief-backed quoters, market
-   efficiency `eta`, the locked player posterior +
-   credibility, and the decaying event-impulse overlay
+   efficiency `eta`, the player's posterior + its scoring,
+   and the decaying event-impulse overlay
    (overhaul phase 4; src/race/belief.js + src/race/impulse.js).
 
    Hard-assertion checks:
@@ -21,11 +21,15 @@
       ID is a no-op. And a public listing-day quote equals the
       contract's base rate (the seed) -- two-sided.
 
-   C. Brier / credibility arithmetic (02a): credibility =
-      EMA(alpha=0.25, init 0) of (1 - 2*Brier), Brier averaged
-      over the maturing claim vector. Checked to the digit
-      against hand-computed values, incl. a coincident-maturity
-      average and the full-vector-mandatory lock guard.
+   C. Posterior scoring arithmetic (02a, the posterior): the
+      quarter's survival-conditioned crossing probability and
+      the log-likelihood-ratio increment checked to the digit
+      against an independent naive formula; a market copier
+      scores exactly 0; credibility = tanh(S_P / K_CRED); the
+      lock guard (full valid curve set, on-grid + current day,
+      immutable with exact replay); scoring needs the opening
+      lock and runs once per quarter; no manufactured forecast
+      (the day-0 draft is a copy of B, nothing is locked).
 
    D. Lock-day schedule (02a): isLockDay is true exactly on
       0, 63, 126, ... and false off-grid.
@@ -60,7 +64,9 @@ import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief,
     binaryProb, binaryQuoteFromBelief, computeCurveFromBelief, computeUrgency,
     impliedTimeline, marketEfficiency, beliefCauses,
-    isLockDay, LOCK_INTERVAL, lockForecast, lockedClaim, settleClaim, settleClaims,
+    isLockDay, LOCK_INTERVAL, lockForecast, lockedClaim, scoreQuarter, quarterProb,
+    logScoreDelta, presetCurves, marketCurves, normalizeCurves, draftCurves, curvesEqual,
+    forecastRecord, forecastTuning,
     credibility, canSendMemos, canActAsFund, playerPilled, marketPilled,
     firmBelief, stepFirmBelief, scrutinyGap, hasEverLocked,
 } from '../src/race/belief.js';
@@ -130,7 +136,7 @@ function corruptLatent(race) {
 let causalityOK = true, allCausesHaveId = true, invarianceOK = true, ledgerCoverageOK = false;
 let totalCauses = 0;
 {
-    const PUBLIC_VIEW_KEYS = ['day', 'certifiedFrontierRung', 'releasedFrontierRung', 'releaseCount', 'lastReleaseDay', 'controlRegime'].sort().join(',');
+    const PUBLIC_VIEW_KEYS = ['day', 'certifiedFrontierRung', 'releasedFrontierRung', 'claimedRung', 'releaseCount', 'lastReleaseDay', 'controlRegime'].sort().join(',');
     // 1. Every non-random B move has an ID, over N full runs.
     for (let i = 0; i < N; i++) {
         const race = createRaceState((BASE_SEED + i) >>> 0);
@@ -260,67 +266,97 @@ let leakOnceOK = false, stepIdempotentOK = false;
 }
 
 // ==========================================================================
-// C. Brier / credibility arithmetic
+// C. Posterior scoring arithmetic
 // ==========================================================================
 
-let credSingleOK = false, credChainOK = false, credAvgOK = false, lockGuardOK = false;
-let lockSkipStallsOK = false, noManufacturedOK = false;
+let probOK = false, copierZeroOK = false, deltaOK = false, lockGuardOK = false;
+let scoreGuardOK = false, noManufacturedOK = false, claimIsQuoteOK = false;
 {
-    // Single claim: lock p=0.8 on R2, settle YES. Brier=(0.8-1)^2=0.04;
-    // 1-2*Brier=0.92; cred = 0 + 0.25*(0.92-0) = 0.23.
+    // Independent naive forms (02a "Scoring"), against the module's stable ones.
+    const sig = (x) => 1 / (1 + Math.exp(-x));
+    const naiveP = (m, w, t0, t1) => {
+        const F0 = sig((t0 - m) / w), F1 = sig((t1 - m) / w);
+        return Math.min(0.98, Math.max(0.02, (F1 - F0) / (1 - F0)));
+    };
+    const naiveD = (pP, pM, o) => o ? Math.log(pP / pM) : Math.log((1 - pP) / (1 - pM));
+    probOK = [[100, 50, 0, 63], [721, 140, 315, 378], [400, 25, 378, 441], [2016, 400, 0, 63]]
+        .every(([m, w, t0, t1]) => Math.abs(quarterProb(m, w, t0, t1) - naiveP(m, w, t0, t1)) < 1e-12)
+        // A median far behind t0 (the naive form is 0/0 here): the logistic's tail
+        // hazard is 1/w, so the quarter's probability is 1 - e^(-63/w).
+        && Math.abs(quarterProb(10, 25, 1000, 1063) - (1 - Math.exp(-63 / 25))) < 1e-9;
+    assert(probOK, 'quarterProb disagrees with the naive survival-conditioned form');
+
+    // A market copier: lock B's curves at day 0, close the quarter at day 63 with a
+    // certification inside it -> every increment is exactly 0, and so is credibility.
     const race = createRaceState((BASE_SEED + 222) >>> 0);
     initBelief(race);
-    lockForecast(0, { 2: 0.8, 3: 0.5, 4: 0.5, 5: 0.5 });
-    const c1 = settleClaim(2, 1);
-    credSingleOK = Math.abs(c1 - 0.23) < 1e-9;
-    assert(credSingleOK, `single-claim credibility ${c1} != 0.23`);
+    lockForecast(0, presetCurves('market'));
+    belief.day = 63;
+    belief.rungs[2].crossed = true; belief.rungs[2].certDay = 40;
+    const q1 = scoreQuarter(63);
+    copierZeroOK = !!q1 && q1.rungs.length === 3 && q1.rungs.every(r => r.delta === 0)
+        && q1.delta === 0 && credibility() === 0 && forecastRecord().quarters === 1;
+    assert(copierZeroOK, `market copier scored ${q1 && q1.delta} (want exactly 0)`);
 
-    // Chain a second: settle R3 NO at p=0.5. Brier=0.25; 1-2*Brier=0.5;
-    // cred = 0.75*0.23 + 0.25*0.5 = 0.2975.
-    const c2 = settleClaim(3, 0);
-    credChainOK = Math.abs(c2 - 0.2975) < 1e-9;
-    assert(credChainOK, `chained credibility ${c2} != 0.2975`);
-
-    // Coincident maturity: fresh store, lock, settle {R2 YES @0.9, R3 NO @0.4}
-    // together. Briers 0.01 and 0.16 -> mean 0.085; 1-2*0.085=0.83;
-    // cred = 0 + 0.25*0.83 = 0.2075.
+    // A call: R2 earlier than B (and it certifies in the quarter), R3/R4 as drawn.
     const race2 = createRaceState((BASE_SEED + 223) >>> 0);
     initBelief(race2);
-    lockForecast(0, { 2: 0.9, 3: 0.4, 4: 0.5, 5: 0.5 });
-    const c3 = settleClaims([{ rung: 2, outcome: 1 }, { rung: 3, outcome: 0 }]);
-    credAvgOK = Math.abs(c3 - 0.2075) < 1e-9;
-    assert(credAvgOK, `coincident-average credibility ${c3} != 0.2075`);
+    const mk = marketCurves();
+    const mine = normalizeCurves({ ...mk, 2: { m: 120, w: 60 } });
+    lockForecast(0, mine);
+    belief.day = 63;
+    belief.rungs[2].crossed = true; belief.rungs[2].certDay = 63;   // ON L_q+1: inside the quarter
+    const q2 = scoreQuarter(63);
+    const want = [2, 3, 4].reduce((acc, R) => acc + naiveD(
+        naiveP(mine[R].m, mine[R].w, 0, 63), naiveP(mk[R].m, mk[R].w, 0, 63), R === 2 ? 1 : 0), 0);
+    deltaOK = !!q2 && Math.abs(q2.delta - want) < 1e-12 && q2.delta > 0
+        && Math.abs(credibility() - Math.tanh(want / forecastTuning.K_CRED)) < 1e-12
+        && q2.rungs.find(r => r.R === 2).o === 1 && Math.abs(logScoreDelta(0.5, 0.5, 1)) === 0;
+    assert(deltaOK, `scored delta ${q2 && q2.delta} != hand ${want}`);
 
-    // Lock semantics (02a "Belief, η, and the firm"): full VECTOR mandatory; on-grid + CURRENT-day
-    // only; immutable once accepted (exact replay idempotent, edits rejected).
+    // Lock semantics (02a): a full VALID curve set; on-grid + CURRENT-day only;
+    // immutable once accepted (exact replay idempotent, edits rejected).
     const race3 = createRaceState((BASE_SEED + 224) >>> 0);
     initBelief(race3);   // belief.day == 0
-    const bad = lockForecast(0, { 2: 0.5, 3: 0.5 });                        // partial -> null
-    const outOfRange = lockForecast(0, { 2: 1.5, 3: 0.5, 4: 0.5, 5: 0.5 }); // p>1 -> null
-    const offGrid = lockForecast(7, { 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5 });    // 7 % 63 != 0 -> null
-    const wrongDay = lockForecast(63, { 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5 });  // 63 != belief.day 0 -> null
-    const good = lockForecast(0, { 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5 });       // valid
-    const replay = lockForecast(0, { 2: 0.5, 3: 0.5, 4: 0.5, 5: 0.5 });     // exact replay -> idempotent
-    const mutate = lockForecast(0, { 2: 0.9, 3: 0.5, 4: 0.5, 5: 0.5 });     // edit -> rejected (immutable)
-    lockGuardOK = bad === null && outOfRange === null && offGrid === null && wrongDay === null
-        && good !== null && replay === good && mutate === null;
-    assert(lockGuardOK, 'lock semantics wrong (mandatory-vector / on-grid+current-day / immutable)');
+    const base = presetCurves('market');
+    const partial = lockForecast(0, { 2: base[2], 3: base[3] });                          // missing rungs
+    const outOfRange = lockForecast(0, { ...base, 5: { m: 2017, w: 100 } });               // m > 2016
+    const tooNarrow = lockForecast(0, { ...base, 3: { m: base[3].m, w: 10 } });            // w < 25
+    const crossed = lockForecast(0, { ...base, 3: { m: base[2].m - 1, w: base[3].w } });   // m3 < m2
+    const offGrid = lockForecast(7, base);
+    const wrongDay = lockForecast(63, base);
+    const good = lockForecast(0, base);
+    const replay = lockForecast(0, presetCurves('market'));
+    const mutate = lockForecast(0, presetCurves('earlier'));
+    lockGuardOK = partial === null && outOfRange === null && tooNarrow === null && crossed === null
+        && offGrid === null && wrongDay === null && good !== null && replay === good && mutate === null
+        && Object.isFrozen(good) && Object.isFrozen(good.curves[2]);
+    assert(lockGuardOK, 'lock semantics wrong (valid-set / on-grid+current-day / immutable)');
 
-    // Skipping a lock day scores no Brier and STALLS the EMA (staleness is the
-    // penalty): a never-locked player's credibility stays exactly 0 on settlement.
+    // Scoring guards: no lock at L_q -> nothing scored; once per quarter.
     const race4 = createRaceState((BASE_SEED + 225) >>> 0);
     initBelief(race4);
-    const credBefore = credibility();
-    const credAfterSkip = settleClaim(3, 1);   // R3 never locked -> no Brier
-    lockSkipStallsOK = credBefore === 0 && credAfterSkip === 0;
-    assert(lockSkipStallsOK, `skip did not stall the EMA (before=${credBefore} after=${credAfterSkip})`);
+    belief.day = 63;
+    const noLock = scoreQuarter(63);
+    belief.day = 0; lockForecast(0, presetCurves('later')); belief.day = 63;
+    const first = scoreQuarter(63), again = scoreQuarter(63);
+    scoreGuardOK = noLock === null && !!first && again === first && forecastRecord().quarters === 1
+        && forecastRecord().S === first.S && scoreQuarter(64) === null && scoreQuarter(126) === null;
+    assert(scoreGuardOK, 'scoreQuarter guards wrong (needs the opening lock; once per quarter; current day only)');
 
-    // No manufactured day-0 forecast: a fresh store has NO locks, credibility 0,
-    // and no claim to read.
+    // No manufactured day-0 forecast: no locks, credibility 0, no claim; the draft
+    // is a copy of B.
     const race5 = createRaceState((BASE_SEED + 226) >>> 0);
     initBelief(race5);
-    noManufacturedOK = belief.player.locks.length === 0 && credibility() === 0 && lockedClaim(2) === null;
-    assert(noManufacturedOK, 'initBelief manufactured a day-0 forecast (must be a real prompted lock)');
+    const d0 = draftCurves(), m0 = marketCurves();
+    noManufacturedOK = belief.player.locks.length === 0 && credibility() === 0 && lockedClaim(2) === null
+        && [2, 3, 4, 5].every(R => curvesEqual(d0, m0, R));
+    assert(noManufacturedOK, 'initBelief manufactured a forecast, or the day-0 draft is not B');
+
+    // A locked market curve reads the Consensus quote it copied (lockedClaim).
+    lockForecast(0, presetCurves('market'));
+    claimIsQuoteOK = [2, 3, 4, 5].every(R => Math.abs(lockedClaim(R) - binaryProb(R, { 2: 420, 3: 756, 4: 880, 5: 1000 }[R])) < 1e-9);
+    assert(claimIsQuoteOK, 'lockedClaim of a market lock != the day-0 Consensus quote');
 }
 
 // ==========================================================================
@@ -502,7 +538,7 @@ let neverLockNoScrutinyOK = false, guardNotVacuousOK = false;
     // The guard is not vacuous: a divergent LOCKED posterior CAN still trigger.
     const race2 = createRaceState((BASE_SEED + 601) >>> 0);
     initConsensus(race2); initBelief(race2);
-    lockForecast(0, { 2: 0.99, 3: 0.99, 4: 0.99, 5: 0.99 });   // maximally pilled at day 0 vs F=15
+    lockForecast(0, normalizeCurves({ 2: { m: 30, w: 25 }, 3: { m: 40, w: 25 }, 4: { m: 50, w: 25 }, 5: { m: 60, w: 25 } }));   // maximally pilled at day 0 vs F=15
     guardNotVacuousOK = hasEverLocked() && Math.abs(scrutinyGap(race2, playerPilled())) > 20;
     assert(guardNotVacuousOK, 'scrutiny guard is vacuous (a divergent locked posterior cannot trigger)');
 }
@@ -613,13 +649,14 @@ line('\nB. Leak once-per-ID');
 line(`  leaked beat folds exactly once (replay is a no-op): ${leakOnceOK ? 'ok' : 'FAIL'}`);
 line(`  replayed leak records no second causal move:        ${stepIdempotentOK ? 'ok' : 'FAIL'}`);
 
-line('\nC. Brier / credibility arithmetic (EMA a=0.25 of 1-2*Brier)');
-line(`  single claim (0.8, YES) -> 0.2300:                  ${credSingleOK ? 'ok' : 'FAIL'}`);
-line(`  chained (+0.5, NO) -> 0.2975:                       ${credChainOK ? 'ok' : 'FAIL'}`);
-line(`  coincident-average (0.9 YES, 0.4 NO) -> 0.2075:     ${credAvgOK ? 'ok' : 'FAIL'}`);
-line(`  lock semantics (mandatory-vector/on-grid+day/immutable): ${lockGuardOK ? 'ok' : 'FAIL'}`);
-line(`  skip stalls the EMA (staleness self-penalizes):     ${lockSkipStallsOK ? 'ok' : 'FAIL'}`);
-line(`  no manufactured day-0 forecast:                     ${noManufacturedOK ? 'ok' : 'FAIL'}`);
+line('\nC. Posterior scoring arithmetic (log-likelihood ratio vs B, credibility = tanh(S/K))');
+line(`  quarter crossing probability == naive form, stable: ${probOK ? 'ok' : 'FAIL'}`);
+line(`  market copier scores exactly 0:                     ${copierZeroOK ? 'ok' : 'FAIL'}`);
+line(`  a call's increment == hand value; cred = tanh(S/K):  ${deltaOK ? 'ok' : 'FAIL'}`);
+line(`  lock semantics (valid-set/on-grid+day/immutable):   ${lockGuardOK ? 'ok' : 'FAIL'}`);
+line(`  scoring needs the opening lock; once per quarter:   ${scoreGuardOK ? 'ok' : 'FAIL'}`);
+line(`  no manufactured forecast; day-0 draft is B:         ${noManufacturedOK ? 'ok' : 'FAIL'}`);
+line(`  a market lock's claim == the Consensus quote:       ${claimIsQuoteOK ? 'ok' : 'FAIL'}`);
 
 line('\nD. Lock-day schedule (0, 63, 126, ...)');
 line(`  isLockDay matches the grid over ${HORIZON}d:           ${scheduleOK ? 'ok' : 'FAIL'}`);

@@ -17,6 +17,12 @@ export function fmtQty(v) {
 
 export function fmtNum(v, dp = 4) { return Number(v).toFixed(dp); }
 
+/** Always signed, with a true minus: +1.8, −0.4. A value that rounds to zero reads +0.0. */
+export function fmtSigned(v, dp = 1) {
+    const r = Number(Number(v).toFixed(dp));
+    return (r < 0 ? '−' : '+') + Math.abs(r).toFixed(dp);
+}
+
 export function pnlClass(v) {
     if (v > 0) return 'pnl-up';
     if (v < 0) return 'pnl-down';

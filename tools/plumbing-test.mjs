@@ -167,7 +167,7 @@ import {
     resetImpactState, getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact,
 } from '../src/price-impact.js';
 import {
-    belief, initBelief, deactivateBelief, lockForecast, credibility,
+    belief, initBelief, deactivateBelief, lockForecast, presetCurves, credibility,
     stepBelief, foldPlayerLeak, beliefCauses, beliefProcessed, BLACKOUT_FOLD_MAX_SEV,
 } from '../src/race/belief.js';
 import { market, syncMarket } from '../src/market.js';
@@ -463,22 +463,24 @@ check('gray-zone fires at tension 1', grayAtTension1 > 0, `${grayAtTension1} tot
         deactivateConsensus();
     }
 
-    // -- R2 probe: a synchronous ruling SCORES credibility (no milestone settles --
-    //    unscored). Lock 0.9 on R2, rule YES, apply via the shared helper.         --
+    // -- R2 probe: a synchronous ruling settles through the shared helper, exactly  --
+    //    once, and does NOT move credibility (02a: the posterior is scored against  --
+    //    B each quarter; Consensus settlement no longer scores it).                  --
     {
         const race = createRaceState(301);
         initConsensus(race); initBelief(race);
         const c = consensus.contracts.find(x => x.predicate.rung === 2);
-        lockForecast(0, { 2: 0.9, 3: 0.5, 4: 0.3, 5: 0.2 });
+        lockForecast(0, presetCurves('earlier'));
         const before = credibility();
         openDispute(c.key, 10, 'private');
         const row = ruleDispute(c.key, 'YES', 12, 'private');
-        applyBinarySettlementRows([row]);                              // cash + settleClaims
+        const first = applyBinarySettlementRows([row]);                // cash, exactly-once
+        const again = applyBinarySettlementRows([row]);                // consumed -> no-op
         consensus.pendingRows = consensus.pendingRows.filter(r => !r._consumed);
         const after = credibility();
-        // Brier = (0.9-1)^2 = 0.01; cred EMA (a=0.25, init 0) -> 0.25*(1-2*0.01) = 0.245.
-        check('R2: ruling scores credibility (shared helper, no unscored settle)',
-            !!row && before === 0 && Math.abs(after - 0.245) < 1e-6, `cred ${before}->${after.toFixed(4)}`);
+        check('R2: ruling settles via the shared helper, credibility untouched',
+            !!row && first.fresh.length === 1 && again.fresh.length === 0 && before === 0 && after === 0,
+            `fresh ${first.fresh.length}/${again.fresh.length}, cred ${before}->${after}`);
         deactivateConsensus(); deactivateBelief();
     }
 

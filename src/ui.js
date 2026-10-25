@@ -6,7 +6,8 @@
    Pure functions -- no internal state.
    ===================================================== */
 
-import { fmtNum, pnlClass, fmtDte, fmtQty, posTypeLabel } from './format-helpers.js';
+import { fmtNum, pnlClass, fmtDte, fmtQty, posTypeLabel, fmtSigned } from './format-helpers.js';
+import { forecastRecord } from './race/belief.js';
 import { drawSparkline } from './sparkline.js';
 import { computeBidAsk } from './portfolio.js';
 import { renderChainInto, rebuildExpiryDropdown, posKey } from './chain-renderer.js';
@@ -154,6 +155,7 @@ export function cacheDOMElements($) {
     $.lobbyActions       = document.getElementById('lobby-actions');
     $.standingsSection   = document.getElementById('standings-section');
     $.standingsWorld     = document.getElementById('standings-world');
+    $.standingsRecord    = document.getElementById('standings-record');
     $.standingsFactions  = document.getElementById('standings-factions');
     $.consensusSection   = document.getElementById('consensus-section');
     $.consensusTbody     = document.getElementById('consensus-tbody');
@@ -1160,7 +1162,37 @@ const _FACTION_IDS = ['firmStanding', 'regulatoryExposure', 'federalistSupport',
 export function updateStandings($, world, factions, getFactionDescriptor) {
     if (!$.standingsWorld || !$.standingsFactions) return;
     _renderWorldState($.standingsWorld, world);
+    _renderRecord($.standingsRecord);
     _renderFactionScores($.standingsFactions, factions, getFactionDescriptor);
+}
+
+/** The forecast record (02a, the posterior's scoring): skill in nats over the
+ *  quarters scored, and credibility as a whole percent. Dynamic only. */
+function _renderRecord(container) {
+    if (!container) return;
+    container.textContent = '';
+    const rec = forecastRecord();
+    if (!rec) return;
+    const pct = Math.round(rec.credibility * 100);
+    const entries = [
+        ['Track record', rec.quarters
+            ? `${fmtSigned(rec.S)} nats over ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'}`
+            : 'No quarter scored yet'],
+        ['Credibility', (pct < 0 ? '−' : '') + Math.abs(pct) + '%'],
+    ];
+    for (const [label, value] of entries) {
+        const row = document.createElement('div');
+        row.className = 'stat-row';
+        const lbl = document.createElement('span');
+        lbl.className = 'stat-label';
+        lbl.textContent = label;
+        const val = document.createElement('span');
+        val.className = 'stat-value';
+        val.textContent = value;
+        row.appendChild(lbl);
+        row.appendChild(val);
+        container.appendChild(row);
+    }
 }
 
 function _renderWorldState(container, world) {

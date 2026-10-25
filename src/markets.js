@@ -16,6 +16,16 @@
    sandbox (sandbox.js). Reads public state only: the
    Consensus and compute curves come from belief B and
    the public views, the same inputs as the quoters.
+
+   The Consensus panel also draws the player's draft
+   posterior over B (02a, the posterior), one solid curve
+   per open rung with a bead at its median. "Your curves"
+   puts the panel in edit mode: the beads become handles
+   (drag across for the median, up and down for the
+   width; arrows on a focused panel), and sandbox picks
+   are off until edit mode ends. A lock the player chose
+   to adjust first holds edit mode on and shows the
+   panel's Lock. The draft itself lives in belief.js.
    ===================================================== */
 
 import { market } from './market.js';
@@ -24,7 +34,10 @@ import { vasicekBondPrice, computeEffectiveSigma, computeSkewSigma, computeVXHCN
 import { unitPrice } from './position-value.js';
 import { consensus, BINARY_NOTIONAL } from './race/consensus.js';
 import { computeMarket, buildComputePublicView, isComputeTradeable } from './race/compute-market.js';
-import { belief, binaryProb, computeCurveFromBelief } from './race/belief.js';
+import {
+    belief, binaryProb, computeCurveFromBelief, crossingProb,
+    draftCurves, marketCurves, curvesEqual, openRungs, setDraftMedian, setDraftWidth,
+} from './race/belief.js';
 import { HORIZON } from './race/resolution.js';
 
 const TY = TRADING_DAYS_PER_YEAR;
@@ -229,7 +242,15 @@ export const PANELS = [
 const _st = {
     ctx: null, onPick: null, legState: () => 0, cur: null, ghost: null, ghostHead: '', prev: null,
     t0: -1e9, dur: 1100, smileIdx: -1, panels: [], visible: false, raf: 0, reduced: false, cap: null,
+    // The Consensus editor: edit mode, a held lock, the selected rung, the Lock hook.
+    edit: false, pending: false, sel: 2, onLock: null, cons: null,
 };
+
+// Editor steps (UNRATIFIED feel numbers, 02a gives only the keys): ←/→ move a
+// median 5 days, Shift 21 (ratified); ↑/↓ scale the width by 10%; a vertical drag
+// scales it by e per 90 px, up tighter.
+const EDIT_STEP = 5, EDIT_STEP_BIG = 21, EDIT_W_STEP = 1.1, EDIT_W_PX = 90;
+const _EDIT_HELP = 'Drag a median; up and down to tighten or loosen.';
 
 const _ease = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
@@ -246,17 +267,30 @@ export function initMarkets(ctx, hooks) {
     _st.cap = _colophon.caption(document.getElementById('cap-markets'), 300);
     const grid = document.getElementById('mk-grid');
     grid.textContent = '';
+    _st.onLock = hooks.onLock || null;
     for (const spec of PANELS) {
         const fig = document.createElement('figure');
         fig.className = 'mk-panel';
+        const cons = spec.key === 'cons';
         fig.innerHTML = `<figcaption class="mk-h"><span class="mk-t">${spec.title}</span> <span class="mk-sub">· ${spec.sub}</span>`
             + (spec.key === 'smile' ? ' <span class="mk-exp"><button class="hbtn" type="button" data-exp="-1" aria-label="Earlier expiry">‹</button><button class="hbtn" type="button" data-exp="1" aria-label="Later expiry">›</button></span>' : '')
-            + `</figcaption><p class="mk-what">${spec.what}</p><div class="mk-box"><canvas tabindex="0" role="img"></canvas></div>`;
+            + (cons ? ' <span class="mk-exp"><button class="hbtn mk-edit" type="button" aria-pressed="false" hidden>Your curves</button></span>' : '')
+            + `</figcaption><p class="mk-what"><span class="mk-what-t">${spec.what}</span>`
+            + (cons ? ' <button class="hbtn mk-lock" type="button" hidden>Lock these curves</button>' : '')
+            + `</p><div class="mk-box"><canvas tabindex="0" role="img"></canvas></div>`;
         grid.appendChild(fig);
         const canvas = fig.querySelector('canvas');
-        canvas.setAttribute('aria-label', `${spec.title}, ${spec.sub}. ${spec.what} Arrow keys choose a contract; Enter adds it to the sandbox, again to go short, a third time to remove it.`);
-        const p = { spec, fig, canvas, ctx2d: canvas.getContext('2d'), w: 0, h: 0, pts: [], hover: null, focus: -1, read: '' };
+        const p = { spec, fig, canvas, ctx2d: canvas.getContext('2d'), w: 0, h: 0, pts: [], hover: null, focus: -1, read: '', handles: [], geom: null, drag: null };
+        _label(p);
         _st.panels.push(p);
+        if (cons) {
+            _st.cons = p;
+            p.editBtn = fig.querySelector('.mk-edit');
+            p.lockBtn = fig.querySelector('.mk-lock');
+            p.whatEl = fig.querySelector('.mk-what-t');
+            p.editBtn.addEventListener('click', () => { if (!_st.pending) setCurveEdit(!_st.edit); });
+            p.lockBtn.addEventListener('click', () => { if (_st.pending && _st.onLock) _st.onLock(); });
+        }
         _wirePanel(p);
         new ResizeObserver(() => { _size(p); _draw(p); }).observe(fig.querySelector('.mk-box'));
     }
@@ -304,11 +338,57 @@ export function marketsDayClose(newsHead) {
     if (_st.visible) { _drawAll(); _kick(); }
 }
 
-/** Clear ghosts and snapshots (reset / regime change). */
+/** Clear ghosts and snapshots, and leave edit mode (reset / regime change). */
 export function resetMarkets() {
     _st.cur = _st.prev = _st.ghost = null;
     _st.ghostHead = '';
     _st.smileIdx = -1;
+    setCurveEdit(false, false);
+}
+
+/** The canvas's accessible name: the sandbox keys, or the editor's in edit mode. */
+function _label(p) {
+    const { spec } = p;
+    p.canvas.setAttribute('aria-label', spec.key === 'cons' && _st.edit
+        ? `${spec.title}, your curves over the market’s. Tab chooses a rung; left and right move its median, with Shift for larger steps; up and down tighten or loosen it.`
+        : `${spec.title}, ${spec.sub}. ${spec.what} Arrow keys choose a contract; Enter adds it to the sandbox, again to go short, a third time to remove it.`);
+}
+
+/**
+ * Edit mode for the Consensus panel's curves (main.js and the panel's toggle).
+ * `pending` is a lock the player chose to adjust first: it forces edit mode on
+ * and shows the Lock button until main.js records the lock. `focus` moves
+ * keyboard focus to the panel (the dispatch's "Adjust first").
+ */
+export function setCurveEdit(on, pending = false, focus = false) {
+    _st.pending = !!pending;
+    _st.edit = !!on || _st.pending;
+    const p = _st.cons;
+    if (!p) return;
+    p.drag = null;
+    p.hover = null;
+    p.editBtn.setAttribute('aria-pressed', String(_st.edit));
+    p.editBtn.disabled = _st.pending;
+    p.lockBtn.hidden = !_st.pending;
+    p.whatEl.textContent = _st.edit ? _EDIT_HELP : p.spec.what;
+    p.fig.classList.toggle('editing', _st.edit);
+    _label(p);
+    if (_st.edit) _selectOpen(0);
+    if (focus) p.canvas.focus();
+    if (_st.visible) _draw(p);
+}
+
+/** Keep the selected rung on an open one: step `dir` through the open rungs
+ *  (0 = stay if still open, else the first). Returns false past either end. */
+function _selectOpen(dir) {
+    const open = belief.active ? openRungs() : [];
+    if (!open.length) return false;
+    const i = open.indexOf(_st.sel);
+    if (dir === 0) { if (i < 0) _st.sel = open[0]; return true; }
+    const j = (i < 0 ? 0 : i) + dir;
+    if (j < 0 || j >= open.length) return false;
+    _st.sel = open[j];
+    return true;
 }
 
 /** Re-snapshot now (page shown, expiry stepped, theme or sandbox changed). */
@@ -367,6 +447,7 @@ function _draw(p) {
     if (!W || !H) return;
     const pal = _themePalette(), text = pal.text, muted = pal.textMuted;
     c.clearRect(0, 0, W, H);
+    if (p.editBtn) p.editBtn.hidden = !(s && s.consensus);
     if (!s) return;
     const spec = p.spec;
     const font = (px, it) => `${it ? 'italic ' : ''}${px}px ${_FONT.text}`;
@@ -399,6 +480,7 @@ function _draw(p) {
     }
     const X = (x) => g.l + (g.r - g.l) * (x - x0) / (x1 - x0);
     const Y = (y) => g.t + (g.b - g.t) * (1 - (y - lo) / (hi - lo));
+    p.geom = { x0, x1, gl: g.l, gr: g.r };
 
     if (empty && !cur.length) {
         c.strokeStyle = _r(text, 0.12); c.lineWidth = 1;
@@ -427,6 +509,13 @@ function _draw(p) {
     }
 
     const cons = spec.key === 'cons', ind = pal.inks.indigo;
+    const editing = cons && _st.edit;
+    // The player's draft (02a, the posterior), read live from belief.js: it moves
+    // under the pointer, not once a day like the snapshot.
+    const draft = cons && s.consensus && belief.active ? draftCurves() : null;
+    const mkt = draft ? marketCurves() : null;
+    const tNow = draft ? s.consensus.raceDay : 0;
+    const open = draft ? openRungs() : [];
     const consDash = { 2: [], 3: [], 4: [5, 3], 5: [1.5, 2.5] }, consW = { 2: 1.1, 3: 1.6, 4: 1.4, 5: 1.4 };
     const line = (pts) => { c.beginPath(); pts.forEach((q, i) => i ? c.lineTo(X(q[0]), Y(q[1])) : c.moveTo(X(q[0]), Y(q[1]))); c.stroke(); };
     c.save();
@@ -438,8 +527,19 @@ function _draw(p) {
         for (const sr of ghost) if (!sr.faint && !(cons && sr.crossed)) line(sr.pts);
         c.setLineDash([]);
     }
-    // The curves.
     c.lineJoin = 'round';
+    // The draft, beneath B: solid, in the text ink. A rung whose draft is B's own
+    // curve is left to B's line; its bead below still marks the median.
+    if (draft) {
+        c.strokeStyle = text; c.lineWidth = 1.5;
+        for (const R of open) {
+            if (curvesEqual(draft, mkt, R)) continue;
+            const { m, w } = draft[R], pts = [];
+            for (let i = 0; i <= 120; i++) { const D = x0 + (x1 - x0) * i / 120; pts.push([D, crossingProb(m, w, tNow, D)]); }
+            line(pts);
+        }
+    }
+    // The curves.
     for (const sr of cur) {
         if (sr.faint) { c.strokeStyle = _r(text, 0.14); c.lineWidth = 1; line(sr.pts); continue; }
         if (cons) {
@@ -473,6 +573,38 @@ function _draw(p) {
         }
     }
 
+    // The draft's medians: a bead on each open rung, a handle in edit mode. A
+    // median outside the panel's span sits on the nearer edge with a chevron.
+    p.handles = [];
+    if (draft) {
+        for (const R of open) {
+            const { m, w } = draft[R];
+            const xm = Math.max(x0, Math.min(x1, m));
+            p.handles.push({ R, sx: X(xm), sy: Y(crossingProb(m, w, tNow, xm)), off: m < x0 ? -1 : m > x1 ? 1 : 0 });
+        }
+        for (const hd of p.handles) {
+            const sel = editing && hd.R === _st.sel;
+            c.beginPath(); c.arc(hd.sx, hd.sy, editing ? (sel ? 4.6 : 3.8) : 2.4, 0, Math.PI * 2);
+            if (!editing) { c.fillStyle = text; c.fill(); continue; }
+            c.fillStyle = sel ? text : pal.canvas; c.fill();
+            c.strokeStyle = text; c.lineWidth = 1.5; c.stroke();
+            if (hd.off) {
+                const ax = hd.sx - hd.off * 9;
+                c.beginPath(); c.moveTo(ax - hd.off * 3, hd.sy - 3.5); c.lineTo(ax, hd.sy); c.lineTo(ax - hd.off * 3, hd.sy + 3.5);
+                c.lineWidth = 1.2; c.stroke();
+            }
+            if (sel) {
+                c.font = font(12, true); c.fillStyle = text; c.textBaseline = 'alphabetic';
+                c.textAlign = hd.sx > (g.l + g.r) / 2 ? 'right' : 'left';
+                c.fillText(`R${hd.R}`, hd.sx + (c.textAlign === 'left' ? 7 : -7), hd.sy - 7);
+                if (document.activeElement === p.canvas) {
+                    c.strokeStyle = pal.accent; c.lineWidth = 1;
+                    c.strokeRect(Math.round(hd.sx) - 7.5, Math.round(hd.sy) - 7.5, 15, 15);
+                }
+            }
+        }
+    }
+
     // Tradeable points: hollow; legs held in the sandbox: a triangle, up long, down short.
     const pts = (s.points[spec.key] || []).map(q => ({ ...q, sx: X(q.x), sy: Y(q.y) }));
     p.pts = pts;
@@ -489,7 +621,7 @@ function _draw(p) {
             c.strokeStyle = q.disabled ? _r(text, 0.3) : _r(text, on ? 0.95 : 0.65);
             c.stroke();
         }
-        if (p.focus === i && document.activeElement === p.canvas) {
+        if (!editing && p.focus === i && document.activeElement === p.canvas) {
             c.strokeStyle = pal.accent; c.lineWidth = 1;
             c.strokeRect(Math.round(q.sx) - 7.5, Math.round(q.sy) - 7.5, 15, 15);
         }
@@ -497,8 +629,9 @@ function _draw(p) {
 
     // The reading, top left; a label for the hovered or focused contract.
     c.font = font(12, true); c.fillStyle = muted; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
-    c.fillText(spec.read(s), g.l, 11);
-    const lab = p.hover || (p.focus >= 0 && document.activeElement === p.canvas ? pts[p.focus] : null);
+    const sd = editing && draft && draft[_st.sel] ? _st.sel : 0;
+    c.fillText(sd ? `R${sd} by day ${Math.round(draft[sd].m)} · Consensus by day ${Math.round(mkt[sd].m)}` : spec.read(s), g.l, 11);
+    const lab = editing ? null : p.hover || (p.focus >= 0 && document.activeElement === p.canvas ? pts[p.focus] : null);
     if (lab) {
         const side = _st.legState(lab.id);
         const act = lab.disabled ? 'not trading' : side > 0 ? 'click: go short' : side < 0 ? 'click: remove' : 'click: add long';
@@ -536,20 +669,71 @@ function _nearest(p, x, y) {
     return best;
 }
 
+function _nearestHandle(p, x, y) {
+    let best = null, bd = 14;
+    for (const h of p.handles) { const d = Math.hypot(h.sx - x, h.sy - y); if (d < bd) { bd = d; best = h; } }
+    return best;
+}
+
+/** True while this panel is the Consensus editor in edit mode. */
+const _editing = (p) => p.spec.key === 'cons' && _st.edit;
+
 function _wirePanel(p) {
     const local = (e) => { const b = p.canvas.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+    // The editor's drag (Consensus, edit mode): across for the median, up and down
+    // for the width, measured from where the drag began.
+    p.canvas.addEventListener('pointerdown', (e) => {
+        if (!_editing(p) || e.button !== 0) return;
+        const [x, y] = local(e);
+        const h = _nearestHandle(p, x, y);
+        const d = draftCurves();
+        if (!h || !d) return;
+        _st.sel = h.R;
+        p.drag = { R: h.R, x, y, m0: d[h.R].m, w0: d[h.R].w };
+        p.canvas.setPointerCapture(e.pointerId);
+        p.canvas.style.cursor = 'grabbing';
+        e.preventDefault();
+        _draw(p);
+    });
     p.canvas.addEventListener('pointermove', (e) => {
+        if (_editing(p)) {
+            const [x, y] = local(e);
+            if (p.drag && p.geom) {
+                const perPx = (p.geom.x1 - p.geom.x0) / Math.max(1, p.geom.gr - p.geom.gl);
+                setDraftMedian(p.drag.R, p.drag.m0 + (x - p.drag.x) * perPx);
+                setDraftWidth(p.drag.R, p.drag.w0 * Math.exp((y - p.drag.y) / EDIT_W_PX));
+                _draw(p);
+            } else {
+                p.canvas.style.cursor = _nearestHandle(p, x, y) ? 'grab' : '';
+            }
+            return;
+        }
         const h = _nearest(p, ...local(e));
         if ((h && h.id) !== (p.hover && p.hover.id)) { p.hover = h; p.canvas.style.cursor = h && !h.disabled ? 'pointer' : ''; _draw(p); }
     });
-    p.canvas.addEventListener('pointerleave', () => { p.hover = null; _draw(p); });
+    const endDrag = () => {
+        if (!p.drag) return;
+        p.drag = null;
+        p.canvas.style.cursor = 'grab';
+        _draw(p);
+        _announceEdit();
+    };
+    p.canvas.addEventListener('pointerup', endDrag);
+    p.canvas.addEventListener('pointercancel', endDrag);
+    p.canvas.addEventListener('pointerleave', () => { if (_editing(p)) return; p.hover = null; _draw(p); });
     p.canvas.addEventListener('click', (e) => {
+        if (_editing(p)) return;                     // edit mode: no sandbox picks
         const h = _nearest(p, ...local(e));
         if (h && !h.disabled && _st.onPick) _st.onPick(h, p.spec.key);
     });
-    p.canvas.addEventListener('focus', () => { if (p.focus < 0 && p.pts.length) p.focus = 0; _draw(p); _announce(p); });
+    p.canvas.addEventListener('focus', () => {
+        if (_editing(p)) { _selectOpen(0); _draw(p); _announceEdit(); return; }
+        if (p.focus < 0 && p.pts.length) p.focus = 0;
+        _draw(p); _announce(p);
+    });
     p.canvas.addEventListener('blur', () => _draw(p));
     p.canvas.addEventListener('keydown', (e) => {
+        if (_editing(p)) { _editKey(p, e); return; }
         if (!p.pts.length) return;
         if (e.key === 'ArrowRight' || e.key === 'ArrowDown') p.focus = (p.focus + 1) % p.pts.length;
         else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') p.focus = (p.focus - 1 + p.pts.length) % p.pts.length;
@@ -564,6 +748,39 @@ function _wirePanel(p) {
         _draw(p);
         _announce(p);
     });
+}
+
+/**
+ * The editor's keys (02a): ←/→ move the selected median 5 days (Shift: 21),
+ * ↑ tightens and ↓ loosens its width. Tab and Shift+Tab step through the open
+ * rungs like the thumbs of a multi-thumb slider, letting focus leave the panel
+ * past either end; Home and End choose the first and last.
+ */
+function _editKey(p, e) {
+    const d = draftCurves();
+    if (!d) return;
+    const R = _st.sel, open = openRungs();
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        setDraftMedian(R, d[R].m + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? EDIT_STEP_BIG : EDIT_STEP));
+    } else if (e.key === 'ArrowUp') setDraftWidth(R, d[R].w / EDIT_W_STEP);
+    else if (e.key === 'ArrowDown') setDraftWidth(R, d[R].w * EDIT_W_STEP);
+    else if (e.key === 'Tab') { if (!_selectOpen(e.shiftKey ? -1 : 1)) return; }
+    else if (e.key === 'Home') _st.sel = open[0];
+    else if (e.key === 'End') _st.sel = open[open.length - 1];
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+    _draw(p);
+    _announceEdit();
+}
+
+/** Speak the selected rung's draft beside the market's (screen readers). */
+function _announceEdit() {
+    const live = document.getElementById('sb-live');
+    const d = draftCurves();
+    if (!live || !d || !d[_st.sel]) return;
+    const R = _st.sel, mk = marketCurves();
+    live.textContent = `R${R}: your median day ${Math.round(d[R].m)}, width ${Math.round(d[R].w)} days. Consensus median day ${Math.round(mk[R].m)}.`;
 }
 
 function _announce(p) {

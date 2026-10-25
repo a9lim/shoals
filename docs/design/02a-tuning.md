@@ -490,7 +490,12 @@ at listing `w = {90, 140, 120, 160}` for R2–R5; `RUNG_SPACING = 150` days
 for rungs pulled forward by a certification below them. Medians are
 seeded so day-0 `F_R(deadline)` equals the listing base rate *exactly*,
 solved against the survival-conditioned law (day-zero implied medians
-{393, 721, 846, 863} against measured KM {405, 736, 860}). Widths
+{341, 686, 831, 863} against measured KM {405, 736, 860}). The law runs
+early by construction: two parameters cannot hold both the median and
+the deadline probability of an outcome with a long "not this term"
+tail. A plateau mass `q` per rung (`F = (1 − q)·σ(·)`) would fix this,
+and it belongs with the calibrated public estimator (see "The valuation
+layer"). Widths
 **tighten with evidence** — `w ← w·(1 − 0.15·α)` on each timeline update,
 floor 25 — so the market sharpens as the race resolves: Act III's
 "repricing all at once" in mechanism form. The quoted probability is
@@ -559,7 +564,7 @@ under the lock recorded at `L_q`, for both the player and the snapshotted
 log-likelihood ratio, in nats:
 `Δ = o·ln(p_P/p_M) + (1 − o)·ln((1 − p_P)/(1 − p_M))`. Cumulative skill
 is `S_P = ΣΔ`, and **credibility = tanh(S_P / K_CRED)**, with K_CRED set
-in calibration (start 2.5). R5 is not scored, because nothing certifies
+in calibration. R5 is not scored, because nothing certifies
 it.
 
 These properties are gated by the harness:
@@ -581,12 +586,26 @@ Credibility now moves up to sixteen times a run. The gates stay: memos >
 - An informed player halfway between `B` and the truth (`w = 0.7·w_B`)
   clears the memo gate by day 882 in roughly half of worlds.
 - The market copier stays at 0.
-- No static preset (earlier or later) has a positive mean skill across
-  worlds.
+- No static preset (earlier or later) earns more than a bounded edge.
+  Because `B` runs early (above), a static *later* caller earns about
+  +0.14 nats over a run from Act I's quiet quarters and clears the memo
+  gate in about 4% of worlds. That is gated at ≤ 0.25 nats and ≤ 10%,
+  and accepted until `B` gains a plateau mass.
 
-Consumers read the posterior through `lockedClaim(R)`, the latest lock's
-P(T_R ≤ D_R) at the contract deadline, so `playerPilled`, the scrutiny
-gap and the F conversion keep their meanings. Consensus settlement no
+**K_CRED = 1.8** (calibrated by `forecast-test`). The oracle clears the
+fund gate by day 756 in 100% of qualifying worlds, and the informed
+player clears the memo gate by day 882 in 53%. The informed rate is
+steep in K (94% at 1.5, 31% at 2.0), so retune with care. Early
+quarters carry little score, because both laws clamp at 0.02 until a
+rung is in reach.
+
+`lockedClaim(R)` is the latest lock's P(T_R ≤ D_R) at the contract
+deadline. `playerPilled` mirrors `marketPilled` exactly: 100 × the
+latest lock's P(R4 within 252 days of today | not yet crossed). A player
+who locks the market's curves therefore reads exactly the market's
+pilledness, and draws no scrutiny gap or trait for copying. Comparing a
+contract-deadline claim against a 252-day market horizon would have
+read a copier as 65 against 1. Consensus settlement no
 longer scores credibility. Display: the Markets page's Consensus panel
 draws the draft over `B`, with a median handle per uncertified rung
 (drag for the median, vertical drag or ↑/↓ for the width, ←/→ moves the
@@ -781,11 +800,20 @@ public state only (`buildPublicView` and `belief`):
 V = Π·[Λ·m_W + (1 − Λ)·m_C] + (1 − Π)·m_F
 ```
 
-- `Π` is the survival-conditioned R5 quote, `binaryProb(5, 1000)`: will
-  the race finish this term. It is 0 after day 1000 without a crossing.
-- `Λ = σ((r_W − r_T)/0.75)` is the public lead. `r_W` is the highest
+- `Π = F₅(1000)` is the market's *unconditional* belief that R5 lands
+  this term, read off `B`'s own R5 law `{m, w}`. It is 0 after day 1000
+  without a crossing. Unconditional, because `B` moves only on legible
+  events, so `Π` moves only on news: certifications and rung claims pull
+  the median in, and routine releases with no claim drift it out, which
+  is how a stall unwinds the AGI trade. The survival-conditioned quote
+  was tried first and rejected: it decays toward the deadline in every
+  world, so V fell from 0.93 to 0.62 even in worlds the West won, and
+  shorting HCN became a free trade.
+- `Λ = σ(λ₀ + (r_W − r_T)/0.75)` is the public lead, with `λ₀ = 1.0`
+  (the market's prior that Tianxia trails). `r_W` is the highest
   *claimed* released rung of Halcyon or Polaris, and `r_T` is Tianxia's
-  (below the ladder counts as 0).
+  (below the ladder counts as 0). Without the prior, tied R1 claims
+  (30% of day-0 worlds) read as a coin flip.
 - `m_W = 1.40` (the family-1/2 blend of 1.60 and 1.25, weighted 14:21),
   `m_C = 0.35` (family 4's recovery), and `m_F = 0.55` (the fizzle
   centre).
@@ -793,13 +821,14 @@ V = Π·[Λ·m_W + (1 − Λ)·m_C] + (1 − Π)·m_F
   survival conditioning. The Deal is absent in this version, and a
   public treaty term can join later.
 
-Day 0 reads Π 0.70 and Λ ≈ 0.79, so V ≈ 0.99.
+Day 0 reads Π 0.70, so V ≈ 1.08 with a one-rung Western claim lead and ≈ 0.95 tied.
 
 `V` is recomputed at day close, after `stepBelief` and the bridge pass.
 The authoritative price takes the change as a level gap before the next
 open: `S ← S·V_t/V_{t−1}`, with the daily ratio clamped to [0.75, 1.30].
-A Halcyon certification lifts Π and Λ, a Tianxia claim of parity cuts Λ,
-and a quiet approach to the deadline decays Π, so the AGI trade unwinds
+A Halcyon certification lifts Π and Λ, and a Tianxia claim of parity
+cuts Λ. Routine releases that claim nothing drift `B`'s R5 median out,
+and day 1000 without a crossing drops Π to 0, so the AGI trade unwinds
 on the tape in the worlds that stall. The gap reaches every downstream
 mark the normal way (`_syncAll`), and the markets snapshot is taken
 after it. Classic has no `V`. The decaying impulses stay, as texture:
@@ -808,10 +837,30 @@ vol, jump intensity and a hair of drift.
 Invariants (`belief-test`):
 
 - Corrupting every latent field leaves `V` bit-identical.
+- No silent drift: across seeds, V is unchanged on every day without a
+  legible event that moved `B` or a claim.
 - `V ∈ [m_C, m_W]`.
 - `V` is constant in Classic.
 - No-player race trajectories are untouched, because nothing under
   `src/race/` reads `sim`.
+
+Measured (`valuation-test`, N 300):
+
+- Day-0 V is 1.081 in the 70% of worlds with a Western claim lead and
+  0.948 when claims are tied.
+- Daily gaps over 2% fall on 0.84% of days; the largest is 29%.
+- V is bit-identical on all 270k days without a legible input.
+
+**Known bias, accepted for this version:** `B` is a heuristic updater,
+not a martingale, so V inherits its drift. Routine releases pull R5 out
+in every world. Mean log V falls about 0.29 over a run even in family 1
+(−0.09 of it on the deadline day), and the terminal reveal is large:
+the median `m_f/V_T` is 1.85 for family 1 and 0.42 for family 3. The
+principled successor is a **calibrated public estimator**: V as
+E[m_f | survival, public state], fit from the race model's own outcome
+statistics over certified rung, claim lead and elapsed time. That makes
+V a martingale under the model, so a stall's decay is paid back by
+progress jumps and no drift is free. It is the next valuation round.
 
 Terminal reconciliation replaces closeout cell 1's spot multiple:
 outside the conversion regimes, the HCN mark is `spot·m_f / V_T`. Here
@@ -896,9 +945,10 @@ Ratified 2026-10-24. The primary market is where capital is literally
 not neutral (03): money in a round reaches the lab. There are two
 instruments, and neither has a price process of its own.
 
-**Polaris rounds.** Polaris stays private for the whole run. It raises
-at its founding (the spawn day) and then every 126 ± 21 days while it
-lives. Timing draws from a `rounds` substream outside `race.streams`, so
+**Polaris rounds.** Polaris stays private for the whole run. Its
+founding round comes 21 days after the walkout (the spawn day belongs
+to that superevent), and later rounds follow every 126 ± 21 days while
+it lives. Timing draws from a `rounds` substream outside `race.streams`, so
 a run nobody participates in is bit-identical to one without rounds. The
 founding round prices a unit at 1.00. Each later round prices at
 `P_k = P_{k−1}·clamp(exp(0.8·Δr + 1.0·ΔΠ − 0.15), 0.5, 3.0)`, where `Δr`

@@ -62,7 +62,7 @@ import {
     appendLedger, ledgerTotals, ledgerEntries, applyRaceEffects,
 } from '../src/race/ledger.js';
 import { COUPLING_TUNING } from '../src/race/coupling.js';
-import { belief, initBelief, stepFirmBelief } from '../src/race/belief.js';
+import { belief, initBelief, stepFirmBelief, credibility } from '../src/race/belief.js';
 
 const clampFn = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const PLAYER_CLIP_FRAC = 3 / 7;   // 02a bounded-influence clip (mirrors resolution.js)
@@ -865,8 +865,9 @@ let ejInvOK = true, sDetail = '', nonVacuous = 0, seedsChecked = 0;
     }
     // At least one seed exercised the post-ejection-certification -> YES path.
     if (nonVacuous === 0) fail('vacuous: no post-ejection certification settled YES in any seed');
-    // Credibility scoring routes through applyBinarySettlementRows: every matured YES/NO
-    // is scored exactly once (the shape the shared consequence helper consumes).
+    // Terminal settlement routes through applyBinarySettlementRows exactly once, and it
+    // does not score credibility (02a: the posterior is scored against B each quarter;
+    // Consensus settlement no longer touches it).
     const rc = createRaceState(BASE_SEED >>> 0);
     initConsensus(rc); initBelief(rc);
     for (let d = 0; d < HORIZON && !rc.resolution; d++) {
@@ -874,11 +875,12 @@ let ejInvOK = true, sDetail = '', nonVacuous = 0, seedsChecked = 0;
     }
     if (!rc.resolution) checkResolution(rc, null);
     const finRows = finalizeConsensusTerminal(rc);
-    const yesNo = finRows.filter(r => r.outcome === 'YES' || r.outcome === 'NO').length;
-    const { matured } = applyBinarySettlementRows(finRows);
-    if (matured.length !== yesNo) fail(`matured ${matured.length} != YES/NO ${yesNo} (scoring not routed exactly-once)`);
-    // second application scores nothing (exactly-once).
-    if (applyBinarySettlementRows(finRows).matured.length !== 0) fail('re-apply re-scored (not exactly-once)');
+    const credBefore = credibility();
+    const { fresh } = applyBinarySettlementRows(finRows);
+    if (fresh.length !== finRows.length) fail(`applied ${fresh.length} of ${finRows.length} terminal rows (not routed exactly-once)`);
+    if (credibility() !== credBefore) fail(`terminal settlement moved credibility ${credBefore} -> ${credibility()}`);
+    // second application applies nothing (exactly-once).
+    if (applyBinarySettlementRows(finRows).fresh.length !== 0) fail('re-apply re-applied (not exactly-once)');
 }
 check(`S: ejection-invariance (desk presence never changes the oracle; ${seedsChecked} seeds, ${nonVacuous} non-vacuous)`, ejInvOK, sDetail);
 

@@ -23,7 +23,7 @@
    ended and the epilogue reveals them.
    ===================================================== */
 
-import { belief } from './race/belief.js';
+import { belief, latestLock } from './race/belief.js';
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
 
@@ -182,15 +182,19 @@ const sig = (x) => 1 / (1 + Math.exp(-x));
  *  (a Tianxia far behind) sits in a narrow strip just under the R1 rule. */
 const _bandV = (r, frac) => (r >= 1 ? r + frac : 0.66 + 0.3 * frac);
 
-/** Conditional crossing law of rung R from belief B, given no crossing by `t0`. */
-function _law(R, t0) {
-    const r = belief.rungs[R];
-    if (!r || r.crossed) return null;
-    const F0 = sig((t0 - r.m) / r.w);
-    const tgt = F0 + (1 - F0) / 2;
+/** Conditional crossing law of rung R from belief B (or from `curve`, a locked
+ *  {m, w} of the player's), given no crossing by `t0`. */
+function _law(R, t0, curve) {
+    const b = belief.rungs[R];
+    if (!b || b.crossed) return null;
+    const r = curve || b;
+    const a = (t0 - r.m) / r.w, F0 = sig(a);
+    // The conditional median m + w*logit((1 + F0)/2) = m + w*ln(1 + 2e^a), in a
+    // form that stays finite when the median is far behind t0 (a lock can be).
+    const lift = a > 0 ? a + Math.log(2 + Math.exp(-a)) : Math.log1p(2 * Math.exp(a));
     return {
         dens: (d) => { const s = sig((d - r.m) / r.w); return s * (1 - s) / r.w / (1 - F0); },
-        median: r.m + r.w * Math.log(tgt / (1 - tgt)),
+        median: r.m + r.w * lift,
     };
 }
 
@@ -471,8 +475,14 @@ function _table() {
     for (const R of [2, 3, 4, 5]) {
         const tr = document.createElement('tr');
         const claim = _pub.claims.find(cl => cl.rung === R), cert = _pub.certs.find(ce => ce.rung === R);
-        const law = race && belief.active ? _law(R, _st.ended ? _pub.lastDay : Math.min(race.day, HORIZON)) : null;
-        const cells = [`R${R}`, claim ? `${claim.day}, ${LAB[claim.lab].name}` : '—', cert ? String(cert.day) : '—', law ? String(Math.round(law.median)) : cert ? 'certified' : '—'];
+        const t0 = race ? (_st.ended ? _pub.lastDay : Math.min(race.day, HORIZON)) : 0;
+        const law = race && belief.active ? _law(R, t0) : null;
+        // Yours: the latest lock's median, conditioned on today like the market's
+        // beside it, so a lock of the market's curves reads the market's number.
+        const lock = race && belief.active ? latestLock() : null;
+        const mine = lock ? _law(R, t0, lock.curves[R]) : null;
+        const med = (l) => l ? String(Math.round(l.median)) : cert ? 'certified' : '—';
+        const cells = [`R${R}`, claim ? `${claim.day}, ${LAB[claim.lab].name}` : '—', cert ? String(cert.day) : '—', med(law), lock ? med(mine) : '—'];
         cells.forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (!i) td.className = 'l'; tr.appendChild(td); });
         tb.appendChild(tr);
     }
