@@ -71,10 +71,7 @@ import {
 } from '../src/portfolio.js';
 import { market, syncMarket } from '../src/market.js';
 
-// ui.js sets one top-level property on `window`; stub it, then load the module
-// dynamically (after the stub) so the pure render helper is headless-importable.
-globalThis.window = globalThis.window || {};
-const { consensusOutcomeClass } = await import('../src/ui.js');
+import { consensusOutcomeClass } from '../src/format-helpers.js';
 
 // ---- CLI -----------------------------------------------------------------
 

@@ -314,7 +314,7 @@ This creates a locally risk-free position (for small moves), but the hedge
 must be rebalanced as the stock moves (because $\\Delta$ itself changes &mdash; see Gamma).</p>
 
 <h3>Portfolio delta</h3>
-<p>The aggregate delta displayed in the Book rail sums delta across all
+<p>The aggregate delta in your book on the front page sums delta across all
 option positions, weighted by quantity and multiplied by the option multiplier (1 in this sim).
 A portfolio delta of $+50$ means $+\\$50$ P&amp;L per $\\$1$ stock move.</p>
 `,
@@ -575,8 +575,9 @@ environments have wider spreads, increasing transaction costs.</p>
 $\\$100$ with a 0.5% half-spread, each round-trip costs $\\sim\\$1.00$.</p>
 
 <h3>Viewing bid-ask prices</h3>
-<p>Hover over any price cell in the chain to see the bid and ask prices in a tooltip.
-The displayed price is always the theoretical mid-price (fair value).</p>
+<p>Open a curve on the Markets page by its title: its table lists the bid and ask of every
+contract on it (for options, hover a cell for both). The ticket shows each leg&rsquo;s
+mid, and its net cost at the side each leg fills on.</p>
 `,
     },
 
@@ -719,40 +720,32 @@ quarterly boundaries</li>
     orderTypes: {
         title: 'Order types',
         body: `
-<p>The simulation supports three order types that determine when and how your trade executes.</p>
+<p>The ticket sends an order one of three ways. A single leg, or a named strategy, can rest
+as a limit or a stop; anything else trades at market.</p>
 
 <h3>Market order</h3>
-<p>Executes immediately at the current bid or ask price. Buys fill at the ask; sells fill
-at the bid. Market orders guarantee execution but not price &mdash; the fill price includes
-the bid-ask spread as an implicit cost.</p>
-<p>Use market orders when you want immediate execution and are willing to pay the spread.</p>
+<p>Executes now at the current bid or ask. Buys fill at the ask; sells fill at the bid.
+A market order guarantees execution but not price: the spread is its implicit cost.</p>
 
-<h3>Limit order</h3>
-<p>Specifies a maximum buy price (or minimum sell price). The order sits in the pending
-queue until the market price reaches your trigger level:</p>
-<ul>
-<li><strong>Buy limit</strong>: triggers when the ask $\\leq$ trigger price. Use to buy at a
-lower price than the current market.</li>
-<li><strong>Sell limit</strong>: triggers when the bid $\\geq$ trigger price. Use to sell at a
-higher price than the current market (take profit).</li>
-</ul>
-<p>When triggered, the limit order executes as a market order at the prevailing bid/ask.
-Limit orders may never fill if the market doesn&rsquo;t reach your price.</p>
-
-<h3>Stop order</h3>
-<p>A stop order becomes a market order when the stock price crosses the trigger level.
-Unlike limit orders, stops are used to enter <em>with</em> momentum or to cut losses:</p>
-<ul>
-<li><strong>Buy stop</strong>: triggers when the ask $\\geq$ trigger price. Use for breakout entries.</li>
-<li><strong>Sell stop</strong>: triggers when the bid $\\leq$ trigger price. Use as a stop-loss.</li>
-</ul>
-<p>Warning: stop orders execute at the prevailing market price after triggering, which
-may be worse than the trigger level if the price gaps through.</p>
+<h3>Limit and stop orders</h3>
+<p>A resting order waits for <strong>HCN&rsquo;s price</strong> to reach its trigger, whatever
+the contract: a limit on a put or a bond is still a condition on the stock.</p>
+<table style="width:100%;border-collapse:collapse;margin:12px 0">
+<tr><th style="text-align:left;padding:4px 8px">Order</th><th style="text-align:left;padding:4px 8px">Fills when</th><th style="text-align:left;padding:4px 8px">Typical use</th></tr>
+<tr><td style="padding:4px 8px">Buy limit</td><td style="padding:4px 8px">HCN $\leq$ trigger</td><td style="padding:4px 8px">Buy the dip</td></tr>
+<tr><td style="padding:4px 8px">Sell limit</td><td style="padding:4px 8px">HCN $\geq$ trigger</td><td style="padding:4px 8px">Take profit</td></tr>
+<tr><td style="padding:4px 8px">Buy stop</td><td style="padding:4px 8px">HCN $\geq$ trigger</td><td style="padding:4px 8px">Enter on a breakout</td></tr>
+<tr><td style="padding:4px 8px">Sell stop</td><td style="padding:4px 8px">HCN $\leq$ trigger</td><td style="padding:4px 8px">Stop a loss</td></tr>
+<tr><td style="padding:4px 8px">Strategy limit</td><td style="padding:4px 8px">HCN $\leq$ trigger</td><td style="padding:4px 8px">Every leg at once</td></tr>
+<tr><td style="padding:4px 8px">Strategy stop</td><td style="padding:4px 8px">HCN $\geq$ trigger</td><td style="padding:4px 8px">Every leg at once</td></tr>
+</table>
+<p>When triggered, the order executes at the prevailing bid or ask, which may be worse than
+the trigger if the price gaps through it.</p>
 
 <h3>Order lifecycle</h3>
-<p>Pending limit and stop orders are checked at every sub-step (16 per day). They appear
-in the &ldquo;Pending orders&rdquo; section of the Book rail and can be cancelled via the
-&ldquo;&times;&rdquo; button. Orders are cancelled automatically if their associated option expires.</p>
+<p>Resting orders are checked at every sub-step (16 a day). They appear under
+&ldquo;Working orders&rdquo; in your book on the front page and can be cancelled with
+their &ldquo;&times;&rdquo;. An order is dropped if its contract expires first.</p>
 `,
     },
 
@@ -802,39 +795,37 @@ and LEAPS-style positions.</li>
     // Strategy Topics
     // -----------------------------------------------------------------------
 
-    strategies: {
-        title: 'Strategy builder',
+    ticket: {
+        title: 'The ticket',
         body: `
-<p>The strategy builder lets you construct multi-leg option strategies by combining
-calls, puts, stock, and bonds into a single package with unified execution.</p>
+<p>Every trade starts on the Markets page&rsquo;s ticket. It takes stock, bonds, VXHCN
+futures, options, Consensus binaries and Cambria compute futures, alone or together.</p>
 
-<h3>Building a strategy</h3>
+<h3>Adding legs</h3>
 <ol>
-<li>Switch to the <strong>Strategy</strong> page.</li>
-<li>Select a <strong>quantity</strong> per leg using the slider.</li>
-<li>Choose an <strong>expiry</strong> from the dropdown.</li>
-<li><strong>Left-click</strong> any chain cell to add a long leg; <strong>right-click</strong> for a short leg.</li>
-<li>Stock and bond legs are added via the top price cells.</li>
-<li>Each leg appears in the legs list below &mdash; you can remove individual legs.</li>
+<li><strong>Pick a point</strong> on any curve: once for long, twice for short, a third time
+to take it off. A right-click goes short at once.</li>
+<li><strong>Open a curve</strong> by its title for its table: every contract on the curve, with
+its bid and ask. A click on an ask buys, on a bid sells; on the options chain a click
+cycles like a point.</li>
+<li>A point on the smile is a strike. The leg&rsquo;s <em>call</em> or <em>put</em> is a link
+on the ticket that switches it.</li>
+<li>A position&rsquo;s name in your book puts that contract on the ticket, on its side.</li>
 </ol>
 
-<h3>Execution &amp; rollback</h3>
-<p>Click &ldquo;Execute&rdquo; to fill all legs simultaneously as a strategy group.
-Each leg executes as a market order at the current bid or ask. If any leg fails
-(e.g., insufficient margin for a short leg), <strong>all previously filled legs are
-rolled back</strong> &mdash; positions are closed and cash is restored. This prevents
-partial fills that could leave you with unintended exposure.</p>
+<h3>Ratio and size</h3>
+<p>Each leg carries a signed ratio and the size scales them all, so a butterfly is
+$+1/-2/+1$ at any size. A leg trades $|\text{ratio}| \times \text{size}$ thousand units.</p>
 
-<h3>Saved strategies</h3>
-<p>Click &ldquo;Save&rdquo; to name and store the strategy. Saved strategies appear as
-grouped positions in the Book rail under &ldquo;Strategy positions.&rdquo;
-Individual legs can be closed independently, but the grouping helps you
-track the strategy as a whole.</p>
-
-<h3>Payoff diagram</h3>
-<p>While in strategy mode, the left canvas shows a real-time payoff diagram.
-The X-axis is the stock price at evaluation; the Y-axis is strategy P&amp;L.
-Green = profit region, rose = loss region. See the Payoff reference for more details.</p>
+<h3>Strategies</h3>
+<p>A named ticket of stock, bonds, VXHCN and options trades as one strategy: every leg
+fills, or none does (a failed leg <strong>rolls the others back</strong>), and the legs group
+under the name in your book with one unwind. It may also rest as a limit or a stop.
+Any other ticket trades leg by leg.</p>
+<p>&ldquo;Load a strategy&rdquo; places a built-in or saved structure at the Options
+panel&rsquo;s expiry, its strikes set around today&rsquo;s price. &ldquo;Save&rdquo; stores the
+ticket by its name: relative to whatever expiry it later loads at when its legs share one,
+at fixed distances (a calendar) when they don&rsquo;t.</p>
 
 <h3>Common structures</h3>
 <table style="width:100%;border-collapse:collapse;margin:12px 0">
@@ -851,54 +842,33 @@ Green = profit region, rose = loss region. See the Payoff reference for more det
 `,
     },
 
-    payoff: {
-        title: 'Payoff diagrams',
+    horizon: {
+        title: 'The ticket’s figure',
         body: `
-<p>The payoff diagram shows the P&amp;L profile of the current strategy across a range
-of possible stock prices. It updates in real time as you add or remove legs.</p>
+<p>Under the ticket, the figure prices its legs at a horizon across HCN moves from
+$-40\%$ to $+40\%$. Each line is one scenario row: in the Dynamic regime, how far the
+race gets (no new rung, solid; one rung further, dashed; two, dotted); in a Classic regime,
+how volatility goes (as now, falling, rising). The area between the first line and zero is
+shaded viridian where it gains and red where it loses; ticks on the zero line are its
+breakevens, labelled with HCN&rsquo;s price.</p>
 
-<h3>Reading the diagram</h3>
-<ul>
-<li><strong>X-axis</strong>: stock price at evaluation time</li>
-<li><strong>Y-axis</strong>: strategy P&amp;L (profit/loss in dollars)</li>
-<li><strong>Green region</strong>: profit (above the zero line)</li>
-<li><strong>Rose region</strong>: loss (below the zero line)</li>
-<li><strong>Zero line</strong>: breakeven &mdash; no profit, no loss</li>
-<li><strong>Vertical dashed line</strong>: current stock price</li>
-</ul>
+<h3>The horizon</h3>
+<p>Until you set it, the horizon is a quarter out or the nearest option&rsquo;s expiry,
+whichever is sooner, so an option book reads at expiry: the hockey stick. Options are
+repriced on the binomial tree at the horizon; one that has expired is worth what it pays.</p>
 
-<h3>Time-to-expiry slider</h3>
-<p>The slider at the bottom adjusts the evaluation time between now and the nearest
-expiry. At the leftmost position (0%), the diagram shows the payoff at expiry &mdash;
-the characteristic hockey-stick shape of raw option payoffs. As you slide right
-toward 100% (now), the lines smooth out due to remaining time value.</p>
-<p>The slider percentage maps to an evaluation day:
-$\\text{evalDay} = \\text{currentDay} + \\text{pct} \\times \\text{maxDTE}$,
-clamped to the range of active leg expiries.</p>
+<h3>The scenario model</h3>
+<p>The model is the display&rsquo;s, not the engine&rsquo;s. Variance follows Heston&rsquo;s
+mean reversion with a leverage shock that grows with a fall; each newly certified rung
+lifts the long-run rate by the capex channel&rsquo;s $0.005$; Consensus reprices off the
+market&rsquo;s belief evaluated on a copy of the public record with the row&rsquo;s
+certification added; compute reprices off the public curve at the new certified rung.
+Nothing hidden is read.</p>
 
-<h3>Greek overlays</h3>
-<p>Click the legend entries ($\\Delta$, $\\Gamma$, $\\Theta$, $\\mathcal{V}$, $\\rho$) to
-overlay Greek profiles across the strike range. Each Greek has its own Y-axis scale.
-The overlays show how risk sensitivities change with the stock price, helping you
-understand where your exposures concentrate.</p>
-<p>Key patterns to observe:</p>
-<ul>
-<li>Delta crosses zero at the breakeven(s) of simple spreads</li>
-<li>Gamma peaks at each leg&rsquo;s strike</li>
-<li>Theta is most negative where gamma is highest</li>
-<li>Vega has a broad hump centered on ATM strikes</li>
-</ul>
-
-<h3>Breakeven points</h3>
-<p>Dots on the zero line mark prices where the strategy crosses from profit to loss
-(or vice versa). The summary panel lists exact breakeven values. Breakevens shift
-as the slider moves &mdash; an initially unprofitable position may become profitable
-if the stock reaches certain levels before expiry.</p>
-
-<h3>Caching</h3>
-<p>The diagram uses input-keyed caching: each combination of legs, time, and stock price
-range is computed once and reused until inputs change. Greek overlays are computed
-lazily and cached independently per Greek.</p>
+<h3>The grid and the sentence</h3>
+<p>The grid is the figure&rsquo;s table at $\pm10\%$, $\pm20\%$ and $\pm30\%$, in
+thousands of dollars. The sentence under it says what the book bets on and names its worst
+cell. &ldquo;Include my book&rdquo; adds your open positions, marked from today.</p>
 `,
     },
 

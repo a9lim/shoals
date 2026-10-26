@@ -1,14 +1,16 @@
 /* =====================================================
-   surface.js -- The front page's volatility surface: a
-   small mesh of the pricing vol the chain is quoted at,
-   by strike (moneyness) and expiry.
+   surface.js -- The volatility surface under the opened
+   Options panel: a small mesh of the pricing vol the
+   chain is quoted at, by strike (moneyness) and expiry.
 
    Each vertex is computeEffectiveSigma (Heston term) with
    computeSkewSigma (skew and smile) at that strike and
    expiry, the same vol every option price on the page
-   uses. Height and shade both read the vol; the mesh
-   lines are the strikes and expiries. Drawn once a day
-   and on theme change; a horizontal drag turns it.
+   uses. Height and the ink's weight both read the vol
+   (paper to a tenth of ink, no hue); the mesh lines are
+   the strikes and expiries. Drawn when the panel opens,
+   once a day while it is open, and on theme change; a
+   horizontal drag turns it.
    ===================================================== */
 
 import { market } from './market.js';
@@ -82,12 +84,12 @@ export function drawSurface() {
         quads.push({ q: [a, b, e, d], depth: a[2] + b[2] + d[2] + e[2], v: (a[3] + b[3] + d[3] + e[3]) / 4 });
     }
     quads.sort((p, q) => q.depth - p.depth);
-    const ink = _parseHex(pal.inks.prussian), cv = _parseHex(pal.canvas);
+    const ink = _parseHex(text), cv = _parseHex(pal.canvas);
     for (const qd of quads) {
-        const t = 0.1 + 0.55 * (qd.v - lo) / (hi - lo);
+        const t = 0.015 + 0.11 * (qd.v - lo) / (hi - lo);
         c.fillStyle = 'rgb(' + cv.map((x, k) => Math.round((x + (ink[k] - x) * t) * 255)).join(',') + ')';
         c.beginPath(); qd.q.forEach((p, i) => (i ? c.lineTo(p[0], p[1]) : c.moveTo(p[0], p[1]))); c.closePath();
-        c.fill(); c.strokeStyle = _r(text, 0.3); c.lineWidth = 0.6; c.stroke();
+        c.fill(); c.strokeStyle = _r(text, 0.42); c.lineWidth = 0.7; c.stroke();
     }
 
     // Labels: strike runs left to right, expiry into the page; the vol scale.

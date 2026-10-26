@@ -75,19 +75,22 @@ constants are in [02a-tuning.md](02a-tuning.md).
 The **market's implied timeline** is `B`, per rung a crossing-date law
 whose quotes are the binaries; its implied date is the day the law is
 even odds, or "not this term". The **player's posterior** is a
-logistic per rung with a plateau, drawn: on the Markets page's Consensus
-panel, "Your curves" draws the player's draft over the market's curves,
-starting from a fit of `B` into the player's family. A median handle per
-uncertified rung drags along the timeline and up or down for width; a
-square at the term's end sets the chance the rung lands this term at
-all. Arrow keys move the median 5 days (21 with Shift) and tighten or
-loosen it, Page Up and Page Down move the plateau, and Tab moves between
-rungs. Edit mode suspends the panel's sandbox picks. The draft is locked
-each quarter through the forecast-lock dispatch — as drawn, the
-market's, earlier or later than the market, or "adjust first", which
-holds the quarter until the panel's Lock is pressed. Locking the
-market's curves is a policy, not a drawing: it scores exactly what the
-market scores.
+logistic per rung with a plateau, drawn on the Race page over the
+evidence it is a reading of: on each uncertified rung, the player's
+crossing-date distribution in ink over Consensus's in indigo, on one
+scale per rung, starting from a fit of `B` into the player's family. The
+bead on the rung is the median; it drags along the rung, and up or down
+for width. A square on a gauge at the term's end sets the chance the
+rung lands this term at all, beside a tick for the market's. Arrow keys
+move the median 5 days (21 with Shift) and tighten or loosen it, Page Up
+and Page Down move the plateau, and Tab moves between rungs. "Match the
+market" resets the draft to the fit. The Markets page's Consensus panel
+shows the draft read-only, on the rungs where it differs from the
+market. The draft is locked each quarter through the forecast-lock
+dispatch — as drawn, the market's, earlier or later than the market, or
+"adjust first", which opens the Race page and holds the quarter until
+its Lock is pressed. Locking the market's curves is a policy, not a
+drawing: it scores exactly what the market scores.
 
 At each quarter's close, every open rung is scored for the player and
 for the market's snapshot alike, from the probabilities both stored at

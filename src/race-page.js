@@ -14,6 +14,15 @@
    conditioned on today). The self-graded Fixedpoint Index
    sits apart, unlisted.
 
+   Your forecast (02a, the posterior) is drawn over
+   Consensus in ink and edited here: on each open rung,
+   the bead is your median (drag along the rung; up and
+   down to tighten or loosen), and the square on the
+   term's-end gauge is the chance the rung lands this
+   term at all. The keys follow 02a. Consensus's spindle
+   and yours share one scale per rung, so a narrower or
+   less likely forecast reads as one.
+
    THE INTEGRITY RULE (09 "Information hygiene", as in
    race/consensus.js): during play this page reads only
    public records -- release dates and claimed rungs,
@@ -23,7 +32,11 @@
    ended and the epilogue reveals them.
    ===================================================== */
 
-import { belief, latestLock, beliefLaw, isCertified, crossingProb, curveMedian } from './race/belief.js';
+import {
+    belief, latestLock, beliefLaw, isCertified, crossingProb, curveMedian,
+    draftCurves, openRungs, setDraftMedian, setDraftWidth, setDraftPlateau, plateauHeight,
+    curvesEqual, marketCurves, impliedTimeline, setDraft,
+} from './race/belief.js';
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
 
@@ -37,16 +50,32 @@ const LAB = Object.fromEntries(LABS.map(l => [l.id, l]));
 
 // Public record (drawn during play) and hidden record (drawn after the end).
 let _pub = null, _hid = null;
-const _st = { ctx: null, visible: false, revealed: false, ended: false, reveal0: -1e9, raf: 0, w: 0, h: 0, dpr: 1, cap: null, canvas: null, c: null, reduced: false };
+const _st = {
+    ctx: null, visible: false, revealed: false, ended: false, reveal0: -1e9, raf: 0, w: 0, h: 0, dpr: 1, cap: null, canvas: null, c: null, reduced: false,
+    // The forecast editor: the selected rung, a drag, the handles drawn last frame,
+    // a lock held open by "Adjust first", and main.js's hooks.
+    sel: 2, drag: null, handles: [], hover: null, pending: false, hooks: {},
+};
+
+// Editor steps (UNRATIFIED feel numbers, 02a gives only the keys): ←/→ move a
+// median 5 days, Shift 21 (ratified); ↑/↓ scale the width by 10%; a vertical drag
+// scales it by e per 90 px, up tighter. The plateau: PageUp/PageDown move the
+// term-end height 0.05, Shift 0.01; a drag follows the gauge.
+const EDIT_STEP = 5, EDIT_STEP_BIG = 21, EDIT_W_STEP = 1.1, EDIT_W_PX = 90;
+const EDIT_H_STEP = 0.05, EDIT_H_STEP_FINE = 0.01;
 
 function _fresh() {
     _pub = { releases: [], claims: [], certs: [], open: [], fixedpoint: null, lastDay: 0 };
     _hid = { days: [], tracks: { halcyon: [], tianxia: [], polaris: [], open: [] } };
 }
 
-/** @param {object} ctx { race(), world() } */
-export function initRacePage(ctx) {
+/**
+ * @param {object} ctx    { race(), world() }
+ * @param {object} hooks  { onLock(), onEdit() }: the held lock's button; a draft change
+ */
+export function initRacePage(ctx, hooks = {}) {
     _st.ctx = ctx;
+    _st.hooks = hooks;
     _st.canvas = document.getElementById('race-canvas');
     _st.c = _st.canvas.getContext('2d');
     _st.cap = _colophon.caption(document.getElementById('cap-race'), 300);
@@ -55,6 +84,13 @@ export function initRacePage(ctx) {
     new ResizeObserver(() => { if (_size()) drawRace(); }).observe(_st.canvas.parentElement);
     const btn = document.getElementById('race-reveal');
     btn.addEventListener('click', () => revealRace(!_st.revealed));
+    document.getElementById('race-lock').addEventListener('click', () => { if (_st.pending && _st.hooks.onLock) _st.hooks.onLock(); });
+    document.getElementById('race-match').addEventListener('click', () => {
+        if (!_editable()) return;
+        setDraft(marketCurves());
+        _edited(true);
+    });
+    _wireEditor();
     _key();
 }
 
@@ -228,7 +264,7 @@ export function drawRace() {
     c.clearRect(0, 0, W, H);
     if (!race) {
         c.font = font(14, true); c.fillStyle = muted; c.textAlign = 'center';
-        c.fillText('The race runs in the Dynamic regimes. Choose one on the Desk page.', W / 2, H / 2);
+        c.fillText('The race runs in the Dynamic regime. Choose it in Meridian’s settings.', W / 2, H / 2);
         _st.cap('No race in a Classic regime.');
         return;
     }
@@ -236,7 +272,8 @@ export function drawRace() {
     // Once the run has ended, "today" is the desk's last day; an extrapolated
     // resolution runs on past it, and only the epilogue sees that far.
     const today = _st.ended ? _pub.lastDay : Math.min(race.day, HORIZON);
-    const L0 = narrow ? 6 : 10, R0 = W - (narrow ? 62 : 128), T0 = 34;
+    // The rung names sit in a gutter of their own, clear of releases and spindles.
+    const L0 = narrow ? 30 : 168, R0 = W - (narrow ? 62 : 128), T0 = 34;
     const stripH = narrow ? 40 : 46, B0 = H - 30 - stripH - 14;
     const X = (d) => L0 + (R0 - L0) * d / HORIZON;
     const Y = (v) => B0 - (B0 - T0) * (v - 0.62) / (5.7 - 0.62);
@@ -263,14 +300,16 @@ export function drawRace() {
         c.beginPath(); c.moveTo(L0, y); c.lineTo(R0, y); c.stroke();
     }
     const rungLabels = () => {
-        c.font = font(12.5, true); c.textAlign = 'left'; c.textBaseline = 'alphabetic';
+        c.textAlign = 'right'; c.textBaseline = 'middle';
         for (let R = 1; R <= 5; R++) {
-            const t = narrow ? `R${R}` : `R${R} · ${RUNG_NAME[R]}`, y = Math.round(Y(R)) + 0.5;
-            c.fillStyle = pal.canvas;
-            c.fillRect(L0, y - 17, c.measureText(t).width + 6, 15);
-            c.fillStyle = muted;
-            c.fillText(t, L0 + 2, y - 5);
+            const y = Math.round(Y(R)) + 0.5;
+            c.font = font(13, false, 600); c.fillStyle = text;
+            c.fillText(`R${R}`, L0 - 8, narrow ? y : y - 8);
+            if (narrow) continue;
+            c.font = font(12, true); c.fillStyle = muted;
+            c.fillText(RUNG_NAME[R], L0 - 8, y + 8);
         }
+        c.textBaseline = 'alphabetic';
     };
 
     // Open weights: a hatched strip on the rung the open ecosystem has reached.
@@ -296,17 +335,26 @@ export function drawRace() {
 
     rungLabels();
 
-    // Consensus: the implied crossing date on every rung still ahead.
+    // Consensus, and your forecast over it: on every rung still ahead, each
+    // implied crossing date as a distribution, the two on one scale per rung.
     const ind = ink.indigo;
     const deadlines = {};
     for (const ct of consensus.contracts) deadlines[ct.predicate.rung] = ct;
+    const editing = _editable();
+    const draft = editing ? draftCurves() : null;
+    const focused = document.activeElement === _st.canvas;
+    const mkt = draft ? marketCurves() : null;
+    _st.handles = [];
+    _st.geom = { L0, R0 };
     if (belief.active && !_st.revealed) {
+        const rowGap = Y(2) - Y(3);
         for (const R of [2, 3, 4, 5]) {
             const law = _law(R, today);
             if (!law) continue;
+            const mine = draft && draft[R] ? _law(R, today, draft[R]) : null;
             const y = Y(R), amp = narrow ? 10 : 15;
             let mx = 0;
-            for (let d = today; d <= HORIZON; d += 4) mx = Math.max(mx, law.dens(d));
+            for (let d = today; d <= HORIZON; d += 4) mx = Math.max(mx, law.dens(d), mine ? mine.dens(d) : 0);
             if (mx <= 0) continue;
             c.beginPath();
             for (let d = today; d <= HORIZON; d += 3) c.lineTo(X(d), y - amp * law.dens(d) / mx);
@@ -325,6 +373,59 @@ export function drawRace() {
                 c.font = font(12, true); c.fillStyle = ind; c.textAlign = 'left';
                 const p = Math.round(q.mid * 100);
                 c.fillText(narrow ? `${p}%` : `${p}% by day ${ct.deadline}`, R0 + 6, y + 4);
+            }
+            if (!mine) continue;
+
+            // Yours, in ink: the outline, the median bead, and the term's-end gauge.
+            const d = draft[R];
+            c.beginPath();
+            for (let x = today; x <= HORIZON; x += 3) c.lineTo(X(x), y - amp * mine.dens(x) / mx);
+            for (let x = HORIZON; x >= today; x -= 3) c.lineTo(X(x), y + amp * mine.dens(x) / mx);
+            c.closePath();
+            c.strokeStyle = text; c.lineWidth = 1.3; c.stroke();
+            const sel = R === _st.sel && (focused || (_st.drag && _st.drag.R === R));
+            const hov = _st.hover && _st.hover.R === R;
+            const xm = X(Math.max(today, Math.min(HORIZON, d.m)));
+            const off = d.m < today ? -1 : d.m > HORIZON ? 1 : 0;
+            c.beginPath(); c.arc(xm, y, sel ? 4.8 : hov && !_st.hover.plateau ? 4.4 : 3.8, 0, Math.PI * 2);
+            c.fillStyle = sel ? text : pal.canvas; c.fill();
+            c.strokeStyle = text; c.lineWidth = 1.5; c.stroke();
+            if (off) {
+                const ax = xm - off * 9;
+                c.beginPath(); c.moveTo(ax - off * 3, y - 3.5); c.lineTo(ax, y); c.lineTo(ax - off * 3, y + 3.5);
+                c.lineWidth = 1.2; c.stroke();
+            }
+            _st.handles.push({ R, sx: xm, sy: y });
+            if (sel && focused) {
+                c.strokeStyle = pal.accent; c.lineWidth = 1;
+                c.strokeRect(Math.round(xm) - 7.5, Math.round(y) - 7.5, 15, 15);
+            }
+            // Its median as the market's is read: conditional on today (null: not
+            // this term). A rung still on the market's projection reads the market's.
+            const dMed = curvesEqual(draft, mkt, R) ? law.median : mine.median;
+            if (!narrow) {
+                c.font = font(12, true); c.fillStyle = sel ? text : pal.textSecondary; c.textAlign = 'center';
+                c.fillText(dMed == null ? 'yours: not this term' : `yours day ${Math.round(dMed)}`, Math.max(L0 + 40, Math.min(R0 - 40, xm)), y + amp + 15);
+            }
+            // The gauge: 0 at the rung, 1 a little under the rung above. The market's
+            // chance this term is its tick; yours is the square.
+            const G = Math.max(18, Math.min(rowGap * 0.5, 44)), gx = Math.round(R0) + 0.5;
+            const bLaw = beliefLaw(R), pm = bLaw ? bLaw.cdf(HORIZON) : 0;
+            const h = plateauHeight(d.m, d.w, d.q || 0, today);
+            c.strokeStyle = _r(text, 0.35); c.lineWidth = 1;
+            c.beginPath(); c.moveTo(gx, y); c.lineTo(gx, y - G); c.moveTo(gx - 2.5, Math.round(y - G) + 0.5); c.lineTo(gx + 2.5, Math.round(y - G) + 0.5); c.stroke();
+            c.strokeStyle = ind; c.lineWidth = 1.5;
+            c.beginPath(); c.moveTo(gx - 5, Math.round(y - G * pm) + 0.5); c.lineTo(gx + 5, Math.round(y - G * pm) + 0.5); c.stroke();
+            const ps = _st.hover && _st.hover.R === R && _st.hover.plateau;
+            const sr = sel && _st.drag && _st.drag.plateau ? 4.4 : ps ? 4.2 : 3.4;
+            c.beginPath(); c.rect(gx - sr, y - G * h - sr, 2 * sr, 2 * sr);
+            c.fillStyle = sel ? text : pal.canvas; c.fill();
+            c.strokeStyle = text; c.lineWidth = 1.4; c.stroke();
+            _st.handles.push({ R, plateau: true, sx: gx, sy: y - G * h, G, y0: y });
+            if (sel || ps) {
+                c.font = font(12, true); c.fillStyle = text; c.textAlign = 'right'; c.textBaseline = 'middle';
+                c.fillText(`${Math.round(h * 100)}% this term · market ${Math.round(pm * 100)}%`, gx - 9, y - G * h);
+                c.textBaseline = 'alphabetic';
             }
         }
     }
@@ -424,8 +525,14 @@ export function drawRace() {
     // The Fixedpoint Index, apart: self-graded, unlisted.
     const sT = H - 30 - stripH, sB = H - 30;
     c.strokeStyle = _r(text, 0.2); c.beginPath(); c.moveTo(L0, Math.round(sT) + 0.5); c.lineTo(R0, Math.round(sT) + 0.5); c.stroke();
+    if (!narrow) {
+        c.textAlign = 'right'; c.textBaseline = 'middle';
+        c.font = font(13, false, 600); c.fillStyle = text; c.fillText('Fixedpoint', L0 - 8, (sT + sB) / 2 - 8);
+        c.font = font(12, true); c.fillStyle = muted; c.fillText('Index', L0 - 8, (sT + sB) / 2 + 8);
+        c.textBaseline = 'alphabetic';
+    }
     c.font = font(12.5, true); c.fillStyle = muted; c.textAlign = 'left';
-    c.fillText(narrow ? 'Fixedpoint Index · unlisted' : 'Fixedpoint Index · Halcyon’s tasks, graded by Halcyon · unlisted: Consensus will not list it', L0 + 2, sT + 15);
+    c.fillText(narrow ? 'Fixedpoint Index · unlisted' : 'Halcyon’s tasks, graded by Halcyon · unlisted: Consensus will not list it', L0 + 2, sT + 15);
     const fp = _pub.fixedpoint;
     if (_st.revealed && _hid.tracks.halcyon.length > 1) {
         const tr = _hid.tracks.halcyon, FY = (v) => sB - 4 - (sB - sT - 22) * Math.max(0, Math.min(1, (v - 1) / 4.5));
@@ -463,7 +570,143 @@ function _caption(today, frontier) {
         const law = _law(next, today);
         tail = law && law.median != null ? ` Consensus’s median for R${next} is day ${Math.round(law.median)}.` : '';
     }
-    _st.cap(`Day ${today}. The released frontier claims R${frontier || 1}.${tail} Hollow diamonds are claims nobody has adjudicated; the thick rule to a filled one is the certification lag.`);
+    const ink = _editable() ? ' Your forecast is in ink over it: drag a bead along its rung, up or down to tighten it; the square sets the chance it lands this term.' : '';
+    _st.cap(`Day ${today}. The released frontier claims R${frontier || 1}.${tail}${ink} Hollow diamonds are unadjudicated claims; the thick rule to a filled one is the certification lag.`);
+}
+
+// ---------------------------------------------------------------------------
+// The forecast editor (02a, the posterior's editor)
+// ---------------------------------------------------------------------------
+
+/** The draft is editable while the race runs and nothing has been revealed. */
+function _editable() {
+    return !!(belief.active && _st.ctx && _st.ctx.race() && !_st.ended && !_st.revealed && draftCurves());
+}
+
+/**
+ * "Adjust first" holds the quarter's lock until the Race page's Lock is pressed:
+ * show it (and focus the editor, for the dispatch's hand-off), or clear it.
+ */
+export function setForecastPending(pending, focus = false) {
+    _st.pending = !!pending;
+    const lock = document.getElementById('race-lock'), note = document.getElementById('race-lock-note');
+    if (lock) lock.hidden = !_st.pending;
+    if (note) note.hidden = !_st.pending;
+    if (focus && _st.canvas) { _selectOpen(0); _st.canvas.focus(); }
+    if (_st.visible) drawRace();
+}
+
+/** Keep the selected rung on an open one: step `dir` through the open rungs
+ *  (0 = stay if still open, else the first). Returns false past either end. */
+function _selectOpen(dir) {
+    const open = belief.active ? openRungs() : [];
+    if (!open.length) return false;
+    const i = open.indexOf(_st.sel);
+    if (dir === 0) { if (i < 0) _st.sel = open[0]; return true; }
+    const j = (i < 0 ? 0 : i) + dir;
+    if (j < 0 || j >= open.length) return false;
+    _st.sel = open[j];
+    return true;
+}
+
+/** A draft change landed: the table, the reader, main.js. */
+function _edited(redraw) {
+    if (redraw) drawRace();
+    _table();
+    _announce();
+    if (_st.hooks.onEdit) _st.hooks.onEdit();
+}
+
+function _wireEditor() {
+    const cv = _st.canvas;
+    const local = (e) => { const b = cv.getBoundingClientRect(); return [e.clientX - b.left, e.clientY - b.top]; };
+    const near = (x, y) => {
+        let best = null, bd = 14;
+        for (const h of _st.handles) { const d = Math.hypot(h.sx - x, h.sy - y); if (d < bd) { bd = d; best = h; } }
+        return best;
+    };
+    const same = (a, b) => (a && a.R + (a.plateau ? 'p' : '')) === (b && b.R + (b.plateau ? 'p' : ''));
+    cv.addEventListener('pointerdown', (e) => {
+        if (!_editable() || e.button !== 0) return;
+        const [x, y] = local(e), h = near(x, y), d = draftCurves();
+        if (!h || !d) return;
+        _st.sel = h.R;
+        _st.drag = { R: h.R, plateau: !!h.plateau, x, y, m0: d[h.R].m, w0: d[h.R].w, G: h.G, y0: h.y0 };
+        cv.setPointerCapture(e.pointerId);
+        cv.style.cursor = 'grabbing';
+        e.preventDefault();
+        drawRace();
+    });
+    cv.addEventListener('pointermove', (e) => {
+        if (!_editable()) return;
+        const [x, y] = local(e), dr = _st.drag;
+        if (dr) {
+            if (dr.plateau) setDraftPlateau(dr.R, (dr.y0 - y) / dr.G);
+            else {
+                // Across for the median, up and down for the width, from where the drag began.
+                const perPx = HORIZON / Math.max(1, _st.geom.R0 - _st.geom.L0);
+                setDraftMedian(dr.R, dr.m0 + (x - dr.x) * perPx);
+                setDraftWidth(dr.R, dr.w0 * Math.exp((y - dr.y) / EDIT_W_PX));
+            }
+            drawRace();
+            return;
+        }
+        const h = near(x, y);
+        if (!same(h, _st.hover)) { _st.hover = h; drawRace(); }
+        cv.style.cursor = h ? 'grab' : '';
+    });
+    const end = () => {
+        if (!_st.drag) return;
+        _st.drag = null;
+        cv.style.cursor = 'grab';
+        _edited(true);
+    };
+    cv.addEventListener('pointerup', end);
+    cv.addEventListener('pointercancel', end);
+    cv.addEventListener('pointerleave', () => { if (_st.hover && !_st.drag) { _st.hover = null; drawRace(); } });
+    cv.addEventListener('focus', () => { if (_editable()) { _selectOpen(0); drawRace(); _announce(); } });
+    cv.addEventListener('blur', () => { if (_st.visible) drawRace(); });
+    cv.addEventListener('keydown', _editKey);
+}
+
+/**
+ * The editor's keys (02a): ←/→ move the selected median 5 days (Shift: 21),
+ * ↑ tightens and ↓ loosens its width, Page Up/Down raise and lower the chance it
+ * lands this term (Shift: finer). Tab and Shift+Tab step through the open rungs
+ * like the thumbs of a multi-thumb slider, letting focus leave past either end;
+ * Home and End choose the first and last.
+ */
+function _editKey(e) {
+    if (!_editable()) return;
+    const d = draftCurves();
+    const R = _st.sel, open = openRungs();
+    if (!d || !d[R]) return;
+    if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
+        setDraftMedian(R, d[R].m + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? EDIT_STEP_BIG : EDIT_STEP));
+    } else if (e.key === 'ArrowUp') setDraftWidth(R, d[R].w / EDIT_W_STEP);
+    else if (e.key === 'ArrowDown') setDraftWidth(R, d[R].w * EDIT_W_STEP);
+    else if (e.key === 'PageUp' || e.key === 'PageDown') {
+        const h = plateauHeight(d[R].m, d[R].w, d[R].q, belief.day);
+        setDraftPlateau(R, h + (e.key === 'PageUp' ? 1 : -1) * (e.shiftKey ? EDIT_H_STEP_FINE : EDIT_H_STEP));
+    } else if (e.key === 'Tab') { if (!_selectOpen(e.shiftKey ? -1 : 1)) return; }
+    else if (e.key === 'Home') _st.sel = open[0];
+    else if (e.key === 'End') _st.sel = open[open.length - 1];
+    else return;
+    e.preventDefault();
+    e.stopPropagation();
+    _edited(true);
+}
+
+/** Speak the selected rung's draft beside the market's (screen readers). */
+function _announce() {
+    const live = document.getElementById('race-live');
+    const d = draftCurves();
+    if (!live || !d || !d[_st.sel]) return;
+    const R = _st.sel, bMed = impliedTimeline()[R], t = belief.day;
+    const dMed = curvesEqual(d, marketCurves(), R) ? bMed : curveMedian(d[R], t, R);
+    const h = plateauHeight(d[R].m, d[R].w, d[R].q || 0, t);
+    const by = (x) => x == null ? 'not this term' : `by day ${Math.round(x)}`;
+    live.textContent = `R${R}: yours ${by(dMed)}, width ${Math.round(d[R].w)} days, ${Math.round(100 * h)}% this term. Consensus ${by(bMed)}.`;
 }
 
 // ---------------------------------------------------------------------------
@@ -483,9 +726,12 @@ function _table() {
         // Yours: the latest lock's median, conditioned on today like the market's
         // beside it. A market-policy lock reads the market's own law (02a).
         const lock = race && belief.active ? latestLock() : null;
-        const mine = lock ? (lock.policy === 'market' ? law : _law(R, t0, lock.curves[R])) : null;
+        const locked = lock ? (lock.policy === 'market' ? law : _law(R, t0, lock.curves[R])) : null;
+        // The draft as the canvas reads it: on the market's projection, the market's day.
+        const draft = race && belief.active && !_st.ended ? draftCurves() : null;
+        const drawn = draft && law ? (curvesEqual(draft, marketCurves(), R) ? law : _law(R, t0, draft[R])) : null;
         const med = (l) => l ? (l.median != null ? String(Math.round(l.median)) : 'not this term') : cert ? 'certified' : '—';
-        const cells = [`R${R}`, claim ? `${claim.day}, ${LAB[claim.lab].name}` : '—', cert ? String(cert.day) : '—', med(law), lock ? med(mine) : '—'];
+        const cells = [`R${R}`, claim ? String(claim.day) : '—', cert ? String(cert.day) : '—', med(law), draft ? med(drawn) : '—', lock ? med(locked) : '—'];
         cells.forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (!i) td.className = 'l'; tr.appendChild(td); });
         tb.appendChild(tr);
     }

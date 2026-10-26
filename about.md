@@ -2,7 +2,7 @@
 name: Shoals
 title: Shoals — Trading the AI Race
 description: Trade stock, bonds, VXHCN volatility futures, American options, and AI-milestone binaries through the last years of the race — stochastic pricing, a hidden capability model, and six ways it ends.
-updated: 2026-10-24
+updated: 2026-10-26
 ---
 
 # Shoals — Trading the AI Race
@@ -11,13 +11,17 @@ Shoals is a derivatives trading game set in the last years of the AI race. The p
 
 ## The Brief
 
-The interface is *The Meridian Brief*, the firm's morning note. Each trading day is an edition, and an extra edition marks a regime change, a blockade or a crisis. The front page leads with the newest item on the wire, sets HCN as a Tufte tape (each day's range as a band, the close as a line over it, news days ticked), and prints quotes, the options chain and the Consensus and Cambria books as agate tables you trade by clicking. Decisions arrive as dispatches, and the epilogue is the last edition.
+The interface is *The Meridian Brief*, the firm's morning note, in four pages with one job each. Each trading day is an edition, and an extra edition marks a regime change, a blockade or a crisis. Decisions arrive as dispatches, and the epilogue is the last edition.
 
-The Markets page draws every market as a curve, as six small multiples: HCN through time, the Vasicek yield curve, the VXHCN futures term structure, the option smile, the Cambria compute forward curve, and Consensus's implied crossing curves. On a news day each keeps the previous day's curve as a dashed ghost, so what moved together is visible at a glance. Every point on a curve is a contract: clicking one (or focusing a curve and pressing Enter) adds it to the sandbox, again to go short, a third time to remove it. The sandbox revalues its legs, and optionally the live book, a quarter out across HCN moves and how far the race gets, says in one sentence what the book bets on, and can send the legs to the desk as market orders.
+The front page is for reading. It leads with the newest item on the wire, with the rest of the wire under it, and sets HCN as a tape of print candles: a hollow body on a day that closed up, a solid red one on a day that closed down, the hairline wick its range, news days ticked above. The forming day's wick holds each new extreme as the day trades; zoomed far out, the candles become the close as a line over a band of the range. Beside the tape is the player's book: its value against holding HCN, the account, positions, strategies, working orders and Greeks.
 
-The Consensus panel is also where the player states a timeline. Switching on "Your curves" draws the player's own crossing curve for each rung over the market's. A median is dragged along the timeline, and a curve tightened or loosened, by pointer or keyboard. Each quarter a forecast-lock dispatch records the draft, the market's curves, or a shift earlier or later. At the next quarter both are scored by log-likelihood against the rungs that certified and the quarters that passed quietly. Credibility is the player's demonstrated edge over the market, and it opens the firm's memo, the fund's agency and a seat in the room.
+The Markets page is where every trade is made. It draws every market as a curve, as six small multiples: HCN through time, the Vasicek yield curve, the VXHCN futures term structure, the option smile, the Cambria compute forward curve, and Consensus's implied crossing curves. On a news day each keeps the previous day's curve as a dashed ghost, so what moved together is visible at a glance. Every point on a curve is a contract: picking one (or focusing a curve and pressing Enter) puts it on the ticket, again to go short, a third time to remove it. A curve's title opens it with its table, every contract on the curve by bid and ask; the options chain sits beside the smile, with the volatility surface under it. The ticket carries signed ratios and one size, single-leg limit and stop orders, Greeks and net cost. Its figure revalues the legs, and optionally the live book, at a horizon across HCN moves and how far the race gets, its grid tabulates the same, and one sentence says what the book bets on. Strategies load and save on the ticket, and a named one trades all-or-nothing.
 
-The Race page follows Epoch's Capabilities Index: every public release placed by date on the rung it claims, claims and certifications on the rungs, the released frontier, and Consensus's implied crossing date as a distribution on each rung still ahead. It reads only public records. The self-graded Fixedpoint Index sits apart, unlisted, and the hidden internal tracks appear only once the run has ended.
+The Race page is for knowing. It follows Epoch's Capabilities Index: every public release placed by date on the rung it claims, claims and certifications on the rungs, the released frontier, and Consensus's implied crossing date as a distribution on each rung still ahead. It reads only public records. The self-graded Fixedpoint Index sits apart, unlisted, and the hidden internal tracks appear only once the run has ended.
+
+The Race page is also where the player states a timeline. Over Consensus's distribution on each open rung, the player's own is drawn in ink: its median a bead that drags along the rung (up and down to tighten or loosen it), and the chance it lands this term a square on a gauge at the term's end, by pointer or keyboard. Each quarter a forecast-lock dispatch records the draft, the market's curves, or a shift earlier or later. At the next quarter both are scored by log-likelihood against the rungs that certified and the quarters that passed quietly. Credibility is the player's demonstrated edge over the market, and it opens the firm's memo, the fund's agency and a seat in the room.
+
+Meridian, the fourth page, keeps the accounts: the player's forecast record and scored quarters, their standing with the firm and with Washington, standing orders and convictions, the two chambers as seat bars, regulations, government affairs, and the settings.
 
 ## Pricing Models
 
@@ -27,9 +31,9 @@ Stock prices follow geometric Brownian motion (GBM) with optional Merton jump di
 
 The options chain spans 21 strikes and eight expiries, displaying calls and puts with real-time Greeks (delta, gamma, theta, vega, rho). Each contract is priced with a term- and moneyness-adjusted volatility derived from the current Heston state.
 
-## Strategy Builder
+## Multi-leg Strategies
 
-The multi-leg strategy builder lets users construct spreads, straddles, strangles, condors, butterflies, and custom combinations. Each strategy shows a payoff diagram, Greek overlays, maximum profit/loss, and break-even points. A margin system tracks portfolio-level exposure.
+The ticket builds spreads, straddles, strangles, condors, butterflies, and custom combinations, alone or loaded from a built-in list, with any instrument as a leg. Its figure shows the payoff at the horizon (at expiry for an option book, until the player moves it) with breakevens, one line per scenario, and its Greeks are read before the trade fills. A margin system tracks portfolio-level exposure.
 
 ## Instruments and Portfolio
 
@@ -55,7 +59,7 @@ The score is synthesized in the browser: "Halcyon", a 32-bar ballad in A minor f
 
 ## Accessibility
 
-Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market/portfolio readouts, and focus trapping for narrative popups and the epilogue. Every curve and the sandbox can be driven from the keyboard. The live tape, the markets' easing after news, sparklines, the typewriter treatment, and other animated feedback create continuous motion; with reduced motion the desk opens paused on a complete edition and the curves change without easing.
+Shoals provides keyboard shortcuts, light and dark themes, labeled controls, numerical market/portfolio readouts, and focus trapping for narrative popups and the epilogue. Every curve, every opened table, the ticket and the forecast editor can be driven from the keyboard. The live tape, the markets' easing after news, sparklines, the typewriter treatment, and other animated feedback create continuous motion; with reduced motion the desk opens paused on a complete edition and the curves change without easing.
 
 ## Price Impact
 

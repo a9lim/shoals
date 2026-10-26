@@ -300,8 +300,8 @@ the financing race given one lifecycle:
 - **Compute obligations as funding deadlines** for the labs, so financing
   windows close on their own clock.
 - **The thesis:** a declared investment thesis with a risk envelope. The
-  sandbox values the book under the player's curves, so "what is this book
-  worth if I'm right" becomes a computation.
+  ticket's figure values the book under the player's curves, so "what is
+  this book worth if I'm right" becomes a computation.
 - **Exit costs.** Releasing a mandate early forfeits something real:
   standing, an allocation, a relationship.
 - **Gates:**
@@ -311,22 +311,23 @@ the financing race given one lifecycle:
   - every enacted commitment has an attributable channel;
   - distinct preparations produce distinct feasible proposals in the room.
 
-### The Desk as Meridian
+### Meridian, the firm
 
-The Desk page still has the politics-era layout, with Congress hemicycles
-in the centre column. The firm is the game's most persistent human
-throughline, and today it is one line of text. Make the page Meridian:
+The 2026-10-26 visual round made the Desk the Meridian page: the
+player's forecast record and scored quarters, their standing, standing
+orders and convictions, and Washington as two seat bars, the regulations
+and the lobbying list, with the settings at its foot. The firm itself is
+still one line of standing text. Give the page the firm:
 
 - the CIO, Webb and the risk committee;
 - the credibility record against the market's and the reader's;
 - `F` beside the player's curves;
 - the sources as people with histories, reliability records and fates,
   with tips about evidence as well as incidents;
-- the mandates and standing orders;
+- the mandates beside the standing orders;
 - the ledger's shadow: what the book financed this quarter, by channel.
 
-Congress moves to the wire and a small panel. The firm's arc becomes
-mechanical:
+The firm's arc becomes mechanical:
 
 - **The scrutiny loop gets teeth:** "explain this thesis" dispatches, and
   forced trims on a divergent drawdown.
@@ -572,7 +573,6 @@ calibration too.
 
 ## Cuts and deferrals (2026-10-25)
 
-- **The Congress hemicycles** leave the Desk page (section 2).
 - **The party-PAC lobby bar** is replaced by the AI-policy menu
   (section 2).
 - **The political pool:** trim its *exposure* — how often it leads the
@@ -777,9 +777,6 @@ autumn of 2026 (real events are calibration, never content):
 - Race-page labels collide where a claim, a certification and an
   in-house crossing fall within a few weeks of each other (around R2 in
   the 2026-10-25 run).
-- At an 800-pixel viewport, the Markets page's sandbox rail overlaps the
-  Options and Consensus panels; at desktop width it lays out cleanly.
-  Seen in the 2026-10-25 round. Check whether it predates the round.
 - The reader's known limits (02a, "The reader" and "The valuation
   layer") all point to the same next step, a nonlinear model class over
   the same features (boosted trees, or a martingale-corrected family

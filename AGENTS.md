@@ -51,22 +51,24 @@ stage `tools/`.
 ## Layout
 
 ```
-index.html, styles.css, colors.js  the Brief: masthead, five pages, overlays; styles; data hues on the inks
+index.html, styles.css, colors.js  the Brief: masthead, four pages, overlays; styles; data hues on the inks
 main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~4.3k lines)
-src/pages.js       the five pages (folios) and the front page's Quotes/Book rail tabs
+src/pages.js       the four pages (folios), and a folio's count (the ticket's legs on Markets)
 src/brief.js       masthead, editions and extras, the lead item and "In brief"
-src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard, the curve editor
-src/sandbox.js     the sandbox: legs from curve points, the scenario grid, the reading
-src/race-page.js   the race page: public release/claim/certification record, Consensus laws, epilogue reveal
+src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard, opened panels and their tables
+src/ticket.js      the ticket: legs, ratios and size, order types, the scenario figure and grid, the reading, strategies
+src/surface.js     the volatility surface under the opened Options panel
+src/race-page.js   the race page: public release/claim/certification record, Consensus laws, the forecast editor, epilogue reveal
 src/config.js      named constants and PRESETS
 src/simulation.js  GBM + Merton + Heston stock, Vasicek rate, 16 substeps/day; history-buffer.js ring buffer
 src/pricing.js     CRR binomial American pricing, Heston term/skew vol, VXHCN spot/futures, Vasicek bond
-src/chain.js, chain-renderer.js       option chain skeleton/pricing and its table
+src/chain.js       option chain skeleton and pricing
 src/position-value.js  unitPrice() for every position type
 src/price-impact.js    square-root impact overlays, MM rehedge flow, Layer-3 exposure param shifts
 src/portfolio.js       positions, orders, margin, expiry, borrow, liquidation, binary/compute settlement
-src/chart.js       the tape: HCN after Tufte (range band, close line, news days, entries, strikes)
-src/portfolio-renderer.js, ui.js, strategy.js, reference.js  DOM and canvas rendering, info/reference panels
+src/chart.js       the tape: HCN as print candles (zoomed out, a close line over a range band), news days, entries, strikes
+src/portfolio-renderer.js  the book on the front page's rail
+src/ui.js, reference.js    the DOM cache and settings, Meridian's panels, the dispatch; info and reference panels
 src/strategy-store.js  built-in and saved (localStorage) strategies
 src/market.js          shared market snapshot, written only by main.js `_syncAll()`
 src/events.js          EventEngine: Poisson draw, pulses, one-shots, followups, triggers, impulse dispatch
@@ -133,7 +135,7 @@ at the post-gap price and queues the round offers; `marketsDayClose` snapshots a
   vol × 100 (`computeVXHCNSpot`), and the futures use the forward variance curve.
 - `unitPrice()` in `position-value.js` is the one valuation path. It covers stock,
   bond, vxhcnfuture, computefuture, binary, call and put, with the vol surface and
-  impact overlay included. Only the strategy payoff sweep prices trees directly.
+  impact overlay included. Only the ticket's scenario figure prices trees directly.
 - Impact is an overlay on `sim.S` and never rewrites the path. The decaying
   cumulative volume per instrument feeds `getStockImpact(sigma)`,
   `getBondImpact(sigmaR)`, `getVxhcnImpact(xi)` and `getOptionImpact(…)`. Layer 3
@@ -257,14 +259,25 @@ key is `shoals-theme`.
   or a crisis (`compound`) event; main.js calls it after the day's events fire.
 - **The wire.** Every event-log refresh goes through main.js `_updateWire()`, which
   also sets the front page's lead (the newest log entry, split at its first clause
-  break by `splitHeadline`; the text is quoted, never rewritten), the "In brief"
-  column and the tape's news days. Event toasts show only off the front page, where
-  the lead carries them. A quiet first edition leads with the tape.
-- **Pages.** `pages.js` shows one of Front page, Markets, Race, Strategy and Desk
-  (`[` `]`, and F, M, G). Entering Strategy is the old strategy mode (it pauses the
-  desk). Hidden pages do no drawing. The old sidebar's contents are distributed: Quotes
-  and Book in the front page's rail (`#tab-trade`, `#tab-portfolio`, ids unchanged),
-  the builder in the Strategy page's rail, the Info tab on the Desk page.
+  break by `splitHeadline`; the text is quoted, never rewritten), the wire under it
+  (the log's last forty items, the paper's archive) and the tape's news days. Event
+  toasts show only off the front page, where the lead carries them. A quiet first
+  edition leads with the tape.
+- **Pages.** One job each (2026-10-26): the Front page reads (lead and wire, the tape,
+  the book), Markets commits (the curves and the ticket, the only order entry), Race
+  knows (the ladder and the forecast editor), and Meridian accounts (the record, the
+  standing, standing orders and convictions, Washington, the settings). `pages.js`
+  shows one (`[` `]`, and F, M, G, D); hidden pages do no drawing.
+- **The tape.** `chart.js` draws print candles: hollow in ink on a day that closed
+  up, solid in the accent on a day that closed down, a hairline wick that never
+  crosses the body. The forming day's wick is a water mark of the eased close, so it
+  ratchets out and holds. Below `CANDLE_MIN_PX` a day it draws the close as a line
+  over a band of the range, and `chart.mode` tells the caption which.
+- **The book.** The front page's rail (`portfolio-renderer.js`): the value in ink with
+  a line comparing it to holding HCN (the sparkline's dashed ghost), the account,
+  positions (binaries included) as contract, quantity and P&L, strategy groups,
+  working orders and the Greeks. A position's name hands its contract to the ticket
+  (`shoals:toTicket`).
 - **Opening.** The desk opens playing on Edition 1 unless the platform asks for reduced
   motion, which opens paused on a complete frame. The day-0 forecast lock is queued at
   boot and arrives as a dispatch when day 0 closes (the popup barrier holds the day, so
@@ -278,28 +291,46 @@ key is `shoals-theme`.
   `unitPrice` or the books' quotes. On a news day the previous snapshot is the ghost
   and the curves ease from it. Consensus curves come from `binaryProb` (belief B) and
   the compute curve from `computeCurveFromBelief` on the public view: public state
-  only, the quoters' own inputs. The Consensus panel is also the posterior's editor
-  ("Your curves"): the draft draws over B, median handles drag or take arrows, the
-  plateau square at the term's end sets the chance it lands this term (Page Up/Down),
-  and edit mode suspends sandbox picks. The lock dispatch's "Adjust first" holds the
-  quarter (`_lockPending`): play and step refuse until the panel's Lock is pressed.
-- **Sandbox.** Legs are curve points (a click or Enter cycles long, short, removed).
-  `renderSandbox` revalues every leg 63 trading days out across HCN moves and, in
-  Dynamic, how far the race gets (in Classic, volatility). The scenario model is the
-  display's, not the engine's, and unratified: Heston mean reversion with a leverage
-  shock on variance, the capex channel's +0.005 on `b` per newly certified rung, B
-  re-evaluated on a copy of the record and the rule with the scenario's certification
-  added (the quiet row carries routine releases forward at each lab's cadence), and
-  compute repriced by `placeholderCurve` at the new certified rung. "Trade these legs" sends
-  each leg through the manual paths (`_deferManual`, `executeMarketOrder`,
-  `executeBinaryTrade`), so the latency ladder and spreads apply.
+  only, the quoters' own inputs. The Consensus panel draws the player's draft
+  read-only, on the rungs where it differs from B's projection. A panel's title opens
+  it over the curves area with its table (`openPanel`): every contract on the curve
+  by bid and ask, a bid cell selling and an ask cell buying; the Options panel opens
+  to the published chain (`publishedChain`, so Act III can hold it) with every listed
+  strike on the smile and the surface under it. Open tables refresh each substep.
+- **The ticket.** `ticket.js` is the one order entry. Legs come from curve points and
+  table rows (a click cycles long, short, removed; a right-click goes short), carry
+  a signed ratio and share one size; an option leg's kind is a link that switches
+  call and put. One leg, or a named ticket of strategy types, may rest as a limit or
+  stop (triggered on HCN's price, as `checkPendingOrders` does); a named ticket trades
+  through `executeWithRollback` or the ladder's `'strategy'` entry, anything else leg
+  by leg through `_deferManual`, `executeMarketOrder` and `executeBinaryTrade`, so the
+  latency ladder and spreads apply. Greeks come from `aggregateGreeks` over the legs.
+  The figure and grid revalue every leg at the horizon (until the player sets it, a
+  quarter or the nearest option expiry, whichever is sooner) across HCN moves and,
+  in Dynamic, how far the race gets (in Classic, volatility). The scenario model is
+  the display's, not the engine's, and unratified: Heston mean reversion with a
+  leverage shock on variance, the capex channel's +0.005 on `b` per newly certified
+  rung, B re-evaluated on a copy of the record and the rule with the scenario's
+  certification added (the quiet row carries routine releases forward at each lab's
+  cadence), and compute repriced by `placeholderCurve` at the new certified rung.
+  Strategies load at the Options panel's expiry (`strategy-store.js`) and save
+  relative to it when their legs share one expiry.
 - **Race page.** `recordRaceDay` (after the day's events) appends public records to
   `_pub` (releases with the rung they claim, released-rung claims, certifications, the
   open ecosystem's rung, the Fixedpoint Index's publication day) and the continuous
   tracks to `_hid`. During play only `_pub`, belief B and the listed contracts are
   drawn; `_hid` and the internal crossing days are drawn only after `endRacePage()`
   (game over). The Fixedpoint Index has no numeric series in the model, so its strip
-  shows publication only.
+  shows publication only. The page is also the posterior's editor: the draft's daily
+  mass drawn in ink over B's on each open rung, on one scale; the bead is the median
+  (drag across; up and down for width), the square on the term-end gauge the plateau
+  (beside B's tick), with 02a's keys on the focused canvas. The lock dispatch's
+  "Adjust first" opens the page with the Lock shown (`setForecastPending`) and holds
+  the quarter (`_lockPending`): play and step refuse until it is pressed.
+- **Meridian.** The settings (regime, sound, the pricing parameters) sit at its foot.
+  Sections marked `data-dynamic` (Meridian's columns, the race page's forecast notes)
+  hide in Classic. Congress is one seat bar per chamber: Farmer-Labor solid, the
+  Federalists hatched, a rule at the majority.
 
 ### Endings, Act III, audio
 
@@ -339,7 +370,7 @@ key is `shoals-theme`.
   `EPILOGUE_SLOTS` cells are HTML and use entities.
 - **Public state only.** Quotes, curves, act3 and the bridge's capex latch read only
   public views (`buildPublicView`, `buildComputePublicView`, the `world.ai` mirrors).
-  No hidden capability, latent or τ reaches a price. The markets page, the sandbox and
+  No hidden capability, latent or τ reaches a price. The markets page, the ticket and
   the race page during play hold to the same rule; the race page's hidden tracks are
   drawn only after the run ends. The harnesses corrupt every
   hidden field and assert the quotes are unchanged.
@@ -367,7 +398,7 @@ key is `shoals-theme`.
   queued or the epilogue is pending, and dismissal closes the waiting day via
   `_closeCompletedDayIfPending()`.
 - **Machinery vs the player's hand.** The latency ladder and spread multiplier apply
-  to every manual entry (market and chain orders, binaries, compute futures,
+  to every manual entry (the ticket's market legs, binaries, compute futures,
   strategies) plus position close and strategy unwind, all via `_deferManual`.
   Exercise, popup trades, margin liquidation, standing orders and terminal paths
   stay instant. Lag 0 bypasses the queue and `spreadMult === 1`
@@ -403,15 +434,18 @@ key is `shoals-theme`.
   and is spent on losses and down moves (`--down`, `pnl-down`, a down session's last
   close); gains take viridian (`--up`). A short position is not a loss and is never
   red. Instruments have inks (`colors.js`: stock ochre, bond prussian, call verdigris,
-  put sienna, VXHCN violet, binary indigo, compute umber, private stake sap), and the Greeks match the
-  strategy diagram (`--delta` …).
-  Portfolio value is colored against buy-and-hold. All UI and canvas text is
+  put sienna, VXHCN violet, binary indigo, compute umber, private stake sap), and each
+  Greek has its own (`--delta` …).
+  The book's value is set in ink; the line under it colors the comparison with
+  holding HCN. All UI and canvas text is
   `--font-text`/`_FONT.text`. The canvas redraws once `_loadTextFonts()` resolves. Live
   captions use `_colophon.caption()`; the tape's first write is forced, because the
   helper skips a write that falls within its interval of time zero.
 - **Labels.** UI labels, presets, built-in strategies, traits and epilogue labels are
-  sentence case in source. The chain table is rebuilt on every update, with one
-  delegated listener (`_chainClicksBound`).
+  sentence case in source. Contracts are named once, by `contractName`
+  (format-helpers.js), for the ticket, the tables and the book. An opened panel's
+  table is rebuilt on each refresh with delegated listeners on its container, and
+  keeps focus on the same cell.
 
 ## Open work
 

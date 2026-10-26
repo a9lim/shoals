@@ -74,7 +74,7 @@ import {
 } from '../src/portfolio.js';
 import { market, syncMarket } from '../src/market.js';
 import { positionLabel } from '../src/portfolio-renderer.js';
-import { posTypeLabel, fmtQty, fmtDte } from '../src/format-helpers.js';
+import { contractName, fmtSpan } from '../src/format-helpers.js';
 
 // ---- CLI -----------------------------------------------------------------
 
@@ -705,13 +705,14 @@ let noListAfterFreezeOK = false, firstDecreeAllOK = false, exactlyOnceOK = false
     assert(exactlyOnceOK, `spurious post-freeze settlements: ${extra}`);
 }
 
-// J6. DTE display source: compute rows omit the (race-clock) DTE; sim-clock rows keep it.
+// J6. DTE display source: compute rows name their (race-clock) delivery day and no
+// span from the sim day; sim-clock rows carry the span to expiry.
 let dteOmittedOK = false, dteKeptOK = false;
 {
     const cfLabel = positionLabel({ type: 'computefuture', qty: 2, strike: 189, expiryDay: 189 }, 300);
-    dteOmittedOK = cfLabel === posTypeLabel('computefuture', 2) + ' x' + fmtQty(2);   // no strike, no DTE
+    dteOmittedOK = cfLabel === contractName('computefuture', 189, 189, 300);   // the delivery day, no span
     const bondLabel = positionLabel({ type: 'bond', qty: 3, expiryDay: 500 }, 300);
-    dteKeptOK = bondLabel === posTypeLabel('bond', 3) + ' ' + fmtDte(500 - 300) + ' x' + fmtQty(3);
+    dteKeptOK = bondLabel === 'Bond, ' + fmtSpan(500 - 300);
     assert(dteOmittedOK, `compute row DTE not omitted: "${cfLabel}"`);
     assert(dteKeptOK, `sim-clock row DTE missing/wrong: "${bondLabel}"`);
 }

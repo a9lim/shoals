@@ -1,33 +1,19 @@
 /* =====================================================
-   ui.js -- DOM manipulation, event binding, and display
-   updates for the Shoals trading simulator.
+   ui.js -- DOM access for the Brief outside its canvases
+   and its own modules: the element cache, the settings,
+   the book's Greeks, Meridian's record, standing, orders
+   and Washington, and the dispatch.
 
-   Owns all DOM access outside of canvas rendering.
-   Pure functions -- no internal state.
+   Pure functions over the cache -- no simulation state.
    ===================================================== */
 
-import { fmtNum, pnlClass, fmtDte, fmtQty, posTypeLabel, fmtSigned } from './format-helpers.js';
+import { fmtSigned } from './format-helpers.js';
 import { forecastRecord } from './race/belief.js';
-import { drawSparkline } from './sparkline.js';
-import { computeBidAsk } from './portfolio.js';
-import { renderChainInto, rebuildExpiryDropdown, posKey } from './chain-renderer.js';
-import { vasicekBondPrice, computeVXHCNFuturePrice } from './pricing.js';
-import { BOND_FACE_VALUE, STRIKE_INTERVAL, STRIKE_RANGE } from './config.js';
-import { market } from './market.js';
-import { getStockImpact, getBondImpact, getVxhcnImpact } from './price-impact.js';
 export { updatePortfolioDisplay } from './portfolio-renderer.js';
-
-// ---------------------------------------------------------------------------
-// Buy/Sell mode toggle (module-scoped)
-// ---------------------------------------------------------------------------
-let sellMode = false;
-window._shoalsSellMode = () => sellMode;
 
 // ---------------------------------------------------------------------------
 // Focus trap state (module-scoped for overlay open/close)
 // ---------------------------------------------------------------------------
-let _tradeTrapCleanup = null;
-let _tradePrevFocus = null;
 let _popupTrapCleanup = null;
 let _popupPrevFocus = null;
 
@@ -54,23 +40,19 @@ export function refreshTooltip() {
 
 export function cacheDOMElements($) {
     $.chartCanvas    = document.getElementById('chart-canvas');
-    $.strategyCanvas = document.getElementById('strategy-canvas');
     $.playBtn     = document.getElementById('play-btn');
     $.speedBtn    = document.getElementById('speed-btn');
     $.stepBtn     = document.getElementById('step-btn');
-    $.sidebar    = document.getElementById('sidebar');
-    $.tradeExpiry    = document.getElementById('trade-expiry');
-    $.chainTable    = document.getElementById('chain-table');
-    $.stockPriceCell = document.getElementById('stock-price-cell');
-    $.bondPriceCell  = document.getElementById('bond-price-cell');
-    $.vxhcnPriceCell   = document.getElementById('vxhcn-price-cell');
+    $.book        = document.getElementById('book');
     $.defaultPositions  = document.getElementById('default-positions');
     $.strategyPositions = document.getElementById('strategy-positions');
+    $.strategySection   = document.getElementById('book-strategies');
     $.pendingOrders     = document.getElementById('pending-orders');
+    $.ordersSection     = document.getElementById('book-orders');
     $.cashDisplay       = document.getElementById('cash-display');
     $.portfolioValue    = document.getElementById('portfolio-value');
+    $.bookChange        = document.getElementById('book-change');
     $.portfolioSparkCanvas = document.getElementById('portfolio-sparkline');
-    $.portfolioSparkCtx    = $.portfolioSparkCanvas ? $.portfolioSparkCanvas.getContext('2d') : null;
     $.marginStatus      = document.getElementById('margin-status');
     $.borrowCostDisplay = document.getElementById('borrow-cost');
     $.dividendDisplay   = document.getElementById('dividend-income');
@@ -80,12 +62,6 @@ export function cacheDOMElements($) {
     $.greekVega       = document.getElementById('greek-vega');
     $.greekRho        = document.getElementById('greek-rho');
     $.presetSelect    = document.getElementById('preset-select');
-    $.rateDisplay     = document.getElementById('rate-display');
-    $.rateSparkCanvas = document.getElementById('rate-sparkline');
-    $.rateSparkCtx    = $.rateSparkCanvas ? $.rateSparkCanvas.getContext('2d') : null;
-    $.vxhcnDisplay      = document.getElementById('vxhcn-display');
-    $.vxhcnSparkCanvas  = document.getElementById('vxhcn-sparkline');
-    $.vxhcnSparkCtx     = $.vxhcnSparkCanvas ? $.vxhcnSparkCanvas.getContext('2d') : null;
     $.advancedToggle  = document.getElementById('advanced-toggle');
     $.advancedSection = document.getElementById('advanced-section');
     $.resetBtn        = document.getElementById('reset-btn');
@@ -99,68 +75,26 @@ export function cacheDOMElements($) {
     $.zoomOutBtn   = document.getElementById('zoom-out-btn');
     $.zoomResetBtn = document.getElementById('zoom-reset-btn');
     $.zoomLevel    = document.getElementById('zoom-level');
-    $.timeSliderBar   = document.getElementById('time-slider-bar');
-    $.timeSlider      = document.getElementById('time-slider');
-    $.timeSliderLabel = document.getElementById('time-slider-label');
-    $.tradeDialog         = document.getElementById('trade-dialog');
-    $.tradeDialogTitle    = document.getElementById('trade-dialog-title');
-    $.tradeDialogBody     = document.getElementById('trade-dialog-body');
-    $.tradeConfirmBtn     = document.getElementById('trade-confirm-btn');
-    $.tradeCancelBtn      = document.getElementById('trade-cancel-btn');
-    $.tradeDialogClose    = document.getElementById('trade-dialog-close');
     $.popupOverlay   = document.getElementById('popup-event-overlay');
     $.popupHeadline  = document.getElementById('popup-event-headline');
     $.popupContext   = document.getElementById('popup-event-context');
     $.popupChoices   = document.getElementById('popup-event-choices');
-
-    $.strategyLegsList = document.getElementById('strategy-legs-list');
-    $.strategySummary  = document.getElementById('strategy-summary');
-    $.stratGreekDelta  = document.getElementById('strat-greek-delta');
-    $.stratGreekGamma  = document.getElementById('strat-greek-gamma');
-    $.stratGreekTheta  = document.getElementById('strat-greek-theta');
-    $.stratGreekVega   = document.getElementById('strat-greek-vega');
-    $.stratGreekRho    = document.getElementById('strat-greek-rho');
-    $.saveStrategyBtn  = document.getElementById('save-strategy-btn');
-    $.deleteStrategyBtn  = document.getElementById('delete-strategy-btn');
-    $.strategyNameInput  = document.getElementById('strategy-name');
-    $.selectableExpiryToggle = document.getElementById('selectable-expiry-toggle');
-    $.strategyLoadSelect = document.getElementById('strategy-load-select');
-    $.strategyEditFields = document.getElementById('strategy-edit-fields');
-    $.tradeStrategySelect = document.getElementById('trade-strategy-select');
-    $.tradeExecStrategyBtn = document.getElementById('trade-exec-strategy-btn');
-    $.strategyCreditDebit = document.getElementById('strategy-credit-debit');
-    $.strategyNetCost    = document.getElementById('strategy-net-cost');
-    $.strategyBuilder  = document.getElementById('strategy-builder');
-    $.strategyExpiry   = document.getElementById('strategy-expiry');
-    $.strategyChainTable = document.getElementById('strategy-chain-table');
-    $.strategyStockCell  = document.getElementById('strategy-stock-cell');
-    $.strategyBondCell   = document.getElementById('strategy-bond-cell');
-    $.strategyVxhcnCell    = document.getElementById('strategy-vxhcn-cell');
-    $.tradeQty         = document.getElementById('trade-qty');
-    $.tradeQtyVal      = document.getElementById('trade-qty-val');
-    $.strategyQty      = document.getElementById('strategy-qty');
-    $.strategyQtyVal   = document.getElementById('strategy-qty-val');
-    $.orderTypeToggles = document.getElementById('order-type-toggles');
-    $.triggerPriceGroup = document.getElementById('trigger-price-group');
-    $.triggerPrice     = document.getElementById('trigger-price');
-    $.triggerPriceVal  = document.getElementById('trigger-price-val');
-    $.eventLogSection    = document.getElementById('event-log-section');
-    $.eventLog           = document.getElementById('event-log');
-    $.congressSection    = document.getElementById('congress-section');
-    $.senateDiagram      = document.getElementById('senate-diagram');
-    $.houseDiagram       = document.getElementById('house-diagram');
-    $.senateLegend       = document.getElementById('senate-legend');
-    $.houseLegend        = document.getElementById('house-legend');
+    $.dynamicOnly    = document.querySelectorAll('[data-dynamic]');
+    $.meridianClassic    = document.getElementById('mer-classic');
+    $.senateSeats        = document.getElementById('senate-seats');
+    $.houseSeats         = document.getElementById('house-seats');
+    $.senateKey          = document.getElementById('senate-key');
+    $.houseKey           = document.getElementById('house-key');
     $.lobbyBar           = document.getElementById('lobby-bar');
     $.lobbyActions       = document.getElementById('lobby-actions');
-    $.standingsSection   = document.getElementById('standings-section');
     $.standingsWorld     = document.getElementById('standings-world');
     $.standingsRecord    = document.getElementById('standings-record');
     $.standingsFactions  = document.getElementById('standings-factions');
-    $.consensusSection   = document.getElementById('consensus-section');
-    $.consensusTbody     = document.getElementById('consensus-tbody');
-    $.computeSection     = document.getElementById('compute-section');
-    $.computeTbody       = document.getElementById('compute-tbody');
+    $.standingOrdersSection = document.getElementById('standing-orders-section');
+    $.standingOrdersList    = document.getElementById('standing-orders-list');
+    $.standingOrdersHint    = document.getElementById('standing-orders-hint');
+    $.convictionsSection = document.getElementById('convictions-section');
+    $.convictionsList    = document.getElementById('convictions-list');
 }
 
 // ---------------------------------------------------------------------------
@@ -168,14 +102,7 @@ export function cacheDOMElements($) {
 // ---------------------------------------------------------------------------
 
 export function bindEvents($, handlers) {
-    const {
-        onSpeedUp, onSpeedDown,
-        onPresetChange, onReset, onSliderChange, onTimeSlider,
-        onBuyStock, onShortStock, onBuyBond, onShortBond, onBuyVxhcn, onShortVxhcn,
-        onChainCellClick, onExpiryChange,
-        onTradeSubmit,
-        onTradeClose,
-    } = handlers;
+    const { onSpeedUp, onSpeedDown, onPresetChange, onReset, onSliderChange } = handlers;
 
     // Play, step and theme live in the colophon (shared/colophon.js), wired by main.js.
     $.speedBtn.addEventListener('click', onSpeedUp);
@@ -187,7 +114,8 @@ export function bindEvents($, handlers) {
     $.resetBtn.addEventListener('click', onReset);
 
     $.advancedToggle.addEventListener('click', () => {
-        $.advancedSection.classList.toggle('hidden');
+        const open = $.advancedSection.classList.toggle('hidden') === false;
+        $.advancedToggle.setAttribute('aria-expanded', String(open));
         if (typeof _haptics !== 'undefined') _haptics.trigger('selection');
     });
 
@@ -196,334 +124,44 @@ export function bindEvents($, handlers) {
         _forms.bindSlider($.sliders[p], $.sliders[p + 'Val'], v => onSliderChange(p, v));
     }
 
-    $.timeSlider.addEventListener('input', () => {
-        const pct = parseInt($.timeSlider.value, 10);
-        $.timeSlider.style.setProperty('--slider-fill', pct + '%');
-        onTimeSlider(pct);
-    });
-
-    // Buy/sell mode toggle button
-    // The ticket's side: one button that reads Buy or Sell (X), the red when selling.
-    const modeBtn = document.getElementById('mode-btn');
-    if (modeBtn) {
-        modeBtn.addEventListener('click', () => {
-            sellMode = !sellMode;
-            modeBtn.setAttribute('aria-pressed', String(sellMode));
-            modeBtn.textContent = sellMode ? 'Sell' : 'Buy';
-            modeBtn.classList.toggle('selling', sellMode);
-        });
-    }
-
-    // Stock price cell: left-click = buy (or sell in sell mode), right-click = short
-    $.stockPriceCell.addEventListener('click', () => {
-        if (sellMode) onShortStock(); else onBuyStock();
-    });
-    $.stockPriceCell.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        onShortStock();
-    });
-    // Bond price cell: left-click = buy (or sell in sell mode), right-click = sell/short
-    $.bondPriceCell.addEventListener('click', () => {
-        if (sellMode) { if (typeof onShortBond === 'function') onShortBond(); } else onBuyBond();
-    });
-    $.bondPriceCell.addEventListener('contextmenu', (e) => {
-        e.preventDefault();
-        if (typeof onShortBond === 'function') onShortBond();
-    });
-    // VXHCN futures price cell
-    if ($.vxhcnPriceCell) {
-        $.vxhcnPriceCell.addEventListener('click', () => {
-            if (sellMode) { if (typeof onShortVxhcn === 'function') onShortVxhcn(); } else if (typeof onBuyVxhcn === 'function') onBuyVxhcn();
-        });
-        $.vxhcnPriceCell.addEventListener('contextmenu', (e) => {
-            e.preventDefault();
-            if (typeof onShortVxhcn === 'function') onShortVxhcn();
-        });
-    }
-
-    // Mobile hint text
-    if (window.matchMedia('(pointer: coarse)').matches) {
-        const hint = document.getElementById('trade-hint');
-        if (hint) hint.textContent = 'Tap to Trade \u00b7 Long-press for Bid/Ask \u00b7 Pinch to Zoom Chart';
-    }
-    const closeTrade = () => {
-        $.tradeDialog.classList.add('hidden');
-        if (_tradeTrapCleanup) { _tradeTrapCleanup(); _tradeTrapCleanup = null; }
-        if (_tradePrevFocus && _tradePrevFocus.focus) { _tradePrevFocus.focus(); _tradePrevFocus = null; }
-        if (typeof onTradeClose === 'function') onTradeClose();
-    };
-    initOverlayDismiss($.tradeDialog, $.tradeDialogClose, closeTrade);
-    $.tradeCancelBtn.addEventListener('click', closeTrade);
-
-    $._onChainCellClick = onChainCellClick;
-    $._onTradeSubmit    = onTradeSubmit;
-
-    // Trade tab qty slider
-    if ($.tradeQty) _forms.bindSlider($.tradeQty, $.tradeQtyVal, null, v => v + 'k');
-
-    // Trade tab expiry dropdown
-    if ($.tradeExpiry) {
-        $.tradeExpiry.addEventListener('change', () => {
-            if (typeof onExpiryChange === 'function') onExpiryChange(parseInt($.tradeExpiry.value, 10));
-        });
-    }
-
-    // Strategy tab qty slider
-    if ($.strategyQty) _forms.bindSlider($.strategyQty, $.strategyQtyVal);
-
-    // Strategy expiry dropdown -- rebuild strategy chain on change
-    if ($.strategyExpiry) {
-        $.strategyExpiry.addEventListener('change', () => {
-            if (typeof handlers.onStrategyExpiryChange === 'function') {
-                handlers.onStrategyExpiryChange(parseInt($.strategyExpiry.value, 10));
-            }
-        });
-    }
-
-    // Selectable expiry toggle -- override legs when turned on
-    if ($.selectableExpiryToggle) {
-        $.selectableExpiryToggle.addEventListener('change', () => {
-            if (typeof handlers.onSelectableExpiryChange === 'function') {
-                handlers.onSelectableExpiryChange($.selectableExpiryToggle.checked);
-            }
-        });
-    }
-
-    // Order type toggle (Market / Limit / Stop)
-    if ($.orderTypeToggles) {
-        const _updateOrderDeps = _forms.bindDeps([
-            { target: $.triggerPriceGroup, show: () => $.orderTypeToggles.querySelector('.mode-btn.active')?.dataset.ordertype !== 'market' }
-        ]);
-        _forms.bindModeGroup($.orderTypeToggles, 'ordertype', () => _updateOrderDeps());
-    }
-
-    // Trigger price slider
-    if ($.triggerPrice) _forms.bindSlider($.triggerPrice, $.triggerPriceVal, null, v => '$' + v.toFixed(0));
-
-    // Strategy builder: stock/bond cell clicks -> add leg
-    if ($.strategyStockCell && typeof handlers.onAddLeg === 'function') {
-        $.strategyStockCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('stock', 'long'); });
-        $.strategyStockCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('stock', 'short'); });
-        $.strategyBondCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('bond', 'long'); });
-        $.strategyBondCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('bond', 'short'); });
-        if ($.strategyVxhcnCell) {
-            $.strategyVxhcnCell.addEventListener('click', () => { if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('vxhcnfuture', 'long'); });
-            $.strategyVxhcnCell.addEventListener('contextmenu', (e) => { e.preventDefault(); if (typeof _haptics !== 'undefined') _haptics.trigger('selection'); handlers.onAddLeg('vxhcnfuture', 'short'); });
-        }
-    }
-    if ($.saveStrategyBtn && typeof handlers.onSaveStrategy === 'function') {
-        $.saveStrategyBtn.addEventListener('click', handlers.onSaveStrategy);
-    }
-    if ($.deleteStrategyBtn && typeof handlers.onDeleteStrategy === 'function') {
-        $.deleteStrategyBtn.addEventListener('click', handlers.onDeleteStrategy);
-    }
-    if ($.tradeExecStrategyBtn && typeof handlers.onTradeExecStrategy === 'function') {
-        $.tradeExecStrategyBtn.addEventListener('click', handlers.onTradeExecStrategy);
-    }
-    if ($.strategyLoadSelect && typeof handlers.onStrategySelectChange === 'function') {
-        $.strategyLoadSelect.addEventListener('change', () => {
-            handlers.onStrategySelectChange($.strategyLoadSelect.value);
-        });
-    }
-    if ($.tradeStrategySelect && typeof handlers.onTradeStrategySelectChange === 'function') {
-        $.tradeStrategySelect.addEventListener('change', () => {
-            handlers.onTradeStrategySelectChange($.tradeStrategySelect.value);
-        });
-    }
-
-    // Tooltip delegation for [data-tooltip] cells
+    // Tooltip delegation for [data-tooltip] cells (bid and ask on the chain).
     if (typeof createSimTooltip === 'function') {
         _tip = createSimTooltip();
-        const _wireTooltipDelegation = (el) => {
-            el.addEventListener('mouseover', (e) => {
-                const target = e.target.closest('[data-tooltip]');
-                if (target === _tipTarget) return;
-                if (target) {
-                    _tipTarget = target;
-                    _tip.show(e.clientX, e.clientY, target.dataset.tooltip);
-                } else if (_tipTarget) {
-                    _tipTarget = null;
-                    _tip.hide();
-                }
-            });
-            el.addEventListener('mouseout', (e) => {
-                if (!_tipTarget) return;
-                const related = e.relatedTarget;
-                if (!related || !_tipTarget.contains(related)) {
-                    _tipTarget = null;
-                    _tip.hide();
-                }
-            });
-        };
-        _wireTooltipDelegation(document.getElementById('pages'));
+        const pages = document.getElementById('pages');
+        pages.addEventListener('mouseover', (e) => {
+            const target = e.target.closest('[data-tooltip]');
+            if (target === _tipTarget) return;
+            if (target) {
+                _tipTarget = target;
+                _tip.show(e.clientX, e.clientY, target.dataset.tooltip);
+            } else if (_tipTarget) {
+                _tipTarget = null;
+                _tip.hide();
+            }
+        });
+        pages.addEventListener('mouseout', (e) => {
+            if (!_tipTarget) return;
+            const related = e.relatedTarget;
+            if (!related || !_tipTarget.contains(related)) {
+                _tipTarget = null;
+                _tip.hide();
+            }
+        });
     }
 }
 
 // ---------------------------------------------------------------------------
-// updateChainDisplay
-// ---------------------------------------------------------------------------
-
-/**
- * Update trade-tab chain table with a pre-priced expiry.
- */
-export function updateChainDisplay($, pricedExpiry, posMap) {
-    renderChainInto($.chainTable, pricedExpiry, $._onChainCellClick, posMap);
-}
-
-/**
- * Rebuild the trade-tab expiry dropdown from the skeleton.
- * Call only when skeleton changes (day complete, reset).
- */
-export function rebuildTradeDropdown($, skeleton, selectedIndex) {
-    rebuildExpiryDropdown($.tradeExpiry, skeleton, selectedIndex);
-}
-
-/**
- * Rebuild the strategy-tab expiry dropdown from the skeleton.
- */
-export function rebuildStrategyDropdown($, skeleton, selectedIndex) {
-    rebuildExpiryDropdown($.strategyExpiry, skeleton, selectedIndex);
-}
-
-
-// ---------------------------------------------------------------------------
-// updateGreeksDisplay
+// The book's Greeks
 // ---------------------------------------------------------------------------
 
 export function updateGreeksDisplay($, greeks) {
     if (!greeks) return;
-    $.greekDelta.textContent = fmtNum(greeks.delta, 4);
-    $.greekGamma.textContent = fmtNum(greeks.gamma, 4);
-    $.greekTheta.textContent = fmtNum(greeks.theta, 4);
-    $.greekVega.textContent  = fmtNum(greeks.vega,  4);
-    $.greekRho.textContent   = fmtNum(greeks.rho,   4);
-}
-
-// ---------------------------------------------------------------------------
-// updateRateDisplay
-// ---------------------------------------------------------------------------
-
-export function updateRateDisplay($, rate, rateHistory) {
-    if ($.rateDisplay) $.rateDisplay.textContent = (rate * 100).toFixed(2) + '%';
-    if ($.rateSparkCtx && rateHistory && rateHistory.count >= 2) {
-        const c = $.rateSparkCanvas;
-        const color = getComputedStyle(document.documentElement).getPropertyValue('--rho').trim() || '#000000';
-        drawSparkline($.rateSparkCtx, rateHistory, c.width, c.height, color, color + '44');
-    }
-}
-
-// ---------------------------------------------------------------------------
-// updateVxhcnDisplay
-// ---------------------------------------------------------------------------
-
-export function updateVxhcnDisplay($, vxhcn, vxhcnHistory) {
-    if ($.vxhcnDisplay) $.vxhcnDisplay.textContent = vxhcn.toFixed(2);
-    if ($.vxhcnSparkCtx && vxhcnHistory && vxhcnHistory.count >= 2) {
-        const c = $.vxhcnSparkCanvas;
-        const color = getComputedStyle(document.documentElement).getPropertyValue('--vxhcn').trim() || '#000000';
-        drawSparkline($.vxhcnSparkCtx, vxhcnHistory, c.width, c.height, color, color + '44');
-    }
-}
-
-// ---------------------------------------------------------------------------
-// updateStockBondPrices -- updates both trade-tab and strategy-tab cells
-// ---------------------------------------------------------------------------
-
-function _applyPill(el, text, qty, tooltipText) {
-    el.textContent = text;
-    el.classList.remove('pos-long', 'pos-short');
-    if (qty) el.classList.add(qty > 0 ? 'pos-long' : 'pos-short');
-    if (tooltipText) el.dataset.tooltip = tooltipText;
-    else delete el.dataset.tooltip;
-}
-
-function _bidAskTip(mid, vol) {
-    if (mid == null || vol == null) return null;
-    const ba = computeBidAsk(mid, vol);
-    return 'Bid ' + ba.bid.toFixed(2) + ' / Ask ' + ba.ask.toFixed(2);
-}
-
-/**
- * @param {Array} skeleton - chain skeleton (has .day, .dte per entry)
- * @param {number} [vPublished] - P7-1 VXHCN PUBLICATION variance for the VXHCN
- *        futures cells (display only; main.js owns the latch). Omitted => the
- *        true `market.v`, which is what every fill / mark / settlement uses.
- */
-export function updateStockBondPrices($, spot, rate, sigma, skeleton, posMap, stratPosMap, vPublished) {
-    const dash = '\u2014';
-    const vDisp = vPublished != null ? vPublished : market.v;
-    const displaySpot = spot != null ? spot + getStockImpact(sigma) : null;
-    const stockTxt = displaySpot != null ? displaySpot.toFixed(2) : dash;
-    const stockTip = _bidAskTip(displaySpot, sigma);
-
-    // Trade tab bond: from trade expiry dropdown
-    const tradeIdx = parseInt($.tradeExpiry?.value, 10);
-    const tradeExp = skeleton && skeleton.length > 0
-        ? skeleton[isNaN(tradeIdx) ? skeleton.length - 1 : Math.min(tradeIdx, skeleton.length - 1)]
-        : null;
-    const tradeBondMid = tradeExp && rate != null
-        ? market.a >= 1e-8
-            ? vasicekBondPrice(BOND_FACE_VALUE, rate, tradeExp.dte / 252, market.a, market.b, market.sigmaR)
-            : BOND_FACE_VALUE * Math.exp(-rate * tradeExp.dte / 252)
-        : null;
-    const tradeBondDisplay = tradeBondMid != null ? tradeBondMid + getBondImpact(market.sigmaR) : null;
-    const tradeBond = tradeBondDisplay != null ? tradeBondDisplay.toFixed(2) : dash;
-
-    // Trade tab VXHCN futures: from trade expiry dropdown
-    const tradeVxhcnMid = tradeExp
-        ? computeVXHCNFuturePrice(vDisp, market.kappa, market.theta, market.xi, tradeExp.dte / 252)
-        : null;
-    const tradeVxhcnDisplay = tradeVxhcnMid != null ? tradeVxhcnMid + getVxhcnImpact(market.xi) : null;
-    const tradeVxhcn = tradeVxhcnDisplay != null ? tradeVxhcnDisplay.toFixed(2) : dash;
-
-    if ($.stockPriceCell) _applyPill($.stockPriceCell, stockTxt, posMap && posMap['stock'], stockTip);
-    if ($.bondPriceCell) {
-        const bondQty = posMap && tradeExp
-            ? posMap[posKey('bond', null, tradeExp.day)]
-            : null;
-        _applyPill($.bondPriceCell, tradeBond, bondQty, _bidAskTip(tradeBondMid, market.sigmaR));
-    }
-    if ($.vxhcnPriceCell) {
-        const vxhcnQty = posMap && tradeExp
-            ? posMap[posKey('vxhcnfuture', null, tradeExp.day)]
-            : null;
-        _applyPill($.vxhcnPriceCell, tradeVxhcn, vxhcnQty, _bidAskTip(tradeVxhcnMid, market.xi));
-    }
-
-    // Strategy tab bond: from strategy expiry dropdown
-    const stratIdx = parseInt($.strategyExpiry?.value, 10);
-    const stratExp = skeleton && skeleton.length > 0
-        ? skeleton[isNaN(stratIdx) ? skeleton.length - 1 : Math.min(stratIdx, skeleton.length - 1)]
-        : null;
-    const stratBondMid = stratExp && rate != null
-        ? market.a >= 1e-8
-            ? vasicekBondPrice(BOND_FACE_VALUE, rate, stratExp.dte / 252, market.a, market.b, market.sigmaR)
-            : BOND_FACE_VALUE * Math.exp(-rate * stratExp.dte / 252)
-        : null;
-    const stratBondDisplay = stratBondMid != null ? stratBondMid + getBondImpact(market.sigmaR) : null;
-    const stratBond = stratBondDisplay != null ? stratBondDisplay.toFixed(2) : dash;
-
-    // Strategy tab VXHCN futures: from strategy expiry dropdown
-    const stratVxhcnMid = stratExp
-        ? computeVXHCNFuturePrice(vDisp, market.kappa, market.theta, market.xi, stratExp.dte / 252)
-        : null;
-    const stratVxhcnDisplay = stratVxhcnMid != null ? stratVxhcnMid + getVxhcnImpact(market.xi) : null;
-    const stratVxhcn = stratVxhcnDisplay != null ? stratVxhcnDisplay.toFixed(2) : dash;
-
-    const sMap = stratPosMap || posMap;
-    if ($.strategyStockCell) _applyPill($.strategyStockCell, stockTxt, sMap && sMap['stock'], stockTip);
-    if ($.strategyBondCell) {
-        const bondQty = sMap && stratExp
-            ? sMap[posKey('bond', null, stratExp.day)]
-            : null;
-        _applyPill($.strategyBondCell, stratBond, bondQty, _bidAskTip(stratBondMid, market.sigmaR));
-    }
-    if ($.strategyVxhcnCell) {
-        const vxhcnQty = sMap && stratExp
-            ? sMap[posKey('vxhcnfuture', null, stratExp.day)]
-            : null;
-        _applyPill($.strategyVxhcnCell, stratVxhcn, vxhcnQty, _bidAskTip(stratVxhcnMid, market.xi));
-    }
+    const f = (v) => fmtSigned(v, Math.abs(v) < 10 ? 2 : 1);
+    $.greekDelta.textContent = f(greeks.delta);
+    $.greekGamma.textContent = f(greeks.gamma);
+    $.greekTheta.textContent = f(greeks.theta);
+    $.greekVega.textContent  = f(greeks.vega);
+    $.greekRho.textContent   = f(greeks.rho);
 }
 
 // ---------------------------------------------------------------------------
@@ -541,20 +179,10 @@ export function syncSettingsUI($, sim) {
         valSpan.textContent = String(sim.params[p]);
         _forms.updateSliderFill(slider);
     }
-
 }
 
 // ---------------------------------------------------------------------------
-// toggleStrategyView
-// ---------------------------------------------------------------------------
-
-export function toggleStrategyView($, active) {
-    // The payoff lives on its own page (pages.js); only the time slider is shared state.
-    if (!active) $.timeSliderBar.classList.add('hidden');
-}
-
-// ---------------------------------------------------------------------------
-// updatePlayBtn
+// The colophon's play button and the speed control
 // ---------------------------------------------------------------------------
 
 export function updatePlayBtn($, playing) {
@@ -562,245 +190,10 @@ export function updatePlayBtn($, playing) {
 }
 
 export function updateSpeedBtn($, speed) {
-    const t = (speed < 1 ? String(speed).replace(/^0/, '') : String(speed)) + '\u00d7';
+    const t = (speed < 1 ? String(speed).replace(/^0/, '') : String(speed)) + '×';
     $.speedBtn.textContent = t;
     $.speedBtn.setAttribute('aria-label', 'Speed ' + t + ' (. faster, , slower)');
 }
-
-// ---------------------------------------------------------------------------
-// Strategy selectors & builder
-// ---------------------------------------------------------------------------
-
-/**
- * Update the strategy chain table, stock/bond prices, and trigger price slider.
- * Called whenever the chain is rebuilt.
- */
-/**
- * Update trigger price slider range to match strike prices.
- */
-export function updateTriggerPriceSlider($, spot) {
-    if (!$.triggerPrice || !spot) return;
-    const atm = Math.round(spot / STRIKE_INTERVAL) * STRIKE_INTERVAL;
-    const trigMin = Math.max(STRIKE_INTERVAL, atm - STRIKE_RANGE * STRIKE_INTERVAL);
-    const trigMax = atm + STRIKE_RANGE * STRIKE_INTERVAL;
-    $.triggerPrice.min = trigMin;
-    $.triggerPrice.max = trigMax;
-    $.triggerPrice.step = STRIKE_INTERVAL;
-    const curTrig = parseFloat($.triggerPrice.value);
-    if (curTrig < trigMin || curTrig > trigMax) {
-        $.triggerPrice.value = atm;
-    }
-    $.triggerPriceVal.textContent = '$' + parseFloat($.triggerPrice.value).toFixed(0);
-}
-
-/**
- * Update strategy selectors: chain table + trigger price slider.
- */
-export function updateStrategySelectors($, pricedExpiry, spot, onAddLeg, posMap) {
-    updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap);
-    updateTriggerPriceSlider($, spot);
-}
-
-/**
- * Update strategy chain table with a pre-priced expiry.
- */
-export function updateStrategyChainDisplay($, pricedExpiry, onAddLeg, posMap) {
-    if (!$.strategyChainTable) return;
-
-    const onClick = typeof onAddLeg === 'function'
-        ? (info) => onAddLeg(info.type, info.side, info.strike, info.expiryDay)
-        : null;
-
-    renderChainInto($.strategyChainTable, pricedExpiry, onClick, posMap);
-}
-
-
-const _STRATEGY_INFO = {
-    netCost:    { title: 'Net debit / credit', body: 'Cost to enter the strategy at current prices. Debit = you pay; credit = you receive premium.' },
-    breakevens: { title: 'Breakevens', body: 'Stock prices where strategy P&L crosses zero at expiry. Multi-leg strategies can have multiple breakevens.' },
-};
-
-export function renderStrategyBuilder($, legs, summary, onRemoveLeg, skeleton, onLegChange, currentStrategyHash, isBuiltin) {
-    if (!$.strategyLegsList) return;
-
-    $.strategyLegsList.textContent = '';
-
-    if (!legs || legs.length === 0) {
-        const hint = document.createElement('p');
-        hint.className = 'panel-hint';
-        hint.textContent = 'No legs added. Click buttons above to build a strategy.';
-        $.strategyLegsList.appendChild(hint);
-    } else {
-        for (let i = 0; i < legs.length; i++) {
-            const leg = legs[i];
-            $.strategyLegsList.appendChild(_buildLegRow(leg, i, onRemoveLeg, skeleton, onLegChange));
-        }
-    }
-
-    // Update summary
-    if ($.strategySummary) {
-        $.strategySummary.textContent = '';
-        if (summary && legs && legs.length > 0) {
-            const fmtVal = (v) => {
-                if (v === Infinity) return '\u221E';
-                if (v === -Infinity) return '-\u221E';
-                return (v < 0 ? '-' : '') + Math.abs(v).toFixed(2);
-            };
-            const items = [
-                { label: summary.netCost < 0 ? 'Net credit' : summary.netCost > 0 ? 'Net debit' : 'Net cost', value: fmtVal(Math.abs(summary.netCost)), cls: pnlClass(-summary.netCost), info: 'netCost' },
-                { label: 'Max profit', value: fmtVal(summary.maxProfit), cls: summary.maxProfit > 0 ? 'pnl-up' : '' },
-                { label: 'Max loss', value: fmtVal(summary.maxLoss), cls: summary.maxLoss < 0 ? 'pnl-down' : '' },
-            ];
-            if (summary.breakevens.length > 0) {
-                items.push({
-                    label: 'Breakeven' + (summary.breakevens.length > 1 ? 's' : ''),
-                    value: summary.breakevens.map(b => b.toFixed(2)).join(', '),
-                    cls: '',
-                    info: 'breakevens',
-                });
-            }
-            for (const item of items) {
-                const row = document.createElement('div');
-                row.className = 'stat-row';
-                const lbl = document.createElement('span');
-                lbl.className = 'stat-label';
-                lbl.textContent = item.label;
-                if (item.info && typeof createInfoTip !== 'undefined') {
-                    const btn = document.createElement('button');
-                    btn.className = 'info-trigger';
-                    btn.type = 'button';
-                    btn.dataset.info = item.info;
-                    btn.setAttribute('aria-label', 'Info: ' + item.label);
-                    btn.textContent = '?';
-                    lbl.appendChild(document.createTextNode(' '));
-                    lbl.appendChild(btn);
-                    createInfoTip(btn, _STRATEGY_INFO[item.info]);
-                }
-                const val = document.createElement('span');
-                val.className = 'stat-value ' + item.cls;
-                val.textContent = item.value;
-                row.appendChild(lbl);
-                row.appendChild(val);
-                $.strategySummary.appendChild(row);
-            }
-        }
-    }
-
-    // Strategy Greeks at current price
-    if ($.stratGreekDelta) {
-        const g = (summary && legs && legs.length > 0) ? summary.greeks : null;
-        $.stratGreekDelta.textContent = fmtNum(g ? g.delta : 0, 4);
-        $.stratGreekGamma.textContent = fmtNum(g ? g.gamma : 0, 4);
-        $.stratGreekTheta.textContent = fmtNum(g ? g.theta : 0, 4);
-        $.stratGreekVega.textContent  = fmtNum(g ? g.vega  : 0, 4);
-        $.stratGreekRho.textContent   = fmtNum(g ? g.rho   : 0, 4);
-    }
-
-    // Disable edit fields for built-in strategies
-    if ($.strategyEditFields) $.strategyEditFields.classList.toggle('ctrl-disabled', !!isBuiltin);
-
-    // Enable/disable save & delete buttons
-    const hasLegs = legs && legs.length > 0;
-    if ($.saveStrategyBtn) $.saveStrategyBtn.disabled = !hasLegs || !!isBuiltin;
-    if ($.deleteStrategyBtn) $.deleteStrategyBtn.disabled = !currentStrategyHash || !!isBuiltin;
-}
-
-export function updateStrategyDropdowns($, strategies) {
-    const selects = [$.strategyLoadSelect, $.tradeStrategySelect];
-    for (const sel of selects) {
-        if (!sel) continue;
-        const prev = sel.value;
-        while (sel.options.length > 0) sel.remove(0);
-        const defOpt = document.createElement('option');
-        defOpt.value = '';
-        defOpt.textContent = sel === $.strategyLoadSelect ? 'New strategy' : 'Select a strategy\u2026';
-        sel.appendChild(defOpt);
-        for (const s of strategies) {
-            const opt = document.createElement('option');
-            opt.value = s.id;
-            opt.textContent = s.name;
-            sel.appendChild(opt);
-        }
-        if (prev && Array.from(sel.options).some(o => o.value === prev)) {
-            sel.value = prev;
-        }
-    }
-}
-
-export function updateCreditDebit($, netCost) {
-    if (!$.strategyCreditDebit || !$.strategyNetCost) return;
-    if (netCost == null || !isFinite(netCost)) {
-        $.strategyCreditDebit.querySelector('.stat-label').textContent = 'Net cost';
-        $.strategyNetCost.textContent = '\u2014';
-        $.strategyNetCost.className = 'stat-value';
-        return;
-    }
-    const label = netCost < 0 ? 'Net credit' : netCost > 0 ? 'Net debit' : 'Net cost';
-    const value = Math.abs(netCost).toFixed(2);
-    $.strategyCreditDebit.querySelector('.stat-label').textContent = label;
-    $.strategyNetCost.textContent = value;
-    $.strategyNetCost.className = 'stat-value ' + pnlClass(-netCost);
-}
-
-function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
-    const row = document.createElement('div');
-    row.className = 'leg-row stat-row';
-
-    // Label: "L:CALL ATM+5 3mo" matching portfolio format
-    const label = document.createElement('span');
-    label.className = 'stat-label';
-    let desc = posTypeLabel(leg.type, leg.qty);
-    if (leg.strike != null) {
-        const atm = Math.round((leg._refS || 100) / 5) * 5;
-        const offset = leg.strike - atm;
-        desc += ' ' + (offset === 0 ? 'ATM' : offset > 0 ? 'ATM+' + offset : 'ATM' + offset);
-    }
-    if (leg.expiryDay != null) {
-        const expiry = skeleton ? skeleton.find(e => e.day === leg.expiryDay) : null;
-        const dte = expiry ? expiry.dte : Math.max(1, leg.expiryDay - (leg._refDay || 0));
-        desc += ' ' + fmtDte(dte);
-    }
-    label.textContent = desc;
-
-    // Inline qty input
-    const qtyInput = document.createElement('input');
-    qtyInput.type = 'number';
-    qtyInput.className = 'leg-qty-input';
-    qtyInput.value = Math.abs(leg.qty);
-    qtyInput.min = '1';
-    qtyInput.step = '1';
-    qtyInput.title = 'Quantity';
-    qtyInput.addEventListener('change', () => {
-        const newAbsQty = Math.max(1, parseInt(qtyInput.value, 10) || 1);
-        leg.qty = (leg.qty < 0) ? -newAbsQty : newAbsQty;
-        if (typeof onLegChange === 'function') onLegChange();
-    });
-
-    // Remove button
-    const removeBtn = document.createElement('button');
-    removeBtn.className = 'ghost-btn pos-close-btn';
-    removeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
-    removeBtn.title = 'Remove leg';
-    removeBtn.setAttribute('aria-label', 'Remove leg');
-    removeBtn.addEventListener('click', () => {
-        if (typeof onRemoveLeg === 'function') onRemoveLeg(index);
-        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-    });
-
-    const actions = document.createElement('div');
-    actions.className = 'pos-actions';
-    actions.appendChild(qtyInput);
-    actions.appendChild(removeBtn);
-
-    row.appendChild(label);
-    row.appendChild(actions);
-
-    return row;
-}
-
-// ---------------------------------------------------------------------------
-// wireInfoTips
-// ---------------------------------------------------------------------------
 
 /**
  * Attach info tip popovers to slider labels and other UI elements.
@@ -809,75 +202,49 @@ function _buildLegRow(leg, index, onRemoveLeg, skeleton, onLegChange) {
 export function wireInfoTips() {
     const data = {
         // --- Simulation parameters ---
-        mu:           { title: 'Drift (\u03BC)', body: 'Expected annualised return of the stock. Positive = bullish tendency. The actual drift also accounts for dividends, jumps, and the Itô correction.' },
-        theta:        { title: 'Vol mean (\u03B8)', body: 'Long-run variance level. Volatility reverts toward $\\sqrt{\\theta}$ over time. $\\theta = 0.04$ corresponds to ~20% annualised vol.' },
-        kappa:        { title: 'Mean reversion (\u03BA)', body: 'Speed at which variance returns to $\\theta$. Half-life of a vol shock is $\\ln(2)/\\kappa$. Higher = faster reversion, shallower term structure.' },
-        xi:           { title: 'Vol of vol (\u03BE)', body: 'Volatility of the variance process. Higher $\\xi$ steepens the volatility skew and fattens return tails.' },
-        rho:          { title: 'Correlation (\u03C1)', body: 'Correlation between price and variance shocks. Negative = leverage effect (price drops cause vol spikes, steepening the skew).' },
-        lambda:       { title: 'Jump rate (\u03BB)', body: 'Expected Poisson jump count per year. $\\lambda = 0.5$: ~1 jump every 2 years. $\\lambda = 8$: crisis-level discontinuity.' },
-        muJ:          { title: 'Jump mean (\u03BCJ)', body: 'Average log-jump size. Negative = predominantly downward jumps (crash risk). The drift compensator $\\lambda k$ offsets the expected jump effect.' },
-        sigmaJ:       { title: 'Jump vol (\u03C3J)', body: 'Standard deviation of jump sizes. Higher = more unpredictable jump magnitudes, fattening both tails of the return distribution.' },
+        mu:           { title: 'Drift (μ)', body: 'Expected annualised return of the stock. Positive = bullish tendency. The actual drift also accounts for dividends, jumps, and the Itô correction.' },
+        theta:        { title: 'Vol mean (θ)', body: 'Long-run variance level. Volatility reverts toward $\\sqrt{\\theta}$ over time. $\\theta = 0.04$ corresponds to ~20% annualised vol.' },
+        kappa:        { title: 'Mean reversion (κ)', body: 'Speed at which variance returns to $\\theta$. Half-life of a vol shock is $\\ln(2)/\\kappa$. Higher = faster reversion, shallower term structure.' },
+        xi:           { title: 'Vol of vol (ξ)', body: 'Volatility of the variance process. Higher $\\xi$ steepens the volatility skew and fattens return tails.' },
+        rho:          { title: 'Correlation (ρ)', body: 'Correlation between price and variance shocks. Negative = leverage effect (price drops cause vol spikes, steepening the skew).' },
+        lambda:       { title: 'Jump rate (λ)', body: 'Expected Poisson jump count per year. $\\lambda = 0.5$: ~1 jump every 2 years. $\\lambda = 8$: crisis-level discontinuity.' },
+        muJ:          { title: 'Jump mean (μJ)', body: 'Average log-jump size. Negative = predominantly downward jumps (crash risk). The drift compensator $\\lambda k$ offsets the expected jump effect.' },
+        sigmaJ:       { title: 'Jump vol (σJ)', body: 'Standard deviation of jump sizes. Higher = more unpredictable jump magnitudes, fattening both tails of the return distribution.' },
         a:            { title: 'Rate reversion (a)', body: 'Speed of Vasicek mean reversion. Higher $a$ means rate shocks are transient. Bond duration capped at $1/a$.' },
         b:            { title: 'Rate mean (b)', body: 'Long-run equilibrium rate in the Vasicek model. Rates revert toward $b$ over time. Affects bond prices inversely.' },
-        sigmaR:       { title: 'Rate vol (\u03C3R)', body: 'Volatility of the interest rate process. Higher = wider rate swings, more volatile bond prices.' },
+        sigmaR:       { title: 'Rate vol (σR)', body: 'Volatility of the interest rate process. Higher = wider rate swings, more volatile bond prices.' },
         borrowSpread: { title: 'Borrow spread (k)', body: 'Volatility-scaled borrow cost factor. Daily charge = notional $\\times$ (max($r$,0) + $k \\sigma$) / 252. Events like short squeezes spike this.' },
         q:            { title: 'Dividend yield (q)', body: 'Continuous dividend yield. Reduces stock drift and option cost of carry ($b = r - q$). Cash dividends paid quarterly.' },
-        // --- Portfolio / Account ---
-        margin:       { title: 'Margin status', body: 'Your margin health. OK = well-collateralised. Low = approaching maintenance threshold. Margin call = equity below required level.' },
+        // --- The book ---
+        margin:       { title: 'Margin', body: 'Your collateral against what the book requires. Low means you are near the maintenance threshold; a margin call means equity is below it, and the desk will trim the book.' },
         cash:         { title: 'Cash', body: 'Available cash. Changes with trades, dividends, borrow costs, and exercises. Can go negative (buying on margin).' },
-        portfolioValue: { title: 'Portfolio value', body: 'Total equity: cash plus mark-to-market value of all open positions at mid-price.' },
+        portfolioValue: { title: 'The book', body: 'Total equity: cash plus every position marked to market at mid-price. Set against holding HCN with the same starting capital, the dashed line under it.' },
         borrowCost:   { title: 'Borrow cost', body: 'Cumulative interest on short positions and margin debit. Charged daily using the borrow spread formula.' },
         dividends:    { title: 'Dividends', body: 'Net cumulative dividends. Long stock receives cash quarterly; short stock pays. Amount = $S \\times q/4$ per share.' },
-        // --- Greeks ---
-        delta:        { title: 'Delta ($\\Delta$)', body: 'Rate of change of option price w.r.t. stock price. Calls: 0 to +1, puts: $-1$ to 0. Measures directional exposure.' },
-        gamma:        { title: 'Gamma ($\\Gamma$)', body: 'Rate of change of delta. Measures convexity — how fast your hedge ratio changes. Highest ATM near expiry.' },
-        theta_greek:  { title: 'Theta ($\\Theta$)', body: 'Daily time decay. Long options lose value each day (negative $\\Theta$); short options gain. Accelerates near expiry.' },
-        vega:         { title: 'Vega ($\\mathcal{V}$)', body: 'Sensitivity to implied volatility. Long options benefit from rising vol. ATM and longer-dated options have the most vega.' },
-        rho_greek:    { title: 'Rho ($\\rho$)', body: 'Sensitivity to interest rates. Calls have positive rho (higher rates help); puts negative. More meaningful with Vasicek stochastic rates.' },
-        // --- Trade tab ---
-        orderTypes:   { title: 'Order types', body: 'Market: fills immediately at bid/ask. Limit: waits until price reaches your target. Stop: triggers a market order when price crosses a level.' },
-        expiry:       { title: 'Expiry', body: '8 rolling expiry dates, each 63 trading days apart (~quarterly). Nearer expiries have faster theta decay and higher ATM gamma.' },
-        bidask:       { title: 'Bid-ask spread', body: 'You buy at the ask and sell at the bid. Spreads widen with higher volatility and deeper OTM strikes. Hover any cell to see bid/ask.' },
-        // --- Strategy ---
-        strategies:   { title: 'Strategy builder', body: 'Build multi-leg strategies: left-click for long, right-click for short. Execute fills all legs atomically with rollback on failure.' },
-        sharedExpiry: { title: 'Shared expiry', body: 'On: all legs share the expiry dropdown selection. Off: each leg keeps its own DTE offset (for calendar spreads).' },
-        // --- Settings ---
-        regime:       { title: 'Market regime', body: '5 static presets (Calm bull to Rate hike) plus the Dynamic mode with narrative events. Changing preset resets the simulation.' },
-        riskFreeRate: { title: 'Risk-free rate', body: 'Current Vasicek rate $r$. Drives option pricing, bond values, and borrow costs. Sparkline shows recent history.' },
-        events:       { title: 'Event engine', body: 'Generates narrative events that shift parameters. Fed ~every 32 days, non-Fed Poisson ~1/30 days. Followup chains create storylines.' },
+        greeks:       { title: 'Greeks', body: '$\\Delta$: change in value per point of HCN. $\\Gamma$: change in $\\Delta$. $\\Theta$: decay per trading day. $\\nu$: change per point of volatility. $\\rho$: change per point of rates.' },
+        // --- The ticket ---
+        ticket:       { title: 'The ticket', body: 'Every trade starts here. Pick points on the curves, or rows of an opened curve’s table. Each leg has a side and a ratio; the size scales them all. You buy at the ask and sell at the bid, and spreads widen with volatility and distance from the money.' },
+        orderTypes:   { title: 'Order types', body: 'Market fills now. Limit and stop rest until HCN reaches the trigger: a limit buys on the way down, a stop on the way up (and the reverse to sell). One leg, or a named strategy, can rest.' },
+        horizon:      { title: 'The horizon', body: 'How far out the figure and the grid value the legs. Options are repriced on the tree at that day; one that expires before it is worth what it pays.' },
+        // --- Meridian ---
+        regime:       { title: 'Market regime', body: 'Five fixed regimes (Calm bull to Rate hike) for the trading sim alone, or Dynamic: the race, its markets and the wire. Changing regime resets the run.' },
         gbm:          { title: 'Pricing models', body: 'GBM + Merton jumps + Heston stochastic vol + Vasicek rates. American options priced via 128-step CRR binomial tree.' },
     };
     registerInfoTips(data);
 }
 
 // ---------------------------------------------------------------------------
-// updateDynamicSections
+// updateDynamicSections: the sections that exist only with the race
 // ---------------------------------------------------------------------------
 
 export function updateDynamicSections($, presetIndex) {
     const isDynamic = presetIndex >= 5;
-
-    if ($.eventLogSection) {
-        $.eventLogSection.classList.toggle('hidden', !isDynamic);
-    }
-    if ($.congressSection) {
-        $.congressSection.classList.toggle('hidden', !isDynamic);
-    }
-    if ($.standingsSection) {
-        $.standingsSection.classList.toggle('hidden', !isDynamic);
-    }
-    if ($.consensusSection) {
-        $.consensusSection.classList.toggle('hidden', !isDynamic);
-    }
-    if ($.computeSection) {
-        $.computeSection.classList.toggle('hidden', !isDynamic);
-    }
+    for (const el of $.dynamicOnly || []) el.hidden = !isDynamic;
+    if ($.meridianClassic) $.meridianClassic.hidden = isDynamic;
     // Standing orders (P7-2) are Dynamic-only AND rung-gated: the mode switch can
     // only ever HIDE the panel here; `updateStandingOrdersPanel` owns showing it
     // (released frontier rung >= 3).
-    if (!isDynamic && $.standingOrdersSection) {
-        $.standingOrdersSection.classList.add('hidden');
-    }
+    if (!isDynamic && $.standingOrdersSection) $.standingOrdersSection.hidden = true;
 }
 
 // ---------------------------------------------------------------------------
@@ -885,78 +252,37 @@ export function updateDynamicSections($, presetIndex) {
 // ---------------------------------------------------------------------------
 
 let _standingSig = null;   // last rendered arm/lock signature (render-churn guard)
+let _standingBound = false;
 
 /**
- * Build the Standing Orders section on first use and cache it on `$`.
- *
- * The section is created HERE rather than in index.html by ruling (P7-2 brief:
- * no index.html / styles.css edits) -- it reuses the sidebar's existing classes
- * only (`stat-group` / `group-label` / `checkbox-label` / `stat-label` /
- * `panel-hint`), the same pattern the lobby pills and the regulation badges use.
- * It lands in the PORTFOLIO tab, immediately before the Convictions section:
- * standing orders are a statement about the book, and they read as one there.
- */
-function _ensureStandingOrdersSection($, onToggle) {
-    if ($.standingOrdersSection) return $.standingOrdersSection;
-    const host = document.getElementById('tab-portfolio');
-    if (!host) return null;
-
-    const section = document.createElement('div');
-    section.id = 'standing-orders-section';
-    section.className = 'stat-group hidden';
-
-    const label = document.createElement('div');
-    label.className = 'group-label';
-    label.textContent = 'Standing orders';
-    section.appendChild(label);
-
-    const list = document.createElement('div');
-    list.id = 'standing-orders-list';
-    section.appendChild(list);
-
-    const hint = document.createElement('p');
-    hint.className = 'panel-hint';
-    section.appendChild(hint);
-
-    const convictions = document.getElementById('convictions-section');
-    if (convictions && convictions.parentNode === host) host.insertBefore(section, convictions);
-    else host.appendChild(section);
-
-    // Delegated toggle, bound ONCE on the stable list container (rows are rebuilt
-    // every render -- same discipline as the consensus/compute tbodies).
-    if (onToggle) {
-        list.addEventListener('change', (e) => {
-            const box = e.target.closest('[data-standing-rule]');
-            if (box) onToggle(box.dataset.standingRule, box.checked);
-        });
-    }
-
-    $.standingOrdersSection = section;
-    $.standingOrdersList = list;
-    $.standingOrdersHint = hint;
-    return section;
-}
-
-/**
- * Render the standing-orders authoring panel from the engine's view model
- * (standing-orders.js `standingOrdersView()`): one row per rule with an
- * arm/disarm toggle and its FIXED parameter shown underneath (v1 parameters are
- * not editable -- arming is the choice). Hidden until the released frontier rung
- * unlocks it; after R5 every toggle is disabled and the hint says so.
+ * Render the standing-orders authoring panel on the Meridian page from the
+ * engine's view model (standing-orders.js `standingOrdersView()`): one row per
+ * rule with an arm/disarm toggle and its FIXED parameter shown underneath (v1
+ * parameters are not editable -- arming is the choice). Hidden until the
+ * released frontier rung unlocks it; after R5 every toggle is disabled and the
+ * hint says so.
  *
  * @param {object} $        DOM cache
  * @param {object|null} view  standingOrdersView(), or null (Classic / no race)
  * @param {Function} onToggle (ruleId, on) => void
  */
 export function updateStandingOrdersPanel($, view, onToggle) {
-    const section = _ensureStandingOrdersSection($, onToggle);
+    const section = $.standingOrdersSection;
     if (!section) return;
+    if (!_standingBound && onToggle) {
+        // Delegated toggle, bound once on the stable list (rows rebuild on change).
+        $.standingOrdersList.addEventListener('change', (e) => {
+            const box = e.target.closest('[data-standing-rule]');
+            if (box) onToggle(box.dataset.standingRule, box.checked);
+        });
+        _standingBound = true;
+    }
     if (!view || !view.unlocked) {
-        section.classList.add('hidden');
+        section.hidden = true;
         _standingSig = null;
         return;
     }
-    section.classList.remove('hidden');
+    section.hidden = false;
 
     // The panel changes at most once a day (and on a toggle), while updateUI runs
     // constantly -- rebuild only when the state actually moved, so the rows are not
@@ -969,30 +295,23 @@ export function updateStandingOrdersPanel($, view, onToggle) {
     const list = $.standingOrdersList;
     list.textContent = '';
     for (const rule of view.rules) {
-        const block = document.createElement('div');
-
         const row = document.createElement('label');
-        row.className = 'checkbox-label';
-        row.style.padding = '0.3rem 0';
-        const name = document.createElement('span');
-        name.className = 'stat-label';
-        name.textContent = rule.label;
-        row.appendChild(name);
+        row.className = 'so-row';
         const box = document.createElement('input');
         box.type = 'checkbox';
         box.dataset.standingRule = rule.id;
         box.checked = rule.armed;
         box.disabled = view.locked || view.frozen;
-        row.appendChild(box);
-        block.appendChild(row);
-
-        const param = document.createElement('p');
-        param.className = 'panel-hint';
-        param.style.margin = '0 0 6px';
+        const text = document.createElement('span');
+        const name = document.createElement('span');
+        name.className = 'so-name';
+        name.textContent = rule.label;
+        const param = document.createElement('span');
+        param.className = 'so-param';
         param.textContent = rule.param;
-        block.appendChild(param);
-
-        list.appendChild(block);
+        text.append(name, param);
+        row.append(box, text);
+        list.appendChild(row);
     }
 
     // Lock state, plainly.
@@ -1002,206 +321,53 @@ export function updateStandingOrdersPanel($, view, onToggle) {
 }
 
 // ---------------------------------------------------------------------------
-// Consensus markets panel (milestone binaries -- overhaul phase 3a)
-// ---------------------------------------------------------------------------
-
-/**
- * Pure helper: CSS class for a settled outcome cell. Returns '' for FALLBACK
- * (and anything without a directional color) so callers never pass '' to
- * classList.add (which throws). Exported for unit testing.
- */
-export function consensusOutcomeClass(outcome) {
-    if (outcome === 'YES') return 'pnl-up';
-    if (outcome === 'NO') return 'pnl-down';
-    return '';   // FALLBACK / pending -> neutral
-}
-
-/**
- * Render the Consensus milestone-binary book: one row per listed contract with
- * the compact predicate, the live quote (bid-ask in cents, or the settled
- * outcome / pending marker), the player's net position, and days-to-deadline.
- * Open rows carry a `data-binary-key` for the delegated buy/sell-YES handler
- * bound in main.js; settled / pending / frozen rows are non-tradeable.
- * Dynamic-only; called from updateUI when consensus is active.
- */
-export function updateConsensusPanel($, consensus, portfolio, day) {
-    const tbody = $.consensusTbody;
-    if (!tbody) return;
-    tbody.textContent = '';
-
-    for (const c of consensus.contracts) {
-        const q = consensus.quotes[c.key] || {};
-        const st = consensus.settled[c.key];
-        const pending = consensus.pendingCloseout && consensus.pendingCloseout[c.key];
-        const tradeable = !st && !pending && !q.frozen && !q.pending;
-        const pos = portfolio.positions.find(p => p.type === 'binary' && p.strike === c.key);
-
-        const row = document.createElement('tr');
-        row.className = 'chain-row consensus-row' + ((st || pending) ? ' consensus-settled' : '');
-        if (tradeable) row.dataset.binaryKey = String(c.key);
-
-        // Milestone (compact predicate label -- data, not narrative flavor).
-        const cMile = document.createElement('td');
-        cMile.className = 'chain-cell';
-        cMile.textContent = 'R' + c.predicate.rung + ' by ' + c.deadline;
-        row.appendChild(cMile);
-
-        // Quote: settled outcome, pending-closeout marker, or bid-ask in cents.
-        const cQuote = document.createElement('td');
-        cQuote.className = 'chain-cell';
-        let quoteCls = '';
-        if (st) {
-            cQuote.textContent = st.outcome === 'YES' ? 'Yes'
-                : st.outcome === 'FALLBACK' ? (c.fallbackValue * 100).toFixed(0) + '¢'
-                : 'No';
-            quoteCls = consensusOutcomeClass(st.outcome);
-        } else if (pending) {
-            cQuote.textContent = 'closeout';
-        } else if (q.frozen) {
-            cQuote.textContent = 'frozen';
-        } else if (q.bid != null) {
-            cQuote.textContent = Math.round(q.bid * 100) + '–' + Math.round(q.ask * 100) + '¢';
-        } else {
-            cQuote.textContent = '—';
-        }
-        if (quoteCls) cQuote.classList.add(quoteCls);
-        row.appendChild(cQuote);
-
-        // Player net position (signed; YES side).
-        const cPos = document.createElement('td');
-        cPos.className = 'chain-cell';
-        if (pos) {
-            cPos.textContent = (pos.qty > 0 ? '+' : '−') + fmtQty(pos.qty);
-        } else {
-            cPos.textContent = '—';
-        }
-        row.appendChild(cPos);
-
-        // Days-to-deadline (or terminal marker).
-        const cDte = document.createElement('td');
-        cDte.className = 'chain-cell';
-        cDte.textContent = st ? 'settled' : pending ? 'pending' : Math.max(0, c.deadline - day) + 'd';
-        row.appendChild(cDte);
-
-        tbody.appendChild(row);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Compute futures panel (compute-index term structure -- overhaul phase 3b)
-// ---------------------------------------------------------------------------
-
-/**
- * Render the compute-futures ladder: one row per listed maturity with the curve
- * mark (or a settled / frozen marker), the player's net position, and days-to-
- * maturity. Open rows carry a `data-compute-key` for the delegated buy/sell
- * handler bound in main.js; a frozen (mobilized+) book is non-tradeable.
- * Dynamic-only; called from updateUI when the compute market is active.
- */
-export function updateComputePanel($, computeMarket, portfolio, day) {
-    const tbody = $.computeTbody;
-    if (!tbody) return;
-    tbody.textContent = '';
-
-    for (const c of computeMarket.contracts) {
-        const q = computeMarket.quotes[c.key] || {};
-        const settled = computeMarket.settled[c.key];
-        const tradeable = !settled && !q.settled && !q.frozen && !computeMarket.frozen;
-        const pos = portfolio.positions.find(p => p.type === 'computefuture' && p.strike === c.key);
-
-        const row = document.createElement('tr');
-        row.className = 'chain-row compute-row' + (settled ? ' consensus-settled' : '');
-        if (tradeable) row.dataset.computeKey = String(c.key);
-
-        // Maturity (the settlement day -- data label).
-        const cMat = document.createElement('td');
-        cMat.className = 'chain-cell';
-        cMat.textContent = 'Q@' + c.settleDay;
-        row.appendChild(cMat);
-
-        // Curve mark: settled/frozen marker, or the mid index level.
-        const cQuote = document.createElement('td');
-        cQuote.className = 'chain-cell';
-        if (settled) {
-            cQuote.textContent = 'settled';
-        } else if (q.frozen) {
-            cQuote.textContent = 'frozen';
-        } else if (q.mid != null) {
-            cQuote.textContent = q.mid.toFixed(1);
-        } else {
-            cQuote.textContent = '—';
-        }
-        row.appendChild(cQuote);
-
-        // Player net position (signed).
-        const cPos = document.createElement('td');
-        cPos.className = 'chain-cell';
-        if (pos) {
-            cPos.textContent = (pos.qty > 0 ? '+' : '−') + fmtQty(pos.qty);
-        } else {
-            cPos.textContent = '—';
-        }
-        row.appendChild(cPos);
-
-        // Days-to-maturity.
-        const cDte = document.createElement('td');
-        cDte.className = 'chain-cell';
-        cDte.textContent = Math.max(0, c.settleDay - day) + 'd';
-        row.appendChild(cDte);
-
-        tbody.appendChild(row);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Standings panel
+// Meridian: your record, your standing, the world
 // ---------------------------------------------------------------------------
 
 const _FACTION_IDS = ['firmStanding', 'regulatoryExposure', 'federalistSupport', 'farmerLaborSupport', 'mediaTrust', 'fedRelations', 'safetyNetworkTrust', 'labRelations'];
 
 export function updateStandings($, world, factions, getFactionDescriptor) {
     if (!$.standingsWorld || !$.standingsFactions) return;
-    _renderWorldState($.standingsWorld, world);
+    _renderRows($.standingsWorld, [
+        ['Barron approval', (world?.election?.barronApproval ?? '?') + '%'],
+        ['Fed stance', (world?.fed?.hikeCycle) ? 'Hiking' : (world?.fed?.cutCycle) ? 'Cutting' : 'Holding'],
+        ['Fed credibility', (world?.fed?.credibilityScore ?? '?') + ' of 10'],
+    ]);
     _renderRecord($.standingsRecord);
-    _renderFactionScores($.standingsFactions, factions, getFactionDescriptor);
+    _renderRows($.standingsFactions, _FACTION_IDS.map(id => [_FACTION_LABELS[id] || id, getFactionDescriptor(id)]));
 }
 
 /** The forecast record (02a, the posterior's scoring): skill in nats over the
  *  quarters scored, and credibility as a whole percent. Dynamic only. */
 function _renderRecord(container) {
     if (!container) return;
-    container.textContent = '';
     const rec = forecastRecord();
-    if (!rec) return;
+    if (!rec) { container.textContent = ''; return; }
     const pct = Math.round(rec.credibility * 100);
-    const entries = [
-        ['Track record', rec.quarters
+    _renderRows(container, [
+        ['Against the market', rec.quarters
             ? `${fmtSigned(rec.S)} nats over ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'}`
             : 'No quarter scored yet'],
         ['Credibility', (pct < 0 ? '−' : '') + Math.abs(pct) + '%'],
-    ];
-    for (const [label, value] of entries) {
-        const row = document.createElement('div');
-        row.className = 'stat-row';
-        const lbl = document.createElement('span');
-        lbl.className = 'stat-label';
-        lbl.textContent = label;
-        const val = document.createElement('span');
-        val.className = 'stat-value';
-        val.textContent = value;
-        row.appendChild(lbl);
-        row.appendChild(val);
-        container.appendChild(row);
-    }
+        ['Forecasts locked', String(rec.locks)],
+    ]);
+    // The quarters scored, newest first.
+    const tbl = document.getElementById('record-quarters');
+    if (!tbl) return;
+    tbl.hidden = !rec.history.length;
+    const sig = rec.history.length + ':' + rec.S;
+    if (tbl._sig === sig) return;
+    tbl._sig = sig;
+    tbl.tBodies[0].innerHTML = rec.history.slice(-12).reverse().map(q =>
+        `<tr><td class="l">Days ${q.from}–${q.to}${q.terminal ? ', at the end' : ''}</td><td>${q.rungs.length}</td>`
+        + `<td class="${q.delta > 0.005 ? 'pnl-up' : q.delta < -0.005 ? 'pnl-down' : ''}">${fmtSigned(q.delta, 2)}</td></tr>`).join('');
 }
 
-function _renderWorldState(container, world) {
+function _renderRows(container, entries) {
+    const sig = entries.map(e => e.join(':')).join('|');
+    if (container._sig === sig) return;
+    container._sig = sig;
     container.textContent = '';
-    const entries = [
-        ['Barron approval', (world?.election?.barronApproval ?? '?') + '%'],
-        ['Fed stance', (world?.fed?.hikeCycle) ? 'Hiking' : (world?.fed?.cutCycle) ? 'Cutting' : 'Holding'],
-        ['Fed credibility', (world?.fed?.credibilityScore ?? '?') + '/10'],
-    ];
     for (const [label, value] of entries) {
         const row = document.createElement('div');
         row.className = 'stat-row';
@@ -1211,231 +377,71 @@ function _renderWorldState(container, world) {
         const val = document.createElement('span');
         val.className = 'stat-value';
         val.textContent = value;
-        row.appendChild(lbl);
-        row.appendChild(val);
+        row.append(lbl, val);
         container.appendChild(row);
     }
 }
 
 const _FACTION_LABELS = {
-    firmStanding: 'Firm',
-    regulatoryExposure: 'Regulatory',
+    firmStanding: 'The firm',
+    regulatoryExposure: 'Regulators',
     federalistSupport: 'Federalists',
     farmerLaborSupport: 'Farmer-Labor',
-    mediaTrust: 'Media',
-    fedRelations: 'Fed relations',
-    safetyNetworkTrust: 'Safety network',
-    labRelations: 'Lab relations',
+    mediaTrust: 'The press',
+    fedRelations: 'The Fed',
+    safetyNetworkTrust: 'The safety network',
+    labRelations: 'The labs',
 };
 
-function _renderFactionScores(container, factions, getFactionDescriptor) {
-    container.textContent = '';
-    for (const id of _FACTION_IDS) {
-        const row = document.createElement('div');
-        row.className = 'stat-row';
-        const lbl = document.createElement('span');
-        lbl.className = 'stat-label';
-        lbl.textContent = _FACTION_LABELS[id] || id;
-        const val = document.createElement('span');
-        val.className = 'stat-value';
-        val.textContent = getFactionDescriptor(id);
-        row.appendChild(lbl);
-        row.appendChild(val);
-        container.appendChild(row);
-    }
-}
-
 // ---------------------------------------------------------------------------
-// updateEventLog
+// Congress: one seat bar a chamber
 // ---------------------------------------------------------------------------
 
-export function updateEventLog($, eventLog, dayOrigin) {
-    if (!$.eventLog) return;
-    if (!eventLog || eventLog.length === 0) {
-        $.eventLog.textContent = '';
-        const empty = document.createElement('div');
-        empty.className = 'event-log-empty';
-        empty.textContent = 'No events yet.';
-        $.eventLog.appendChild(empty);
-        return;
-    }
-    // The wire's archive, newest first
-    $.eventLog.textContent = '';
-    const recent = eventLog.slice(-40).reverse();
-    for (const e of recent) {
-        const row = document.createElement('div');
-        row.className = 'event-log-entry';
-        row.dataset.magnitude = e.magnitude;
-
-        const daySpan = document.createElement('span');
-        daySpan.className = 'event-log-day';
-        daySpan.textContent = 'Ed. ' + Math.max(1, e.day - (dayOrigin || 0) + 1);
-
-        const headlineSpan = document.createElement('span');
-        headlineSpan.className = 'event-log-headline';
-        headlineSpan.textContent = e.headline;
-
-        row.appendChild(daySpan);
-        row.appendChild(headlineSpan);
-        $.eventLog.appendChild(row);
-    }
-}
-
-// ---------------------------------------------------------------------------
-// updateCongressDiagrams -- parliament-style semicircle diagrams
-// ---------------------------------------------------------------------------
-
-function _congressColors() {
-    return {
-        federalist: _themePalette().inks.sienna,
-        farmerLabor: _themePalette().inks.sap,
-    };
-}
-
-function _drawParliament(canvas, segments, total) {
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-    const { width: w, height: h } = resizeCanvasDPR(canvas, ctx);
-    ctx.clearRect(0, 0, w, h);
+/**
+ * Each chamber as one bar of its seats: Farmer-Labor solid in sap, the
+ * Federalists hatched in sienna (pattern before hue), a rule at the majority.
+ */
+function _seats(bar, key, chamber, fl, fed, majority) {
+    if (!bar) return;
+    const total = fl + fed;
     if (!total) return;
-
-    // A hemicycle of seats, one dot each, in rows whose seat counts grow with
-    // their radius. Seats fill left to right by party; the first party's are
-    // filled, the second's are rings (pattern before hue), vacancies faint.
-    const cx = w / 2, cy = h - 5;
-    const R = Math.min(cx - 6, h - 10), r0 = R * 0.4;
-    const rows = total > 200 ? 9 : 5;
-    const radii = Array.from({ length: rows }, (_, i) => r0 + (R - r0) * (i + 0.5) / rows);
-    const sumR = radii.reduce((a, b) => a + b, 0);
-    const counts = radii.map(r => Math.round(total * r / sumR));
-    counts[rows - 1] += total - counts.reduce((a, b) => a + b, 0);
-    const seats = [];
-    radii.forEach((r, i) => {
-        const n = counts[i];
-        for (let j = 0; j < n; j++) {
-            const a = Math.PI * (1 - (n === 1 ? 0.5 : j / (n - 1)));
-            seats.push({ a, x: cx + r * Math.cos(a), y: cy - r * Math.sin(a) });
-        }
-    });
-    seats.sort((p, q) => q.a - p.a);
-    const dot = Math.max(1.3, Math.min(5, (R - r0) / rows * 0.36));
-    const muted = _themePalette().textMuted;
-    let k = 0;
-    segments.forEach((seg, si) => {
-        for (let n = 0; n < seg.count && k < seats.length; n++, k++) {
-            const p = seats[k];
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, si === 0 ? dot : dot - 0.5, 0, Math.PI * 2);
-            if (si === 0) { ctx.fillStyle = seg.color; ctx.fill(); }
-            else { ctx.strokeStyle = seg.color; ctx.lineWidth = 1; ctx.stroke(); }
-        }
-    });
-    for (; k < seats.length; k++) {
-        ctx.beginPath();
-        ctx.arc(seats[k].x, seats[k].y, dot * 0.6, 0, Math.PI * 2);
-        ctx.fillStyle = _r(muted, 0.4);
-        ctx.fill();
-    }
-}
-
-function _updateLegend(el, segments, majority) {
-    if (!el) return;
-    el.textContent = '';
-    for (const seg of segments) {
-        if (seg.count <= 0) continue;
-        const item = document.createElement('span');
-        item.className = 'congress-legend-item';
-
-        const dot = document.createElement('span');
-        dot.className = 'congress-legend-dot';
-        dot.style.background = seg.color;
-        dot.style.borderColor = seg.color;
-
-        const label = document.createElement('span');
-        label.textContent = seg.label + ' ' + seg.count;
-        if (seg.count >= majority) label.style.fontWeight = '600';
-
-        item.appendChild(dot);
-        item.appendChild(label);
-        el.appendChild(item);
-    }
+    bar.querySelector('.seats-fl').style.width = (100 * fl / total) + '%';
+    bar.querySelector('.seats-fed').style.width = (100 * fed / total) + '%';
+    bar.querySelector('.seats-maj').style.left = (100 * majority / total) + '%';
+    bar.setAttribute('aria-label', `${chamber}: Farmer-Labor ${fl}, Federalists ${fed}; ${majority} for a majority`);
+    key.innerHTML = `<span class="${fl >= majority ? 'maj' : ''}">Farmer-Labor ${fl}</span> · <span class="${fed >= majority ? 'maj' : ''}">Federalists ${fed}</span>`;
 }
 
 export function updateCongressDiagrams($, world) {
-    if (!world || !$.senateDiagram) return;
-    const c = _congressColors();
-    const s = world.congress.senate;
-    const h = world.congress.house;
-
-    const senateSegs = [
-        { label: 'F-L', count: s.farmerLabor, color: c.farmerLabor },
-        { label: 'Fed', count: s.federalist, color: c.federalist },
-    ];
-    const senateTotal = s.federalist + s.farmerLabor;
-    _drawParliament($.senateDiagram, senateSegs, senateTotal);
-    _updateLegend($.senateLegend, senateSegs, 51);
-
-    const houseSegs = [
-        { label: 'F-L', count: h.farmerLabor, color: c.farmerLabor },
-        { label: 'Fed', count: h.federalist, color: c.federalist },
-    ];
-    const houseTotal = h.federalist + h.farmerLabor;
-    _drawParliament($.houseDiagram, houseSegs, houseTotal);
-    _updateLegend($.houseLegend, houseSegs, 218);
+    if (!world) return;
+    const s = world.congress.senate, h = world.congress.house;
+    _seats($.senateSeats, $.senateKey, 'Senate', s.farmerLabor, s.federalist, 51);
+    _seats($.houseSeats, $.houseKey, 'House', h.farmerLabor, h.federalist, 218);
 }
 
-const _popupCategoryMeta = {
-    fed:            { label: 'Federal Reserve',    color: 'var(--ink-prussian)' },
-    investigation:  { label: 'Investigation',      color: 'var(--accent)' },
-    congressional:  { label: 'Congress',            color: 'var(--ink-indigo)' },
-    political:      { label: 'Political',           color: 'var(--ink-sienna)' },
-    midterm:        { label: 'Election',            color: 'var(--ink-madder)' },
-    macro:          { label: 'Macro',               color: 'var(--ink-verdigris)' },
-    sector:         { label: 'Sector',              color: 'var(--ink-sap)' },
-    market:         { label: 'Markets',             color: 'var(--ink-ochre)' },
-    compound:       { label: 'Crisis',              color: 'var(--accent)' },
-    desk:           { label: 'Meridian Capital',    color: 'var(--accent)' },
-    margin:         { label: 'Margin call',         color: 'var(--down)' },
-    gameover:       { label: 'Game over',           color: 'var(--accent)' },
-    // Race-era categories (overhaul): previously fell through to 'desk'.
-    release:        { label: 'The race',            color: 'var(--vxhcn)' },
-    certification:  { label: 'Consensus markets',   color: 'var(--vxhcn)' },
-    incident:       { label: 'Incident report',     color: 'var(--accent)' },
-    theft:          { label: 'Exfiltration',        color: 'var(--accent)' },
-    strait:         { label: 'The strait',          color: 'var(--ink-madder)' },
-    regime:         { label: 'The state',           color: 'var(--ink-indigo)' },
-    halcyon:        { label: 'Halcyon',             color: 'var(--vxhcn)' },
-    china:          { label: 'Beijing',             color: 'var(--accent)' },
-    polaris:        { label: 'Polaris',             color: 'var(--ink-verdigris)' },
-    rounds:         { label: 'The round',           color: 'var(--ink-verdigris)' },
-    wonder:         { label: 'The wonders',         color: 'var(--ink-sap)' },
-    policy:         { label: 'Washington',          color: 'var(--ink-indigo)' },
-    treaty:         { label: 'Geneva',              color: 'var(--ink-prussian)' },
-    summit:         { label: 'Reykjavik',           color: 'var(--ink-prussian)' },
-    insider:        { label: 'The channel',         color: 'var(--ink-sienna)' },
-    ghostwritten:   { label: 'Unsigned',            color: 'var(--ink-verdigris)' },
+// ---------------------------------------------------------------------------
+// The dispatch
+// ---------------------------------------------------------------------------
+
+const _popupCategoryLabel = {
+    fed: 'Federal Reserve', investigation: 'Investigation', congressional: 'Congress', political: 'Political',
+    midterm: 'Election', macro: 'Macro', sector: 'Sector', market: 'Markets', compound: 'Crisis',
+    desk: 'Meridian Capital', margin: 'Margin call', gameover: 'Game over',
+    release: 'The race', certification: 'Consensus markets', incident: 'Incident report', theft: 'Exfiltration',
+    strait: 'The strait', regime: 'The state', halcyon: 'Halcyon', china: 'Beijing', polaris: 'Polaris',
+    rounds: 'The round', wonder: 'The wonders', policy: 'Washington', treaty: 'Geneva', summit: 'Reykjavik',
+    insider: 'The channel', ghostwritten: 'Unsigned',
 };
 
 export function showPopupEvent($, headline, context, choices, onChoice, category, magnitude, superevent = false) {
-    // Category kicker (label + colored dot)
-    const meta = _popupCategoryMeta[category] || _popupCategoryMeta.desk;
-
-    // Magnitude-based backdrop (blur only, no darkening)
-    if (magnitude === 'major') {
-        $.popupOverlay.style.backdropFilter = 'blur(8px)';
-    } else {
-        $.popupOverlay.style.backdropFilter = '';
-    }
-
-    // Category tag
+    // Category kicker
     let tag = $.popupOverlay.querySelector('.popup-tag');
     if (!tag) {
         tag = document.createElement('span');
         tag.className = 'popup-tag';
         $.popupHeadline.parentNode.insertBefore(tag, $.popupHeadline);
     }
-    tag.textContent = meta.label;
-    tag.style.setProperty('--tag-color', meta.color);
+    tag.textContent = _popupCategoryLabel[category] || _popupCategoryLabel.desk;
 
     $.popupHeadline.textContent = headline;
     if (superevent) {
@@ -1488,9 +494,6 @@ export function showPopupEvent($, headline, context, choices, onChoice, category
         btn.appendChild(desc);
         btn.addEventListener('click', () => {
             $.popupOverlay.classList.add('hidden');
-            // Clean up inline styles
-            $.popupOverlay.style.background = '';
-            $.popupOverlay.style.backdropFilter = '';
             $.popupOverlay.classList.remove('superevent');
             if (_popupTrapCleanup) { _popupTrapCleanup(); _popupTrapCleanup = null; }
             if (_popupPrevFocus && _popupPrevFocus.focus) { _popupPrevFocus.focus(); _popupPrevFocus = null; }

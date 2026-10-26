@@ -1,5 +1,5 @@
-// Sparklines: a ring-buffer history and a polyline drawn on a small canvas (the rate,
-// VXHCN and portfolio readouts). Moved here from shared/ when each sim took its own
+// Sparklines: a ring-buffer history and a polyline drawn on a small canvas (the
+// book's value against holding HCN). Moved here from shared/ when each sim took its own
 // small charts (docs/sim-overhaul/PLAN.md).
 
 /**
@@ -42,8 +42,10 @@ export function resetSparkHistory(h) {
  * @param {number} hh      Canvas height (CSS pixels)
  * @param {string} color   Stroke color (hex)
  * @param {string} dimColor  Dim color for the "now" marker (hex with alpha)
+ * @param {object} [ghost] A second history on the same scale, drawn dashed in dimColor
+ *                         (the book's buy-and-hold benchmark)
  */
-export function drawSparkline(ctx, h, w, hh, color, dimColor) {
+export function drawSparkline(ctx, h, w, hh, color, dimColor, ghost) {
     ctx.clearRect(0, 0, w, hh);
     if (h.count < 2) return;
 
@@ -56,15 +58,32 @@ export function drawSparkline(ctx, h, w, hh, color, dimColor) {
     let pad = hh * 0.1;
     let plotH = hh - 2 * pad;
 
-    // Single pass: find min/max
+    // Single pass: find min/max (over the ghost too, so both share one scale)
     let min = Infinity, max = -Infinity;
-    for (let i = 0; i < count; i++) {
-        let v = data[(base + i) % cap];
-        if (v < min) min = v;
-        if (v > max) max = v;
+    for (const src of ghost && ghost.count >= 2 ? [h, ghost] : [h]) {
+        const b = (src.head - src.count + src.cap) % src.cap;
+        for (let i = 0; i < src.count; i++) {
+            let v = src.data[(b + i) % src.cap];
+            if (v < min) min = v;
+            if (v > max) max = v;
+        }
     }
     let range = max - min || 1;
     let yScale = plotH / range;
+
+    if (ghost && ghost.count >= 2) {
+        const gb = (ghost.head - ghost.count + ghost.cap) % ghost.cap;
+        ctx.beginPath();
+        ctx.strokeStyle = dimColor;
+        ctx.lineWidth = 1;
+        ctx.setLineDash([3, 3]);
+        for (let i = 0; i < ghost.count; i++) {
+            const y = pad + plotH - (ghost.data[(gb + i) % ghost.cap] - min) * yScale;
+            if (i === 0) ctx.moveTo(i * xScale, y); else ctx.lineTo(i * xScale, y);
+        }
+        ctx.stroke();
+        ctx.setLineDash([]);
+    }
 
     // Draw polyline
     ctx.beginPath();

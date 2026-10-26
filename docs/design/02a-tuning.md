@@ -911,7 +911,8 @@ Leaks update by evidence, never by interpolating toward truth. The
 player's leak verb folds there, under the detection's id. No quote,
 valuation or display reads it.
 
-**Displays.** The Markets page draws `B`'s pooled crossing curve. Its
+**Displays.** The Markets page draws `B`'s pooled crossing curve, and the
+Race page its daily mass on each rung. Its
 implied date is the pooled conditional median, or "not this term" when
 less than half the mass lands within the support. The posterior editor
 starts from `B`'s **projection** onto the player's family (below): a
@@ -990,8 +991,9 @@ are monotone over the certification rungs (`m₂ ≤ m₃ ≤ m₄`,
 `q₂ ≤ q₃ ≤ q₄`), and dragging one pushes its neighbours. R5 is not
 ordered against them: an internal R5 crossing can end a world before R4
 certifies. A certified rung is frozen at its certification day. The
-player edits a standing **draft** at any time on the Markets page:
-median, width, and plateau. The plateau handle edits the conditional
+player edits a standing **draft** at any time on the Race page (moved
+from the Markets page's Consensus panel by a9's ruling, 2026-10-26):
+median, width, and plateau, with the same keys. The plateau handle edits the conditional
 curve's height at the term's end, `1 − S(1008)/S(t)`, the chance of a
 crossing this term given none yet, and `q` follows from it given `m` and
 `w`. Day 0's draft is `B`'s projection.
@@ -1004,9 +1006,8 @@ holds the day (it counts in `_popupBarrier`) until a lock is recorded.
 The choices are *as drawn*, *the market's curves*, *earlier than the
 market* (`B`'s projection with `m − 0.5·w` on each uncertified rung,
 `w` and `q` kept), *later than the market* (`m + 0.5·w`), or *adjust
-first*. Adjust first dismisses the dispatch, opens the Markets page with
-the editor focused, and keeps the day held until the panel's Lock is
-pressed.
+first*. Adjust first dismisses the dispatch, opens the Race page with
+the editor focused, and keeps the day held until its Lock is pressed.
 
 A lock stores, for every rung it will score, the quarter's probability
 from each side: `p_P` from the player's law and `p_M` from `B` at the
@@ -1014,7 +1015,7 @@ lock. It also stores the player's curves and `B`'s projection for
 display. `scoreQuarter` reads the stored pair and never re-evaluates
 `B`. *The market's curves* records a **market-policy** lock: `p_P ≡ p_M`,
 and its pilledness and claims read `B`'s own (below). So does any lock,
-from the dispatch or the panel, of a draft still equal to today's
+from the dispatch or the Race page, of a draft still equal to today's
 projection on every open rung: an untouched drawing is the market's
 call, and the Brief says so.
 

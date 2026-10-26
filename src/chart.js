@@ -1,8 +1,14 @@
 /* ===================================================
-   chart.js — The tape: HCN drawn after Tufte on
-   Canvas 2D. Each day's range is a band, the close a
-   line over it; news days are ticked on the band and
-   the most recent carry their heads. Position entries,
+   chart.js — The tape: HCN as print candles on Canvas
+   2D. A day that closed up is a hollow body in ink, a
+   day that closed down a solid body in the accent; the
+   hairline wick is the day's range. The forming day
+   ratchets: its wick holds each new extreme while the
+   close eases toward the next substep. Zoomed out until
+   a body would be too narrow to read, the candles fall
+   back to the close as a line over a band of the
+   range. News days are ticked above the wick and the
+   most recent carry their heads; position entries,
    held strikes and a crosshair with the day's agate
    line complete it. The shared camera pans and zooms
    horizontally; the log Y axis fits the visible days.
@@ -46,6 +52,9 @@ export class ChartRenderer {
 
         // News days for the tape (setNews): [{ day, head, major }]
         this._news = [];
+
+        // 'candle' or 'line': what the last draw used (the caption reads it).
+        this.mode = 'candle';
 
         // Axis gutter sizes (CSS px) — from config.js
         this.Y_AXIS_W  = CHART_Y_AXIS_W;
@@ -218,10 +227,11 @@ export class ChartRenderer {
     /* -----------------------------------------------
        draw(history, positions, mouseX, mouseY, latestBar)
 
-       The tape, after Tufte: each day's range is a
-       band, the close a line over it. News days are
-       ticked on the band, positions marked where they
-       were entered, option strikes ruled across.
+       The tape: a print candle per day, or, below
+       CANDLE_MIN_PX a day, the close as a line over a
+       band of the range. News days are ticked above
+       the wick, positions marked where they were
+       entered, option strikes ruled across.
 
        @param {Object[]} history     OHLC bars { day, open, high, low, close }
        @param {Object[]} positions   Portfolio positions
@@ -304,9 +314,11 @@ export class ChartRenderer {
         ctx.fillStyle = muted;
         ctx.textAlign = 'left';
         ctx.textBaseline = 'middle';
+        // Today's close takes the axis where it sits; a rule label under it gives way.
+        const closeY = bars.length ? Y(bars[bars.length - 1].c) : -1e9;
         for (let p = Math.ceil(pLo / step) * step; p <= pHi; p += step) {
             const y = Y(p);
-            if (y < plotY + 6 || y > plotY + plotH - 4) continue;
+            if (y < plotY + 6 || y > plotY + plotH - 4 || Math.abs(y - closeY) < 13) continue;
             ctx.fillText(_tickPrice(p, step), plotX + plotW + 8, y);
         }
 
@@ -338,24 +350,47 @@ export class ChartRenderer {
             ctx.fillText(`${K} ${f.call && f.put ? 'call and put' : f.call ? 'call' : 'put'}`, plotX + 6, y - 2);
         }
 
-        // ── The day's range: one band through every high and low ──
-        const half = Math.max(0.5, Math.min(6, (cam ? cam.zoom : 8) * 0.36));
-        ctx.beginPath();
-        for (let i = 0; i < bars.length; i++) {
-            const b = bars[i];
-            if (i === 0) ctx.moveTo(b.x - half, Y(b.h)); else ctx.lineTo(b.x - half, Y(b.h));
-            ctx.lineTo(b.x + half, Y(b.h));
+        // ── Candles, or the line and band when a body would be too narrow ──
+        const slot = cam ? cam.zoom : 8;
+        const candles = slot >= CANDLE_MIN_PX;
+        this.mode = candles ? 'candle' : 'line';
+        if (!candles) {
+            const half = Math.max(0.5, Math.min(6, slot * 0.36));
+            ctx.beginPath();
+            for (let i = 0; i < bars.length; i++) {
+                const b = bars[i];
+                if (i === 0) ctx.moveTo(b.x - half, Y(b.h)); else ctx.lineTo(b.x - half, Y(b.h));
+                ctx.lineTo(b.x + half, Y(b.h));
+            }
+            for (let i = bars.length - 1; i >= 0; i--) {
+                const b = bars[i];
+                ctx.lineTo(b.x + half, Y(b.l));
+                ctx.lineTo(b.x - half, Y(b.l));
+            }
+            ctx.closePath();
+            ctx.fillStyle = _r(text, document.documentElement.dataset.theme === 'dark' ? 0.13 : 0.09);
+            ctx.fill();
+        } else {
+            // Hollow up in ink, solid down in the accent; the wick never crosses a body.
+            const bw = Math.max(2, Math.min(18, Math.round(slot * this.BODY_RATIO)));
+            ctx.lineWidth = 1;
+            for (const b of bars) {
+                const up = b.c >= b.o, col = up ? text : red;
+                const xr = Math.round(b.x) + 0.5;
+                const top = Math.round(Y(Math.max(b.o, b.c))), bot = Math.round(Y(Math.min(b.o, b.c)));
+                const bh = Math.max(1, bot - top);
+                ctx.strokeStyle = col;
+                ctx.beginPath();
+                ctx.moveTo(xr, Y(b.h)); ctx.lineTo(xr, top);
+                ctx.moveTo(xr, top + bh); ctx.lineTo(xr, Y(b.l));
+                ctx.stroke();
+                const bx = Math.round(b.x - bw / 2);
+                if (up && bh > 1) ctx.strokeRect(bx + 0.5, top + 0.5, bw - 1, bh - 1);
+                else { ctx.fillStyle = col; ctx.fillRect(bx, top, bw, bh); }
+            }
         }
-        for (let i = bars.length - 1; i >= 0; i--) {
-            const b = bars[i];
-            ctx.lineTo(b.x + half, Y(b.l));
-            ctx.lineTo(b.x - half, Y(b.l));
-        }
-        ctx.closePath();
-        ctx.fillStyle = _r(text, document.documentElement.dataset.theme === 'dark' ? 0.13 : 0.09);
-        ctx.fill();
 
-        // ── News days: a tick on the band; recent heads along the top ──
+        // ── News days: a tick above the wick; recent heads along the top ──
         const news = this._news || [];
         const newsByDay = new Map();
         for (const n of news) if (n.day >= firstDay && n.day <= lastDay) newsByDay.set(n.day, n);
@@ -400,13 +435,15 @@ export class ChartRenderer {
         ctx.rect(plotX, plotY - 2, plotW, plotH + 4);
         ctx.clip();
 
-        // ── The close: one line ──
-        ctx.strokeStyle = text;
-        ctx.lineWidth = 1.4;
-        ctx.lineJoin = 'round';
-        ctx.beginPath();
-        bars.forEach((b, i) => { if (i) ctx.lineTo(b.x, Y(b.c)); else ctx.moveTo(b.x, Y(b.c)); });
-        ctx.stroke();
+        // ── The close: one line, when the candles have fallen back ──
+        if (!candles) {
+            ctx.strokeStyle = text;
+            ctx.lineWidth = 1.4;
+            ctx.lineJoin = 'round';
+            ctx.beginPath();
+            bars.forEach((b, i) => { if (i) ctx.lineTo(b.x, Y(b.c)); else ctx.moveTo(b.x, Y(b.c)); });
+            ctx.stroke();
+        }
 
         // ── Entries: a triangle under the band for long, over it for short ──
         for (const pos of positions || []) {
@@ -428,10 +465,13 @@ export class ChartRenderer {
             ctx.strokeStyle = _r(text, 0.3);
             ctx.lineWidth = 1;
             ctx.setLineDash([1, 3]);
-            ctx.beginPath(); ctx.moveTo(last.x + 5, Math.round(y) + 0.5); ctx.lineTo(plotX + plotW + 4, Math.round(y) + 0.5); ctx.stroke();
+            const gap = candles ? Math.max(2, Math.min(18, Math.round(slot * this.BODY_RATIO))) / 2 + 3 : 5;
+            ctx.beginPath(); ctx.moveTo(last.x + gap, Math.round(y) + 0.5); ctx.lineTo(plotX + plotW + 4, Math.round(y) + 0.5); ctx.stroke();
             ctx.setLineDash([]);
-            ctx.beginPath(); ctx.arc(last.x, y, 3, 0, Math.PI * 2);
-            ctx.fillStyle = down ? red : text; ctx.fill();
+            if (!candles) {
+                ctx.beginPath(); ctx.arc(last.x, y, 3, 0, Math.PI * 2);
+                ctx.fillStyle = down ? red : text; ctx.fill();
+            }
             ctx.font = `600 12.5px ${_FONT.text}`;
             const lbl = last.c.toFixed(2), lw = ctx.measureText(lbl).width;
             ctx.fillStyle = pal.canvas;
@@ -509,6 +549,9 @@ export class ChartRenderer {
 // ─────────────────────────────────────────────────────────────────────────────
 // Private helpers
 // ─────────────────────────────────────────────────────────────────────────────
+
+/** Below this many CSS px a day, a candle body can't be read: draw the line and band. */
+const CANDLE_MIN_PX = 3.5;
 
 /**
  * Choose a "nice" grid interval for `range` spread across `targetCount` ticks.

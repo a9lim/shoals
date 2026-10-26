@@ -1,15 +1,20 @@
 /* =====================================================
-   portfolio-renderer.js -- Portfolio display with DOM
-   diffing for the Shoals trading simulator.
+   portfolio-renderer.js -- The book, on the front
+   page's rail: the value against holding HCN, the
+   account, positions, strategies and working orders.
 
-   Extracted from ui.js. Updates P&L values in-place
-   instead of rebuilding all position rows every day.
+   Rows are agate: the contract as the ticket names it,
+   the signed quantity, the profit or loss. A row's name
+   hands the contract to the ticket; its × closes it.
+   P&L values update in place instead of rebuilding the
+   rows every substep.
    ===================================================== */
 
 import { computePositionPnl, computePositionValue } from './position-value.js';
 import { drawSparkline } from './sparkline.js';
-import { fmtDollar, fmtQty, pnlClass, fmtDte, posTypeLabel } from './format-helpers.js';
+import { fmtDollar, pnlClass, contractName } from './format-helpers.js';
 import { lastPolarisRound } from './race/rounds.js';
+import { contractByKey } from './race/consensus.js';
 
 const PRIVATE_TIP = 'Private stakes are marked at the last round and cannot be sold before the race ends. At the end they settle by what happened to Polaris.';
 
@@ -18,11 +23,12 @@ const PRIVATE_TIP = 'Private stakes are marked at the last round and cannot be s
 // ---------------------------------------------------------------------------
 
 function _computeMarginDisplay(equity, required) {
-    if (required <= 0) return { label: 'OK', cls: 'margin-ok' };
+    if (required <= 0) return { label: 'Clear', cls: 'margin-ok' };
     if (equity < required) return { label: 'Margin call', cls: 'margin-alert' };
     const pct = Math.min((equity / required) * 100, 999);
-    if (equity < required * 1.2) return { label: 'Low (' + pct.toFixed(0) + '%)', cls: 'margin-warn' };
-    return { label: 'OK (' + pct.toFixed(0) + '%)', cls: 'margin-ok' };
+    if (equity < required * 1.2) return { label: 'Low, ' + pct.toFixed(0) + '% of requirement', cls: 'margin-warn' };
+    if (equity >= required * 5) return { label: 'Ample', cls: 'margin-ok' };
+    return { label: pct.toFixed(0) + '% of requirement', cls: 'margin-ok' };
 }
 
 // ---------------------------------------------------------------------------
@@ -30,29 +36,42 @@ function _computeMarginDisplay(equity, required) {
 // ---------------------------------------------------------------------------
 
 /**
- * Build a position-row label. Single source of truth for both the initial render
- * and the daily in-place update, so the DTE clock can't diverge between them.
- * Compute futures carry a RACE-clock `expiryDay`; subtracting the sim `day` would
- * print a nonsense DTE, so it is omitted for them (the maturity lives in the
- * compute panel, shown against raceState.day). All other instruments are
- * sim-clock. Exported for headless display-source testing.
+ * A position's name, as the ticket and the markets tables name its contract.
+ * Single source of truth for the initial render and the daily in-place update,
+ * so the span to expiry can't diverge between them. Compute futures carry a
+ * RACE-clock `expiryDay` (their key), so they name their delivery day rather
+ * than a span from the sim `day`; binaries name their rung and deadline. All
+ * other instruments are sim-clock. Exported for headless display-source testing.
  */
 export function positionLabel(pos, day) {
-    const absQty    = Math.abs(pos.qty);
-    if (pos.type === 'privatestake') return 'Polaris (private) x' + fmtQty(absQty);
-    const typeLabel = posTypeLabel(pos.type, pos.qty);
-    const isOption  = pos.type === 'call' || pos.type === 'put';
-    const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
-    const expiryStr = (pos.expiryDay != null && pos.type !== 'computefuture') ? ' ' + fmtDte(pos.expiryDay - day) : '';
-    return typeLabel + strikeStr + expiryStr + ' x' + fmtQty(absQty);
+    if (pos.type === 'binary') {
+        const c = contractByKey(pos.strike);
+        return contractName('binary', pos.strike, pos.expiryDay, day, c ? c.predicate.rung : undefined);
+    }
+    return contractName(pos.type, pos.strike, pos.expiryDay, day);
 }
+
+const _qty = (q) => (q < 0 ? '−' : '+') + Math.abs(q).toLocaleString() + 'k';
 
 function _updatePrivateLabel(label, pos) {
     const round = lastPolarisRound();
     label.querySelector('.pos-private-name').textContent = positionLabel(pos);
-    label.querySelector('.pos-private-mark').textContent = '$' + (round?.price ?? 0).toFixed(2) + ' / unit';
-    label.querySelector('.pos-private-note').textContent = round && !round.founding
-        ? 'marked at the Series ' + round.letter + ' round' : 'marked at the founding round';
+    label.querySelector('.pos-private-note').textContent = '$' + (round?.price ?? 0).toFixed(2) + ' a unit, '
+        + (round && !round.founding ? 'marked at the Series ' + round.letter + ' round' : 'marked at the founding round');
+}
+
+function _iconBtn(cls, title, event, detail, haptic) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'x-btn ' + cls;
+    b.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
+    b.title = title;
+    b.setAttribute('aria-label', title);
+    b.addEventListener('click', () => {
+        b.dispatchEvent(new CustomEvent(event, { detail, bubbles: true }));
+        if (typeof _haptics !== 'undefined') _haptics.trigger(haptic);
+    });
+    return b;
 }
 
 // ---------------------------------------------------------------------------
@@ -60,41 +79,37 @@ function _updatePrivateLabel(label, pos) {
 // ---------------------------------------------------------------------------
 
 function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
-    const absQty     = Math.abs(pos.qty);
-    const pnl        = computePositionPnl(pos, currentPrice, vol, rate, day, q);
-    const value      = computePositionValue(pos, currentPrice, vol, rate, day, q);
-    const entryTotal = pos.entryPrice * absQty;
-    const isOption   = pos.type === 'call' || pos.type === 'put';
-    const labelStr   = positionLabel(pos, day);
-
+    const isOption = pos.type === 'call' || pos.type === 'put';
     const row = document.createElement('div');
-    row.className = 'data-row pos-row stat-row';
+    row.className = 'pos-row';
     row.dataset.posId = pos.id;
 
-    const labelEl = document.createElement('span');
-    labelEl.className = 'pos-label stat-label';
-    labelEl.textContent = labelStr;
+    let labelEl;
     if (pos.type === 'privatestake') {
-        labelEl.classList.add('pos-private-label');
-        labelEl.textContent = '';
-        for (const cls of ['pos-private-name', 'pos-private-mark', 'pos-private-note']) {
+        labelEl = document.createElement('span');
+        labelEl.className = 'pos-label pos-private-label';
+        for (const cls of ['pos-private-name', 'pos-private-note']) {
             const part = document.createElement('span');
             part.className = cls;
             labelEl.appendChild(part);
         }
         _updatePrivateLabel(labelEl, pos);
+    } else {
+        // The name hands the contract to the ticket, on the position's side.
+        labelEl = document.createElement('button');
+        labelEl.type = 'button';
+        labelEl.className = 'pos-label link-btn';
+        labelEl.title = 'Put this contract on the ticket';
+        labelEl.addEventListener('click', () => {
+            labelEl.dispatchEvent(new CustomEvent('shoals:toTicket', { detail: { id: pos.id }, bubbles: true }));
+        });
     }
 
-    const valueEl = document.createElement('span');
-    valueEl.className = 'pos-value stat-value';
-    valueEl.textContent = fmtDollar(value);
-    valueEl.title = 'Entry ' + fmtDollar(entryTotal);
-
+    const qtyEl = document.createElement('span');
+    qtyEl.className = 'pos-qty';
     const pnlEl = document.createElement('span');
-    pnlEl.className = 'pos-pnl stat-value ' + pnlClass(pnl);
-    pnlEl.textContent = fmtDollar(pnl);
-
-    const actions = document.createElement('div');
+    pnlEl.className = 'pos-pnl';
+    const actions = document.createElement('span');
     actions.className = 'pos-actions';
 
     if (pos.type === 'privatestake') {
@@ -104,120 +119,225 @@ function _buildPositionRow(pos, currentPrice, vol, rate, day, q) {
         info.textContent = '?';
         info.setAttribute('aria-label', 'Info: Polaris (private)');
         info.title = PRIVATE_TIP;
-        if (typeof createInfoTip !== 'undefined') row._infoCleanup = createInfoTip(info, { title: 'Polaris (private)', body: PRIVATE_TIP });
+        if (typeof createInfoTip !== 'undefined') row._infoCleanup = createInfoTip(info, { title: 'Polaris, private', body: PRIVATE_TIP });
         actions.appendChild(info);
     } else {
-        const closeBtn = document.createElement('button');
-        closeBtn.className = 'ghost-btn pos-close-btn';
-        closeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
-        closeBtn.title = 'Close position';
-        closeBtn.setAttribute('aria-label', 'Close position');
-        closeBtn.addEventListener('click', () => {
-            closeBtn.dispatchEvent(new CustomEvent('shoals:closePosition', { detail: { id: pos.id }, bubbles: true }));
-            if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
-        });
-        actions.appendChild(closeBtn);
+        if (isOption && pos.qty > 0) {
+            const exBtn = document.createElement('button');
+            exBtn.type = 'button';
+            exBtn.className = 'link-btn pos-exercise-btn';
+            exBtn.textContent = 'ex';
+            exBtn.title = 'Exercise option';
+            exBtn.setAttribute('aria-label', 'Exercise option');
+            exBtn.addEventListener('click', () => {
+                exBtn.dispatchEvent(new CustomEvent('shoals:exerciseOption', { detail: { id: pos.id }, bubbles: true }));
+                if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
+            });
+            actions.appendChild(exBtn);
+        }
+        actions.appendChild(_iconBtn('pos-close-btn', 'Close position', 'shoals:closePosition', { id: pos.id }, 'medium'));
     }
 
-    if (isOption && pos.qty > 0) {
-        const exBtn = document.createElement('button');
-        exBtn.className = 'ghost-btn pos-exercise-btn';
-        exBtn.textContent = 'Ex';
-        exBtn.title = 'Exercise option';
-        exBtn.addEventListener('click', () => {
-            exBtn.dispatchEvent(new CustomEvent('shoals:exerciseOption', { detail: { id: pos.id }, bubbles: true }));
-            if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
-        });
-        actions.appendChild(exBtn);
-    }
-
-    const numCol = document.createElement('div');
-    numCol.className = 'pos-nums';
-    numCol.appendChild(pnlEl);
-    numCol.appendChild(valueEl);
-
-    row.appendChild(labelEl);
-    row.appendChild(numCol);
-    row.appendChild(actions);
+    row.append(labelEl, qtyEl, pnlEl, actions);
+    _updatePositionRow(row, pos, currentPrice, vol, rate, day, q);
     return row;
+}
+
+function _updatePositionRow(row, pos, S, vol, rate, day, q) {
+    const pnl = computePositionPnl(pos, S, vol, rate, day, q);
+    const value = computePositionValue(pos, S, vol, rate, day, q);
+    const labelEl = row.querySelector('.pos-label');
+    if (pos.type === 'privatestake') _updatePrivateLabel(labelEl, pos);
+    else labelEl.textContent = positionLabel(pos, day);
+    row.querySelector('.pos-qty').textContent = _qty(pos.qty);
+    const pnlEl = row.querySelector('.pos-pnl');
+    pnlEl.textContent = (pnl < 0 ? '−' : '+') + fmtDollar(Math.abs(pnl));
+    pnlEl.className = 'pos-pnl ' + pnlClass(pnl);
+    pnlEl.title = 'Worth ' + fmtDollar(value) + '; entered at ' + fmtDollar(pos.entryPrice * Math.abs(pos.qty));
 }
 
 // ---------------------------------------------------------------------------
 // _buildOrderRow
 // ---------------------------------------------------------------------------
 
-function _buildOrderRow(order) {
-    let labelStr;
-    if (order.legs) {
-        labelStr = (order.strategyName || 'Strategy') + ' x' + fmtQty(order.execMult) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
-    } else {
-        const typeLabel = posTypeLabel(order.type, order.side);
-        const strikeStr = order.strike != null ? ' K' + order.strike : '';
-        labelStr = typeLabel + strikeStr + ' x' + fmtQty(order.qty) + ' ' + order.orderType + ' @ $' + order.triggerPrice.toFixed(2);
-    }
+/** "when HCN ≤ 115": resting orders trigger on HCN's price (checkPendingOrders). */
+function _when(order) {
+    const long = order.legs ? true : order.side === 'long';
+    const below = (order.orderType === 'limit') === long;
+    return `when HCN ${below ? '≤' : '≥'} ${order.triggerPrice.toFixed(0)}`;
+}
 
-    // Strategy orders use a strategy-group-style box; single-leg orders use a flat row
-    if (order.legs) {
-        const group = document.createElement('div');
-        group.className = 'strategy-group';
-        group.dataset.orderId = order.id;
-
-        const header = document.createElement('div');
-        header.className = 'strategy-group-header';
-
-        const nameEl = document.createElement('span');
-        nameEl.className = 'stat-label strategy-group-name';
-        nameEl.textContent = labelStr;
-        header.appendChild(nameEl);
-
-        const cancelBtn = document.createElement('button');
-        cancelBtn.className = 'ghost-btn pos-close-btn';
-        cancelBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
-        cancelBtn.title = 'Cancel order';
-        cancelBtn.setAttribute('aria-label', 'Cancel order');
-        cancelBtn.addEventListener('click', () => {
-            cancelBtn.dispatchEvent(new CustomEvent('shoals:cancelOrder', { detail: { id: order.id }, bubbles: true }));
-            if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-        });
-        header.appendChild(cancelBtn);
-
-        const detail = document.createElement('div');
-        detail.className = 'order-detail';
-        const parts = order.legs.map(leg => {
-            const baseQty = leg._baseQty || Math.abs(leg.qty);
-            const label = posTypeLabel(leg.type, leg.qty);
-            const isOption = leg.type === 'call' || leg.type === 'put';
-            const strikeStr = isOption && leg.strike != null ? ' K' + leg.strike : '';
-            return label + strikeStr + ' x' + baseQty;
-        });
-        detail.textContent = parts.join(', ');
-
-        group.appendChild(header);
-        group.appendChild(detail);
-        return group;
-    }
-
+function _buildOrderRow(order, day) {
     const row = document.createElement('div');
-    row.className = 'data-row order-row stat-row';
+    row.className = 'pos-row order-row';
     row.dataset.orderId = order.id;
-
-    const labelEl = document.createElement('span');
-    labelEl.className = 'order-label stat-label';
-    labelEl.textContent = labelStr;
-
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'ghost-btn order-cancel-btn';
-    cancelBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
-    cancelBtn.title = 'Cancel order';
-    cancelBtn.setAttribute('aria-label', 'Cancel order');
-    cancelBtn.addEventListener('click', () => {
-        cancelBtn.dispatchEvent(new CustomEvent('shoals:cancelOrder', { detail: { id: order.id }, bubbles: true }));
-        if (typeof _haptics !== 'undefined') _haptics.trigger('light');
-    });
-
-    row.appendChild(labelEl);
-    row.appendChild(cancelBtn);
+    const label = document.createElement('span');
+    label.className = 'pos-label';
+    const qty = document.createElement('span');
+    qty.className = 'pos-qty';
+    const when = document.createElement('span');
+    when.className = 'pos-pnl order-when';
+    when.textContent = order.orderType + ', ' + _when(order);
+    if (order.legs) {
+        label.textContent = order.strategyName || 'Strategy';
+        label.title = order.legs.map(l => _qty(l._baseQty != null ? Math.sign(l.qty) * l._baseQty : l.qty).replace('k', '') + ' ' + contractName(l.type, l.strike, l.expiryDay, day)).join('; ');
+        qty.textContent = '×' + (order.execMult || 1).toLocaleString() + 'k';
+    } else {
+        label.textContent = contractName(order.type, order.strike, order.expiryDay, day);
+        qty.textContent = _qty(order.side === 'short' ? -order.qty : order.qty);
+    }
+    const actions = document.createElement('span');
+    actions.className = 'pos-actions';
+    actions.appendChild(_iconBtn('order-cancel-btn', 'Cancel order', 'shoals:cancelOrder', { id: order.id }, 'light'));
+    row.append(label, qty, when, actions);
     return row;
+}
+
+// ---------------------------------------------------------------------------
+// updatePortfolioDisplay -- main export
+// ---------------------------------------------------------------------------
+
+function _sizeSpark(c) {
+    const r = c.getBoundingClientRect();
+    const dpr = Math.min(2, window.devicePixelRatio || 1);
+    const w = Math.round(r.width), h = Math.round(r.height);
+    if (!w || !h) return null;
+    if (c.width !== Math.round(w * dpr) || c.height !== Math.round(h * dpr)) {
+        c.width = Math.round(w * dpr);
+        c.height = Math.round(h * dpr);
+    }
+    const ctx = c.getContext('2d');
+    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    return { ctx, w, h };
+}
+
+/**
+ * @param {object} histories  { value, bench } spark histories, or null to hold the
+ *                            sparkline this frame (Act III's skipped frames)
+ */
+export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q, histories) {
+    $.cashDisplay.textContent = fmtDollar(portfolio.cash);
+    $.cashDisplay.className = 'stat-value ' + (portfolio.cash < 0 ? 'pnl-down' : '');
+
+    // Use marginInfo.equity when available -- it's the canonical portfolio value computed
+    // by the margin system (cash + all position mark-to-market values). Fall back to cash
+    // only when marginInfo is not provided (e.g. called before first margin check).
+    const totalValue = (marginInfo && marginInfo.equity != null) ? marginInfo.equity : portfolio.cash;
+    // The figure in ink, rounded as the dateline sets it; the line under it carries
+    // the comparison with holding HCN: viridian ahead of it, the accent behind.
+    $.portfolioValue.textContent = (totalValue < 0 ? '−' : '') + '$' + Math.round(Math.abs(totalValue)).toLocaleString('en-US') + 'k';
+    const buyHoldValue = (portfolio.initialCapital / 100) * currentPrice;
+    const vsBenchmark = totalValue - buyHoldValue;
+    const benchCls = vsBenchmark > 0.005 ? 'pnl-up' : vsBenchmark < -0.005 ? 'pnl-down' : '';
+    if ($.bookChange) {
+        const term = (totalValue / portfolio.initialCapital - 1) * 100;
+        const t = (term < 0 ? '−' : '+') + Math.abs(term).toFixed(1) + '%';
+        const b = (vsBenchmark < 0 ? '−' : '+') + fmtDollar(Math.abs(vsBenchmark));
+        const key = t + '|' + b;
+        if ($.bookChange._key !== key) {
+            $.bookChange._key = key;
+            $.bookChange.innerHTML = `<span class="${pnlClass(term)}">${t}</span> on the term · <span class="${benchCls}">${b}</span> against holding HCN`;
+        }
+    }
+
+    // Value sparkline, with holding HCN dashed under it.
+    if ($.portfolioSparkCanvas && histories && histories.value && histories.value.count >= 2) {
+        const sz = _sizeSpark($.portfolioSparkCanvas);
+        if (sz) {
+            const pal = _themePalette();
+            drawSparkline(sz.ctx, histories.value, sz.w, sz.h, pal.text, _r(pal.textMuted, 0.8), histories.bench);
+        }
+    }
+
+    // Margin display from pre-computed values
+    const marginDisplay = marginInfo
+        ? _computeMarginDisplay(marginInfo.collateralEquity ?? marginInfo.equity, marginInfo.required)
+        : { label: 'Clear', cls: 'margin-ok' };
+    $.marginStatus.textContent = marginDisplay.label;
+    $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;
+
+    // Cumulative borrow cost across all positions (including closed -- tracked on portfolio)
+    let totalBorrowCost = 0;
+    for (const pos of portfolio.positions) {
+        if (pos.borrowCost) totalBorrowCost += pos.borrowCost;
+    }
+    totalBorrowCost += portfolio.closedBorrowCost || 0;
+    totalBorrowCost += portfolio.marginDebitCost || 0;
+    if ($.borrowCostDisplay) {
+        $.borrowCostDisplay.textContent = fmtDollar(-totalBorrowCost);
+        $.borrowCostDisplay.className = 'stat-value ' + (totalBorrowCost > 0 ? pnlClass(-totalBorrowCost) : '');
+    }
+
+    // Cumulative dividend income
+    const totalDividends = portfolio.totalDividends || 0;
+    if ($.dividendDisplay) {
+        $.dividendDisplay.textContent = fmtDollar(totalDividends);
+        $.dividendDisplay.className = 'stat-value ' + (totalDividends !== 0 ? pnlClass(totalDividends) : '');
+    }
+
+    // Single positions, every instrument (binaries included: the book is their one list).
+    const defaultPos = portfolio.positions.filter(p => !p.strategyName);
+    _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'Nothing held. Trade from the ticket on the Markets page.', q);
+
+    // Strategy positions -- grouped by name, one row per strategy and its legs under it.
+    const strategyNames = [...new Set(
+        portfolio.positions.filter(p => p.strategyName).map(p => p.strategyName)
+    )];
+    if ($.strategySection) $.strategySection.hidden = strategyNames.length === 0;
+
+    for (const g of $.strategyPositions.querySelectorAll('.strategy-group')) {
+        if (!strategyNames.includes(g.dataset.strategyName)) g.remove();
+    }
+    for (const name of strategyNames) {
+        const groupPositions = portfolio.positions.filter(p => p.strategyName === name);
+        let totalValue = 0, totalPnl = 0;
+        for (const pos of groupPositions) {
+            totalValue += computePositionValue(pos, currentPrice, vol, rate, day, q);
+            totalPnl += computePositionPnl(pos, currentPrice, vol, rate, day, q);
+        }
+        // Execution multiplier from base qty: strategyBaseQty is each leg's
+        // per-execution qty, set at first execution.
+        const ref = groupPositions.find(p => p.strategyBaseQty);
+        const mult = ref ? Math.round(Math.abs(ref.qty) / ref.strategyBaseQty) : 1;
+        const constituents = groupPositions.map(pos => {
+            const baseQty = pos.strategyBaseQty || Math.abs(pos.qty);
+            return (pos.qty < 0 ? '−' : '+') + baseQty + ' ' + positionLabel(pos, day);
+        }).join('; ');
+
+        let group = $.strategyPositions.querySelector('.strategy-group[data-strategy-name="' + CSS.escape(name) + '"]');
+        if (!group) {
+            group = document.createElement('div');
+            group.className = 'strategy-group';
+            group.dataset.strategyName = name;
+            const head = document.createElement('div');
+            head.className = 'pos-row';
+            const n = document.createElement('span');
+            n.className = 'pos-label strategy-group-name';
+            const qtyEl = document.createElement('span');
+            qtyEl.className = 'pos-qty';
+            const pnlEl = document.createElement('span');
+            pnlEl.className = 'pos-pnl';
+            const actions = document.createElement('span');
+            actions.className = 'pos-actions';
+            actions.appendChild(_iconBtn('pos-close-btn', 'Unwind strategy', 'shoals:unwindStrategy', { name }, 'medium'));
+            head.append(n, qtyEl, pnlEl, actions);
+            const detail = document.createElement('div');
+            detail.className = 'strategy-group-detail';
+            group.append(head, detail);
+            $.strategyPositions.appendChild(group);
+        }
+        group.querySelector('.strategy-group-name').textContent = name;
+        group.querySelector('.pos-qty').textContent = '×' + mult.toLocaleString() + 'k';
+        const pnlEl = group.querySelector('.pos-pnl');
+        pnlEl.textContent = (totalPnl < 0 ? '−' : '+') + fmtDollar(Math.abs(totalPnl));
+        pnlEl.className = 'pos-pnl ' + pnlClass(totalPnl);
+        pnlEl.title = 'Worth ' + fmtDollar(totalValue);
+        group.querySelector('.strategy-group-detail').textContent = constituents;
+    }
+
+    // Working orders -- DOM diff
+    if ($.ordersSection) $.ordersSection.hidden = portfolio.orders.length === 0;
+    _diffOrderRows($.pendingOrders, portfolio.orders, day);
 }
 
 // ---------------------------------------------------------------------------
@@ -261,25 +381,8 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
     for (const pos of positions) {
         const posId = String(pos.id);
         const existing = rowMap.get(posId);
-        if (existing) {
-            // Update value and P&L in-place
-            const value = computePositionValue(pos, S, vol, rate, day, q);
-            const valueEl = existing.querySelector('.pos-value');
-            if (valueEl) valueEl.textContent = fmtDollar(value);
-            const pnl = computePositionPnl(pos, S, vol, rate, day, q);
-            const pnlEl = existing.querySelector('.pos-pnl');
-            if (pnlEl) {
-                pnlEl.textContent = fmtDollar(pnl);
-                pnlEl.className = 'pos-pnl stat-value ' + pnlClass(pnl);
-            }
-            // Update label (DTE changes each day) -- shared source of truth.
-            const labelStr = positionLabel(pos, day);
-            const labelEl = existing.querySelector('.pos-label');
-            if (labelEl) {
-                if (pos.type === 'privatestake') _updatePrivateLabel(labelEl, pos);
-                else labelEl.textContent = labelStr;
-            }
-        } else {
+        if (existing) _updatePositionRow(existing, pos, S, vol, rate, day, q);
+        else {
             const row = _buildPositionRow(pos, S, vol, rate, day, q);
             rowMap.set(posId, row);
             container.appendChild(row);
@@ -287,212 +390,14 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
     }
 }
 
-function _diffOrderRows(container, orders) {
+function _diffOrderRows(container, orders, day) {
     const currentIds = new Set(orders.map(o => String(o.id)));
-
-    // Remove cancelled/filled orders
     for (const row of container.querySelectorAll('[data-order-id]')) {
         if (!currentIds.has(row.dataset.orderId)) row.remove();
     }
-
-    if (orders.length === 0) {
-        if (!container.querySelector('.panel-hint')) {
-            container.textContent = '';
-            const hint = document.createElement('p');
-            hint.className = 'panel-hint';
-            hint.textContent = 'No pending orders.';
-            container.appendChild(hint);
-        }
-        return;
-    }
-
-    // Remove stale hint
-    const hint = container.querySelector('.panel-hint');
-    if (hint) hint.remove();
-
-    // Add new orders (orders don't change once placed, so no update needed)
+    // Orders don't change once placed, so only new ones are built.
     for (const order of orders) {
         const orderId = String(order.id);
-        const existing = container.querySelector('[data-order-id="' + orderId + '"]');
-        if (!existing) {
-            container.appendChild(_buildOrderRow(order));
-        }
+        if (!container.querySelector('[data-order-id="' + orderId + '"]')) container.appendChild(_buildOrderRow(order, day));
     }
-}
-
-// ---------------------------------------------------------------------------
-// updatePortfolioDisplay -- main export
-// ---------------------------------------------------------------------------
-
-export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, day, marginInfo, q, portfolioHistory) {
-    $.cashDisplay.textContent = fmtDollar(portfolio.cash);
-    $.cashDisplay.className = 'stat-value ' + (portfolio.cash < 0 ? 'pnl-down' : '');
-
-    // Use marginInfo.equity when available -- it's the canonical portfolio value computed
-    // by the margin system (cash + all position mark-to-market values). Fall back to cash
-    // only when marginInfo is not provided (e.g. called before first margin check).
-    const totalValue = (marginInfo && marginInfo.equity != null) ? marginInfo.equity : portfolio.cash;
-    $.portfolioValue.textContent = fmtDollar(totalValue);
-
-    // Color portfolio value: green if outpacing buy-and-hold stock, red if underperforming
-    const buyHoldValue = (portfolio.initialCapital / 100) * currentPrice;
-    const vsBenchmark = totalValue - buyHoldValue;
-    const benchCls = vsBenchmark > 0.005 ? 'pnl-up' : vsBenchmark < -0.005 ? 'pnl-down' : '';
-    $.portfolioValue.className = 'stat-value ' + benchCls;
-
-    // Portfolio value sparkline
-    if ($.portfolioSparkCtx && portfolioHistory && portfolioHistory.count >= 2) {
-        const c = $.portfolioSparkCanvas;
-        const color = getComputedStyle(document.documentElement).getPropertyValue('--text').trim() || '#000000';
-        drawSparkline($.portfolioSparkCtx, portfolioHistory, c.width, c.height, color, color + '44');
-    }
-
-    // Margin display from pre-computed values
-    const marginDisplay = marginInfo
-        ? _computeMarginDisplay(marginInfo.collateralEquity ?? marginInfo.equity, marginInfo.required)
-        : { label: 'OK', cls: 'margin-ok' };
-    $.marginStatus.textContent = marginDisplay.label;
-    $.marginStatus.className   = 'stat-value ' + marginDisplay.cls;
-
-
-    // Cumulative borrow cost across all positions (including closed -- tracked on portfolio)
-    let totalBorrowCost = 0;
-    for (const pos of portfolio.positions) {
-        if (pos.borrowCost) totalBorrowCost += pos.borrowCost;
-    }
-    totalBorrowCost += portfolio.closedBorrowCost || 0;
-    totalBorrowCost += portfolio.marginDebitCost || 0;
-    if ($.borrowCostDisplay) {
-        $.borrowCostDisplay.textContent = fmtDollar(-totalBorrowCost);
-        $.borrowCostDisplay.className = 'stat-value ' + (totalBorrowCost > 0 ? pnlClass(-totalBorrowCost) : '');
-    }
-
-    // Cumulative dividend income
-    const totalDividends = portfolio.totalDividends || 0;
-    if ($.dividendDisplay) {
-        $.dividendDisplay.textContent = fmtDollar(totalDividends);
-        $.dividendDisplay.className = 'stat-value ' + (totalDividends !== 0 ? pnlClass(totalDividends) : '');
-    }
-
-    // Default (non-strategy) positions -- DOM diff. Consensus binaries are shown
-    // in their own panel (Dynamic-only), not this list, so exclude them here.
-    const defaultPos = portfolio.positions.filter(p => !p.strategyName && p.type !== 'binary');
-    _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'No open positions.', q);
-
-    // Strategy positions -- grouped by name, single box per strategy
-    const strategyNames = [...new Set(
-        portfolio.positions.filter(p => p.strategyName).map(p => p.strategyName)
-    )];
-
-    if (strategyNames.length === 0) {
-        const existingGroups = $.strategyPositions.querySelectorAll('.strategy-group');
-        for (const g of existingGroups) g.remove();
-        if (!$.strategyPositions.querySelector('.panel-hint')) {
-            $.strategyPositions.textContent = '';
-            const hint = document.createElement('p');
-            hint.className = 'panel-hint';
-            hint.textContent = 'No strategy positions.';
-            $.strategyPositions.appendChild(hint);
-        }
-    } else {
-        const hint = $.strategyPositions.querySelector('.panel-hint');
-        if (hint) hint.remove();
-
-        // Remove groups for strategies no longer present
-        for (const g of $.strategyPositions.querySelectorAll('.strategy-group')) {
-            if (!strategyNames.includes(g.dataset.strategyName)) g.remove();
-        }
-
-        for (const name of strategyNames) {
-            const groupPositions = portfolio.positions.filter(p => p.strategyName === name);
-            let totalValue = 0, totalPnl = 0;
-            for (const pos of groupPositions) {
-                totalValue += computePositionValue(pos, currentPrice, vol, rate, day, q);
-                totalPnl += computePositionPnl(pos, currentPrice, vol, rate, day, q);
-            }
-
-            // Nearest expiry among group positions
-            let nearestExpiry = Infinity;
-            for (const pos of groupPositions) {
-                if (pos.expiryDay != null && pos.expiryDay < nearestExpiry) nearestExpiry = pos.expiryDay;
-            }
-            const expiryStr = nearestExpiry < Infinity ? ' ' + fmtDte(nearestExpiry - day) : '';
-
-            // Compute strategy execution multiplier from base qty
-            // strategyBaseQty = per-execution qty for each leg, set at first execution
-            const ref = groupPositions.find(p => p.strategyBaseQty);
-            const mult = ref ? Math.round(Math.abs(ref.qty) / ref.strategyBaseQty) : 1;
-
-            // Build abridged constituents string using per-unit (base) quantities
-            const parts = groupPositions.map(pos => {
-                const baseQty = pos.strategyBaseQty || Math.abs(pos.qty);
-                const label = posTypeLabel(pos.type, pos.qty);
-                const isOption = pos.type === 'call' || pos.type === 'put';
-                const strikeStr = isOption && pos.strike != null ? ' K' + pos.strike : '';
-                return label + strikeStr + ' x' + baseQty;
-            });
-            const constituents = parts.join(', ');
-
-            let group = $.strategyPositions.querySelector('.strategy-group[data-strategy-name="' + CSS.escape(name) + '"]');
-            if (!group) {
-                group = document.createElement('div');
-                group.className = 'strategy-group';
-                group.dataset.strategyName = name;
-
-                const header = document.createElement('div');
-                header.className = 'strategy-group-header';
-
-                const nameEl = document.createElement('span');
-                nameEl.className = 'stat-label strategy-group-name';
-                header.appendChild(nameEl);
-
-                const numCol = document.createElement('div');
-                numCol.className = 'pos-nums';
-
-                const pnlEl = document.createElement('span');
-                pnlEl.className = 'stat-value strategy-group-pnl';
-                numCol.appendChild(pnlEl);
-
-                const valEl = document.createElement('span');
-                valEl.className = 'stat-value strategy-group-value';
-                numCol.appendChild(valEl);
-
-                header.appendChild(numCol);
-
-                const closeBtn = document.createElement('button');
-                closeBtn.className = 'ghost-btn pos-close-btn';
-                closeBtn.innerHTML = _ICON.at('close', 14);   // hardcoded icon markup
-                closeBtn.title = 'Unwind strategy';
-                closeBtn.setAttribute('aria-label', 'Unwind strategy');
-                closeBtn.addEventListener('click', () => {
-                    closeBtn.dispatchEvent(new CustomEvent('shoals:unwindStrategy', { detail: { name }, bubbles: true }));
-                    if (typeof _haptics !== 'undefined') _haptics.trigger('medium');
-                });
-                header.appendChild(closeBtn);
-
-                const detail = document.createElement('div');
-                detail.className = 'strategy-group-detail';
-
-                group.appendChild(header);
-                group.appendChild(detail);
-                $.strategyPositions.appendChild(group);
-            }
-
-            // Update value, P/L and constituents
-            const valEl = group.querySelector('.strategy-group-value');
-            if (valEl) valEl.textContent = fmtDollar(totalValue);
-            const pnlEl = group.querySelector('.strategy-group-pnl');
-            if (pnlEl) {
-                pnlEl.textContent = fmtDollar(totalPnl);
-                pnlEl.className = 'stat-value strategy-group-pnl ' + pnlClass(totalPnl);
-            }
-            const nameEl = group.querySelector('.strategy-group-name');
-            if (nameEl) nameEl.textContent = name + expiryStr + ' x' + fmtQty(mult);
-            const detail = group.querySelector('.strategy-group-detail');
-            if (detail) detail.textContent = constituents;
-        }
-    }
-
-    // Pending orders -- DOM diff
-    _diffOrderRows($.pendingOrders, portfolio.orders);
 }

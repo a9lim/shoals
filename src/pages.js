@@ -1,37 +1,24 @@
 /* =====================================================
-   pages.js -- The Brief's sections (folios) and the
-   front page's rail tabs (Quotes / Book).
+   pages.js -- The Brief's sections (folios).
 
-   Five pages share one masthead: Front page, Markets,
-   Race, Strategy and Desk. Exactly one is visible; the
+   Four pages share one masthead, one job each: the
+   Front page reads (the lead, the wire, the tape, your
+   book), Markets commits (every market a curve, and the
+   ticket), Race knows (the ladder and your forecast),
+   and Meridian accounts (your record, the firm, the
+   world, the settings). Exactly one is visible; the
    others are `hidden`, so their canvases cost nothing
-   until shown. Both tab groups follow the ARIA tabs
-   pattern (roving tabindex, arrow keys, Home/End).
+   until shown. The folios follow the ARIA tabs pattern
+   (roving tabindex, arrow keys, Home/End).
    ===================================================== */
 
-export const PAGES = ['front', 'markets', 'race', 'strategy', 'desk'];
+export const PAGES = ['front', 'markets', 'race', 'meridian'];
 
 let _page = 'front';
 let _onChange = null;
 
 /** The page currently shown. */
 export function currentPage() { return _page; }
-
-function _wireTablist(buttons, activate) {
-    buttons.forEach((btn, i) => {
-        btn.addEventListener('click', () => activate(btn, false));
-        btn.addEventListener('keydown', (e) => {
-            let j = -1;
-            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % buttons.length;
-            else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + buttons.length) % buttons.length;
-            else if (e.key === 'Home') j = 0;
-            else if (e.key === 'End') j = buttons.length - 1;
-            if (j < 0) return;
-            e.preventDefault();
-            activate(buttons[j], true);
-        });
-    });
-}
 
 /**
  * Show one page. `focus` moves keyboard focus to its folio (arrow-key use).
@@ -64,28 +51,36 @@ export function cyclePage(dir) {
     showPage(PAGES[(i + dir + PAGES.length) % PAGES.length]);
 }
 
-/** Show a rail tab on the front page ('trade' or 'portfolio'). */
-export function showRailTab(tab, focus = false) {
-    for (const b of document.querySelectorAll('.rail-tab')) {
-        const on = b.dataset.tab === tab;
-        b.classList.toggle('active', on);
-        b.setAttribute('aria-selected', String(on));
-        b.tabIndex = on ? 0 : -1;
-        if (on && focus) b.focus();
-        const panel = document.getElementById('tab-' + b.dataset.tab);
-        if (panel) panel.classList.toggle('active', on);
-    }
-}
-
 /**
- * Wire the folios and rail tabs.
+ * Wire the folios.
  * @param {function(string, string)} onChange  (page, previous) after a switch
  */
 export function initPages(onChange) {
     _onChange = onChange;
     const folios = PAGES.map(p => document.getElementById('folio-' + p)).filter(Boolean);
-    _wireTablist(folios, (btn, focus) => showPage(btn.dataset.page, focus));
-    const rail = [...document.querySelectorAll('.rail-tab')];
-    _wireTablist(rail, (btn, focus) => showRailTab(btn.dataset.tab, focus));
+    folios.forEach((btn, i) => {
+        btn.addEventListener('click', () => showPage(btn.dataset.page));
+        btn.addEventListener('keydown', (e) => {
+            let j = -1;
+            if (e.key === 'ArrowRight' || e.key === 'ArrowDown') j = (i + 1) % folios.length;
+            else if (e.key === 'ArrowLeft' || e.key === 'ArrowUp') j = (i - 1 + folios.length) % folios.length;
+            else if (e.key === 'Home') j = 0;
+            else if (e.key === 'End') j = folios.length - 1;
+            if (j < 0) return;
+            e.preventDefault();
+            showPage(folios[j].dataset.page, true);
+        });
+    });
     document.body.dataset.page = _page;
+}
+
+/** Mark a folio with a count (the ticket's legs on Markets), or clear it. */
+export function setFolioCount(page, n) {
+    const btn = document.getElementById('folio-' + page);
+    if (!btn) return;
+    let b = btn.querySelector('.folio-n');
+    if (!n) { if (b) b.remove(); return; }
+    if (!b) { b = document.createElement('span'); b.className = 'folio-n'; btn.appendChild(b); }
+    b.textContent = String(n);
+    b.setAttribute('aria-label', `, ${n} on the ticket`);
 }

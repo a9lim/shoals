@@ -1,6 +1,6 @@
 /* =====================================================
    brief.js -- The Meridian Brief: masthead, editions,
-   the lead item and the "In brief" column.
+   the lead item and the wire under it.
 
    Each live trading day is an edition (day 0 is Edition
    1). An extra edition marks a regime change or a crisis:
@@ -9,6 +9,8 @@
    event log the engine already keeps; its head and body
    are the event's own text, split at its first clause
    break, never rewritten. A quiet day leads with the tape.
+   The wire is the rest of the log, newest first, as far
+   back as the last forty items: the paper's archive.
 
    DOM only; reads what main.js hands it.
    ===================================================== */
@@ -38,7 +40,7 @@ let _leadKey = null;
 let _briefSig = null;
 let _reduced = false;
 
-/** Cache the masthead and front-page column. */
+/** Cache the masthead and the front page's lead column. */
 export function initBrief() {
     for (const id of ['ed-no', 'ed-extra', 'dl-day', 'dl-regime', 'dl-hcn', 'dl-vx', 'dl-rate', 'dl-book',
         'lead-item', 'lead-kick', 'lead-head', 'lead-body', 'lead-src', 'briefs', 'mast-title']) {
@@ -54,6 +56,7 @@ export function resetBrief() {
     _extras = 0;
     _leadKey = null;
     _briefSig = null;
+    _syncEdition(0);
 }
 
 /** Today's edition number for a run-relative day (day 0 is Edition 1). */
@@ -162,8 +165,8 @@ function _swapLead(kick, head, body, src) {
 }
 
 /**
- * Set the lead and the "In brief" column from the wire (the engine's event log,
- * oldest first). With no news yet, the lead is the tape itself.
+ * Set the lead and the wire under it from the engine's event log (oldest
+ * first). With no news yet, the lead is the tape itself.
  * @param {object[]} log   eventLog entries { day, headline, magnitude, category }
  * @param {number} origin  sim day of edition 1
  * @param {object} tape    { S, prevClose, vx, rate } for a quiet day's lead
@@ -187,8 +190,8 @@ export function renderWire(log, origin, tape) {
         }
         _leadKey = key;
     }
-    // In brief: the rest of the wire, newest first.
-    const rest = items.slice(-13, -1).reverse();
+    // The wire: the rest of the log, newest first.
+    const rest = items.slice(-41, -1).reverse();
     const sig = rest.map(e => e.day + e.headline.length).join(',');
     if (sig === _briefSig) return;
     _briefSig = sig;

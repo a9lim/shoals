@@ -20,30 +20,29 @@ import {
     isExpiredForTrading, allocatePrivateStake, allocatePrimaryStock,
 } from './src/portfolio.js';
 import { ChartRenderer } from './src/chart.js';
-import { StrategyRenderer } from './src/strategy.js';
 import {
-    cacheDOMElements, bindEvents, updateChainDisplay,
-    rebuildTradeDropdown, rebuildStrategyDropdown,
-    updatePortfolioDisplay, updateGreeksDisplay, updateRateDisplay, updateVxhcnDisplay, updateStockBondPrices,
-    syncSettingsUI, toggleStrategyView,
+    cacheDOMElements, bindEvents,
+    updatePortfolioDisplay, updateGreeksDisplay,
+    syncSettingsUI,
     updatePlayBtn, updateSpeedBtn,
-    renderStrategyBuilder, wireInfoTips, updateStrategySelectors, updateStrategyChainDisplay, updateTriggerPriceSlider,
-    updateDynamicSections, updateEventLog, updateCongressDiagrams, updateStandings,
-    updateConsensusPanel, updateComputePanel, updateStandingOrdersPanel,
+    wireInfoTips,
+    updateDynamicSections, updateCongressDiagrams, updateStandings,
+    updateStandingOrdersPanel,
     refreshTooltip,
-    updateStrategyDropdowns, updateCreditDebit,
     showPopupEvent,
 } from './src/ui.js';
-import { initPages, showPage, cyclePage, currentPage, showRailTab } from './src/pages.js';
+import { initPages, showPage, cyclePage, currentPage, setFolioCount } from './src/pages.js';
 import { initBrief, resetBrief, updateMasthead, renderWire, markExtra, splitHeadline } from './src/brief.js';
-import { initMarkets, setMarketsVisible, marketsDayClose, resetMarkets, refreshMarkets, redrawMarkets, setCurveEdit } from './src/markets.js';
-import { initSandbox, pickPoint, legState, renderSandbox, resetSandbox } from './src/sandbox.js';
-import { initSurface, drawSurface } from './src/surface.js';
-import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace } from './src/race-page.js';
+import { initMarkets, setMarketsVisible, marketsDayClose, resetMarkets, refreshMarkets, redrawMarkets, marketsSubstep, smileExpiryDay } from './src/markets.js';
+import {
+    initTicket, pickPoint, addToTicket, legState, renderTicket, resetTicket, refreshTicketQuotes, redrawTicket,
+    invalidateTicket, tradeTicket, ticketLegCount,
+} from './src/ticket.js';
+import { initSurface } from './src/surface.js';
+import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace, setForecastPending } from './src/race-page.js';
 import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
 import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
-import { posKey } from './src/chain-renderer.js';
 import { REFERENCE } from './src/reference.js';
 import { computeVXHCNSpot } from './src/pricing.js';
 import { syncMarket, market } from './src/market.js';
@@ -54,10 +53,6 @@ import {
     applyParamOverlays, removeParamOverlays,
     selectImpactToast, getStockImpact,
 } from './src/price-impact.js';
-import {
-    listStrategies, getStrategy, saveStrategy, deleteStrategy,
-    resolveLegs, computeNetCost, legsToRelative, nextAutoName,
-} from './src/strategy-store.js';
 import { applyStructuredEffects } from './src/world-state.js';
 import { pickTip, resetUsedTips } from './src/events/tips.js';
 import { getEventById, ALL_EVENTS } from './src/events/index.js';
@@ -150,36 +145,27 @@ import {
 const $ = {};
 const sim = new Simulation();
 const expiryMgr = new ExpiryManager();
-let chart, strategy;
+let chart;
 let camera;
 let chainSkeleton = [];
 let playing = false;
 let _resumeAfterDispatch = false;   // the desk was running when a dispatch paused it; resume once they are all answered
 let speedIndex = 2;
-let strategyMode = false;
 let dirty = true;
-let chainDirty = true;
+let bookDirty = true;     // the book changed: the markets tables and the ticket re-read holdings
 let lastTickTime = 0;
 let dayInProgress = false; // true between beginDay() and finalizeDay()
 let mouseX = -1, mouseY = -1;
-let strategyLegs = [];
-let currentStrategyHash = null;
-let isBuiltinLoaded = false;
-let activeTab = 'trade';
-let greekToggles = { delta: true, gamma: false, theta: false, vega: false, rho: false };
-let sliderPct = 100;  // percentage of max DTE (100% = full time, 0% = at expiry)
-let lastSpot = 0; // track spot changes for range reset
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let raceState = null;    // hidden AI-race state machine (null when not in Dynamic mode; nothing reads it yet)
 let _gameOver = false;   // P6-3 DURABLE terminal latch: desk locked, book closed out, epilogue shown. Never auto-releases (unlike portfolio.restricted); cleared only by _resetCore.
 let _pendingEpilogue = null;   // P6-3: epilogue pages built at game-over, rendered only AFTER the resolution-day beat drains from the popup queue (the treaty superevent reaches the player first).
-let rateHistory = null;   // sparkline ring buffer for risk-free rate
-let vxhcnHistory = null;    // sparkline ring buffer for VX
-let portfolioHistory = null; // sparkline ring buffer for portfolio value
+let portfolioHistory = null; // sparkline ring buffer for the book's value
+let benchHistory = null;     // ... and for holding HCN with the same capital (the ghost under it)
 let _savedOverlays = {};
 let _savedImpulse = {};   // event-impulse overlay saved originals (restored at day-complete)
 let _lastForecastLockDay = -1;   // race-day of the last forecast-lock prompt (avoids double-firing)
-let _lockPending = false;        // "Adjust first": the lock day is held until the Markets panel's Lock is pressed
+let _lockPending = false;        // "Adjust first": the lock day is held until the Race page's Lock is pressed
 let _lockPendingDay = -1;        // the race day that lock belongs to
 let _fundLive = false;    // P7-3 fund-as-actor latch (monotone; mirrored to world.ai.fundLive)
 let _roomFired = false;   // P7-3: the room is a once-per-run branch point, gate open or shut
@@ -189,14 +175,6 @@ let _epilogueReopen = null;   // reopens the last edition after a visit to the r
 const _popupQueue = [];
 const playerChoices = {};
 
-const _LOBBY_META = {
-    pac_federalist:  { cls: 'lobby-pill-fed',     label: '+Fed' },
-    pac_farmerlabor: { cls: 'lobby-pill-fl',      label: '+F-L' },
-    host_fundraiser: { cls: 'lobby-pill-pol',     label: 'Host' },
-    broker_deal:     { cls: 'lobby-pill-pol',     label: 'Deal' },
-    leak_to_media:   { cls: 'lobby-pill-media',   label: 'Leak' },
-    counsel_fed:     { cls: 'lobby-pill-fed-rel', label: 'Fed' },
-};
 const impactHistory = [];
 let _lobbyCount = 0;
 const quarterlyReviews = [];
@@ -466,7 +444,7 @@ function _fireSubstepArrival() {
         _updateWire();
         updateCongressDiagrams($, eventEngine.world);
         updateStandings($, eventEngine.world, factions, getFactionDescriptor);
-        chainDirty = true;
+        bookDirty = true;
         dirty = true;
     }
 }
@@ -490,7 +468,7 @@ function _drainDeferredFills() {
         return;
     }
     for (const entry of due) _executeDeferred(entry);
-    chainDirty = true;
+    bookDirty = true;
     updateUI();
     dirty = true;
 }
@@ -503,7 +481,7 @@ function _drainDeferredFills() {
 function _closePositionAction(id, spreadMult) {
     const ok = closePosition(sim, id, sim.S, market.sigma, sim.r, sim.day, sim.q, spreadMult);
     if (ok) _toast('Position closed.');
-    chainDirty = true;
+    bookDirty = true;
     updateUI();
     dirty = true;
     return ok;
@@ -519,7 +497,7 @@ function _unwindStrategyAction(name, spreadMult) {
     }
     if (closed > 0) {
         _toast('Unwound "' + name + '" (' + closed + ' position' + (closed > 1 ? 's' : '') + ').');
-        chainDirty = true;
+        bookDirty = true;
         updateUI();
         dirty = true;
     }
@@ -636,7 +614,7 @@ function _reportStanding(reports) {
     if (!reports || reports.length === 0) return;
     for (const rep of reports) _toast(rep.message, 4500);
     _haptic('medium');
-    chainDirty = true;
+    bookDirty = true;
     updateUI();
     dirty = true;
 }
@@ -675,97 +653,28 @@ function _onStandingToggle(id, on) {
     _haptic('light');
 }
 
-/** Common tail after modifying strategyLegs: reprice, rebuild UI, mark dirty. */
-function _refreshStrategyView() {
-    strategy.resetRange(sim.S, strategyLegs);
-    const spe = _priceExpiry(_strategyExpiryIdx());
-    updateStrategyChainDisplay($, spe, handleAddLeg, _buildStrategyPosMap());
-    updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-    updateStrategyBuilder();
-    updateTimeSliderRange();
-    dirty = true;
-}
-/** Populate strategyLegs from resolved legs array. */
-function _populateStrategyLegs(resolved) {
-    strategyLegs.length = 0;
-    for (const leg of resolved) {
-        strategyLegs.push({
-            type: leg.type, qty: leg.qty, strike: leg.strike,
-            expiryDay: leg.expiryDay, _refS: sim.S, _refDay: sim.day,
-        });
-    }
-}
-
 // ---------------------------------------------------------------------------
-// Rate sparkline helpers
+// The book's sparkline: its value, and holding HCN beside it
 // ---------------------------------------------------------------------------
 
-function _initRateHistory() {
-    rateHistory = createSparkHistory(HISTORY_CAPACITY);
-    const h = sim.history;
-    for (let d = h.minDay; d <= h.maxDay; d++) {
-        const bar = h.get(d);
-        if (bar) pushSparkSample(rateHistory, bar.r);
-    }
-}
-
-function _initVxhcnHistory() {
-    vxhcnHistory = createSparkHistory(HISTORY_CAPACITY);
-    const h = sim.history;
-    for (let d = h.minDay; d <= h.maxDay; d++) {
-        const bar = h.get(d);
-        if (bar) pushSparkSample(vxhcnHistory, computeVXHCNSpot(bar.v, sim.kappa, sim.theta, sim.xi));
-    }
-}
-
+/** Both histories backfill with holding HCN over the prepopulated year: the book
+ *  starts as cash on day 0, so before it the two lines are one. */
 function _initPortfolioHistory() {
     portfolioHistory = createSparkHistory(HISTORY_CAPACITY);
-    // Prepopulate with buy-and-hold performance tracking the stock price
+    benchHistory = createSparkHistory(HISTORY_CAPACITY);
     const h = sim.history;
     const cap = portfolio.initialCapital;
     for (let d = h.minDay; d <= h.maxDay; d++) {
         const bar = h.get(d);
-        if (bar) pushSparkSample(portfolioHistory, cap / 100 * bar.close);
+        if (bar) { pushSparkSample(portfolioHistory, cap / 100 * bar.close); pushSparkSample(benchHistory, cap / 100 * bar.close); }
     }
 }
 
-// ---------------------------------------------------------------------------
-// Position map builders (for chain pill indicators)
-// ---------------------------------------------------------------------------
-
-function _buildPosMap() {
-    const map = {};
-    for (const pos of portfolio.positions) {
-        const key = posKey(pos.type, pos.strike, pos.expiryDay);
-        map[key] = (map[key] || 0) + pos.qty;
-    }
-    return map;
-}
-
-function _buildStrategyPosMap() {
-    const map = {};
-    for (const leg of strategyLegs) {
-        const key = posKey(leg.type, leg.strike, leg.expiryDay);
-        map[key] = (map[key] || 0) + leg.qty;
-    }
-    return map;
-}
+const _bookHistories = () => ({ value: portfolioHistory, bench: benchHistory });
 
 // ---------------------------------------------------------------------------
 // Lazy chain pricing helpers
 // ---------------------------------------------------------------------------
-
-/** Get the selected trade-tab expiry index, clamped to skeleton bounds. */
-function _tradeExpiryIdx() {
-    const raw = parseInt($.tradeExpiry?.value, 10);
-    return clamp(isNaN(raw) ? chainSkeleton.length - 1 : raw, 0, chainSkeleton.length - 1);
-}
-
-/** Get the selected strategy-tab expiry index, clamped to skeleton bounds. */
-function _strategyExpiryIdx() {
-    const raw = parseInt($.strategyExpiry?.value, 10);
-    return clamp(isNaN(raw) ? chainSkeleton.length - 1 : raw, 0, chainSkeleton.length - 1);
-}
 
 /** Price one skeleton expiry on demand (price-only, no greeks). */
 function _priceExpiry(idx) {
@@ -778,8 +687,6 @@ function _priceExpiry(idx) {
 // ---------------------------------------------------------------------------
 
 cacheDOMElements($);
-$.convictionsSection = document.getElementById('convictions-section');
-$.convictionsList = document.getElementById('convictions-list');
 $.regulationsList = document.getElementById('regulations-list');
 init();
 
@@ -808,9 +715,8 @@ function init() {
     initPages(_onPageChange);
     initBrief();
 
-    // 1. Create renderers
+    // 1. Create the tape's renderer
     chart    = new ChartRenderer($.chartCanvas);
-    strategy = new StrategyRenderer($.strategyCanvas);
 
     // 2. Create camera for horizontal chart pan/zoom
     if (typeof createCamera !== 'undefined') {
@@ -848,21 +754,6 @@ function init() {
         chart.setCamera(camera);
     }
 
-    // 5. Bind strategy canvas wheel zoom and drag pan
-    strategy.bindWheel($.strategyCanvas);
-    strategy.bindPan($.strategyCanvas);
-
-    // 6. Bind click on strategy canvas for legend toggling (skip if drag)
-    $.strategyCanvas.addEventListener('click', (e) => {
-        if (strategy._wasDrag && strategy._wasDrag()) return;
-        const rect = $.strategyCanvas.getBoundingClientRect();
-        const cssX = e.clientX - rect.left;
-        const cssY = e.clientY - rect.top;
-        if (strategy.handleClick(cssX, cssY, greekToggles)) {
-            dirty = true;
-        }
-    });
-
     // 8. Init keyboard shortcuts
 
     var _shortcuts = [
@@ -873,20 +764,17 @@ function init() {
         { key: ',', label: 'Slow down',            group: 'Simulation', action: () => decycleSpeed() },
         { key: '/', label: 'Step forward one day', group: 'Simulation', action: () => step() },
         { key: 'r', label: 'Reset simulation',    group: 'Simulation', action: () => resetSim() },
-        { key: 's', label: 'Show or hide the rail', group: 'View',     action: () => _toggleRail() },
-        { key: 't', label: 'Quotes or book',       group: 'View',       action: () => _toggleRailTab() },
+        { key: 's', label: 'Show or hide your book', group: 'View',   action: () => _toggleRail() },
         { key: '[', label: 'Previous page',        group: 'View',       action: () => cyclePage(-1) },
         { key: ']', label: 'Next page',            group: 'View',       action: () => cyclePage(1) },
         { key: 'f', label: 'Front page',           group: 'View',       action: () => showPage('front') },
         { key: 'm', label: 'Markets',              group: 'View',       action: () => showPage('markets') },
         { key: 'g', label: 'Race',                 group: 'View',       action: () => showPage('race') },
+        { key: 'd', label: 'Meridian',             group: 'View',       action: () => showPage('meridian') },
         { key: '=', label: 'Zoom in',              group: 'View',       action: () => { if (camera) camera.zoomBy(1.2); } },
         { key: '-', label: 'Zoom out',             group: 'View',       action: () => { if (camera) camera.zoomBy(1 / 1.2); } },
         { key: '0', label: 'Reset zoom',           group: 'View',       action: () => { if (camera) { camera.zoom = CHART_SLOT_PX; _repositionCamera(); } } },
-        { key: 'b', label: 'Buy / sell stock',     group: 'Trade',      action: () => handleBuyStock() },
-        { key: 'n', label: 'Buy / sell bond',      group: 'Trade',      action: () => handleBuyBond() },
-        { key: 'x', label: 'Toggle buy / sell',    group: 'Trade',      action: () => document.getElementById('mode-btn').click() },
-        { key: 'Enter', label: 'Execute strategy', group: 'Trade',      action: () => handleTradeExecStrategy(),
+        { key: 'Enter', label: 'Trade the ticket', group: 'Trade',      action: () => { if (currentPage() === 'markets') tradeTicket(); },
           when: () => !document.activeElement || document.activeElement === document.body },
         { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
         { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
@@ -906,16 +794,14 @@ function init() {
             lastUpdated: '2026-10-24',
             description: 'Trade stock, bonds, VXHCN volatility futures, and American options in a stochastic market simulator. Build multi-leg strategies, manage a margin portfolio, and navigate branching institutional events during a volatile political term.',
             controls: [
-                { label: 'Buy / sell stock', value: 'Click the HCN price or press B' },
-                { label: 'Buy / sell bond', value: 'Click the bond price or press N' },
-                { label: 'Trade options', value: 'Click a price in the agate on the front page' },
-                { label: 'Execute strategy', value: 'Enter key or Execute strategy button' },
-                { label: 'Build strategy', value: 'Add legs on the Strategy page' },
-                { label: 'Sandbox', value: 'Click a curve point on Markets, or focus a curve and press Enter' },
+                { label: 'Trade', value: 'Pick points on the Markets page’s curves onto the ticket, then Trade (or Enter)' },
+                { label: 'Every contract', value: 'Open a curve by its title for its table; right-click goes short' },
+                { label: 'Strategies', value: 'Load or save them on the ticket' },
+                { label: 'Your forecast', value: 'Drag the beads on the Race page, or focus the ladder and use the arrows' },
                 { label: 'Pan / zoom the tape', value: 'Drag to pan, = / - / 0 to zoom' },
-                { label: 'Pages', value: '[ previous, ] next; F, M, G for front, markets, race' },
+                { label: 'Pages', value: '[ previous, ] next; F, M, G, D for front, markets, race, Meridian' },
                 { label: 'Speed', value: '. faster, , slower, / step' },
-                { label: 'Load preset', value: 'Desk page or keys 1\u20137' },
+                { label: 'Load preset', value: 'Meridian’s settings, or keys 1\u20136' },
             ],
             shortcuts: _shortcuts,
             repo: 'https://github.com/a9lim/shoals',
@@ -929,101 +815,7 @@ function init() {
         onPresetChange:   (index) => loadPreset(index),
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
-        onTimeSlider:     (pct) => { sliderPct = pct; updateTimeSliderRange(); dirty = true; },
-        onBuyStock:       () => handleBuyStock(),
-        onShortStock:     () => handleShortStock(),
-        onBuyBond:        () => handleBuyBond(),
-        onShortBond:      () => handleShortBond(),
-        onBuyVxhcn:         () => handleBuyVxhcn(),
-        onShortVxhcn:       () => handleShortVxhcn(),
-        onChainCellClick: (info) => handleChainCellClick(info),
-        onExpiryChange:   (idx) => {
-            const pe = _priceExpiry(idx);
-            updateChainDisplay($, pe, _buildPosMap());
-            updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), strategyMode ? _buildStrategyPosMap() : null);
-            if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
-                const ts = getStrategy($.tradeStrategySelect.value);
-                if (ts && ts.selectableExpiry) _updateTradeCreditDebit();
-            }
-            dirty = true;
-        },
-        onTradeSubmit:    (data) => handleTradeSubmit(data),
-        onTradeClose:     () => setTimeout(_processPopupQueue, 100),
-        onAddLeg:         (type, side, strike, expiryDay) => handleAddLeg(type, side, strike, expiryDay),
-        onStrategyExpiryChange: (idx) => {
-            const pe = _priceExpiry(idx);
-            updateStrategyChainDisplay($, pe, handleAddLeg, _buildStrategyPosMap());
-            updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-            if (_isSelectableExpiry()) {
-                const sid = $.strategyLoadSelect ? $.strategyLoadSelect.value : '';
-                const loaded = sid ? getStrategy(sid) : null;
-                if (loaded && loaded.selectableExpiry) {
-                    _reloadSelectableLegs();
-                } else if (strategyLegs.length > 0) {
-                    // Update manually-built legs to use the new expiry
-                    const newDay = _strategyExpiryDay();
-                    if (newDay != null) {
-                        for (const leg of strategyLegs) {
-                            if (leg.type !== 'stock') {
-                                leg.expiryDay = newDay;
-                                leg._refDay = sim.day;
-                            }
-                        }
-                        strategy.resetRange(sim.S, strategyLegs);
-                        updateStrategyBuilder();
-                        updateTimeSliderRange();
-                    }
-                }
-            }
-            dirty = true;
-        },
-        onSelectableExpiryChange: (checked) => {
-            if (checked && strategyLegs.length > 0) {
-                const newDay = _strategyExpiryDay();
-                if (newDay != null) {
-                    for (const leg of strategyLegs) {
-                        if (leg.type !== 'stock') {
-                            leg.expiryDay = newDay;
-                            leg._refDay = sim.day;
-                        }
-                    }
-                    strategy.resetRange(sim.S, strategyLegs);
-                    updateStrategyBuilder();
-                    updateTimeSliderRange();
-                    dirty = true;
-                }
-            }
-        },
-        onSaveStrategy:   () => handleSaveStrategy(),
-        onDeleteStrategy:  () => handleDeleteStrategy(),
-        onTradeExecStrategy: () => handleTradeExecStrategy(),
-        onStrategySelectChange: (id) => {
-            if (id) {
-                handleLoadStrategy(id);
-            } else {
-                // "New strategy" selected — clear builder
-                currentStrategyHash = null;
-                isBuiltinLoaded = false;
-                strategyLegs.length = 0;
-                if ($.strategyNameInput) $.strategyNameInput.value = '';
-                if ($.selectableExpiryToggle) $.selectableExpiryToggle.checked = true;
-                strategy.resetRange(sim.S, strategyLegs);
-                updateStrategyBuilder();
-                updateTimeSliderRange();
-                dirty = true;
-            }
-        },
-        onTradeStrategySelectChange: (id) => {
-            if ($.tradeExecStrategyBtn) $.tradeExecStrategyBtn.disabled = !id;
-            if (id) {
-                _updateTradeCreditDebit();
-            } else {
-                updateCreditDebit($, null);
-            }
-        },
     });
-
-    _refreshStrategyDropdowns();
 
     // 10. Wire custom events from ui.js position rows
     document.addEventListener('shoals:closePosition', (e) => {
@@ -1050,7 +842,7 @@ function init() {
                 _recordImpact(sim.day, isCall ? 1 : -1, qty, 'Option exercise');
             }
             _toast(result ? 'Option exercised.' : 'Cannot exercise.');
-            chainDirty = true;
+            bookDirty = true;
             updateUI();
             dirty = true;
         }
@@ -1066,35 +858,19 @@ function init() {
         }
     });
 
-    // Consensus panel: delegated buy/sell-YES on the milestone rows. Bound once
-    // on the stable tbody (rows are rebuilt each render) -- no listener stacking.
-    if ($.consensusTbody) {
-        $.consensusTbody.addEventListener('click', (e) => {
-            const row = e.target.closest('[data-binary-key]');
-            if (row) handleBinaryTrade(parseInt(row.dataset.binaryKey, 10), 'long');
-        });
-        $.consensusTbody.addEventListener('contextmenu', (e) => {
-            const row = e.target.closest('[data-binary-key]');
-            if (!row) return;
-            e.preventDefault();
-            handleBinaryTrade(parseInt(row.dataset.binaryKey, 10), 'short');
-        });
-    }
-
-    // Compute-futures panel: delegated buy (left) / sell-short (right) on the
-    // maturity rows. Bound once on the stable tbody (rows rebuilt each render).
-    if ($.computeTbody) {
-        $.computeTbody.addEventListener('click', (e) => {
-            const row = e.target.closest('[data-compute-key]');
-            if (row) handleComputeTrade(parseInt(row.dataset.computeKey, 10), 'long');
-        });
-        $.computeTbody.addEventListener('contextmenu', (e) => {
-            const row = e.target.closest('[data-compute-key]');
-            if (!row) return;
-            e.preventDefault();
-            handleComputeTrade(parseInt(row.dataset.computeKey, 10), 'short');
-        });
-    }
+    // A position's name in the book hands its contract to the ticket, on its side.
+    document.addEventListener('shoals:toTicket', (e) => {
+        const pos = portfolio.positions.find(p => p.id === (e.detail && e.detail.id));
+        if (!pos) return;
+        const keyed = pos.type === 'binary' || pos.type === 'computefuture';
+        addToTicket({
+            id: pos.type === 'stock' ? 'stock' : pos.type === 'bond' ? 'bond@' + pos.expiryDay : pos.type === 'vxhcnfuture' ? 'vx@' + pos.expiryDay
+                : pos.type === 'binary' ? 'bin@' + pos.strike : pos.type === 'computefuture' ? 'cmp@' + pos.strike : `${pos.type}${pos.strike}@${pos.expiryDay}`,
+            type: pos.type, strike: keyed ? undefined : pos.strike, key: keyed ? pos.strike : undefined,
+            expiryDay: pos.expiryDay, desc: 'that contract',
+        }, pos.qty > 0 ? 1 : -1);
+        showPage('markets');
+    });
 
     document.addEventListener('shoals:unwindStrategy', (e) => {
         const name = e.detail && e.detail.name;
@@ -1145,8 +921,6 @@ function init() {
     // 13. Pre-populate full history buffer (prices scaled so final close = $100)
     sim.prepopulate();
     _syncAll();
-    _initRateHistory();
-    _initVxhcnHistory();
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
 
@@ -1157,8 +931,6 @@ function init() {
     updatePlayBtn($, playing);
     updateSpeedBtn($, SPEED_OPTIONS[speedIndex] * 2);
     _syncLerpSpeed();
-    lastSpot = sim.S;
-    strategy.resetRange(sim.S, strategyLegs);
 
     // 14b. Initialize event engine for dynamic presets
     if (_isDynamicPreset(DEFAULT_PRESET)) {
@@ -1203,7 +975,6 @@ function init() {
     _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
-    if ($.lobbyBar) $.lobbyBar.style.display = eventEngine ? '' : 'none';
     _updateLobbyPills();
 
     // Wire lobby pill buttons
@@ -1244,7 +1015,6 @@ function init() {
     function handleResize() {
         if (!chartContainer.clientWidth) return;   // the front page is hidden
         chart.resize();
-        if (strategyMode) strategy.resize();
         const newW = $.chartCanvas.clientWidth  || $.chartCanvas.offsetWidth  || 800;
         const newH = $.chartCanvas.clientHeight || $.chartCanvas.offsetHeight || 600;
         if (camera) {
@@ -1269,25 +1039,16 @@ function init() {
         const rect = $.chartCanvas.getBoundingClientRect();
         mouseX = e.clientX - rect.left;
         mouseY = e.clientY - rect.top;
-        if (!strategyMode) dirty = true;
+        dirty = true;
     });
     $.chartCanvas.addEventListener('mouseleave', () => {
         mouseX = -1;
         mouseY = -1;
-        if (!strategyMode) dirty = true;
+        dirty = true;
     });
 
-    // 18. Strategy page resizes with its own container; the rail tabs are pages.js's.
-    const strategyContainer = document.getElementById('strategy-container');
-    if (strategyContainer && typeof ResizeObserver !== 'undefined') {
-        new ResizeObserver(() => {
-            if (!strategyMode) return;
-            strategy.resize();
-            renderCurrentView();
-        }).observe(strategyContainer);
-    }
-
-    // The markets page and its sandbox read the engines through one context.
+    // The markets page and its ticket read the engines through one context. The
+    // opened Options table reads the published chain (Act III may hold it).
     const _mkCtx = {
         sim,
         expiries: () => chainSkeleton,
@@ -1295,17 +1056,30 @@ function init() {
         geo: () => (eventEngine ? eventEngine.world.geopolitical : null),
         origin: () => chart.dayOrigin,
         positions: () => portfolio.positions,
+        chain: (day) => {
+            const idx = chainSkeleton.findIndex(e => e.day === day);
+            return idx < 0 ? null : publishedChain(_priceExpiry(idx), substepClock());
+        },
+        vxVariance: () => publishedVariance(market.v),
+        vxSpot: () => publishedVxhcn(market.vxhcn),
+        expiryDay: () => smileExpiryDay(),
     };
-    initSandbox(_mkCtx, { onChange: () => redrawMarkets(), onTrade: (legs) => _tradeSandbox(legs) });
-    initMarkets(_mkCtx, { onPick: (pt) => pickPoint(pt), legState, onLock: () => _lockFromEditor() });
-    marketsDayClose(null);
-    renderSandbox();
+    initTicket(_mkCtx, {
+        onChange: () => { redrawMarkets(); setFolioCount('markets', ticketLegCount()); },
+        onTrade: (order) => _tradeTicket(order),
+        toast: (msg) => _toast(msg, 2500),
+    });
+    initMarkets(_mkCtx, { onPick: (pt, side) => pickPoint(pt, side), legState });
     initSurface();
-    initRacePage({ race: () => raceState, world: () => (eventEngine ? eventEngine.world : null) });
+    marketsDayClose(null);
+    initRacePage({ race: () => raceState, world: () => (eventEngine ? eventEngine.world : null) }, {
+        onLock: () => _lockFromEditor(),
+        onEdit: () => redrawMarkets(),
+    });
     resetRacePage();
     document.getElementById('race-epilogue').addEventListener('click', () => { if (_epilogueReopen) _epilogueReopen(); });
 
-    // Volume (Desk page)
+    // Volume (Meridian's settings)
     const _vol = document.getElementById('volume-slider');
     if (_vol) {
         _vol.value = Math.round(getVolume() * 100);
@@ -1357,39 +1131,21 @@ function init() {
 // frame — rAF loop
 // ---------------------------------------------------------------------------
 
-/** A page switch (pages.js). The Strategy page is the old strategy mode: it
- *  pauses the desk on entry and reprices its builder; the front page re-syncs the
- *  tape's buffer, which was zero-sized while hidden. */
+/** A page switch (pages.js). The front page re-syncs the tape's buffer, which
+ *  was zero-sized while hidden; Markets reprices the ticket. */
 function _onPageChange(page) {
-    const isStrategy = page === 'strategy';
-    if (isStrategy !== strategyMode) {
-        strategyMode = isStrategy;
-        mouseX = -1; mouseY = -1;
-        toggleStrategyView($, strategyMode);
-        if (strategyMode && playing) {
-            playing = false;
-            updatePlayBtn($, playing);
-        }
-    }
-    if (isStrategy) {
-        strategy.resize();
-        // Invalidate caches so chart/summary reprice with current impact state
-        strategy._cache = null;
-        strategy._summaryCache = null;
-        rebuildStrategyDropdown($, chainSkeleton);
-        const stratPriced = _priceExpiry(_strategyExpiryIdx());
-        updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, _buildStrategyPosMap());
-        updateStockBondPrices($, sim.S, sim.r, market.sigma, chainSkeleton, _buildPosMap(), _buildStrategyPosMap());
-        updateTimeSliderRange();
-        if (strategyLegs.length > 0) updateStrategyBuilder();
-    } else if (page === 'front') {
+    if (page === 'front') {
         chart.resize();
         _repositionCamera();
-        drawSurface();
     }
     setMarketsVisible(page === 'markets');
-    if (page === 'markets') renderSandbox();
+    if (page === 'markets') renderTicket();
     setRaceVisible(page === 'race');
+    if (page === 'meridian') {
+        _updateRegulationDisplay();
+        _updateLobbyPills();
+        if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
+    }
     dirty = true;
 }
 
@@ -1397,62 +1153,84 @@ function _onPageChange(page) {
 function _onThemeChange() {
     updateUI();
     redrawMarkets();
-    if (currentPage() === 'markets') renderSandbox();
+    redrawTicket();
     drawRace();
-    drawSurface();
     dirty = true;
 }
 
 /**
- * Trade the sandbox's legs through the desk's own paths: each leg is a manual
- * market order (the latency ladder and spread apply, as to any click), binaries
- * through executeBinaryTrade, compute through the compute chokepoint. Legs are
- * independent; the toast reports what filled.
+ * Trade the ticket through the desk's own paths (ticket.js builds the order).
+ * A named strategy goes as one unit: every leg or none, through the latency
+ * ladder as a 'strategy', or resting as a strategy limit or stop. Otherwise each
+ * leg goes alone: a single leg may rest as a limit or stop; market legs go as
+ * manual orders (the ladder and spread apply, as to any click), binaries through
+ * executeBinaryTrade, compute through the compute chokepoint. The toast reports
+ * what filled.
  */
-function _tradeSandbox(legs) {
+function _tradeTicket(order) {
     if (_blockedByRestriction()) return;
+    if (order.kind === 'strategy') {
+        const mult = order.size;
+        const scaled = order.legs.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
+        if (order.order === 'market') {
+            // P7-1: the whole strategy defers as one unit (all legs at the execution
+            // substep, or rollback) -- legs never straddle the latency window.
+            if (!_deferManual('strategy', { legs: scaled, name: order.name, mult })) executeWithRollback(scaled, order.name, mult);
+        } else {
+            placePendingOrder(null, null, null, order.order, order.trigger, null, null, order.name, scaled, mult);
+            _toast(`Resting ${order.order} for ${mult}k ${order.name}, when HCN ${order.order === 'limit' ? '≤' : '≥'} ${order.trigger}.`);
+            _haptic('medium');
+        }
+        bookDirty = true;
+        updateUI();
+        dirty = true;
+        return;
+    }
+    if (order.order !== 'market' && order.legs.length === 1) {
+        const L = order.legs[0];
+        placePendingOrder(L.type, L.side, L.qty, order.order, order.trigger, L.strike, L.expiryDay);
+        const below = (order.order === 'limit') === (L.side === 'long');
+        _toast(`Resting ${order.order}: ${L.side} ${L.qty}k ${L.desc}, when HCN ${below ? '≤' : '≥'} ${order.trigger}.`);
+        _haptic('medium');
+        bookDirty = true;
+        updateUI();
+        dirty = true;
+        return;
+    }
     let ok = 0, deferred = 0;
     const failed = [];
-    for (const L of legs) {
-        const side = L.side > 0 ? 'long' : 'short';
+    for (const L of order.legs) {
         let res = null;
         if (L.type === 'binary') {
             if (!raceState || !consensus.active) { failed.push(L.desc); continue; }
-            if (_deferManual('binary', { key: L.key, side, qty: L.qty })) { deferred++; continue; }
-            res = executeBinaryTrade(L.key, side, L.qty);
+            if (_deferManual('binary', { key: L.key, side: L.side, qty: L.qty })) { deferred++; continue; }
+            res = executeBinaryTrade(L.key, L.side, L.qty);
         } else if (L.type === 'computefuture') {
             if (!raceState || !computeMarket.active) { failed.push(L.desc); continue; }
-            if (_deferManual('compute', { key: L.key, side, qty: L.qty })) { deferred++; continue; }
-            res = executeMarketOrder(sim, 'computefuture', side, L.qty, sim.S, market.sigma, sim.r, sim.day, L.key, L.key, undefined, sim.q);
+            if (_deferManual('compute', { key: L.key, side: L.side, qty: L.qty })) { deferred++; continue; }
+            res = executeMarketOrder(sim, 'computefuture', L.side, L.qty, sim.S, market.sigma, sim.r, sim.day, L.key, L.key, undefined, sim.q);
         } else {
-            if (_deferManual('market', { type: L.type, side, qty: L.qty, strike: L.strike, expiryDay: L.expiryDay })) { deferred++; continue; }
-            res = executeMarketOrder(sim, L.type, side, L.qty, sim.S, market.sigma, sim.r, sim.day, L.strike, L.expiryDay, undefined, sim.q);
-            if (res && L.type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, L.qty, 'Stock trade');
+            if (_deferManual('market', { type: L.type, side: L.side, qty: L.qty, strike: L.strike, expiryDay: L.expiryDay })) { deferred++; continue; }
+            res = executeMarketOrder(sim, L.type, L.side, L.qty, sim.S, market.sigma, sim.r, sim.day, L.strike, L.expiryDay, undefined, sim.q);
+            if (res && L.type === 'stock') _recordImpact(sim.day, L.side === 'long' ? 1 : -1, L.qty, 'Stock trade');
         }
         if (res) ok++; else failed.push(L.desc);
     }
     const parts = [];
-    if (ok) parts.push(`${ok} leg${ok > 1 ? 's' : ''} filled`);
+    if (ok) parts.push(order.legs.length === 1 ? 'Filled' : `${ok} leg${ok > 1 ? 's' : ''} filled`);
     if (deferred) parts.push(`${deferred} working`);
-    if (failed.length) parts.push(`rejected: ${failed.join(', ')}`);
-    _toast('Sandbox: ' + (parts.join('; ') || 'nothing traded') + '.', failed.length ? 5000 : 3000);
+    if (failed.length) parts.push(`rejected (margin, or the contract closed): ${failed.join(', ')}`);
+    _toast((parts.join('; ') || 'Nothing traded') + '.', failed.length ? 5000 : 3000);
     _haptic(failed.length ? 'error' : 'success');
-    chainDirty = true;
+    bookDirty = true;
     updateUI();
-    renderSandbox();
     dirty = true;
 }
 
-/** S: hide or show the rail beside the tape (the tape takes the width). */
+/** S: hide or show the book beside the tape (the tape takes the width). */
 function _toggleRail() {
     document.body.classList.toggle('rail-off');
     _haptic('light');
-}
-
-/** T: flip the front page's rail between Quotes and Book. */
-function _toggleRailTab() {
-    const onBook = document.getElementById('tab-portfolio').classList.contains('active');
-    showRailTab(onBook ? 'trade' : 'portfolio');
 }
 
 /** The run-relative day of the edition being traded (day 0 is Edition 1). */
@@ -1481,7 +1259,9 @@ function _syncMasthead(force = false) {
         const ch = t.prevClose > 0 ? (t.S / t.prevClose - 1) * 100 : 0;
         const mv = Math.abs(ch) < 0.05 ? 'flat on the session' : `${ch > 0 ? 'up' : 'down'} ${Math.abs(ch).toFixed(1)}% on the session`;
         _capFront(`HCN at ${t.S.toFixed(2)}, ${mv}; today's range ${bar.low.toFixed(2)} to ${bar.high.toFixed(2)}. `
-            + 'The band is each day\u2019s range and the line its close; ticks mark news days.', force);
+            + (chart.mode === 'line'
+                ? 'Zoomed out, the line is each day\u2019s close over a band of its range; ticks mark news days.'
+                : 'A hollow candle closed up, a solid red one down; the wick is the day\u2019s range, and ticks mark news days.'), force);
     }
     updateMasthead({
         rel: _relDay(), regime: _regimeLabel(), S: t.S, prevClose: t.prevClose,
@@ -1489,44 +1269,18 @@ function _syncMasthead(force = false) {
     });
 }
 
-/** The wire: the Desk's event log and the front page's lead and briefs. */
+/** The wire: the front page's lead and the whole wire under it. */
 function _updateWire() {
     const log = eventEngine ? eventEngine.eventLog : [];
-    updateEventLog($, log, chart.dayOrigin);
     renderWire(log, chart.dayOrigin, _tapeSnapshot());
     chart.setNews(log.map(e => ({ day: e.day, head: splitHeadline(e.headline).head, major: e.magnitude === 'major' })));
     dirty = true;
 }
 
-let _capStrategy = null;
-
-/** The payoff page's caption: what the diagram shows, with its live values. */
-function _strategyCaption() {
-    if (!_capStrategy) _capStrategy = _colophon.caption(document.getElementById('cap-strategy'), 300);
-    const n = strategyLegs.length;
-    if (!n) { _capStrategy('Add legs from the chain at right: the payoff of the book against HCN appears here, gains in green and losses in red.'); return; }
-    const dte = Math.max(0, Math.round(_sliderFallbackDte()));
-    _capStrategy(`Profit and loss of the ${n}-leg book against HCN, ${dte ? dte + ' trading days before expiry' : 'at expiry'}; `
-        + `HCN is at ${sim.S.toFixed(2)} (dashed). Gains are green, losses red; the key toggles each Greek.`);
-}
-
-/** Redraw the active canvas view. Called from frame() and handleResize(). */
+/** Redraw the tape (the one rAF-driven canvas). Called from frame() and handleResize(). */
 function renderCurrentView() {
-    if (strategyMode) {
-        _strategyCaption();
-        strategy.draw(
-            strategyLegs, sim.S,
-            market.sigma,
-            sim.r, _sliderFallbackDte(), greekToggles,
-            _sliderEvalDay(), sim.day, sim.q
-        );
-    } else if (currentPage() === 'front') {
-        chart.draw(
-            sim.history, portfolio.positions,
-            mouseX, mouseY,
-            sim.history.last()
-        );
-    }
+    if (currentPage() !== 'front') return;
+    chart.draw(sim.history, portfolio.positions, mouseX, mouseY, sim.history.last());
 }
 
 /**
@@ -1573,11 +1327,11 @@ function _closeTradingDay() {
  * open decision, landing the choice's deltas and `raceEffects` one race tick late.
  *
  * Two halves, both required: an event already SHOWN has been shifted OFF the queue
- * (so the overlay is the only evidence), and an event still QUEUED may be waiting
- * behind the trade dialog (so the overlay is hidden). A pending terminal epilogue
- * bars the close outright -- nothing ticks after the latch. So does a lock the
- * player chose to adjust first (02a, the posterior's locks): the quarter waits on
- * the Markets panel's Lock, with no dispatch on screen.
+ * (so the overlay is the only evidence), and an event still QUEUED is waiting its
+ * turn behind the one on screen. A pending terminal epilogue bars the close
+ * outright -- nothing ticks after the latch. So does a lock the player chose to
+ * adjust first (02a, the posterior's locks): the quarter waits on the Race page's
+ * Lock, with no dispatch on screen.
  */
 function _popupBarrier() {
     if (_popupQueue.length > 0 || _pendingEpilogue || _lockPending) return true;
@@ -1639,7 +1393,7 @@ function frame(now) {
                 // to prevent burst catch-up after tab was backgrounded
                 lastTickTime = Math.max(lastTickTime + tickInterval, now - tickInterval);
                 chart.setLiveCandle(sim._partial);
-                if (!strategyMode) dirty = true;
+                dirty = true;
             }
         }
 
@@ -1664,14 +1418,13 @@ function frame(now) {
             // UI update once per frame (repricing chain/sidebar is expensive)
             if (stepped) {
                 _onSubstepUI();
-                if (!strategyMode) dirty = true;
+                dirty = true;
             }
             // All sub-steps done — close the day (overlays removed) then run
             // day-complete bookkeeping against baseline params. UNLESS the popup
             // barrier holds (02a "Act III"): a decision on screen or waiting
-            // keeps the day OPEN. Retry the drain first, so a beat parked behind
-            // the trade dialog reaches the player the moment the dialog closes and
-            // the day is never stranded.
+            // keeps the day OPEN. Retry the drain first, so a beat still queued
+            // reaches the player and the day is never stranded.
             if (sim.dayComplete) {
                 if (_popupBarrier()) _processPopupQueue();
                 if (!_popupBarrier()) {
@@ -1685,17 +1438,11 @@ function frame(now) {
     // Lerp animation runs every frame (even when paused, for settling)
     chart.update(now);
     // Lerp always causes a redraw while targets differ from display
-    if (chart.isLerpActive() && !strategyMode) dirty = true;
+    if (chart.isLerpActive()) dirty = true;
     // P7-1: a wrong print was drawn last frame — force the corrective redraw even
     // if nothing else is animating (the terminal always catches up).
     if (chart._repaintDirty) {
         chart._repaintDirty = false;
-        if (!strategyMode) dirty = true;
-    }
-
-    // Check if strategy renderer flagged dirty from wheel zoom
-    if (strategy._dirty) {
-        strategy._dirty = false;
         dirty = true;
     }
     if (dirty) {
@@ -1711,7 +1458,7 @@ function _fillPendingOrders() {
     for (const pos of filledOrders) {
         const side = pos.qty > 0 ? 'Bought' : 'Sold';
         _toast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
-        chainDirty = true;
+        bookDirty = true;
     }
 }
 
@@ -1762,39 +1509,34 @@ function _publishVxhcn() {
     return publishedVxhcn(market.vxhcn);
 }
 
+/** Government affairs on the Meridian page: one row per available action, its
+ *  cost beside it, its description under it. */
 function _updateLobbyPills() {
     if (!$.lobbyBar || !$.lobbyActions) return;
     const day = sim.history.maxDay;
-    const actions = getAvailableActions(day, portfolio.cash);
-    while ($.lobbyActions.firstChild) $.lobbyActions.removeChild($.lobbyActions.firstChild);
-    if (actions.length === 0 || !eventEngine) {
-        $.lobbyBar.style.display = 'none';
-        return;
-    }
-    $.lobbyBar.style.display = '';
-    for (let i = 0; i < actions.length; i++) {
-        const action = actions[i];
-        if (i > 0) {
-            const div = document.createElement('span');
-            div.className = 'substrate-divider divider';
-            $.lobbyActions.appendChild(div);
-        }
+    const actions = eventEngine ? getAvailableActions(day, portfolio.cash) : [];
+    $.lobbyBar.hidden = !eventEngine || actions.length === 0;
+    const sig = actions.map(a => a.id + (a.affordable ? 1 : 0) + (a.cooldownReady ? 1 : 0)).join('|');
+    if ($.lobbyActions._sig === sig) return;
+    $.lobbyActions._sig = sig;
+    $.lobbyActions.textContent = '';
+    for (const action of actions) {
+        const row = document.createElement('div');
+        row.className = 'lobby-row';
         const btn = document.createElement('button');
-        const colorCls = (_LOBBY_META[action.id] || {}).cls || '';
-        const isFirst = i === 0;
-        const isLast = i === actions.length - 1;
-        let radiusCls = '';
-        if (isFirst && isLast) radiusCls = 'pill-btn-solo';
-        else if (isFirst) radiusCls = 'pill-btn-left';
-        else if (isLast) radiusCls = 'pill-btn-right';
-        btn.className = `pill-btn lobby-pill ${colorCls} ${radiusCls}`.trim();
+        btn.type = 'button';
+        btn.className = 'link-btn lobby-pill';
         btn.dataset.lobby = action.id;
         btn.disabled = !action.affordable || !action.cooldownReady;
-        const label = (_LOBBY_META[action.id] || {}).label || action.name;
-        const cost = action.cost > 0 ? ` $${action.cost}k` : '';
-        btn.textContent = label + cost;
-        btn.title = action.desc + (action.cooldownReady ? '' : ' (cooldown)');
-        $.lobbyActions.appendChild(btn);
+        btn.textContent = action.name;
+        const cost = document.createElement('span');
+        cost.className = 'lobby-cost';
+        cost.textContent = (action.cost > 0 ? `$${action.cost}k` : 'free') + (action.cooldownReady ? '' : ', cooling off');
+        const desc = document.createElement('p');
+        desc.className = 'lobby-desc';
+        desc.textContent = action.desc;
+        row.append(btn, cost, desc);
+        $.lobbyActions.appendChild(row);
     }
 }
 
@@ -1852,8 +1594,7 @@ function _interceptByStandingOrder(event) {
 
 /** Called after all 16 sub-steps complete — runs portfolio/chain/margin checks. */
 function _processPopupQueue() {
-    // Don't show if another overlay is open (trade dialog / a popup already up).
-    if (!$.tradeDialog.classList.contains('hidden')) return;
+    // Don't show if a popup is already up.
     if (!$.popupOverlay.classList.contains('hidden')) return;
     if (_popupQueue.length === 0) {
         // P6-3: the terminal epilogue renders ONLY after the resolution-day beat has
@@ -1925,7 +1666,7 @@ function _processPopupQueue() {
  *  pause in between is the player's call and clears the latch (togglePlay). */
 function _resumeAfterDispatches() {
     if (!_resumeAfterDispatch) return;
-    if (_gameOver || strategyMode || _popupBarrier()) return;
+    if (_gameOver || _popupBarrier()) return;
     _resumeAfterDispatch = false;
     playing = true;
     lastTickTime = _resumeClockOrigin();
@@ -1964,7 +1705,7 @@ function _applyPopupChoice(event, choice) {
         } else if (result) {
             recordPrimaryAllocation(round.id, raceState.day, result.allocated, equity);
         }
-        chainDirty = true;
+        bookDirty = true;
         updateUI();
     }
     if (choice.deltas && eventEngine) {
@@ -2104,7 +1845,7 @@ function _applyPopupChoice(event, choice) {
         if (closed > 0) {
             const sign = pnlSum >= 0 ? '+' : '';
             _toast(`Closed ${closed} position${closed > 1 ? 's' : ''}. P&L: ${sign}${fmtDollar(pnlSum)}`, 4000);
-            chainDirty = true;
+            bookDirty = true;
             updateUI();
         }
     }
@@ -2138,7 +1879,7 @@ function _applyPopupChoice(event, choice) {
             const closedBefore = portfolio.positions.length;
             const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q, _liqOrder);
             _applyRestriction(stuck, closedBefore);
-            chainDirty = true;
+            bookDirty = true;
             updateUI();
             // Assess lending-eligible equity once exchange legs are flat. Private
             // marks cannot repay a margin debit; frozen exchange claims restrict
@@ -2156,7 +1897,7 @@ function _applyPopupChoice(event, choice) {
             for (const p of stockPos) {
                 closePosition(sim, p.id, sim.S, vol, sim.r, sim.day, sim.q);
             }
-            chainDirty = true;
+            bookDirty = true;
             updateUI();
             // Re-check margin after partial liquidation
             const recheck = checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
@@ -2166,7 +1907,7 @@ function _applyPopupChoice(event, choice) {
                 const { stuck } = liquidateAll(sim, sim.S, vol, sim.r, sim.day, sim.q,
                     standingLiquidationOrder(recheck));
                 _applyRestriction(stuck, closedBefore);
-                chainDirty = true;
+                bookDirty = true;
                 updateUI();
                 const eligible = checkMargin(sim.S, vol, sim.r, sim.day, sim.q).collateralEquity;
                 if (stuck.every(p => p.type === 'privatestake') && eligible < 0) {
@@ -2186,7 +1927,7 @@ function _applyPopupChoice(event, choice) {
     }
     // The quarterly lock (02a, the posterior's locks): record the chosen curves on
     // the scheduled day -- immutable, on-grid, current day only -- or, for "Adjust
-    // first", hold the day for the Markets panel's Lock.
+    // first", hold the day for the Race page's Lock.
     if (event._forecastLock && choice._lockMode) {
         if (choice._lockMode === 'adjust') _beginLockAdjust(event._lockDay);
         else if (choice._lockMode === 'market') _recordLock(event._lockDay, null, 'market');
@@ -2269,7 +2010,7 @@ function _triggerGameOver(endingId) {
     playing = false;
     _resumeAfterDispatch = false;
     _lockPending = false;            // nothing locks after the latch
-    setCurveEdit(false, false);
+    setForecastPending(false);
     updatePlayBtn($, playing);
     // 0b. Partial-day abort (02a "Act III"): a terminal reached MID-DAY -- an
     //     intraday compliance choice, a rogue latch off a substep-lane popup --
@@ -2547,13 +2288,13 @@ function _composeLockDispatch(ev) {
     }
     const choices = [];
     if (!open.every(R => curvesEqual(draft, mkt, R))) {
-        choices.push({ label: 'Lock as drawn', desc: 'Your curves, as they stand on the Markets page.', _lockMode: 'drawn' });
+        choices.push({ label: 'Lock as drawn', desc: 'Your forecast, as it stands on the Race page.', _lockMode: 'drawn' });
     }
     choices.push(
         { label: 'Lock the market’s curves', desc: 'No call this quarter. You score exactly what Consensus scores.', _lockMode: 'market' },
         { label: 'Earlier than the market', desc: 'Every open rung half a width sooner. The recursion is closer than the tape thinks.', _lockMode: 'earlier' },
         { label: 'Later than the market', desc: 'Every open rung half a width later. The wall is real, or at least slow.', _lockMode: 'later' },
-        { label: 'Adjust first', desc: 'Open the curves on the Markets page. The quarter waits until you lock.', _lockMode: 'adjust' },
+        { label: 'Adjust first', desc: 'Open your forecast on the Race page. The quarter waits until you lock.', _lockMode: 'adjust' },
     );
     ev.context = ctx;
     ev.choices = choices;
@@ -2565,27 +2306,27 @@ function _recordLock(day, curves, policy = 'own') {
     const rec = lockForecast(day, curves, policy);
     _toast(rec ? 'Locked for the quarter.' : 'The lock window has passed — no forecast recorded this quarter.', 4000);
     redrawMarkets();
-    if (currentPage() === 'race') setRaceVisible(true);   // the ladder's "Yours" column
+    if (currentPage() === 'race') setRaceVisible(true);   // the ladder's "Locked" column
     return rec;
 }
 
 /** "Adjust first": the dispatch is gone, the day stays held (`_lockPending`), and
- *  the Markets page opens with the Consensus editor focused and its Lock shown. */
+ *  the Race page opens with the forecast editor focused and its Lock shown. */
 function _beginLockAdjust(day) {
     _lockPending = true;
     _lockPendingDay = day;
-    showPage('markets');
-    setCurveEdit(true, true, true);
+    showPage('race');
+    setForecastPending(true, true);
 }
 
-/** The Consensus panel's Lock: record the draft, release the held day, and resume
- *  a desk the dispatch paused. */
+/** The Race page's Lock: record the draft, release the held day, and resume a
+ *  desk the dispatch paused. */
 function _lockFromEditor() {
     if (!_lockPending) return;
     _recordLock(_lockPendingDay, draftCurves());
     _lockPending = false;
     _lockPendingDay = -1;
-    setCurveEdit(true, false);
+    setForecastPending(false);
     _closeCompletedDayIfPending();
     _resumeAfterDispatches();
 }
@@ -2619,31 +2360,35 @@ function _updateRegulationDisplay() {
     const pipeline = getRegulationPipeline();
     list.textContent = '';
     if (pipeline.length === 0) {
-        const span = document.createElement('span');
-        span.className = 'text-muted';
-        span.style.fontSize = '0.78rem';
-        span.textContent = 'None';
-        list.appendChild(span);
+        const p = document.createElement('p');
+        p.className = 'panel-hint';
+        p.textContent = 'Nothing on the books or in committee.';
+        list.appendChild(p);
         return;
     }
     for (const entry of pipeline) {
-        const badge = document.createElement('div');
-        badge.className = 'regulation-badge';
+        const row = document.createElement('div');
+        row.className = 'stat-row';
         const reg = getRegulation(entry.id);
-        badge.dataset.tooltip = reg ? reg.description : '';
-        badge.textContent = entry.name + ' — ' + _regStatusLabel(entry);
-        if (entry.color) badge.style.color = entry.color;
-        list.appendChild(badge);
+        if (reg) row.dataset.tooltip = reg.description;
+        const name = document.createElement('span');
+        name.className = 'stat-label';
+        name.textContent = entry.name;
+        const st = document.createElement('span');
+        st.className = 'stat-value';
+        st.textContent = _regStatusLabel(entry);
+        row.append(name, st);
+        list.appendChild(row);
     }
 }
 
 function _regStatusLabel(entry) {
     if (entry.status === 'active' && entry.remainingDays != null) {
         const months = entry.remainingDays / 21;
-        if (months < 1) return '<1mo';
-        return Math.round(months) + 'mo';
+        if (months < 1) return 'In force, under a month left';
+        return `In force, ${Math.round(months)} ${Math.round(months) === 1 ? 'month' : 'months'} left`;
     }
-    const labels = { introduced: 'Introduced', committee: 'Committee', floor: 'Floor', active: 'Active' };
+    const labels = { introduced: 'Introduced', committee: 'In committee', floor: 'On the floor', active: 'In force' };
     return labels[entry.status] || entry.status;
 }
 
@@ -2734,10 +2479,6 @@ function _onDayComplete() {
 
     const vol = market.sigma;
 
-    // Record rate + VXHCN for sparklines
-    if (rateHistory) pushSparkSample(rateHistory, sim.r);
-    if (vxhcnHistory) pushSparkSample(vxhcnHistory, market.vxhcn);
-
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
 
     // Quarterly dividend payments (every 63 trading days, aligned with expiry cycle)
@@ -2787,7 +2528,7 @@ function _onDayComplete() {
         for (const name of names) {
             _toast('Strategy "' + name + '" expired — unwound all legs.');
         }
-        chainDirty = true;
+        bookDirty = true;
     }
 
     // Crisis profit tracking for trait system
@@ -3062,10 +2803,11 @@ function _onDayComplete() {
         // The race page records the day's public ledger (and, for the epilogue, the hidden tracks).
         if (raceState) recordRaceDay(raceState, eventEngine.world);
         // The markets page keeps the curves from before today's news as its ghost.
+        // Its snapshot reads today's listed expiries, so the skeleton rolls first.
         const _lead = fired.find(ev => !ev.interjection) || popups[0];
+        chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
         marketsDayClose(_lead ? splitHeadline(_lead.headline).head : null);
-        if (currentPage() === 'front') drawSurface();
-        if (currentPage() === 'markets') renderSandbox();
+        invalidateTicket();   // the day's updateUI re-renders it (bookDirty)
         if (hasSupereventPopups) {
             sim.recomputeK();
             _syncAll();
@@ -3115,8 +2857,9 @@ function _onDayComplete() {
     // still takes its daily snapshot.
     if (!eventEngine) {
         _updateWire();
+        chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
         marketsDayClose(null);
-        if (currentPage() === 'front') drawSurface();
+        invalidateTicket();   // the day's updateUI re-renders it (bookDirty)
     }
 
     // Portfolio-triggered popup events
@@ -3185,7 +2928,7 @@ function _onDayComplete() {
     if (grossRatio > 0.75) shiftFaction('regulatoryExposure', 1);
 
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
-    chainDirty = true;
+    bookDirty = true;
 
     // Rogue trading check (before margin)
     const equity = _portfolioEquity();
@@ -3240,14 +2983,9 @@ function _onDayComplete() {
         }
     }
 
-    // Reset strategy range if spot has changed significantly
-    if (Math.abs(sim.S - lastSpot) / lastSpot > 0.01) {
-        strategy.resetRange(sim.S, strategyLegs);
-        lastSpot = sim.S;
-    }
-
-    // Record portfolio value for sparkline
+    // Record the book's value, and holding HCN beside it, for the sparkline
     if (portfolioHistory) pushSparkSample(portfolioHistory, _portfolioEquity());
+    if (benchHistory) pushSparkSample(benchHistory, portfolio.initialCapital / 100 * sim.S);
 
     updateUI(margin);
     _updateTraitDisplay();
@@ -3304,143 +3042,41 @@ function tick() {
 function updateUI(precomputedMargin) {
     const vol = market.sigma;
     const margin = precomputedMargin || checkMargin(sim.S, vol, sim.r, sim.day, sim.q);
-    const pMap = _buildPosMap();
-    const sMap = strategyMode ? _buildStrategyPosMap() : null;
-    const vxhcnShown = _publishVxhcn();
-    if (chainDirty) {
-        rebuildTradeDropdown($, chainSkeleton);
-        const tradePriced = _priceExpiry(_tradeExpiryIdx());
-        updateChainDisplay($, publishedChain(tradePriced, substepClock()), pMap);
-        updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap, publishedVariance(market.v));
-        if (strategyMode) {
-            rebuildStrategyDropdown($, chainSkeleton);
-            const stratPriced = _priceExpiry(_strategyExpiryIdx());
-            updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, sMap);
-        }
-        chainDirty = false;
-    }
-    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, portfolioHistory);
+    _publishVxhcn();
+    updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, margin, sim.q, _bookHistories());
     updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
-    updateRateDisplay($, sim.r, rateHistory);
-    updateVxhcnDisplay($, vxhcnShown, vxhcnHistory);
-    if (raceState && consensus.active) updateConsensusPanel($, consensus, portfolio, raceState.day);
-    if (raceState && computeMarket.active) updateComputePanel($, computeMarket, portfolio, raceState.day);
     // Standing orders (P7-2): hidden until the released frontier rung unlocks the
     // panel, and null outside Dynamic modes (the view model hides it).
     updateStandingOrdersPanel($, raceState ? standingOrdersView() : null, _onStandingToggle);
+    _bookChanged();
     refreshTooltip();
-    if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
-        _updateTradeCreditDebit();
-    }
-    if (strategyMode && strategyLegs.length > 0) {
-        updateStrategyBuilder();
-    }
     _syncMasthead();
 }
 
-/** Lightweight UI update called every substep — reprices visible expiry only. */
+/** The book changed (a fill, a close, an expiry): the tables' holdings, and the
+ *  ticket's figure when it includes the book. */
+function _bookChanged() {
+    if (!bookDirty) return;
+    bookDirty = false;
+    invalidateTicket();
+    if (currentPage() === 'markets') { redrawMarkets(); renderTicket(); }
+}
+
+/** Lightweight UI update called every substep: the book, and on Markets the
+ *  opened table and the ticket's quotes. */
 function updateSubstepUI(marginInfo) {
     const vol = market.sigma;
-    const pMap = _buildPosMap();
-    const sMap = strategyMode ? _buildStrategyPosMap() : null;
-    // P7-1 display latches: the underlying reprice below still runs every substep;
+    // P7-1 display latches: the underlying reprice still runs every substep;
     // only what reaches the DOM is held. Sparklines skip frames at high d.
-    const vxhcnShown = _publishVxhcn();
+    _publishVxhcn();
     const skipSpark = skipSparklineFrame();
-
-    // Reprice the visible trade chain expiry (no dropdown rebuild)
-    const tradePriced = _priceExpiry(_tradeExpiryIdx());
-    updateChainDisplay($, publishedChain(tradePriced, substepClock()), pMap);
-    updateStockBondPrices($, sim.S, sim.r, vol, chainSkeleton, pMap, sMap, publishedVariance(market.v));
-
-    updateTriggerPriceSlider($, sim.S);
-
-    if (strategyMode) {
-        const stratPriced = _priceExpiry(_strategyExpiryIdx());
-        updateStrategySelectors($, stratPriced, sim.S, handleAddLeg, sMap);
-    }
-
-    // Portfolio mark-to-market
     updatePortfolioDisplay($, portfolio, sim.S, vol, sim.r, sim.day, marginInfo, sim.q,
-        skipSpark ? null : portfolioHistory);
-    if (activeTab === 'portfolio') {
-        updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
-    }
-    updateRateDisplay($, sim.r, skipSpark ? null : rateHistory);
-    updateVxhcnDisplay($, vxhcnShown, skipSpark ? null : vxhcnHistory);
-
-    if (strategyMode && strategyLegs.length > 0) {
-        updateStrategyBuilder();
-    }
-
+        skipSpark ? null : _bookHistories());
+    updateGreeksDisplay($, aggregateGreeks(sim.S, vol, sim.r, sim.day, sim.q));
+    if (currentPage() === 'markets') { marketsSubstep(); refreshTicketQuotes(); }
+    _bookChanged();
     refreshTooltip();
-
-    // Live credit/debit update for trade-tab strategy
-    if ($.tradeStrategySelect && $.tradeStrategySelect.value) {
-        _updateTradeCreditDebit();
-    }
-
     _syncMasthead();
-    chainDirty = false;
-}
-
-// ---------------------------------------------------------------------------
-// Time slider range management
-// ---------------------------------------------------------------------------
-
-function _getMaxDTE() {
-    let maxDTE = 0;
-    for (const leg of strategyLegs) {
-        if (leg.expiryDay != null) {
-            const dte = leg.expiryDay - sim.day;
-            if (dte > maxDTE) maxDTE = dte;
-        }
-    }
-    return maxDTE;
-}
-
-function _getMinDTE() {
-    let minDTE = Infinity;
-    for (const leg of strategyLegs) {
-        if (leg.expiryDay != null) {
-            const dte = leg.expiryDay - sim.day;
-            if (dte < minDTE) minDTE = dte;
-        }
-    }
-    return minDTE === Infinity ? 0 : minDTE;
-}
-
-/** Elapsed trading days at the current slider position (0 at 100%, minDTE at 0%). */
-function _sliderElapsed(minDTE) {
-    if (minDTE === undefined) minDTE = _getMinDTE();
-    return Math.round(minDTE * (100 - sliderPct) / 100);
-}
-
-/** Evaluation day for strategy diagram at current slider position. */
-function _sliderEvalDay() {
-    return sim.day + _sliderElapsed();
-}
-
-/** Fallback DTE for legs without expiryDay (max leg's remaining DTE at evalDay). */
-function _sliderFallbackDte() {
-    return _getMaxDTE() - _sliderElapsed();
-}
-
-function updateTimeSliderRange() {
-    const hasLegs = strategyLegs.length > 0;
-    $.timeSliderBar.classList.toggle('hidden', !hasLegs);
-    if (!hasLegs) return;
-    const minDTE = _getMinDTE();
-    if (minDTE > 0) {
-        $.timeSlider.disabled = false;
-    } else {
-        $.timeSlider.disabled = true;
-        sliderPct = 100;
-        $.timeSlider.value = 100;
-    }
-    const elapsed = _sliderElapsed(minDTE);
-    const maxRemaining = _getMaxDTE() - elapsed;
-    if ($.timeSliderLabel) $.timeSliderLabel.textContent = maxRemaining + ' DTE';
 }
 
 // ---------------------------------------------------------------------------
@@ -3454,7 +3090,7 @@ function togglePlay() {
     if (_gameOver) return;
     // "Adjust first" holds the quarter until the curves are locked: no new day
     // opens behind the hold, by play or by step.
-    if (_lockPending && !playing) { _toast('Lock your curves to open the next day.'); return; }
+    if (_lockPending && !playing) { _toast('Lock your forecast on the Race page to open the next day.'); return; }
     _resumeAfterDispatch = false;
     playing = !playing;
     if (playing) {
@@ -3484,7 +3120,7 @@ function _resumeClockOrigin() {
 function step() {
     if (playing) return;
     if (_gameOver) return;   // same reason as togglePlay: never reopen an aborted day
-    if (_lockPending) { _toast('Lock your curves to open the next day.'); return; }
+    if (_lockPending) { _toast('Lock your forecast on the Race page to open the next day.'); return; }
 
     // Start a new day if none in progress (installs overlays via the shared helper).
     if (!dayInProgress) {
@@ -3502,7 +3138,7 @@ function step() {
 
     // If all substeps done, close the day (overlays removed) then bookkeeping --
     // unless the popup barrier holds (02a "Act III"). Retry the drain first so
-    // a beat waiting behind the trade dialog is never stranded.
+    // a beat still queued is never stranded.
     if (sim.dayComplete) {
         if (_popupBarrier()) _processPopupQueue();
         if (!_popupBarrier()) {
@@ -3536,7 +3172,8 @@ function decycleSpeed() {
 function _resetCore(index) {
     resetBrief();
     resetMarkets();
-    resetSandbox();
+    resetTicket();
+    setFolioCount('markets', 0);
     document.getElementById('epilogue-overlay')?.classList.add('hidden');
     document.getElementById('fraud-overlay')?.classList.add('hidden');
     document.getElementById('popup-event-overlay')?.classList.add('hidden');
@@ -3584,26 +3221,16 @@ function _resetCore(index) {
     resetImpactState();
     sim.prepopulate();
     _syncAll();
-    _initRateHistory();
-    _initVxhcnHistory();
     _initPortfolioHistory();
     chart.dayOrigin = sim.day;
     dayInProgress = false;
     chart.resetTransients();   // P7-1 ruling 5: lerp AND the pending one-frame wrong print
     expiryMgr.init(sim.day);
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
-    chainDirty = true;
+    bookDirty = true;
     playing = false;
     _resumeAfterDispatch = false;
-    lastSpot = sim.S;
-    strategyLegs.length = 0;
-    currentStrategyHash = null;
-    isBuiltinLoaded = false;
-    if ($.strategyNameInput) $.strategyNameInput.value = '';
-    _refreshStrategyDropdowns();
-    sliderPct = 100;
-    strategy.resetRange(sim.S, strategyLegs);
-    updateStrategyBuilder();
+    setForecastPending(false);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateDynamicSections($, index);
@@ -3651,12 +3278,11 @@ function loadPreset(index) {
     _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);
     if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
-    if ($.lobbyBar) $.lobbyBar.style.display = eventEngine ? '' : 'none';
 
     updateUI();
     _repositionCamera();
     marketsDayClose(null);
-    renderSandbox();
+    renderTicket();
     resetRacePage();
     dirty = true;
     _haptic('medium');
@@ -3697,7 +3323,7 @@ function resetSim() {
     updateUI();
     _repositionCamera();
     marketsDayClose(null);
-    renderSandbox();
+    renderTicket();
     resetRacePage();
     dirty = true;
     _haptic('heavy');
@@ -3710,251 +3336,6 @@ function syncSliderToSim(param, value) {
     if (param === 'rho') sim._recomputeRhoDerived();
     _syncAll();
     dirty = true;
-}
-
-function _getTradeQty() {
-    return parseInt($.tradeQty?.value, 10) || 1;
-}
-
-function _getOrderType() {
-    const active = $.orderTypeToggles?.querySelector('.mode-btn.active');
-    return active ? active.dataset.ordertype : 'market';
-}
-
-function _getTriggerPrice() {
-    return parseFloat($.triggerPrice?.value) || sim.S;
-}
-
-function _executeOrPlace(type, side, qty, strike, expiryDay) {
-    if (_blockedByRestriction()) return;
-    const vol = market.sigma;
-    const orderType = _getOrderType();
-    if (orderType === 'market') {
-        // P7-1 latency ladder: past released R4 a manual market order WORKS for a
-        // few substeps and fills at the price it finds there. Resting limit/stop
-        // orders below are untouched -- precommitments are the fast path.
-        if (_deferManual('market', { type, side, qty, strike, expiryDay })) {
-            chainDirty = true;
-            updateUI();
-            dirty = true;
-            return;
-        }
-        const pos = executeMarketOrder(sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q);
-        if (pos) {
-            const label = side === 'short' ? 'Shorted' : 'Bought';
-            _toast(label + ' ' + qty + 'k ' + type + ' at $' + pos.fillPrice.toFixed(2));
-            _haptic('success');
-            if (type === 'stock') _recordImpact(sim.day, side === 'long' ? 1 : -1, qty, 'Stock trade');
-        } else {
-            _toast('Insufficient margin.');
-            _haptic('error');
-        }
-    } else {
-        const triggerPrice = _getTriggerPrice();
-        placePendingOrder(type, side, qty, orderType, triggerPrice, strike, expiryDay);
-        _toast('Pending ' + orderType + ' order placed for ' + qty + 'k ' + type + '.');
-        _haptic('medium');
-    }
-    chainDirty = true;
-    updateUI();
-    dirty = true;
-}
-
-function handleBuyStock() {
-    _executeOrPlace('stock', 'long', _getTradeQty());
-}
-
-function handleShortStock() {
-    _executeOrPlace('stock', 'short', _getTradeQty());
-}
-
-function _getTradeExpiryDay() {
-    const idx = parseInt($.tradeExpiry?.value, 10) || 0;
-    return chainSkeleton.length > idx ? chainSkeleton[idx].day : sim.day + 21;
-}
-
-function handleBuyBond() {
-    _executeOrPlace('bond', 'long', _getTradeQty(), null, _getTradeExpiryDay());
-}
-
-function handleShortBond() {
-    _executeOrPlace('bond', 'short', _getTradeQty(), null, _getTradeExpiryDay());
-}
-
-function handleBuyVxhcn() {
-    _executeOrPlace('vxhcnfuture', 'long', _getTradeQty(), null, _getTradeExpiryDay());
-}
-
-function handleShortVxhcn() {
-    _executeOrPlace('vxhcnfuture', 'short', _getTradeQty(), null, _getTradeExpiryDay());
-}
-
-function handleChainCellClick(info) {
-    const expiryDay = info.expiryDay ?? ((info.type === 'bond' || info.type === 'vxhcnfuture') ? _getTradeExpiryDay() : undefined);
-    _executeOrPlace(info.type, info.side, _getTradeQty(), info.strike ?? undefined, expiryDay);
-}
-
-// Consensus milestone binary (overhaul phase 3a): left-click buys YES,
-// right-click sells YES, at the trade-qty slider size. Market-only (no
-// pending-order flow for binaries this slice).
-function handleBinaryTrade(key, side) {
-    if (!raceState || !consensus.active) return;
-    if (_blockedByRestriction()) return;
-    const qty = _getTradeQty();
-    // P7-1 latency ladder: a binary is a manual desk action like any other.
-    if (_deferManual('binary', { key, side, qty })) { updateUI(); dirty = true; return; }
-    const pos = executeBinaryTrade(key, side, qty);
-    if (pos) {
-        _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k Yes', 2500);
-        _haptic('success');
-    } else {
-        _toast('Binary trade rejected — insufficient cash or contract closed.');
-        _haptic('error');
-    }
-    updateUI();
-    dirty = true;
-}
-
-// Compute future (overhaul phase 3b): left-click buys, right-click short-sells
-// the maturity at the trade-qty slider size. Routes through executeMarketOrder --
-// the SAME chokepoint / restriction guard / Reg-T-short mechanics as VXHCN
-// futures (no duplicate guards). `key` is both the contract key and the
-// settlement day; unitPrice('computefuture', ...) reads the cached curve mark.
-function handleComputeTrade(key, side) {
-    if (!raceState || !computeMarket.active) return;
-    if (_blockedByRestriction()) return;
-    const qty = _getTradeQty();
-    const vol = market.sigma;
-    // P7-1 latency ladder (manual desk action; same queue as every other).
-    if (_deferManual('compute', { key, side, qty })) { updateUI(); dirty = true; return; }
-    const pos = executeMarketOrder(sim, 'computefuture', side, qty, sim.S, vol, sim.r, sim.day, key, key, undefined, sim.q);
-    if (pos) {
-        _toast((side === 'long' ? 'Bought' : 'Sold') + ' ' + qty + 'k Compute Q@' + key, 2500);
-        _haptic('success');
-    } else {
-        _toast('Compute trade rejected — insufficient margin or book frozen.');
-        _haptic('error');
-    }
-    updateUI();
-    dirty = true;
-}
-
-
-function handleTradeSubmit(data) {
-    if (_blockedByRestriction()) return;
-    const vol = market.sigma;
-    const { type, side, qty, strike, expiryDay, orderType, limitPrice } = data;
-
-    if (orderType === 'market') {
-        // P7-1 latency ladder (the trade-dialog path shares the desk's hands).
-        if (_deferManual('market', { type, side, qty, strike, expiryDay })) {
-            chainDirty = true;
-            updateUI();
-            dirty = true;
-            return;
-        }
-        const pos = executeMarketOrder(
-            sim, type, side, qty, sim.S, vol, sim.r, sim.day, strike, expiryDay, undefined, sim.q
-        );
-        if (pos) {
-            _toast('Order filled: ' + type + ' x' + qty + 'k');
-            _haptic('success');
-        } else {
-            _toast('Order failed — insufficient margin.');
-            _haptic('error');
-        }
-    } else {
-        placePendingOrder(type, side, qty, orderType, limitPrice, strike, expiryDay);
-        _toast('Pending ' + orderType + ' order placed.');
-        _haptic('medium');
-    }
-
-    chainDirty = true;
-    updateUI();
-    dirty = true;
-}
-
-
-// ---------------------------------------------------------------------------
-// Strategy builder handlers
-// ---------------------------------------------------------------------------
-
-function handleAddLeg(type, side, strike, expiryDay) {
-    const absQty = parseInt($.strategyQty?.value, 10) || 1;
-    const signedQty = side === 'short' ? -absQty : absQty;
-
-    // For stock/bond clicked from the strategy table (no strike/expiryDay passed)
-    if (strike == null && (type === 'call' || type === 'put')) {
-        strike = Math.round(sim.S / 5) * 5;
-    }
-    if (expiryDay == null && (type === 'call' || type === 'put' || type === 'bond' || type === 'vxhcnfuture')) {
-        const idx = parseInt($.strategyExpiry?.value, 10);
-        const expiry = chainSkeleton.length > 0 ? chainSkeleton[isNaN(idx) ? chainSkeleton.length - 1 : Math.min(idx, chainSkeleton.length - 1)] : null;
-        expiryDay = expiry ? expiry.day : sim.day + 21;
-    }
-
-    // Find existing leg of same type/strike/expiry for netting
-    const existing = strategyLegs.find(l =>
-        l.type === type && l.strike === strike && l.expiryDay === expiryDay
-    );
-
-    if (existing) {
-        existing.qty += signedQty;
-        if (existing.qty === 0) {
-            strategyLegs.splice(strategyLegs.indexOf(existing), 1);
-        }
-    } else {
-        const leg = { type, qty: signedQty, strike, expiryDay, _refS: sim.S, _refDay: sim.day };
-        strategyLegs.push(leg);
-    }
-
-    _refreshStrategyView();
-    _haptic('selection');
-}
-
-function handleRemoveLeg(index) {
-    strategyLegs.splice(index, 1);
-    _refreshStrategyView();
-}
-
-function _isSelectableExpiry() {
-    return $.selectableExpiryToggle ? $.selectableExpiryToggle.checked : true;
-}
-
-function _expiryDayFromSelect(sel) {
-    const idx = parseInt(sel?.value, 10);
-    if (isNaN(idx) || !chainSkeleton.length) return null;
-    const entry = chainSkeleton[Math.min(idx, chainSkeleton.length - 1)];
-    return entry ? entry.day : null;
-}
-
-function _tradeExpiryDay() { return _expiryDayFromSelect($.tradeExpiry); }
-function _strategyExpiryDay() { return _expiryDayFromSelect($.strategyExpiry); }
-
-function handleSaveStrategy() {
-    if (strategyLegs.length === 0) return;
-    const name = $.strategyNameInput ? $.strategyNameInput.value : '';
-    const selExpiry = _isSelectableExpiry();
-    const relLegs = legsToRelative(strategyLegs, sim.S, sim.day, selExpiry);
-    const id = saveStrategy(currentStrategyHash, name, relLegs, selExpiry);
-    if (id === 'collision') {
-        _toast('A strategy with that name already exists.');
-        _haptic('error');
-        return;
-    }
-    if (id === null) {
-        _toast('Strategy limit reached (max 50).');
-        _haptic('error');
-        return;
-    }
-    currentStrategyHash = id;
-    isBuiltinLoaded = false;
-    _refreshStrategyDropdowns();
-    if ($.strategyLoadSelect) $.strategyLoadSelect.value = id;
-    const saved = getStrategy(id);
-    _toast('Strategy "' + (saved ? saved.name : '') + '" saved.');
-    _haptic('success');
-    updateStrategyBuilder();
 }
 
 /** Execute a resolved multi-leg strategy atomically. `spreadMult` is the P7-1
@@ -4029,126 +3410,10 @@ function executeWithRollback(resolvedLegs, strategyName, execMult, spreadMult) {
         _toast('Executed ' + mult + 'k ' + name + ' ' + verb + ' $' + perUnit.toFixed(2));
         _haptic('success');
     }
-    chainDirty = true;
+    bookDirty = true;
     updateUI();
     dirty = true;
     return !failed;
-}
-
-function handleLoadStrategy(id) {
-    if (!id) return;
-    const strat = getStrategy(id);
-    if (!strat) return;
-
-    const expiries = expiryMgr.update(sim.day);
-    const overrideDay = strat.selectableExpiry ? _strategyExpiryDay() : null;
-    const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
-
-    _populateStrategyLegs(resolved);
-
-    isBuiltinLoaded = !!strat.builtin;
-    currentStrategyHash = strat.builtin ? null : id;
-    if ($.strategyNameInput) $.strategyNameInput.value = strat.name;
-    if ($.selectableExpiryToggle) $.selectableExpiryToggle.checked = !!strat.selectableExpiry;
-
-    _refreshStrategyView();
-    _haptic('selection');
-}
-
-function handleDeleteStrategy() {
-    // Delete from currentStrategyHash (loaded) or from dropdown selection
-    const id = currentStrategyHash || ($.strategyLoadSelect ? $.strategyLoadSelect.value : '');
-    if (!id) return;
-    const strat = getStrategy(id);
-    if (!strat || strat.builtin) return;
-    deleteStrategy(id);
-    currentStrategyHash = null;
-    isBuiltinLoaded = false;
-    strategyLegs.length = 0;
-    if ($.strategyNameInput) $.strategyNameInput.value = '';
-    _refreshStrategyDropdowns();
-    if ($.strategyLoadSelect) $.strategyLoadSelect.value = '';
-    _refreshStrategyView();
-    _toast('Strategy "' + (strat ? strat.name : '') + '" deleted.');
-    _haptic('light');
-}
-
-function handleTradeExecStrategy() {
-    if (_blockedByRestriction()) return;
-    const id = $.tradeStrategySelect ? $.tradeStrategySelect.value : '';
-    if (!id) return;
-    const strat = getStrategy(id);
-    if (!strat) return;
-    const expiries = expiryMgr.update(sim.day);
-    const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
-    const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
-    const mult = parseInt($.tradeQty?.value, 10) || 1;
-    const scaled = resolved.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
-
-    const orderType = _getOrderType();
-    if (orderType === 'market') {
-        // P7-1: the whole strategy defers as one unit (all legs at the execution
-        // substep, or rollback) -- legs never straddle the latency window.
-        if (_deferManual('strategy', { legs: scaled, name: strat.name, mult })) {
-            chainDirty = true;
-            updateUI();
-            dirty = true;
-            return;
-        }
-        executeWithRollback(scaled, strat.name, mult);
-    } else {
-        const triggerPrice = _getTriggerPrice();
-        placePendingOrder(null, null, null, orderType, triggerPrice, null, null, strat.name, scaled, mult);
-        _toast('Pending ' + orderType + ' for ' + mult + 'k ' + strat.name + 's @ $' + triggerPrice.toFixed(0));
-        _haptic('medium');
-        chainDirty = true;
-        updateUI();
-        dirty = true;
-    }
-}
-
-function _updateTradeCreditDebit() {
-    const id = $.tradeStrategySelect ? $.tradeStrategySelect.value : '';
-    if (!id) { updateCreditDebit($, null); return; }
-    const strat = getStrategy(id);
-    if (!strat) { updateCreditDebit($, null); return; }
-    try {
-        const expiries = expiryMgr.update(sim.day);
-        const overrideDay = strat.selectableExpiry ? _tradeExpiryDay() : null;
-        const net = computeNetCost(strat.legs, sim.S, market.sigma, sim.r, sim.day, sim.q, expiries, overrideDay);
-        updateCreditDebit($, net);
-    } catch { updateCreditDebit($, null); }
-}
-
-function _reloadSelectableLegs() {
-    const id = $.strategyLoadSelect ? $.strategyLoadSelect.value : '';
-    if (!id) return;
-    const strat = getStrategy(id);
-    if (!strat || !strat.selectableExpiry) return;
-    const expiries = expiryMgr.update(sim.day);
-    const overrideDay = _strategyExpiryDay();
-    const resolved = resolveLegs(strat.legs, sim.S, sim.day, expiries, overrideDay);
-    _populateStrategyLegs(resolved);
-    strategy.resetRange(sim.S, strategyLegs);
-    updateStrategyBuilder();
-    updateTimeSliderRange();
-}
-
-function _refreshStrategyDropdowns() {
-    updateStrategyDropdowns($, listStrategies());
-    if ($.strategyNameInput) $.strategyNameInput.placeholder = nextAutoName();
-}
-
-function updateStrategyBuilder() {
-    const summary = strategyLegs.length > 0
-        ? strategy.computeSummary(strategyLegs, sim.S, market.sigma, sim.r, _sliderFallbackDte(),
-            _sliderEvalDay(), sim.day, sim.q)
-        : null;
-    renderStrategyBuilder($, strategyLegs, summary, handleRemoveLeg, chainSkeleton, () => {
-        strategy.resetRange(sim.S, strategyLegs);
-        updateStrategyBuilder();
-        dirty = true;
-    }, currentStrategyHash, isBuiltinLoaded);
 }
 
 // ---------------------------------------------------------------------------

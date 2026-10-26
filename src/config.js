@@ -95,11 +95,6 @@ export const CHART_BODY_RATIO = 0.6;       // fraction of slot that is candle bo
 export const CHART_LEFT_MARGIN = 80;       // left margin for camera positioning (CSS px)
 export const CHART_RIGHT_MARGIN = 120;    // fixed right margin for autoscroll (CSS px)
 
-// -- Strategy rendering --
-export const STRATEGY_SAMPLES = 128;       // sample points across X range
-export const STRATEGY_Y_PAD = 0.15;        // 15% vertical padding
-export const STRATEGY_MARGIN = { top: 24, right: 16, bottom: 48, left: 68 };
-
 // -- Presets --
 const _CALM_BULL = { name: 'Calm bull', mu: 0.48, theta: 0.06, kappa: 2.5, xi: 0.4, rho: -0.6, lambda: 0.6, muJ: -0.02, sigmaJ: 0.04, a: 0.5, b: 0.04, sigmaR: 0.005, borrowSpread: 0.5, q: 0.005 };
 

@@ -401,7 +401,7 @@ export function coherenceStats() {
 export function beliefEta() { return _day().eta; }
 
 /**
- * Display only (the sandbox, 02a): `B` re-evaluated on copies of the record and
+ * Display only (the ticket's scenarios, 02a): `B` re-evaluated on copies of the record and
  * the rule as they would stand on day `day` (> today). With `rung`, a frontier
  * certification of that rung lands on that day -- claimed then if it was not, by
  * the lab with the highest claimed rung -- folded into the rule copy by the
@@ -840,7 +840,7 @@ function _lnSurvival(m, w, q, x) {
 }
 
 /** Survival-conditioned P(t0 < T <= t1 | T > t0) under {m, w, q}, as
- *  1 - S(t1)/S(t0) in log space. Pure; the Markets panel draws the draft with it. */
+ *  1 - S(t1)/S(t0) in log space. Pure; the Race page and the Markets panel draw the draft with it. */
 export function crossingProb(m, w, q, t0, t1) {
     if (t1 <= t0) return 0;
     return -Math.expm1(_lnSurvival(m, w, q, t1) - _lnSurvival(m, w, q, t0));

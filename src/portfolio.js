@@ -1366,13 +1366,15 @@ export function liquidateAll(sim, currentPrice, currentVol, currentRate, current
  * - Long positions contribute positively.
  * - Short positions have their delta, gamma, vega, and rho negated
  *   (theta is also negated for short options).
+ * `positions` defaults to the book; the ticket passes its legs as
+ * `{ type, qty, strike, expiryDay }` to read a trade's Greeks before it fills.
  *
  * @returns {{ delta: number, gamma: number, theta: number, vega: number, rho: number }}
  */
-export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDay, q) {
+export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDay, q, positions = portfolio.positions) {
     let delta = 0, gamma = 0, theta = 0, vega = 0, rho = 0;
 
-    for (const pos of portfolio.positions) {
+    for (const pos of positions) {
         // qty is already signed: positive = long, negative = short
         const w = pos.qty;
 

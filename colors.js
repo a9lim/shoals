@@ -2,8 +2,8 @@
    colors.js -- Shoals' data hues on the shared inks.
    Red is the accent, spent on losses and down moves;
    gains take viridian. Each instrument has its ink
-   (the tape's entry marks, the strategy diagram), and
-   the Greeks match the strategy diagram's overlays.
+   (the tape's entry marks and held strikes), and each
+   Greek its own (the book's and the ticket's Greeks).
    Inks are theme-paired, so canvas code reads these
    through _themePalette() on every draw.
    =================================================== */

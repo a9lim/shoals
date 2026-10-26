@@ -23,6 +23,17 @@ export function fmtSigned(v, dp = 1) {
     return (r < 0 ? '−' : '+') + Math.abs(r).toFixed(dp);
 }
 
+/**
+ * CSS class for a settled Consensus outcome: viridian for yes, the accent for no,
+ * and '' for a fallback settlement or anything pending (callers never pass ''
+ * to classList.add, which throws).
+ */
+export function consensusOutcomeClass(outcome) {
+    if (outcome === 'YES') return 'pnl-up';
+    if (outcome === 'NO') return 'pnl-down';
+    return '';
+}
+
 export function pnlClass(v) {
     if (v > 0) return 'pnl-up';
     if (v < 0) return 'pnl-down';
@@ -54,6 +65,34 @@ export function fmtRelDay(day, origin) {
         dy = (pos % 21) + 1;
     }
     return `Y${yr} M${mo} D${dy}`;
+}
+
+/** A span of trading days in words: "12 days", "3 months", "1.5 years". */
+export function fmtSpan(d) {
+    if (d >= TRADING_DAYS_PER_YEAR) return (d / TRADING_DAYS_PER_YEAR).toFixed(1).replace(/\.0$/, '') + ' years';
+    if (d >= 42) return Math.round(d / 21) + ' months';
+    if (d >= 21) return '1 month';
+    return Math.max(0, Math.round(d)) + (Math.round(d) === 1 ? ' day' : ' days');
+}
+
+/**
+ * One contract's name as the Brief sets it, shared by the ticket, the markets
+ * tables and the book: "HCN 125 call, 3 months", "Bond, 1 year", "R3 certified
+ * by day 504". `day` is the sim day; compute futures and binaries carry race-day
+ * keys, so they name their day rather than a span.
+ */
+export function contractName(type, strike, expiryDay, day, R) {
+    const span = expiryDay != null ? fmtSpan(expiryDay - day) : '';
+    switch (type) {
+        case 'stock': return 'HCN shares';
+        case 'bond': return 'Bond, ' + span;
+        case 'vxhcnfuture': return 'VXHCN future, ' + span;
+        case 'call': case 'put': return `HCN ${strike} ${type}, ${span}`;
+        case 'computefuture': return 'Cambria compute, day ' + strike;
+        case 'binary': return R ? `R${R} ${R === 5 ? 'reached' : 'certified'} by day ${expiryDay}` : 'Consensus, day ' + expiryDay;
+        case 'privatestake': return 'Polaris, private';
+        default: return type;
+    }
 }
 
 export function posTypeLabel(type, sideOrQty) {
