@@ -29,18 +29,20 @@ the projects live from the working tree.
 
 ```bash
 for f in main.js colors.js src/*.js src/events/*.js src/race/*.js tools/*.mjs; do node --check "$f"; done
-node tools/race-mc.mjs        # [N] [--seed S], N=1000: race calibration vs 02a targets (~1 s)
-node tools/plumbing-test.mjs  # [N], N=2000: content plumbing, evidence, Act III, standing orders, room/intel, capex/concealment (~11 s)
-node tools/belief-test.mjs    # [N] [--seed S], N=300: belief B, quoters, credibility, impulse decay (~1 s)
-node tools/compute-test.mjs   # [N] [--seed S], N=300: compute-futures lifecycle, conservation, integrity (~1 s)
-node tools/consensus-test.mjs # [N] [--seed S], N=500: binary settlement, regime split, accounting (~1 s)
-node tools/endings-test.mjs   # [N] [--seed S], N=2000: family distribution, player channels, closeout, terminal path (~8 s)
-node tools/forecast-test.mjs  # [N] [--seed S], N=500: the posterior: properness, the copier, K_CRED calibration, gate reachability (~1 s)
-node tools/valuation-test.mjs # [N] [--seed S], N=300: valuation layer: corruption invariance, no silent drift, reconciliation (~2 s)
-node tools/rounds-test.mjs    # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~16 s)
+node tools/race-mc.mjs         # [N] [--seed S], N=1000: race calibration vs 02a targets (~1 s)
+node tools/plumbing-test.mjs   # [N], N=2000: content plumbing, evidence, Act III, standing orders, room/intel, capex/concealment (~13 s)
+node tools/belief-test.mjs     # [N] [--seed S], N=300: the rule of thumb's ledger and frozen hash, B's pool, quoters, the posterior's arithmetic, impulse decay (~9 s)
+node tools/compute-test.mjs    # [N] [--seed S], N=300: compute-futures lifecycle, conservation, integrity (~2 s)
+node tools/consensus-test.mjs  # [N] [--seed S], N=500: binary settlement, regime split, accounting, listing base rates (~2 s)
+node tools/endings-test.mjs    # [N] [--seed S], N=2000: family distribution, player channels, closeout, terminal path, the reader's ceilings (~18 s)
+node tools/forecast-test.mjs   # [N] [--seed S] [--calibrate], N=500/scenario: properness, the copier, K_CRED vs the reader-copier, static presets (~22 s)
+node tools/valuation-test.mjs  # [N] [--seed S] [--validation], N=1000/scenario: V's corruption invariance, calibration, fairness, reconciliation (~54 s)
+node tools/rounds-test.mjs     # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~28 s)
+node tools/reader-test.mjs     # [N] [--seed S] [--sections A-G], N=2000/scenario: the reader's gates, B's edge and its close (~2 min)
+node tools/reader-fit.mjs      # the reader's offline fit; needs NumPy/SciPy (shared venv). Run only under 02a's refit rule
 ```
 
-The nine harnesses import `src/` directly and exit 1 on any failure. They are the
+The ten harnesses import `src/` directly and exit 1 on any failure. They are the
 regression gate for anything that touches the Dynamic-mode systems. Run them at the
 default N, because their calibration bands are sized for it and small-N runs miss
 them legitimately. Each harness header lists its sections. The parent build doesn't
@@ -72,10 +74,12 @@ src/events/            authored event pools by domain + param-ranges.js; index.j
 src/events/race-bridge.js, race-events.js  race ledger → narrative shells
 src/world-state.js, faction-standing.js, traits.js, regulations.js, lobbying.js  narrative state
 src/endings.js         ending triggers, family/overlay selection, slot-based 5-page epilogue
-src/race/              hidden race model and its markets (DOM-free; see below)
+src/race/              hidden race model and its markets (DOM-free; see below), the public
+                       record and the reader (reader-constants.js is generated; never edit it)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
 src/audio.js           all music and SFX, synthesized
-tools/*.mjs            the nine headless harnesses
+tools/*.mjs            the ten headless harnesses, the reader's fit tool and its data/metrics
+                       modules; tools/reader-optimizer.py (the fit's optimizer)
 docs/design/, docs/lore.md, docs/ROADMAP.md
 ```
 
@@ -135,10 +139,11 @@ at the post-gap price and queues the round offers; `marketsDayClose` snapshots a
   `getBondImpact(sigmaR)`, `getVxhcnImpact(xi)` and `getOptionImpact(…)`. Layer 3
   shifts selected process params temporarily when gross exposure is large.
 - The valuation layer (`race/valuation.js`, 02a): in Dynamic, HCN's level carries
-  V = Π·[Λ·m_W + (1−Λ)·m_C] + (1−Π)·m_F from public state only (B's unconditional
-  R5 CDF at day 1000, the public claim lead), applied as a clamped gap at each day's
-  close. Survival-conditioned by construction: misalignment gets no weight. The
-  closeout marks HCN at spot·m_f/V_T. Known bias and its successor are in 02a.
+  V = (1−η)·V_legible + η·V_full, each reader's survival-conditioned expectation of
+  the closeout's family marks under its per-act family head, applied as a clamped gap
+  at each day's close. Misalignment gets no weight. The closeout marks HCN at
+  spot·m_f/V_T. V's known limit (it drifts predictably at about 0.027 a quarter) is in
+  02a.
 - The primary market (`race/rounds.js`, `src/events/rounds.js`): Polaris private
   rounds (`privatestake`: cash-funded, marked at the last round, zero collateral value,
   illiquid, capped at cash and collateral headroom, settled by closeout cell 10) and a
@@ -215,11 +220,24 @@ them headless.
   and `ledger.js` (the append-only complicity ledger, with `raceChannelsLive()` as the
   shared gate) carry the player's influence, and `closeout.js` values the book at the
   terminal.
-- `belief.js` holds market belief B: per-rung hazards and survival-conditioned quotes;
-  the player's posterior (a drawn draft of per-rung `{m, w}` curves, quarterly locks
-  that snapshot B, `scoreQuarter`'s log-likelihood ratio against that snapshot, and
-  credibility = tanh(S_P/K_CRED)); and firm belief F with scrutiny, where
-  `playerPilled` mirrors `marketPilled`'s 252-day horizon. It feeds the
+- The reader (`public-record.js`, `reader.js`, generated `reader-constants.js`; 02a
+  "The reader"): the public record is the data contract, built from the ledger's
+  public rows, public snapshots and the orchestrator's public world inputs. The reader
+  is fit offline by `tools/reader-fit.mjs` (through `tools/reader-optimizer.py`;
+  NumPy/SciPy from the shared venv's `data` column, needed only to refit) on headless
+  worlds whose seeds are split train/validation/test, and only evaluated in play. Its
+  legible rung heads are the rule of thumb through the calibration stage (each horizon
+  segment rescaled per 21-day knot and claim state, moment-matched), its full heads
+  read the whole record through the same stage, and its family heads are per act. Refit when the
+  distribution of runs or the record changes (02a "Refit rule").
+- `belief.js` holds market belief B: the rule of thumb (the old heuristic updater,
+  ledgered, kept bit-identical; the reader was fit on it) and the pool
+  (1−η)·legible + η·full over the reader's laws, made coherent up the ladder; the
+  player's posterior (a drawn draft of per-rung `{m, w, q}` curves, quarterly locks
+  that store the clamped probability pairs, `scoreQuarter`'s log-likelihood ratio,
+  the outstanding quarter scored at the terminal, credibility = tanh(S_P/K_CRED), and
+  σ₀ reported); and firm belief F with scrutiny, where `playerPilled` mirrors
+  `marketPilled`'s 252-day horizon. It feeds the
   real quoters into `consensus.js` (milestone binaries settled off certifications,
   disputes, R5 settled only at terminal closeout) and `compute-market.js` (the Cambria
   quarterly futures ladder, settled on race-day maturities through
@@ -261,16 +279,18 @@ key is `shoals-theme`.
   and the curves ease from it. Consensus curves come from `binaryProb` (belief B) and
   the compute curve from `computeCurveFromBelief` on the public view: public state
   only, the quoters' own inputs. The Consensus panel is also the posterior's editor
-  ("Your curves"): the draft draws over B, median handles drag or take arrows, and
-  edit mode suspends sandbox picks. The lock dispatch's "Adjust first" holds the
+  ("Your curves"): the draft draws over B, median handles drag or take arrows, the
+  plateau square at the term's end sets the chance it lands this term (Page Up/Down),
+  and edit mode suspends sandbox picks. The lock dispatch's "Adjust first" holds the
   quarter (`_lockPending`): play and step refuse until the panel's Lock is pressed.
 - **Sandbox.** Legs are curve points (a click or Enter cycles long, short, removed).
   `renderSandbox` revalues every leg 63 trading days out across HCN moves and, in
   Dynamic, how far the race gets (in Classic, volatility). The scenario model is the
   display's, not the engine's, and unratified: Heston mean reversion with a leverage
-  shock on variance, the capex channel's +0.005 on `b` per newly certified rung, the
-  next rung's median pulled forward by `RUNG_SPACING` as belief does, and compute
-  repriced by `placeholderCurve` at the new certified rung. "Trade these legs" sends
+  shock on variance, the capex channel's +0.005 on `b` per newly certified rung, B
+  re-evaluated on a copy of the record and the rule with the scenario's certification
+  added (the quiet row carries routine releases forward at each lab's cadence), and
+  compute repriced by `placeholderCurve` at the new certified rung. "Trade these legs" sends
   each leg through the manual paths (`_deferManual`, `executeMarketOrder`,
   `executeBinaryTrade`), so the latency ladder and spreads apply.
 - **Race page.** `recordRaceDay` (after the day's events) appends public records to
@@ -358,9 +378,12 @@ key is `shoals-theme`.
   Binary trades go through `executeBinaryTrade`, never `_fillPrice`. Equity decisions
   use `_portfolioEquity`/`portfolioValue`, which include reserved margin. A frozen leg
   restricts the book (`portfolio.restricted`) rather than force-filling it.
-- **Two homes, one number.** The Consensus listing base rates in `consensus.js` and
-  `RUNG_BASE` in `belief.js` must match so that day-0 quotes equal the listing
-  priors. Edit them together.
+- **Listing base rates.** The Consensus listing base rates live only in
+  `consensus.js` and equal B's day-0 quote, which is the same in every world. Re-derive
+  them on validation seeds whenever the reader is refit.
+- **The rule of thumb is frozen.** The reader's legible heads were fit on the
+  heuristic updater's exact trajectory. belief-test hashes it against commit 1343924;
+  changing the rule means refitting the reader.
 - **Reset paths.** `_resetCore` resets every module singleton. `resetRaceBridge()`
   runs unconditionally, because `loadPreset` creates the race after `_resetCore` and
   stale latches would throttle a fresh run. The epilogue Restart goes through
@@ -394,9 +417,9 @@ key is `shoals-theme`.
 
 `docs/ROADMAP.md` is the queue, in order, and opens with the direction set on
 2026-10-25: know, commit, lose your grip, and an honest accounting, read through
-embedded agency. Next is the reader (a forecaster of the race fit on the simulator,
-public state only), with domains and `B` rebuilt as a designed inefficiency on top of
-it. Then come the decision chain (editions as evidence, dissemination, mandates,
+embedded agency. The reader and `B` as a designed inefficiency landed in that round;
+next is the forecast as a standing policy, then domains and the demonstration channel,
+with a refit. Then come the decision chain (editions as evidence, dissemination, mandates,
 Meridian), influence bounded at the intervention with a replayable accounting, Act III
 taking the player's judgment, a price for alignment, and the run as an object. The
 event-illustration pilot is its own session, briefed there. a9's play-test covers the

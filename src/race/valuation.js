@@ -1,58 +1,61 @@
 /* ===================================================
    src/race/valuation.js -- HCN's race-implied level
-   (02a "The valuation layer", ratified 2026-10-24).
+   (02a "The valuation layer").
 
-   A survival-conditioned expected terminal multiple:
-   public claimed rungs set the Western lead, and B's
-   unconditional R5 CDF sets the chance of finishing this
-   term. The clock changes it only at the deadline, never
-   by silently conditioning away elapsed time.
-   No continuous capability, latent truth or sim
-   state enters this surface. The orchestrator applies
-   the returned ratio to the authoritative process price.
+   A survival-conditioned expected terminal multiple,
+   pooled the way `B` is from the two readers' family
+   heads:
+
+     V   = (1 - eta)*V_legible + eta*V_full
+     V_x = sum_{k != 3} p_{x,k}*m_k / (1 - p_{x,3})
+
+   Misalignment (family 3) gets no weight: the market
+   prices the worlds in which its claims can be paid.
+   The marks are the closeout's family marks, read from
+   CLOSEOUT_TUNING so they live in one place. The clock
+   enters only through the readers. No continuous
+   capability, latent truth or sim state enters this
+   surface. The orchestrator applies the returned ratio
+   to the authoritative process price.
 
    Pure / DOM-free valuation plus one live-run singleton.
    =================================================== */
 
-import { buildPublicView } from './consensus.js';
-import { belief } from './belief.js';
+import { familyHeads } from './belief.js';
+import { CLOSEOUT_TUNING } from './closeout.js';
 
-// 02a "The valuation layer". Mutable for headless calibration sweeps.
+// 02a "The valuation layer": only the gap clamp. Mutable for headless sweeps.
 export const VALUATION_TUNING = {
-    mW: 1.40,
-    mC: 0.35,
-    mF: 0.55,
-    lambda0: 1.0,
-    leadScale: 0.75,
-    deadline: 1000,
     ratioMin: 0.75,
     ratioMax: 1.30,
 };
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 
-/** Unconditional B probability of R5 by the term deadline. Pure: accepts the
- *  public belief law, not the race or a terminal-truth crossing record. */
-export function r5ProbabilityFromBelief(rung, day, deadline = VALUATION_TUNING.deadline) {
-    if (rung.crossed) return rung.certDay <= deadline ? 1 : 0;
-    if (day >= deadline) return 0;
-    return sigmoid((deadline - rung.m) / rung.w);
+/** The family marks m_k (families 1..6; family 3 carries no weight). */
+export function familyMarks() {
+    const T = CLOSEOUT_TUNING;
+    return { 1: T.meltUpWon, 2: T.meltUpDawn, 3: 0, 4: T.doomRecovery, 5: T.boring, 6: T.fizzleFloor };
 }
 
-/** Expected terminal multiple from the public projection and unconditional Pi. */
-export function valuationFromPublic(view, pi) {
-    const T = VALUATION_TUNING;
-    const r = view.claimedRung;
-    const westernRung = Math.max(r.halcyon, r.polaris);
-    const lead = sigmoid(T.lambda0 + (westernRung - r.tianxia) / T.leadScale);
-    return pi * (lead * T.mW + (1 - lead) * T.mC) + (1 - pi) * T.mF;
+/** One reader's survival-conditioned expected multiple from its family
+ *  distribution `p` (index k - 1 is family k). */
+export function valuationFromFamily(p) {
+    const m = familyMarks();
+    let num = 0;
+    for (const k of [1, 2, 4, 5, 6]) num += p[k - 1] * m[k];
+    return num / (1 - p[2]);
 }
 
-/** Read only the public projection and B; no survival-conditioned quote decay. */
+/** The pooled V from the two heads and eta (02a: a pool of the readers'
+ *  survival-conditioned expectations, not of their family probabilities). */
+export function pooledValuation(heads) {
+    return (1 - heads.eta) * valuationFromFamily(heads.legible) + heads.eta * valuationFromFamily(heads.full);
+}
+
+/** V today, from `B`'s cached family heads (public record, rule, day). */
 export function computeValuation(race) {
-    const pi = r5ProbabilityFromBelief(belief.rungs[5], belief.day);
-    return valuationFromPublic(buildPublicView(race), pi);
+    return race ? pooledValuation(familyHeads()) : 1;
 }
 
 // Applied level, rather than yesterday's raw target: any clamped remainder

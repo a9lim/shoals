@@ -59,7 +59,8 @@
            N defaults to 300; base seed defaults to 1.
    =================================================== */
 
-import { createRaceState, advanceRace, setControlRegime } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, setControlRegime, stepControlRegime } from '../src/race/race-state.js';
+import { stepTreaty } from '../src/race/treaty-track.js';
 import {
     computeMarket, initComputeMarket, refreshComputeQuotes, computeFutureSettlements,
     buildComputePublicView, getComputeMark, getComputeQuote, computeContractByKey,
@@ -732,7 +733,7 @@ function primeBelief(seed, days, geo) {
     initComputeMarket(race, geo); initBelief(race); setComputePriceSource(computeCurveFromBelief);
     syncFixed(race.day);
     for (let d = 0; d < days; d++) {
-        advanceRace(race); stepBelief(race);
+        advanceRace(race); stepControlRegime(race); stepTreaty(race, {}); stepBelief(race);
         stepNationalizationRef(race, 100 + race.day * 0.05);
         settleComputeFutures(computeFutureSettlements(race, geo), race);
         refreshComputeQuotes(race, geo);
@@ -792,12 +793,12 @@ let zStructureOK = false, zLiftOK = false, zInvarianceOK = true;
         for (const D of DAYS) {
             const seed = (BASE_SEED + 92200 + s) >>> 0;
             const raceA = createRaceState(seed); installBelief(raceA);
-            for (let d = 0; d < D; d++) { advanceRace(raceA); stepBelief(raceA); computeFutureSettlements(raceA, calmGeo); refreshComputeQuotes(raceA, calmGeo); }
+            for (let d = 0; d < D; d++) { advanceRace(raceA); stepControlRegime(raceA); stepTreaty(raceA, {}); stepBelief(raceA); computeFutureSettlements(raceA, calmGeo); refreshComputeQuotes(raceA, calmGeo); }
             const qA = JSON.stringify(computeMarket.quotes), sA = JSON.stringify(computeMarket.settled);
 
             const raceB = createRaceState(seed); installBelief(raceB);
-            for (let d = 0; d < D - 1; d++) { advanceRace(raceB); stepBelief(raceB); computeFutureSettlements(raceB, calmGeo); refreshComputeQuotes(raceB, calmGeo); }
-            advanceRace(raceB); stepBelief(raceB);   // clean belief step off the day-D ledger
+            for (let d = 0; d < D - 1; d++) { advanceRace(raceB); stepControlRegime(raceB); stepTreaty(raceB, {}); stepBelief(raceB); computeFutureSettlements(raceB, calmGeo); refreshComputeQuotes(raceB, calmGeo); }
+            advanceRace(raceB); stepControlRegime(raceB); stepTreaty(raceB, {}); stepBelief(raceB);   // clean belief step off the day-D ledger
             corruptContinuous(raceB);                 // corrupt AFTER B folded the clean ledger
             computeFutureSettlements(raceB, calmGeo);
             refreshComputeQuotes(raceB, calmGeo);

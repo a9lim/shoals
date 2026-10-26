@@ -1,82 +1,52 @@
 /* ===================================================
-   src/race/belief.js -- Market belief `B`, the implied
-   timeline, the belief-backed Consensus + compute quoters,
-   market efficiency `eta`, the player's posterior +
-   credibility, and firm belief `F` (overhaul phase 4).
+   src/race/belief.js -- Market belief `B`, the rule of
+   thumb inside it, the belief-backed Consensus and compute
+   quoters, market efficiency `eta`, the player's posterior
+   and credibility, and firm belief `F`.
 
-   This module owns `B`, the implied timeline, the player's
-   posterior (draft, locks, scoring) and credibility. Firm
-   belief `F` is STORED on `race.F` (race-state.js owns the
-   reset), and its update logic lives here beside
-   `B` -- UNRATIFIED seam choice (the alternative is
-   faction-standing.js; F is belief-shaped, so it sits with
-   B).
+   ======================= B (02a) =======================
+   `B` is a designed inefficiency (02a "Belief, η, and the
+   firm"). It pools two fitted readers of the public record
+   (src/race/reader.js): the LEGIBLE reader, which reads the
+   market's rule of thumb as it reads the headlines, and the
+   FULL reader, which reads the whole record:
 
-   ========================= B ==========================
-   `B` is the market's posterior over the TIMELINE, held as
-   a hazard curve over rung-crossing dates (02-race-model),
-   NOT a scalar. Per rung R in {2,3,4,5} it carries a
-   logistic crossing-time law F_R(t) = sigmoid((t - m_R)/w_R)
-   -- median believed (certified) crossing day m_R (the
-   "implied timeline" the dashboard shows) and a width w_R.
-   Higher rungs also carry an `alignment` sentiment scalar
-   (public/leaked evidence log-odds) -- the alignment-side of
-   the posterior, present for later phases, display-only in P4.
+     P_B(T <= D | record_t) = (1 - eta)*P_legible + eta*P_full
 
-   THE INTEGRITY RULE (09 "Information hygiene"): `B` updates
-   ONLY on LEGIBLE events -- releases, certifications,
-   DETECTED incidents, PUBLISHED evidence, DISCLOSED thefts,
-   and LEAKS (insider tips / leaked beats / the player's own
-   leak verb) -- never on latent truth (C_internal,
-   C_released, tau, S, heat). `stepBelief` consumes ONLY
-   `race.lastTransitions` (the per-tick ledger), never the
-   latent queues and never a state-diff. Every non-random `B`
-   move records a causal evidence ID (09). Leaks update by the
-   ratified blend `B_new = 0.7*B + 0.3*L(leakedSignal)`, EXACTLY
-   once per evidence ID (02a) -- the `processed` set enforces
-   both no-re-leak and idempotency. If `B` ever needs noise it
-   draws from a NEW named substream deriveSeed(seed,'belief')
-   (seed-stability convention) -- OFF by default so every
-   tested `B` move is causal.
+   with eta the released-frontier dial, then made coherent up
+   the certification ladder (P_B(R4) <= P_B(R3) <= P_B(R2)
+   pointwise, running minima). Every quote, snapshot and
+   display reads the projected pool. `belief.record` is the
+   public record (src/race/public-record.js), created at
+   initBelief and stepped inside stepBelief; the day's laws
+   and family heads are evaluated lazily and cached per day.
 
-   ===================== The quoters =====================
-   `binaryQuoteFromBelief(view, contract)` and
-   `computeCurveFromBelief(view, dte)` are the real P4 quote
-   sources swapped into consensus.js / compute-market.js via
-   setBinaryQuoteSource / setComputePriceSource. They read the
-   `belief` singleton (built from public events) plus the
-   PUBLIC view (buildPublicView / buildComputePublicView) --
-   never `race`. So the corruption-invariance harness holds by
-   construction: corrupting every latent field leaves the
-   ledger (hence `B`), the public view, and the quotes bit-
-   identical.
+   =================== The rule of thumb ==================
+   The heuristic updater that was all of `B` before the
+   reader: per rung R2-R5 a logistic {m, w} over crossing
+   dates, seeded on RUNG_SEED, moved only by releases and
+   certifications, every mutation ledgered under its event
+   ID. Its raw probabilities reach nothing priced; they enter
+   only as the legible reader's features (ruleSummary).
+
+   THE INTEGRITY RULE (09 "Information hygiene"): the rule and
+   the record update ONLY on legible events, never on latent
+   truth. stepBelief consumes `race.lastTransitions` and the
+   public projection only. The alignment sentiment (detected
+   incidents, published evidence, leaks, theft disclosures) is
+   unpriced. If `B` ever needs noise it draws from the reserved
+   deriveSeed(seed,'belief') substream (off).
 
    ================= Player posterior / F ================
-   The player's timeline is held in B's own form (02a, the
-   posterior, ratified 2026-10-24): per rung R2-R5 a logistic
-   {m, w} over the certified crossing day, bounded, monotone,
-   certified rungs frozen. A standing DRAFT (day 0: a copy of
-   B) is edited on the Markets page; LOCKS at the fixed
-   quarterly days 0, 63, 126, ... (LOCK_INTERVAL) freeze it
-   beside a snapshot of B. On each lock day the quarter that
-   just ended is scored for R2-R4 by log-likelihood ratio
-   against that snapshot (scoreQuarter): S_P accumulates in
-   nats, credibility = tanh(S_P / K_CRED). A market copier
-   scores exactly 0. Consensus settlement does not touch
-   credibility. Gates (02a): memos > 0.55; fund-as-actor >
-   0.65 AND F > 60 -- exported predicates. `F` in [0,100]
-   starts 15 (race-state.js), drifts toward the market-
-   implied pilledness derived from `B`, and converts toward
-   the player when they are RIGHT EARLY (credibility-weighted).
-
-   UNRATIFIED magnitudes (02a records these "as rev 1" but
-   does not transcribe rev 1's numbers): the belief widths,
-   the per-event update strengths, the compute belief-demand
-   coefficient, eta's shape, and the F drift/convert rates.
-   The RATIFIED anchors are the leak blend (0.7/0.3), the
-   lock schedule, the posterior's bounds and scoring, the
-   gate thresholds, and eta reading the RELEASED frontier
-   only. K_CRED is set by calibration (forecast-test).
+   The player holds per rung R2-R5 a logistic law with a
+   plateau, F(x) = (1 - q)*sigma((x - m)/w), over the certified
+   crossing day (R5: the terminal crossing). A standing DRAFT
+   (day 0: `B`'s projection onto that family) is edited on the
+   Markets page; LOCKS at days 0, 63, 126, ... store, per rung
+   they will score, the quarter's probability from each side
+   ({pP, pM}); scoreQuarter reads the stored pairs. A
+   market-policy lock has pP === pM and scores exactly 0.
+   credibility = tanh(S_P / K_CRED). `F` lives on race.F.
 
    Pure of DOM. `belief` is a module-level singleton mirroring
    market.js / consensus.js / compute-market.js.
@@ -84,28 +54,31 @@
 
 import { createRng, deriveSeed } from './rng.js';
 import { placeholderCurve } from './compute-market.js';
+import { createPublicRecord, stepPublicRecord, ruleSummary } from './public-record.js';
+import { readerLaw, readerFamily, lawCDF } from './reader.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const sigmoid = (x) => 1 / (1 + Math.exp(-x));
 
-// ---- Contract-space listing priors (PUBLIC; mirror consensus.js) ----------
-// The tracked rungs and their public listing info: deadlines and base rates are
-// legitimately-public market-consistent priors (02a "Consensus binaries"). Kept
-// here so belief seeding does not depend on consensus init ORDER; they must stay
-// in lockstep with consensus.js contractDefs (a divergence would desync the
-// day-0 belief quote from the listed base rate).
+// ---- The rule of thumb's seed (02a "Belief, η, and the firm") --------------
+// Contract deadlines are public listing data (mirrors consensus.js). RUNG_SEED is
+// the rule's seed priors, the old listing base rates: medians are seeded so the
+// day-0 survival-conditioned F_R(deadline) equals them. The listing base rates
+// themselves now live only in consensus.js (02a "Consensus binaries").
 const RUNG_LIST = [2, 3, 4, 5];
+const LADDER = [2, 3, 4];                                     // the certification ladder
 const RUNG_DEADLINE = { 2: 420, 3: 756, 4: 880, 5: 1000 };   // consensus deadlines
-const RUNG_BASE = { 2: 0.70, 3: 0.62, 4: 0.60, 5: 0.70 };    // listing base rates (P6-1b recalibration; in lockstep with consensus.js)
+const RUNG_SEED = { 2: 0.70, 3: 0.62, 4: 0.60, 5: 0.70 };    // the rule's seed priors
+// The readers' supports (02a "The reader"): R2-R4 certify through day 1008; the
+// R5 crossing law runs through day 1260 so the compute horizon is covered.
+const TERM_END = 1008;
+const SUPPORT = { 2: TERM_END, 3: TERM_END, 4: TERM_END, 5: 1260 };
 // Expected certification lag (public knowledge, 02a): a released-rung CLAIM
 // implies certification ~this many days out. R5 has no certification (terminal);
 // its "lead" is a placeholder used only for the crossing-belief target.
 const CERT_LEAD = { 2: 25, 3: 60, 4: 20, 5: 40 };
 
-// UNRATIFIED belief widths (days). Chosen so day-0 implied medians land near the
-// measured certified KM medians (R2~405, R3~736, R4~860) while F_R(deadline)
-// equals the listing base rate exactly (so the belief listing quote == base
-// rate, keeping consensus-test calibration two-sided within +-8pp).
+// The rule's listing widths (days), 02a.
 const RUNG_WIDTH = { 2: 90, 3: 140, 4: 120, 5: 160 };
 const WIDTH_FLOOR = 25;      // widths tighten toward this as certainty grows
 
@@ -144,16 +117,20 @@ const K_BELIEF_DEMAND = 0.15;         // max belief-demand lift on the compute c
 
 // The player's posterior, its scoring, credibility, F (02a "Belief, η, and the firm").
 export const LOCK_INTERVAL = 63;      // RATIFIED lock schedule: days 0, 63, 126, ...
-// RATIFIED posterior bounds (02a): medians in [0, 2016], widths in [25, 400].
-export const POSTERIOR = Object.freeze({ M_MIN: 0, M_MAX: 2016, W_MIN: 25, W_MAX: 400 });
+// RATIFIED posterior bounds (02a): medians in [0, 2016], widths in [25, 400],
+// plateaus (the mass on never) in [0, 0.95].
+export const POSTERIOR = Object.freeze({ M_MIN: 0, M_MAX: 2016, W_MIN: 25, W_MAX: 400, Q_MIN: 0, Q_MAX: 0.95 });
+// The projection's sample spacing (02a "Displays"): days t + 21k within the support.
+const PROJECTION_STEP = 21;
 const SCORED_RUNGS = [2, 3, 4];       // RATIFIED: R5 is never scored -- nothing certifies it
 const SCORE_P_MIN = 0.02, SCORE_P_MAX = 0.98;   // RATIFIED clamp on each quarter's crossing probability
-// credibility = tanh(S_P / K_CRED). K_CRED is set in calibration (02a started it at
-// 2.5): at 1.8 the oracle clears the fund gate by day 756 in every qualifying world
-// and the informed player clears the memo gate by day 882 in ~52% of worlds
-// (tools/forecast-test.mjs; at 2.5 the informed player managed ~16%). Mutable so
-// the harness can sweep it.
-export const forecastTuning = { K_CRED: 1.8 };
+// credibility = tanh(S_P / K_CRED). K_CRED = 1.35 (02a), set by
+// `node tools/forecast-test.mjs 2000 --calibrate` on the validation seeds
+// 2,000,001+ under reader schema 11: the largest K at which the reader-copier
+// clears the memo gate by day 882 in half of worlds with two standard errors to
+// spare (53.1%; the "earlier" preset 5.6%). It was 1.8 against the heuristic `B`.
+// Mutable so the harness can sweep it.
+export const forecastTuning = { K_CRED: 1.35 };
 const MEMO_GATE = 0.55;               // RATIFIED memo gate
 const FUND_CRED_GATE = 0.65;          // RATIFIED fund-as-actor credibility gate
 const FUND_F_GATE = 60;               // RATIFIED fund-as-actor F gate
@@ -178,14 +155,22 @@ export const belief = {
     causes: [],              // audit: every non-random B move { day, id, cause, rung, from, to, alpha }
     rng: null,               // deriveSeed(seed,'belief') substream (noise; OFF by default)
     noise: false,
-    player: null,            // { draft:{R:{m,w}}, locks:[{day,curves,market}], scores:[], S, credibility, lastLockDay }
+    player: null,            // { draft:{R:{m,w,q}}, locks:[{day,policy,curves,market,pairs,claims}], scores:[], S, var0, credibility, lastLockDay }
+    record: null,            // the public record (public-record.js), stepped by stepBelief
 };
+
+// The day's pooled `B`, evaluated lazily from the record, the rule and the day,
+// and dropped whenever stepBelief or initBelief moves any of them.
+let _version = 0, _cache = null;
+// How often the coherence projection binds (02a "What the pool guarantees"),
+// measured once per day at the quarter, the contract deadline and the term's end.
+const _coherence = { days: 0, checks: 0, binds: 0, maxGap: 0, sumGap: 0 };
 
 const _CAUSE_KEEP = 4000;    // cap the audit trail (bounded; ~hundreds of ledgered mutations/run)
 
-/** A fresh player: day 0's draft is a copy of `B` (02a); no lock, no record. */
+/** A fresh player: day 0's draft is `B`'s projection (02a); no lock, no record. */
 function _freshPlayer() {
-    return { draft: marketCurves(), locks: [], scores: [], S: 0, credibility: 0, lastLockDay: null };
+    return { draft: marketCurves(), locks: [], scores: [], S: 0, var0: 0, credibility: 0, lastLockDay: null };
 }
 
 /** Survival-conditioned crossing probability P(T <= D | T > t) under a logistic
@@ -218,7 +203,7 @@ function _seedRungs() {
     // device only -- 02a "Belief, η, and the firm").
     const rungs = {};
     for (const R of RUNG_LIST) {
-        const D = RUNG_DEADLINE[R], b = RUNG_BASE[R], w = RUNG_WIDTH[R];
+        const D = RUNG_DEADLINE[R], b = RUNG_SEED[R], w = RUNG_WIDTH[R];
         rungs[R] = { m: _solveMedian(w, D, b), w, crossed: false, certDay: null };
     }
     return rungs;
@@ -228,7 +213,9 @@ function _seedRungs() {
 
 /** Build a fresh belief store for a race. Dynamic-mode init/reset. Draws the
  *  belief noise substream from the run seed (NEW named stream -- never an
- *  existing one, per the seed-stability convention). */
+ *  existing one, per the seed-stability convention). A race without a
+ *  capability block (the alignment probes' synthetic ledgers) gets the rule and
+ *  the sentiment only: no record, so no `B` and no player. */
 export function initBelief(race) {
     belief.active = true;
     belief.day = race ? race.day : 0;
@@ -238,7 +225,10 @@ export function initBelief(race) {
     belief.causes = [];
     belief.rng = race ? createRng(deriveSeed(race.seed, 'belief')) : null;
     belief.noise = false;
-    belief.player = _freshPlayer();
+    belief.record = race && race.capability ? createPublicRecord(race) : null;
+    _version++; _cache = null;
+    Object.assign(_coherence, { days: 0, checks: 0, binds: 0, maxGap: 0, sumGap: 0 });
+    belief.player = belief.record ? _freshPlayer() : null;
     // NO manufactured day-0 forecast (02a "Belief, η, and the firm"): day 0 is a REAL
     // prompted lock. The draft exists from the start, but until a lock is recorded
     // there is no curve to score and credibility stays 0.
@@ -259,39 +249,242 @@ export function deactivateBelief() {
     belief.causes = [];
     belief.rng = null;
     belief.player = null;
+    belief.record = null;
+    _version++; _cache = null;
 }
 
-// ---- The hazard curve ----------------------------------------------------
+// ---- The pool (02a "Belief, η, and the firm") ------------------------------
 
-/** SURVIVAL-CONDITIONED P(rung R crossed/certified by day D | not yet, as of
- *  today) -- the quoted probability (02a "Belief, η, and the firm"). "today" is belief.day;
- *  no progress as the deadline nears decays the quote toward NO on its own. */
-export function binaryProb(R, D) {
-    const rung = belief.rungs[R];
-    if (!rung) return 0.5;
-    if (rung.crossed) return D >= rung.certDay ? 1 : 0;
-    return _condProb(rung.m, rung.w, belief.day, D);
-}
-
-/** Hazard h_R(t) = f_R(t)/(1 - F_R(t)) -- the crossing-date hazard the curve IS.
- *  Exposed for the dashboard / later phases; the logistic hazard is
- *  sigmoid((t-m)/w)/w, i.e. F*(1-F)/w / (1-F) = F/w ... expressed directly. */
-export function hazard(R, t) {
-    const rung = belief.rungs[R];
-    if (!rung || rung.crossed) return 0;
-    const F = sigmoid((t - rung.m) / rung.w);
-    return F / rung.w;   // logistic hazard = F(t)/w
-}
-
-/** The displayed implied timeline: rung -> believed (certified) crossing day. */
-export function impliedTimeline() {
-    const out = {};
+/** The day's readers, lazily: the rule's summary and eta, then per rung the
+ *  legible and full laws (null once certified), the family heads and the
+ *  projection, each filled on first use. Keyed on the version stepBelief and
+ *  initBelief bump. */
+function _day() {
+    if (_cache && _cache.version === _version) return _cache;
+    const rec = belief.record;
+    if (!rec) throw new Error('belief: no public record (B needs a race)');
+    if (rec.day !== belief.day) throw new Error(`belief: record day ${rec.day} != belief day ${belief.day}`);
+    const rule = ruleSummary(belief.rungs, rec.day);
+    const eta = marketEfficiency(rec.snapshot.view);
+    const laws = {};
     for (const R of RUNG_LIST) {
-        const r = belief.rungs[R];
-        if (!r) continue;
-        out[R] = r.crossed ? r.certDay : Math.round(r.m);
+        let L = null;
+        Object.defineProperty(laws, R, { enumerable: true, get: () => L || (L = { legible: readerLaw(rec, R, 'legible', rule), full: readerLaw(rec, R, 'full', rule) }) });
     }
+    _cache = { version: _version, day: rec.day, rule, eta, laws, family: null, projection: null, certs: {} };
+    for (const R of LADDER) {
+        let d = null;
+        for (const id of ['halcyon', 'tianxia', 'polaris']) {
+            const c = rec.snapshot.labs[id].certs[R];
+            if (c != null && (d == null || c < d)) d = c;
+        }
+        _cache.certs[R] = d;
+    }
+    return _cache;
+}
+
+/** Unprojected pooled CDF of rung R at D (open rung). */
+function _pooled(c, R, D) {
+    const L = c.laws[R];
+    return (1 - c.eta) * lawCDF(L.legible, c.day, D) + c.eta * lawCDF(L.full, c.day, D);
+}
+
+/** The projected pooled CDF P_B(T_R <= D | record_t). A certified rung is a step
+ *  at its certification day. R2-R4 take running minima up the ladder; R5 sits
+ *  outside it (an internal crossing can end a world before R4 certifies). */
+function _projected(c, R, D) {
+    if (R === 5) return _pooled(c, 5, D);
+    let p = 1;
+    for (const r of LADDER) {
+        if (r > R) break;
+        const cd = c.certs[r];
+        const v = cd != null ? +(D >= cd) : _pooled(c, r, D);
+        p = Math.min(p, v);
+    }
+    return p;
+}
+
+/** Record how often, and by how much, the coherence projection binds today, at the
+ *  quarter, the contract deadline and the term's end (02a: reported, not gated). */
+function _measureCoherence(c) {
+    if (c.measured) return;
+    c.measured = true;
+    _coherence.days++;
+    for (const R of [3, 4]) {
+        if (c.certs[R] != null) continue;
+        for (const D of [c.day + LOCK_INTERVAL, RUNG_DEADLINE[R], TERM_END]) {
+            if (D <= c.day) continue;
+            const gap = _pooled(c, R, D) - _projected(c, R, D);
+            _coherence.checks++;
+            if (gap > 1e-9) { _coherence.binds++; _coherence.sumGap += gap; _coherence.maxGap = Math.max(_coherence.maxGap, gap); }
+        }
+    }
+}
+
+/** P_B(rung R certified -- R5: crossed -- by day D | the record today): the pooled,
+ *  projected probability every quote, snapshot and display reads. */
+export function binaryProb(R, D) {
+    const c = _day();
+    _measureCoherence(c);
+    return _projected(c, R, D);
+}
+
+/** `B`'s probability for the quarter that starts today: P_B(T_R <= today + 63). */
+export function quarterProbB(R) {
+    return binaryProb(R, belief.day + LOCK_INTERVAL);
+}
+
+/** Public certification day of rung R (R2-R4; any frontier lab, direct or
+ *  implied), from the record. R5 never certifies. */
+export function certDay(R) {
+    if (!LADDER.includes(R)) return null;
+    return _day().certs[R];
+}
+export function isCertified(R) { return certDay(R) != null; }
+
+/** The pooled conditional median of rung R: the first day on which P_B reaches
+ *  one half, within the support; null ("not this term") when less than half the
+ *  mass lands there. A certified rung reads its certification day. */
+function _median(c, R) {
+    if (R !== 5 && c.certs[R] != null) return c.certs[R];
+    const hi = SUPPORT[R];
+    if (_projected(c, R, hi) < 0.5) return null;
+    let lo = c.day, top = hi;            // P(lo) < 0.5 <= P(top)
+    while (top - lo > 1) {
+        const mid = (lo + top) >> 1;
+        if (_projected(c, R, mid) >= 0.5) top = mid; else lo = mid;
+    }
+    return top;
+}
+
+/** The implied timeline (02a "Displays"): rung -> the pooled conditional median,
+ *  a certification day, or null for "not this term". */
+export function impliedTimeline() {
+    const c = _day();
+    const out = {};
+    for (const R of RUNG_LIST) out[R] = _median(c, R);
     return out;
+}
+
+/** `B`'s law of rung R for the race page, or null once certified: cdf(D), the
+ *  integer-day mass at D, the conditional median (null: not this term), the
+ *  support and the mass beyond it. Valid for today only. */
+export function beliefLaw(R) {
+    const c = _day();
+    if (R !== 5 && c.certs[R] != null) return null;
+    const cdf = (D) => _projected(c, R, D);
+    return Object.freeze({
+        R, day: c.day, support: SUPPORT[R], cdf,
+        density: (D) => (D <= c.day ? 0 : cdf(D) - cdf(D - 1)),
+        median: _median(c, R),
+        atom: 1 - cdf(SUPPORT[R]),
+    });
+}
+
+/** The two readers' family distributions today (families 1..6 at index k - 1)
+ *  and eta, for the valuation layer. */
+export function familyHeads() {
+    const c = _day();
+    if (!c.family) {
+        const rec = belief.record;
+        c.family = { legible: readerFamily(rec, 'legible', c.rule), full: readerFamily(rec, 'full', c.rule) };
+    }
+    return { legible: c.family.legible, full: c.family.full, eta: c.eta };
+}
+
+/** The coherence projection's binding statistics since initBelief. */
+export function coherenceStats() {
+    return { ..._coherence, meanGap: _coherence.binds ? _coherence.sumGap / _coherence.binds : 0 };
+}
+
+/** The day's market-efficiency dial, read off the record's public view. */
+export function beliefEta() { return _day().eta; }
+
+/**
+ * Display only (the sandbox, 02a): `B` re-evaluated on copies of the record and
+ * the rule as they would stand on day `day` (> today). With `rung`, a frontier
+ * certification of that rung lands on that day -- claimed then if it was not, by
+ * the lab with the highest claimed rung -- folded into the rule copy by the
+ * rule's own certification update. With `routine`, each active frontier lab
+ * keeps releasing at its trailing 252-day cadence: rung-less releases spaced
+ * evenly through the stretch, entered in the record copy and folded into the
+ * rule copy by the rule's own routine-release nudge, so a quiet stretch is not a
+ * silent one. Nothing reaches the singleton: the rule's state, ledger and
+ * processed set are restored before returning.
+ * @returns {(R:number, D:number) => number} the scenario's projected P_B
+ */
+export function scenarioBelief(day, rung = null, { routine = false } = {}) {
+    const now = _day();
+    if (!(day > now.day)) throw new Error('scenarioBelief: the scenario day must be after today');
+    const rec = JSON.parse(JSON.stringify(belief.record));
+    const t0 = rec.day;
+    const v = rec.snapshot.view;
+    const active = ['halcyon', 'tianxia', 'polaris'].filter(id => rec.snapshot.labs[id].active);
+    // Routine releases: k per lab over the stretch, at the lab's trailing cadence.
+    const routineRows = [];
+    if (routine) {
+        const window = Math.min(252, t0), span = day - t0;
+        for (const id of active) {
+            const n = window > 0 ? rec.releases.filter(r => r.lab === id && t0 - r.day < 252).length : 0;
+            const k = window > 0 ? Math.round(n / window * span) : 0;
+            for (let j = 1; j <= k; j++) routineRows.push({ day: t0 + Math.max(1, Math.round(j * span / (k + 1))), lab: id });
+        }
+        routineRows.sort((a, b) => a.day - b.day || a.lab.localeCompare(b.lab));
+        for (const r of routineRows) {
+            rec.releases.push({ day: r.day, lab: r.lab, rungs: [] });
+            const L = rec.snapshot.labs[r.lab];
+            L.releaseCount++; L.lastReleaseDay = r.day;
+            v.releaseCount++; v.lastReleaseDay = Math.max(v.lastReleaseDay, r.day);
+        }
+    }
+    rec.day = day; rec.snapshot.day = day; v.day = day;
+    let rungs = JSON.parse(JSON.stringify(belief.rungs));
+    let lab = null;
+    if (rung != null && LADDER.includes(rung)) {
+        lab = active.reduce((a, id) => (v.claimedRung[id] > v.claimedRung[a] ? id : a), active[0]);
+        const L = rec.snapshot.labs[lab];
+        for (let r = 1; r <= rung; r++) {
+            if (L.claims[r] == null) L.claims[r] = day;
+            if (r >= 2 && L.certs[r] == null) L.certs[r] = day;
+        }
+        v.claimedRung[lab] = Math.max(v.claimedRung[lab], rung);
+        v.releasedFrontierRung = Math.max(v.releasedFrontierRung, rung);
+        v.certifiedFrontierRung = Math.max(v.certifiedFrontierRung, rung);
+    }
+    if (routineRows.length || lab) {
+        // The rule's own updates, run on the copy in day order.
+        const saved = { rungs: belief.rungs, causes: belief.causes, processed: belief.processed, day: belief.day };
+        try {
+            belief.rungs = rungs; belief.causes = []; belief.processed = new Set();
+            for (const r of routineRows) {
+                belief.day = r.day;
+                const R = _nextUncrossed();
+                if (R != null) _pullMedian(R, r.day + (CERT_LEAD[R] || 30) + RUNG_SPACING, A_ROUTINE, `scenario_rel_${r.lab}_${r.day}_routine`, 'release-cadence');
+            }
+            if (lab) {
+                belief.day = day;
+                const id = `scenario_${lab}_R${rung}_${day}`;
+                _markCrossed(rung, day, id, 'scenario');
+                if (RUNG_LIST.includes(rung + 1)) _pullMedian(rung + 1, day + RUNG_SPACING, A_CERT_NEXT, `${id}_next`, 'scenario');
+            }
+            rungs = belief.rungs;
+        } finally {
+            Object.assign(belief, saved);
+        }
+    }
+    const rule = ruleSummary(rungs, day);
+    const laws = {};
+    for (const R of RUNG_LIST) laws[R] = { legible: readerLaw(rec, R, 'legible', rule), full: readerLaw(rec, R, 'full', rule) };
+    const c = { day, eta: marketEfficiency(rec.snapshot.view), laws, certs: {} };
+    for (const R of LADDER) {
+        let d = null;
+        for (const id of ['halcyon', 'tianxia', 'polaris']) {
+            const x = rec.snapshot.labs[id].certs[R];
+            if (x != null && (d == null || x < d)) d = x;
+        }
+        c.certs[R] = d;
+    }
+    return (R, D) => _projected(c, R, D);
 }
 
 // ---- Update primitives (EVERY m/w/monotonicity mutation is ledgered) -------
@@ -387,13 +580,15 @@ function _nextUncrossed() {
 // ---- stepBelief: fold ONE completed day's legible ledger into B -----------
 
 /**
- * Advance `B` by consuming `race.lastTransitions` (the per-tick ledger) ONLY.
- * Never reads latent queues (race.latentIncidents/Evidence) or continuous state
- * -- so corrupting every latent field leaves `B` invariant (the corruption
- * probes rely on exactly this). Call once per completed day, right after
- * advanceRace, before the quotes refresh.
+ * Advance `B` one completed day: fold `race.lastTransitions` (the per-tick
+ * ledger) into the rule of thumb and the alignment sentiment, then step the
+ * public record with the day's public world inputs `{ straitTension,
+ * exportControlStage, treatyStage }` (02a "The reader": absent inputs read 0).
+ * Never reads latent queues or continuous state, so corrupting every latent
+ * field leaves `B` invariant. Call once per completed day, after
+ * stepControlRegime and stepTreaty, before the quotes refresh.
  */
-export function stepBelief(race) {
+export function stepBelief(race, inputs = {}) {
     if (!belief.active || !race || !race.lastTransitions) return;
     const tr = race.lastTransitions;
     belief.day = race.day;
@@ -431,9 +626,6 @@ export function stepBelief(race) {
             _pullMedian(nxt, day + RUNG_SPACING, A_CERT_NEXT, `cert_${lab}_R${R}_${day}_next${nxt}`, 'certification-implies-next');
         }
     }
-    // The player's draft freezes a certified rung at its day, like B (02a). The
-    // draft is the player's, not B's: this is its only automatic edit.
-    if (certTop.size) _syncDraft();
 
     // 3. Detected incidents (public detection): a bounded NEGATIVE alignment
     //    signal, scaled by severity. Folded into the alignment sentiment, NOT
@@ -490,6 +682,16 @@ export function stepBelief(race) {
     //    'noise' cause) so the harness's full-coverage reconstruction holds even
     //    if noise is ever enabled. Monotonicity is repaired per-update above.
     if (belief.noise && belief.rng) _diffuse(day);
+
+    // 7. The public record (02a "The reader"), after the regime ratchet and the
+    //    treaty track have run; a same-day replay is a no-op there too. Then drop
+    //    the day's pooled laws.
+    if (belief.record) stepPublicRecord(belief.record, race, inputs);
+    _version++; _cache = null;
+    // The player's draft freezes a certified rung at its day (02a), read off the
+    // stepped record. The draft is the player's, not B's: this is its only
+    // automatic edit.
+    if (certTop.size && belief.record) _syncDraft();
 }
 
 /** Fold an evidence log-LR into the alignment sentiment (leak-once via id). */
@@ -566,11 +768,11 @@ export function marketEfficiency(view) {
 // ---- The belief-backed quoters (public state only) ------------------------
 
 /**
- * Consensus binary quote from `B`: P(rung R certified by the contract's
- * deadline). Reads the `belief` singleton (public-derived) + the PUBLIC `view`
- * + the contract's own listed deadline -- never `race`. Day-0 (pre-event) this
- * returns the listing base rate exactly, so listing mids stay two-sided and
- * within +-8pp of measured frequencies. Swap in via setBinaryQuoteSource.
+ * Consensus binary quote from `B`: the pooled, projected P(rung R certified by
+ * the contract's deadline). Reads the `belief` singleton (built from the public
+ * record) + the PUBLIC `view` + the contract's own listed deadline -- never
+ * `race`. The listing base rates in consensus.js are the population mean of this
+ * quote at day 0 (02a "Consensus binaries"). Swap in via setBinaryQuoteSource.
  */
 export function binaryQuoteFromBelief(view, contract) {
     const R = contract.predicate.rung;
@@ -602,86 +804,223 @@ export function computeCurveFromBelief(view, dte) {
 }
 
 // ---- The player's posterior: draft, locks, scoring -------------------------
-// 02a "Belief, η, and the firm" (the posterior, ratified 2026-10-24). The player
-// holds the same {m, w} logistic family as `B`, one law per tracked rung over the
-// CERTIFIED crossing day (R5: the terminal crossing). A standing DRAFT is edited
-// at any time (the Markets page's Consensus panel); a quarterly LOCK freezes it
-// beside a snapshot of `B`; each lock day scores the quarter that just ended by
-// log-likelihood ratio against that snapshot. Everything here reads `B` and the
-// public certification days in `belief.rungs` -- never the race.
+// 02a "Belief, η, and the firm", the posterior. Per tracked rung R2-R5 the player
+// holds F(x) = (1 - q)*sigma((x - m)/w) over the certified crossing day (R5: the
+// terminal crossing): m is the median given that the rung ever certifies and q
+// the mass on never. Medians and plateaus are monotone over R2-R4; R5 is not
+// ordered against them. A certified rung is frozen at its certification day.
+// A standing DRAFT is edited on the Markets page; a quarterly LOCK stores, per
+// rung it will score, the quarter's probability from each side; scoreQuarter
+// reads the stored pairs. Certification days come from the public record.
 
 /** True on a scheduled lock day (0, 63, 126, ...). RATIFIED schedule. */
 export function isLockDay(day) {
     return day >= 0 && day % LOCK_INTERVAL === 0;
 }
 
-/** Public certification day of rung R as of today, or null (R5 never certifies). */
-function _certDay(R) {
-    const r = belief.rungs[R];
-    return r && r.crossed ? r.certDay : null;
-}
-
-/** The floor every open median sits on: the latest public certification day
- *  (certified rungs are a prefix of the ladder), else the lower bound. */
+/** The floor every open ladder median sits on: the latest public certification
+ *  day (certified rungs are a prefix of the ladder), else the lower bound. */
 function _openFloor() {
     let floor = POSTERIOR.M_MIN;
-    for (const R of RUNG_LIST) { const cd = _certDay(R); if (cd != null) floor = Math.max(floor, cd); }
+    for (const R of LADDER) { const cd = certDay(R); if (cd != null) floor = Math.max(floor, cd); }
     return floor;
 }
 
-/** Tracked rungs not yet certified (the rungs a preset moves and the editor shows). */
+/** Tracked rungs not yet certified (the rungs a preset moves and the editor
+ *  shows). R5 never certifies, so it is always open. */
 export function openRungs() {
-    return RUNG_LIST.filter(R => _certDay(R) == null);
+    return RUNG_LIST.filter(R => certDay(R) == null);
+}
+
+/** ln S(x) for the plateau law, S = 1 - (1 - q)*sigma(z), z = (x - m)/w, written
+ *  as softplus(z + ln q) - softplus(z) so it stays finite in both tails. */
+function _lnSurvival(m, w, q, x) {
+    const z = (x - m) / w;
+    return (q > 0 ? _softplus(z + Math.log(q)) : 0) - _softplus(z);
+}
+
+/** Survival-conditioned P(t0 < T <= t1 | T > t0) under {m, w, q}, as
+ *  1 - S(t1)/S(t0) in log space. Pure; the Markets panel draws the draft with it. */
+export function crossingProb(m, w, q, t0, t1) {
+    if (t1 <= t0) return 0;
+    return -Math.expm1(_lnSurvival(m, w, q, t1) - _lnSurvival(m, w, q, t0));
+}
+
+/** The quarter's scored crossing probability (02a): P(T in (L_q, L_q+1] | T > L_q)
+ *  under {m, w, q}, clamped to [0.02, 0.98]. Pure; the harness scores with it too. */
+export function quarterProb(m, w, q, t0, t1) {
+    return clamp(crossingProb(m, w, q, t0, t1), SCORE_P_MIN, SCORE_P_MAX);
+}
+
+/** The plateau handle's quantity (02a): the conditional curve's height at the
+ *  term's end, 1 - S(1008)/S(t), the chance of a crossing this term given none
+ *  by day t. */
+export function plateauHeight(m, w, q, t) {
+    return crossingProb(m, w, q, t, TERM_END);
+}
+
+/** A curve's conditional median for rung R: the day its crossing CDF, given no
+ *  crossing by day t, reaches one half, or null when it doesn't within the
+ *  rung's support ("not this term", as `impliedTimeline` reads `B`). `m` alone is
+ *  the median given the rung ever certifies, so prose compares this instead.
+ *  Closed form: S(x) = q + (1 - q)·σ(-(x - m)/w), solved for S(x) = S(t)/2. */
+export function curveMedian(c, t, R) {
+    if (!c) return null;
+    const half = Math.exp(_lnSurvival(c.m, c.w, c.q || 0, t)) / 2;
+    const q = c.q || 0;
+    if (half <= q) return null;
+    const u = (half - q) / (1 - q);
+    const x = c.m + c.w * Math.log((1 - u) / u);
+    return x <= (SUPPORT[R] ?? TERM_END) ? Math.max(t, x) : null;
+}
+
+/** The q that gives conditional height h at the term's end, given m, w and day t,
+ *  solved for q directly. With the logistic's survival c_x = sigma(-(x - m)/w),
+ *  S(x) = q + (1 - q)*c_x, and 1 - S(E)/S(t) = h gives
+ *  q = (d - h*c_t) / (h*F_t + d), where F_t = 1 - c_t and d = c_t - c_E >= 0.
+ *  Every term is a product or a stable difference of tails (no cancellation of
+ *  saturated sigmoids), so q stays exact even when it is ~1e-17 late in the
+ *  term. Clamped to the bounds on q (an unreachable height gives q = 0). */
+function _plateauQ(m, w, t, h) {
+    const zt = (t - m) / w, zE = (TERM_END - m) / w;
+    const ct = Math.exp(-_softplus(zt)), Ft = Math.exp(-_softplus(-zt));
+    const d = zt < 0 ? sigmoid(zE) - sigmoid(zt) : ct - Math.exp(-_softplus(zE));
+    const den = h * Ft + d;
+    if (!(den > 0)) return POSTERIOR.Q_MAX;
+    return clamp((d - h * ct) / den, POSTERIOR.Q_MIN, POSTERIOR.Q_MAX);
+}
+
+// The projection's search grid (02a "Displays": a deterministic least-squares fit).
+const PROJ_W_GRID = Array.from({ length: 13 }, (_, i) => POSTERIOR.W_MIN * Math.pow(POSTERIOR.W_MAX / POSTERIOR.W_MIN, i / 12));
+const PROJ_M_STEP = 24, PROJ_M_BACK = 600;
+
+/** Least-squares fit of {m, w, q} to the conditional curve `ys` at days `Ds`,
+ *  given no crossing by t. For fixed (m, w) the conditional CDF is
+ *  A*(sigma_D - sigma_t) with A = (1 - q)/(1 - (1 - q)*sigma_t), linear in A, so A is
+ *  solved in closed form and clamped to q's bounds; (m, ln w) are searched on a
+ *  grid and refined by a halving pattern search. Deterministic. */
+function _fitPlateauLaw(t, Ds, ys) {
+    const n = Ds.length;
+    const d = new Float64Array(n);
+    const sse = (m, w) => {
+        const zt = (t - m) / w, st = sigmoid(zt), ct = sigmoid(-zt);
+        let sdy = 0, sdd = 0;
+        for (let k = 0; k < n; k++) {
+            const zD = (Ds[k] - m) / w;
+            d[k] = zt < 0 ? sigmoid(zD) - st : ct - sigmoid(-zD);
+            sdy += d[k] * ys[k]; sdd += d[k] * d[k];
+        }
+        const aLo = 1 - POSTERIOR.Q_MAX, aHi = 1 - POSTERIOR.Q_MIN;
+        const Alo = aLo / ((1 - aLo) + aLo * ct), Ahi = aHi / ((1 - aHi) + aHi * ct);
+        const A = clamp(sdd > 0 ? sdy / sdd : Ahi, Alo, Ahi);
+        let e = 0;
+        for (let k = 0; k < n; k++) { const r = ys[k] - A * d[k]; e += r * r; }
+        return { e, A, st };
+    };
+    let best = null;
+    for (let m = Math.max(POSTERIOR.M_MIN, t - PROJ_M_BACK); m <= POSTERIOR.M_MAX; m += PROJ_M_STEP) {
+        for (const w of PROJ_W_GRID) {
+            const r = sse(m, w);
+            if (!best || r.e < best.e) best = { m, lw: Math.log(w), e: r.e };
+        }
+    }
+    let sm = PROJ_M_STEP / 2, sw = Math.log(PROJ_W_GRID[1] / PROJ_W_GRID[0]) / 2;
+    const lwLo = Math.log(POSTERIOR.W_MIN), lwHi = Math.log(POSTERIOR.W_MAX);
+    for (let it = 0; it < 200 && sm > 0.05; it++) {
+        let moved = false;
+        for (const [dm, dw] of [[sm, 0], [-sm, 0], [0, sw], [0, -sw]]) {
+            const m = clamp(best.m + dm, POSTERIOR.M_MIN, POSTERIOR.M_MAX), lw = clamp(best.lw + dw, lwLo, lwHi);
+            const e = sse(m, clamp(Math.exp(lw), POSTERIOR.W_MIN, POSTERIOR.W_MAX)).e;
+            if (e < best.e - 1e-15) { best = { m, lw, e }; moved = true; }
+        }
+        if (!moved) { sm /= 2; sw /= 2; }
+    }
+    const w = clamp(Math.exp(best.lw), POSTERIOR.W_MIN, POSTERIOR.W_MAX), r = sse(best.m, w);
+    const a = r.A / (1 + r.A * r.st);
+    return { m: best.m, w, q: clamp(1 - a, POSTERIOR.Q_MIN, POSTERIOR.Q_MAX) };
+}
+
+/** `B`'s projection onto the player's family (02a "Displays"), cached per day: a
+ *  fit to the pooled conditional CDF at days t + 21k within each rung's support,
+ *  then made monotone over the ladder like any curve set. A certified rung is
+ *  frozen at its day (q 0, the narrowest width). */
+function _projection() {
+    const c = _day();
+    if (c.projection) return c.projection;
+    const out = {};
+    for (const R of RUNG_LIST) {
+        const cd = R === 5 ? null : c.certs[R];
+        if (cd != null) { out[R] = { m: cd, w: POSTERIOR.W_MIN, q: 0 }; continue; }
+        const Ds = [];
+        for (let D = c.day + PROJECTION_STEP; D <= SUPPORT[R]; D += PROJECTION_STEP) Ds.push(D);
+        if (!Ds.length && SUPPORT[R] > c.day) Ds.push(SUPPORT[R]);
+        out[R] = Ds.length
+            ? _fitPlateauLaw(c.day, Ds, Ds.map(D => _projected(c, R, D)))
+            : { m: POSTERIOR.M_MAX, w: POSTERIOR.W_MAX, q: POSTERIOR.Q_MAX };
+    }
+    c.projection = Object.freeze(_orderCurves(out));
+    return c.projection;
+}
+
+/** Ladder order (02a): medians and plateaus monotone over R2-R4, pushed up to the
+ *  running floor; a certified rung anchors the floor at its day with q 0. */
+function _orderCurves(curves) {
+    let prevM = -Infinity, prevQ = POSTERIOR.Q_MIN;
+    for (const R of LADDER) {
+        const c = curves[R];
+        if (certDay(R) != null) { prevM = Math.max(prevM, c.m); continue; }
+        c.m = Math.max(prevM, c.m); c.q = Math.max(prevQ, c.q);
+        prevM = c.m; prevQ = c.q;
+    }
+    return curves;
 }
 
 /**
- * Bring a curve set inside the posterior's rules: every rung present, medians
- * clamped to [0, 2016] and widths to [25, 400], a certified rung frozen at its
- * certification day (its width kept), then medians made monotone by pushing each
- * later rung up to the running floor. Missing or non-finite input falls back to
- * `B`'s curve for that rung. Returns a fresh object; the input is untouched.
+ * Bring a curve set inside the posterior's rules: every rung present, m, w and q
+ * clamped to their bounds, a certified rung frozen at its certification day with
+ * q 0 (its width kept), then the ladder's medians and plateaus made monotone.
+ * Missing or non-finite input falls back to `B`'s projection for that rung.
+ * Returns a fresh object; the input is untouched.
  */
 export function normalizeCurves(curves) {
-    const mk = marketCurves();
+    let mk = null;
+    const fb = (R) => (mk || (mk = _projection()))[R];
     const out = {};
-    let prev = -Infinity;
     for (const R of RUNG_LIST) {
         const c = curves && curves[R];
-        const m0 = c && Number.isFinite(c.m) ? c.m : mk[R].m;
-        const w0 = c && Number.isFinite(c.w) ? c.w : mk[R].w;
-        const cd = _certDay(R);
-        const m = cd != null ? cd : Math.max(prev, clamp(m0, POSTERIOR.M_MIN, POSTERIOR.M_MAX));
-        out[R] = { m, w: clamp(w0, POSTERIOR.W_MIN, POSTERIOR.W_MAX) };
-        prev = m;
+        const m0 = c && Number.isFinite(c.m) ? c.m : fb(R).m;
+        const w0 = c && Number.isFinite(c.w) ? c.w : fb(R).w;
+        const q0 = c && Number.isFinite(c.q) ? c.q : fb(R).q;
+        const cd = certDay(R);
+        out[R] = cd != null
+            ? { m: cd, w: clamp(w0, POSTERIOR.W_MIN, POSTERIOR.W_MAX), q: 0 }
+            : { m: clamp(m0, POSTERIOR.M_MIN, POSTERIOR.M_MAX), w: clamp(w0, POSTERIOR.W_MIN, POSTERIOR.W_MAX), q: clamp(q0, POSTERIOR.Q_MIN, POSTERIOR.Q_MAX) };
     }
-    return out;
+    return _orderCurves(out);
 }
 
-/** True when two curve sets agree exactly on rung R ({m, w} bit-equal). */
+/** True when two curve sets agree exactly on rung R ({m, w, q} bit-equal). */
 export function curvesEqual(a, b, R) {
-    return !!(a && b && a[R] && b[R] && a[R].m === b[R].m && a[R].w === b[R].w);
+    return !!(a && b && a[R] && b[R] && a[R].m === b[R].m && a[R].w === b[R].w && a[R].q === b[R].q);
 }
 
-/**
- * `B`'s curves in the posterior's form: each rung's {m, w}, a certified rung
- * frozen at its certification day. This is the market snapshot every lock stores
- * and the "market" preset, so a copier's curves equal it bit for bit.
- */
-export function marketCurves() {
+const _copyCurves = (src) => {
     const out = {};
-    for (const R of RUNG_LIST) {
-        const r = belief.rungs[R];
-        const cd = _certDay(R);
-        out[R] = r ? { m: cd != null ? cd : r.m, w: r.w } : { m: POSTERIOR.M_MAX, w: POSTERIOR.W_MAX };
-    }
+    for (const R of RUNG_LIST) out[R] = { m: src[R].m, w: src[R].w, q: src[R].q };
     return out;
+};
+
+/** `B`'s projection onto the player's family: the editor's starting point and the
+ *  display copy every lock stores. Copying the market is a lock policy, not this. */
+export function marketCurves() {
+    return _copyCurves(_projection());
 }
 
 /**
- * The lock dispatch's starting points, relative to `B` today (02a): 'market' is
- * `B` itself; 'earlier' moves every open rung half a width sooner
- * (m_B - 0.5*w_B, w_B kept); 'later' half a width later. Normalized, so a shift
- * that would cross a neighbour or a certification day is pushed back into order.
+ * The lock dispatch's starting points (02a): 'market' is the projection;
+ * 'earlier' moves every open rung half a width sooner (m - 0.5*w, w and q kept);
+ * 'later' half a width later. Normalized, so a shift that would cross a
+ * neighbour or a certification day is pushed back into order.
  */
 export function presetCurves(kind) {
     const mk = marketCurves();
@@ -689,7 +1028,7 @@ export function presetCurves(kind) {
     const dir = kind === 'earlier' ? -1 : kind === 'later' ? 1 : 0;
     const out = {};
     for (const R of RUNG_LIST) {
-        out[R] = _certDay(R) != null ? mk[R] : { m: mk[R].m + dir * 0.5 * mk[R].w, w: mk[R].w };
+        out[R] = certDay(R) != null ? mk[R] : { m: mk[R].m + dir * 0.5 * mk[R].w, w: mk[R].w, q: mk[R].q };
     }
     return normalizeCurves(out);
 }
@@ -697,10 +1036,7 @@ export function presetCurves(kind) {
 /** A copy of the player's standing draft (null outside Dynamic). */
 export function draftCurves() {
     const P = belief.player;
-    if (!P) return null;
-    const out = {};
-    for (const R of RUNG_LIST) out[R] = { m: P.draft[R].m, w: P.draft[R].w };
-    return out;
+    return P ? _copyCurves(P.draft) : null;
 }
 
 /** Replace the draft wholesale (normalized). Returns the stored copy. */
@@ -712,17 +1048,18 @@ export function setDraft(curves) {
 }
 
 /**
- * Move one open rung's draft median (the editor's drag and ←/→). Dragging one
- * pushes its neighbours (02a): later rungs rise to meet it, earlier open rungs
- * fall to meet it, and nothing goes below the latest certification day or past
- * the bound. A certified rung is frozen: no-op, returns null.
+ * Move one open rung's draft median (the editor's drag and ←/→). On the ladder,
+ * dragging one pushes its neighbours (02a): later rungs rise to meet it, earlier
+ * open rungs fall to meet it, and nothing goes below the latest certification
+ * day or past the bound. R5 moves alone. A certified rung is frozen: null.
  */
 export function setDraftMedian(R, m) {
     const P = belief.player;
-    if (!P || !RUNG_LIST.includes(R) || _certDay(R) != null || !Number.isFinite(m)) return null;
+    if (!P || !RUNG_LIST.includes(R) || certDay(R) != null || !Number.isFinite(m)) return null;
+    if (R === 5) { P.draft[5].m = clamp(m, POSTERIOR.M_MIN, POSTERIOR.M_MAX); return draftCurves(); }
     const v = clamp(m, _openFloor(), POSTERIOR.M_MAX);
-    for (const r of RUNG_LIST) {
-        if (_certDay(r) != null) continue;
+    for (const r of LADDER) {
+        if (certDay(r) != null) continue;
         const d = P.draft[r];
         if (r === R) d.m = v;
         else if (r > R && d.m < v) d.m = v;
@@ -734,8 +1071,31 @@ export function setDraftMedian(R, m) {
 /** Set one open rung's draft width (the editor's vertical drag and ↑/↓). */
 export function setDraftWidth(R, w) {
     const P = belief.player;
-    if (!P || !RUNG_LIST.includes(R) || _certDay(R) != null || !Number.isFinite(w)) return null;
+    if (!P || !RUNG_LIST.includes(R) || certDay(R) != null || !Number.isFinite(w)) return null;
     P.draft[R].w = clamp(w, POSTERIOR.W_MIN, POSTERIOR.W_MAX);
+    return draftCurves();
+}
+
+/**
+ * Set one open rung's plateau by its handle (02a): `h` is the conditional
+ * curve's height at the term's end, 1 - S(1008)/S(today), and q follows from it
+ * given the rung's m and w. On the ladder, plateaus are monotone and a move
+ * pushes the neighbours' q (later rungs rise to meet it, earlier fall). R5
+ * moves alone. A certified rung is frozen: null.
+ */
+export function setDraftPlateau(R, h) {
+    const P = belief.player;
+    if (!P || !RUNG_LIST.includes(R) || certDay(R) != null || !Number.isFinite(h)) return null;
+    const d = P.draft[R];
+    const q = _plateauQ(d.m, d.w, belief.day, clamp(h, 0, 1));
+    if (R === 5) { d.q = q; return draftCurves(); }
+    for (const r of LADDER) {
+        if (certDay(r) != null) continue;
+        const x = P.draft[r];
+        if (r === R) x.q = q;
+        else if (r > R && x.q < q) x.q = q;
+        else if (r < R && x.q > q) x.q = q;
+    }
     return draftCurves();
 }
 
@@ -747,51 +1107,80 @@ function _syncDraft() {
 }
 
 /** A curve set is lockable when every rung is present and finite, inside the
- *  bounds, certified rungs sit exactly on their certification day, and medians
- *  are monotone. Returns a clean copy, or null. */
+ *  bounds, certified rungs sit exactly on their certification day with q 0, and
+ *  the ladder's medians and plateaus are monotone. Returns a frozen copy, or null. */
 function _cleanCurves(curves) {
     if (!curves) return null;
     const out = {};
-    let prev = -Infinity;
     for (const R of RUNG_LIST) {
         const c = curves[R];
-        if (!c || !Number.isFinite(c.m) || !Number.isFinite(c.w)) return null;
-        if (c.m < POSTERIOR.M_MIN || c.m > POSTERIOR.M_MAX || c.w < POSTERIOR.W_MIN || c.w > POSTERIOR.W_MAX) return null;
-        const cd = _certDay(R);
-        if (cd != null && c.m !== cd) return null;
-        if (c.m < prev) return null;
-        prev = c.m;
-        out[R] = Object.freeze({ m: c.m, w: c.w });
+        if (!c || !Number.isFinite(c.m) || !Number.isFinite(c.w) || !Number.isFinite(c.q)) return null;
+        if (c.m < POSTERIOR.M_MIN || c.m > POSTERIOR.M_MAX || c.w < POSTERIOR.W_MIN || c.w > POSTERIOR.W_MAX
+            || c.q < POSTERIOR.Q_MIN || c.q > POSTERIOR.Q_MAX) return null;
+        const cd = certDay(R);
+        if (cd != null && (c.m !== cd || c.q !== 0)) return null;
+        out[R] = Object.freeze({ m: c.m, w: c.w, q: c.q });
+    }
+    let prevM = -Infinity, prevQ = POSTERIOR.Q_MIN;
+    for (const R of LADDER) {
+        if (out[R].m < prevM) return null;
+        prevM = out[R].m;
+        if (certDay(R) != null) continue;
+        if (out[R].q < prevQ) return null;
+        prevQ = out[R].q;
     }
     return Object.freeze(out);
 }
 
+/** The quarter pairs a lock stores (02a): for every ladder rung open at the lock,
+ *  pP from the player's law and pM from `B` at 63 residual days, both clamped. A
+ *  market-policy lock stores pM on both sides. */
+function _lockPairs(day, curves, policy) {
+    const pairs = {};
+    for (const R of SCORED_RUNGS) {
+        if (certDay(R) != null) continue;
+        const pM = clamp(binaryProb(R, day + LOCK_INTERVAL), SCORE_P_MIN, SCORE_P_MAX);
+        const c = curves[R];
+        const pP = policy === 'market' ? pM : quarterProb(c.m, c.w, c.q, day, day + LOCK_INTERVAL);
+        pairs[R] = Object.freeze({ pP, pM });
+    }
+    return Object.freeze(pairs);
+}
+
 /**
- * Record the player's curves at a lock day, beside a snapshot of `B` for the
- * same rungs (02a). Lock semantics (kept from the phase-4 ruling):
- *   - ON-GRID + CURRENT DAY ONLY: `isLockDay(day) && day === belief.day` -- no
- *     off-grid days, no retroactive or historical locks.
- *   - A FULL, VALID curve set (see _cleanCurves) or the lock is rejected (null).
- *     The editor and the presets always produce one; nothing is silently clamped.
+ * Record a lock on `day` (02a). `policy` is 'own' (the curves given) or 'market'
+ * (the market's curves: the projection is stored for display, and every pair has
+ * pP === pM). Own curves equal to today's projection on every open rung are
+ * recorded as a market-policy lock. Lock semantics:
+ *   - ON-GRID + CURRENT DAY ONLY: `isLockDay(day) && day === belief.day`.
+ *   - An own lock needs a FULL, VALID curve set (see _cleanCurves), or it is
+ *     rejected (null); nothing is silently clamped.
  *   - IMMUTABLE once accepted: a second call for the same day is accepted ONLY as
- *     an exact idempotent replay; different curves on a locked day are rejected.
- * A new lock also becomes the standing draft (UNRATIFIED seam: what you last
- * locked is what the editor shows, so "as drawn" defaults to keeping the call).
- * @returns the frozen lock record { day, curves, market }, or null if rejected.
+ *     an exact idempotent replay (same policy and curves).
+ * The lock also stores `B`'s projection (`market`), the quarter pairs, and for a
+ * market-policy lock `B`'s deadline quotes (lockedClaim reads them). A new lock
+ * becomes the standing draft.
+ * @returns the frozen lock record, or null if rejected.
  */
-export function lockForecast(day, curves) {
+export function lockForecast(day, curves, policy = 'own') {
     const P = belief.player;
-    if (!P) return null;
+    if (!P || (policy !== 'own' && policy !== 'market')) return null;
     if (!(isLockDay(day) && day === belief.day)) return null;   // on-grid, current day only
-    const clean = _cleanCurves(curves);
+    const market = _cleanCurves(marketCurves());
+    let clean = policy === 'market' ? market : _cleanCurves(curves);
     if (!clean) return null;
+    // 02a: curves still equal to today's projection on every open rung ARE the
+    // market's call. Decided here, so every path that records a lock inherits it.
+    if (policy === 'own' && openRungs().every(R => curvesEqual(clean, market, R))) { policy = 'market'; clean = market; }
     const existing = P.locks.find(l => l.day === day);
     if (existing) {
+        if (existing.policy !== policy) return null;
         for (const R of RUNG_LIST) if (!curvesEqual(existing.curves, clean, R)) return null;
         return existing;                                          // exact replay: idempotent
     }
-    const market = _cleanCurves(marketCurves());
-    const record = Object.freeze({ day, curves: clean, market });
+    const claims = {};
+    if (policy === 'market') for (const R of RUNG_LIST) claims[R] = binaryProb(R, RUNG_DEADLINE[R]);
+    const record = Object.freeze({ day, policy, curves: clean, market, pairs: _lockPairs(day, clean, policy), claims: Object.freeze(claims) });
     P.locks.push(record);
     P.lastLockDay = day;
     P.draft = normalizeCurves(clean);
@@ -809,91 +1198,119 @@ function _softplus(x) {
     return x > 0 ? x + Math.log1p(Math.exp(-x)) : Math.log1p(Math.exp(x));
 }
 
-/** Survival-conditioned crossing probability P(t0 < T <= t1 | T > t0) under the
- *  logistic {m, w}, as 1 - S(t1)/S(t0) in log space: stable when the median is
- *  far behind t0, where the naive (F(t1) - F(t0))/(1 - F(t0)) is 0/0. Pure; the
- *  Markets panel draws the draft with it. */
-export function crossingProb(m, w, t0, t1) {
-    if (t1 <= t0) return 0;
-    return -Math.expm1(_softplus((t0 - m) / w) - _softplus((t1 - m) / w));
-}
-
-/** The quarter's scored crossing probability (02a): P(T in (L_q, L_q+1] | T > L_q)
- *  under {m, w}, clamped to [0.02, 0.98]. Pure; the harness scores with it too. */
-export function quarterProb(m, w, t0, t1) {
-    return clamp(crossingProb(m, w, t0, t1), SCORE_P_MIN, SCORE_P_MAX);
-}
-
 /** The log-likelihood-ratio increment in nats for one rung-quarter (02a):
  *  o*ln(pP/pM) + (1-o)*ln((1-pP)/(1-pM)). Exactly 0 when pP === pM. */
 export function logScoreDelta(pP, pM, o) {
     return o ? Math.log(pP / pM) : Math.log((1 - pP) / (1 - pM));
 }
 
-/**
- * Score the quarter that ends on lock day `day` (02a "Scoring"), BEFORE that
- * day's lock is recorded. Every rung R in {2,3,4} still uncertified at
- * L_q = day - 63 is scored under the lock recorded at L_q, for the player and
- * the snapshotted `B` alike; o = 1 if R's public certification day falls in
- * (L_q, day]. (02a writes the quarter [L_q, L_q+1); a lock is recorded after its
- * day's close, so a certification ON L_q was already known to it, and one ON
- * L_q+1 lands inside the quarter being closed.) S_P accumulates the increments
- * and credibility = tanh(S_P / K_CRED).
- *
- * Current day only (`day === belief.day`, on-grid, > 0), and once per quarter: a
- * repeat call returns the quarter's existing entry. Returns null when there is no
- * lock at L_q (no stated curve, nothing to score) or no rung was open, so a
- * quarter counts in the record only when something was actually at stake.
- */
-export function scoreQuarter(day) {
+/** The variance of one rung-quarter's increment under the market's own
+ *  probability (02a, sigma0): p_M(1 - p_M)*(ln(p_P/p_M) - ln((1-p_P)/(1-p_M)))^2.
+ *  Exactly 0 when p_P === p_M. */
+export function scoreVariance(pP, pM) {
+    const d = Math.log(pP / pM) - Math.log((1 - pP) / (1 - pM));
+    return pM * (1 - pM) * d * d;
+}
+
+/** Score one lock's quarter from its stored pairs against certification days
+ *  read by `cdOf`; push the entry and return it, or null when no rung was open.
+ *  S_P and sigma0^2 accumulate together. */
+function _scoreLock(lock, to, cdOf, terminal) {
     const P = belief.player;
-    if (!P || !(day > 0 && isLockDay(day) && day === belief.day)) return null;
-    const done = P.scores.find(s => s.to === day);
-    if (done) return done;
-    const from = day - LOCK_INTERVAL;
-    const lock = P.locks.find(l => l.day === from);
-    if (!lock) return null;
     const rungs = [];
     for (const R of SCORED_RUNGS) {
-        const cd = _certDay(R);
-        if (cd != null && cd <= from) continue;                   // certified at L_q: frozen, not scored
-        const o = cd != null && cd <= day ? 1 : 0;
-        const pP = quarterProb(lock.curves[R].m, lock.curves[R].w, from, day);
-        const pM = quarterProb(lock.market[R].m, lock.market[R].w, from, day);
-        rungs.push({ R, o, pP, pM, delta: logScoreDelta(pP, pM, o) });
+        const pr = lock.pairs[R];
+        if (!pr) continue;                                        // certified at L_q: not scored
+        const cd = cdOf(R);
+        const o = cd != null && cd > lock.day && cd <= to ? 1 : 0;
+        rungs.push(Object.freeze({ R, o, pP: pr.pP, pM: pr.pM, delta: logScoreDelta(pr.pP, pr.pM, o), v: scoreVariance(pr.pP, pr.pM) }));
     }
     if (!rungs.length) return null;
     const delta = rungs.reduce((a, r) => a + r.delta, 0);
     P.S += delta;
+    P.var0 += rungs.reduce((a, r) => a + r.v, 0);
     P.credibility = Math.tanh(P.S / forecastTuning.K_CRED);
-    const rec = Object.freeze({ from, to: day, rungs: Object.freeze(rungs), delta, S: P.S, credibility: P.credibility });
+    const rec = Object.freeze({ from: lock.day, to, rungs: Object.freeze(rungs), delta, S: P.S, var0: P.var0, credibility: P.credibility, terminal: !!terminal });
     P.scores.push(rec);
     return rec;
 }
 
+/**
+ * Score the quarter that ends on lock day `day` (02a "Scoring"), BEFORE that
+ * day's lock is recorded. Every rung R in {2,3,4} open at L_q = day - 63 is
+ * scored from the pair the lock at L_q stored; o = 1 if R's public certification
+ * day falls in (L_q, day]. (A lock is recorded after its day's close, so a
+ * certification ON L_q was already known to it, and one ON L_q+1 lands inside
+ * the quarter being closed.) S_P accumulates and credibility = tanh(S_P/K_CRED).
+ *
+ * Current day only (`day === belief.day`, on-grid, > 0), and once per quarter: a
+ * repeat call returns the quarter's existing entry. Null when there is no lock
+ * at L_q or no rung was open.
+ */
+export function scoreQuarter(day) {
+    const P = belief.player;
+    if (!P || !(day > 0 && isLockDay(day) && day === belief.day)) return null;
+    const from = day - LOCK_INTERVAL;
+    const done = P.scores.find(s => s.from === from);
+    if (done) return done;
+    const lock = P.locks.find(l => l.day === from);
+    if (!lock) return null;
+    return _scoreLock(lock, day, certDay, false);
+}
+
+/**
+ * The outstanding quarter at the terminal (02a "Scoring"): when the run ends
+ * between locks, the latest lock's quarter, if unscored, is scored once against
+ * its original end date and the authoritative completed trajectory -- the race's
+ * certification days after resolveNow, so a certification in a desk ejection's
+ * headless extrapolation before that date scores o = 1. No terminal lock is
+ * created and no quarter is scored twice. Call after resolveNow, before the
+ * epilogue. Returns the entry, the existing one on a repeat, or null.
+ */
+export function scoreOutstandingQuarter(race) {
+    const P = belief.player;
+    const lock = latestLock();
+    if (!P || !lock || !race || !race.capability) return null;
+    const done = P.scores.find(s => s.from === lock.day);
+    if (done) return done;
+    const cdOf = (R) => {                                         // the record's predicate, on the completed race
+        let d = null;
+        for (const id of ['halcyon', 'tianxia', 'polaris']) {
+            const c = race.capability.labs[id].rungCertified[R];
+            if (c != null && (d == null || c < d)) d = c;
+        }
+        return d;
+    };
+    return _scoreLock(lock, lock.day + LOCK_INTERVAL, cdOf, true);
+}
+
 /** The player's record (the Desk, the dispatch, the epilogue): quarters scored,
- *  cumulative skill S_P in nats, credibility, and the per-quarter history. */
+ *  cumulative skill S_P in nats, sigma0 (how far the record would swing by luck
+ *  if the market were right; reported, read by no gate), credibility, and the
+ *  per-quarter history. */
 export function forecastRecord() {
     const P = belief.player;
     if (!P) return null;
-    return { quarters: P.scores.length, S: P.S, credibility: P.credibility, locks: P.locks.length, history: P.scores.slice() };
+    return { quarters: P.scores.length, S: P.S, sigma0: Math.sqrt(P.var0),
+        credibility: P.credibility, locks: P.locks.length, history: P.scores.slice() };
 }
 
 /**
  * The latest lock's P(T_R <= D_R) at rung R's contract deadline, survival-
- * conditioned at the lock day -- the same reading a Consensus quote gives, so a
- * copier's claim is the quote it copied. A rung certified by the lock day reads
- * 1 (or 0 if it certified after its deadline); a deadline already behind the
- * lock reads 0. Null if never locked. (The scrutiny gap and the F conversion
- * read playerPilled's horizon measure instead, not this.)
+ * conditioned at the lock day. For a market-policy lock it is `B`'s quote at the
+ * lock (02a). A rung certified by the lock day reads 1 (0 if it certified after
+ * its deadline); a deadline already behind the lock reads 0. Null if never
+ * locked. (The scrutiny gap and the F conversion read playerPilled instead.)
  */
 export function lockedClaim(R) {
     const lock = latestLock();
     if (!lock || !lock.curves[R]) return null;
     const D = RUNG_DEADLINE[R];
-    const cd = _certDay(R);
+    const cd = certDay(R);
     if (cd != null && cd <= lock.day) return cd <= D ? 1 : 0;
-    return clamp(crossingProb(lock.curves[R].m, lock.curves[R].w, lock.day, D), 0, 1);
+    if (lock.policy === 'market') return lock.claims[R];
+    const c = lock.curves[R];
+    return clamp(crossingProb(c.m, c.w, c.q, lock.day, D), 0, 1);
 }
 
 /** Current player credibility in (-1, 1): tanh(S_P / K_CRED), written by
@@ -915,23 +1332,21 @@ export function canActAsFund(F) { return credibility() > FUND_CRED_GATE && (F ??
 
 /**
  * The player's "pilledness" in [0,100]: the SAME measure as marketPilled, read off
- * the latest locked curve instead of `B` -- 100 x P(R4 crosses within F_HORIZON
- * days of today | not yet crossed), survival-conditioned at today, through the same
- * law (_condProb) and horizon (coordinator ruling, 2026-10-24). A market copier
- * therefore reads the market's pilledness exactly on its lock day: no scrutiny gap
- * and no conviction from copying. A certified R4 reads 100, as it does for `B`. If
- * the player has never locked there is no divergence to scrutinize, so this tracks
- * the market (no scrutiny heat). lockedClaim keeps the contract-deadline reading
- * for anything else that wants it.
+ * the latest lock -- 100 x P(R4 within F_HORIZON days of today | not yet),
+ * survival-conditioned at today under the locked {m, w, q}. A market-policy lock
+ * reads marketPilled itself, live (02a), so copying the market draws no scrutiny
+ * gap or trait. A certified R4 reads 100. Never locked: tracks the market.
  */
 export function playerPilled() {
     const lock = latestLock();
-    if (!lock) return marketPilled();
-    const D = belief.day + F_HORIZON;
-    const cd = _certDay(4);
+    if (!lock || lock.policy === 'market') return marketPilled();
+    // The same event B's law measures: R4 within the horizon AND within its
+    // support (nothing certifies after day 1008).
+    const D = Math.min(belief.day + F_HORIZON, SUPPORT[4]);
+    const cd = certDay(4);
     if (cd != null) return D >= cd ? 100 : 0;
     const c = lock.curves[4];
-    return 100 * _condProb(c.m, c.w, belief.day, D);
+    return 100 * crossingProb(c.m, c.w, c.q, belief.day, D);
 }
 
 // ---- Firm belief F (stored on race.F; logic beside B) ---------------------
@@ -939,7 +1354,7 @@ export function playerPilled() {
 /** The market's implied pilledness in [0,100] derived from `B` (belief R4 lands
  *  within the near horizon). The firm wakes toward this. */
 export function marketPilled() {
-    return 100 * binaryProb(4, belief.day + F_HORIZON);
+    return 100 * binaryProb(4, Math.min(belief.day + F_HORIZON, SUPPORT[4]));
 }
 
 /** Read F off the race (0 outside Dynamic). */

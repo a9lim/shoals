@@ -20,8 +20,8 @@ import { createRaceState, advanceRace, stepControlRegime, freshTransitions } fro
 import { stepTreaty } from '../src/race/treaty-track.js';
 import { checkResolution, HORIZON } from '../src/race/resolution.js';
 import { buildPublicView, initConsensus } from '../src/race/consensus.js';
-import { belief, initBelief, stepBelief } from '../src/race/belief.js';
-import { r5ProbabilityFromBelief, initValuation, stepValuation, lastValuation, resetValuation, computeValuation } from '../src/race/valuation.js';
+import { belief, initBelief, stepBelief, binaryProb } from '../src/race/belief.js';
+import { initValuation, stepValuation, lastValuation, resetValuation, computeValuation } from '../src/race/valuation.js';
 import { resetLedger, deactivateLedger, freezeLedger, ledgerEntries, applyRaceEffects, raceChannelsLive } from '../src/race/ledger.js';
 import { resetCoupling, stepCoupling, couplingAttribution, COUPLING_TUNING } from '../src/race/coupling.js';
 import {
@@ -58,7 +58,8 @@ function check(name, ok, detail = '') { results.push({ name, ok, detail }); if (
 const near = (a, b) => Math.abs(a - b) < 1e-9;
 const T = ROUNDS_TUNING;
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-const pi = () => r5ProbabilityFromBelief(belief.rungs[5], belief.day);
+// Pi is the R5 contract's quote (02a rounds): B's P(R5 by day 1000).
+const pi = () => binaryProb(5, 1000);
 
 function copy(value) {
     if (Array.isArray(value)) return value.map(copy);
@@ -363,7 +364,7 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
         portfolioValue: book.portfolioValue,
         allocatePrivateStake: book.allocatePrivateStake, allocatePrimaryStock: book.allocatePrimaryStock,
         cancelAllOrders: book.cancelAllOrders, checkPendingOrders: book.checkPendingOrders,
-        ROUNDS_TUNING, stepRounds, stepValuation, r5ProbabilityFromBelief, belief,
+        ROUNDS_TUNING, stepRounds, stepValuation, binaryProb, belief,
         halcyonOfferPrice, recordPrimaryAllocation, applyRaceEffects, raceChannelsLive,
         consensus: { active: false }, computeMarket: { active: false },
         showToast: message => messages.push(message), fmtDollar,
@@ -391,8 +392,12 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     api.race(race); resetLedger(); initBelief(race); initValuation(race); initRounds(race);
     api.gap(0);   // observe the public walkout
     const previous = lastValuation();
-    race.day = 31; belief.day = 31; race.lastTransitions = freshTransitions();
-    race.capability.labs.tianxia.rungReleased[2] = 31;
+    // Step the public record day by day to 31, where Tianxia's R2 claim lands.
+    for (let d = race.day + 1; d <= 31; d++) {
+        race.day = d; race.lastTransitions = freshTransitions();
+        if (d === 31) race.capability.labs.tianxia.rungReleased[2] = 31;
+        stepBelief(race);
+    }
     const ratio = clamp(computeValuation(race) / previous, 0.75, 1.30);
     api.gap(1);
     check('H: actual main gap combines valuation/dilution and syncs marks', near(api.sim.S, 100 * ratio * T.halcyonDilution) && market.S === api.sim.S);
@@ -441,8 +446,9 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     const r2 = fixture(); api.race(r2); initBelief(r2); initValuation(r2); initRounds(r2);
     api.sim.S = 100; syncMarket(api.sim); api.gap(0);
     const stop = book.placePendingOrder('stock', 'long', 10, 'stop', 104);
-    r2.day += 1; belief.day = r2.day; r2.lastTransitions = freshTransitions();
-    r2.capability.labs.halcyon.rungReleased[3] = r2.day;   // a public claim lifts the lead
+    r2.day += 1; r2.lastTransitions = freshTransitions();
+    r2.capability.labs.halcyon.rungReleased[3] = r2.day;   // a public claim moves V
+    stepBelief(r2);
     api.gap(0);
     const filledAtGap = !book.portfolio.orders.includes(stop) && book.portfolio.positions.some(p => p.type === 'stock' && p.qty === 10);
     check('H: a resting stop the gap jumps fills at the post-gap price, before the next substep',

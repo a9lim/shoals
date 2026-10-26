@@ -55,7 +55,9 @@
            N defaults to 500; base seed defaults to 1.
    =================================================== */
 
-import { createRaceState, advanceRace, setControlRegime } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, setControlRegime, stepControlRegime } from '../src/race/race-state.js';
+import { stepTreaty } from '../src/race/treaty-track.js';
+import { checkResolution } from '../src/race/resolution.js';
 import {
     consensus, initConsensus, refreshBinaryQuotes, computeBinarySettlements,
     buildPublicView, getBinaryQuote, getBinaryMark, pendingTerminalCloseout, BINARY_NOTIONAL,
@@ -448,15 +450,40 @@ let integrityOK = true;
     }
 }
 
+// ---- E0. Event frequencies on the reader's loop ----------------------------
+// The event each contract prices (02a: quotes price the event; the fallback
+// settlement tree is outside the comparison), measured on worlds that run the
+// game's race block to resolution: advanceRace + stepControlRegime + stepTreaty +
+// checkResolution. R2-R4: certified (any frontier lab, direct or implied) by the
+// deadline; R5: the frontier's internal crossing by day 1000.
+const eventFreq = {};
+{
+    const hits = {};
+    for (const c of contractsRef) hits[c.key] = 0;
+    for (let i = 0; i < N; i++) {
+        const race = createRaceState((BASE_SEED + 93000 + i) >>> 0);
+        for (let d = 0; d < HORIZON && !race.resolution; d++) {
+            advanceRace(race); stepControlRegime(race); stepTreaty(race, {});
+            if (checkResolution(race, null)) break;
+        }
+        if (!race.resolution) checkResolution(race, null);
+        for (const c of contractsRef) {
+            const R = c.predicate.rung;
+            const day = c.terminal ? frontierInternalCrossDay(race.capability, R)
+                : Math.min(...['halcyon', 'tianxia', 'polaris'].map(id => race.capability.labs[id].rungCertified[R] ?? Infinity));
+            if (day <= c.deadline) hits[c.key]++;
+        }
+    }
+    for (const c of contractsRef) eventFreq[c.key] = hits[c.key] / N;
+}
+
 // ---- E. Listing calibration (+-8pp of measured, two-sided) ---------------
 
 const listingRows = [];
 {
     for (const c of contractsRef) {
-        const t = outcomeTally[c.key];
-        const tot = t.YES + t.NO + t.FALLBACK + t.PENDING || 1;
-        // Measured "YES-equivalent": YES for cert contracts, crossing (PENDING) for terminal R5.
-        const measured = c.terminal ? t.PENDING / tot : t.YES / tot;
+        // Measured: the event's frequency on the reader's loop (E0).
+        const measured = eventFreq[c.key];
         const mid = listingMids[c.key];
         const within = Math.abs(mid - measured) <= 0.08;
         const twoSided = mid > 0.05 && mid < 0.95;
@@ -634,29 +661,42 @@ let restrictBlocksBinary = false, cancelAllWorks = false, releaseAfterNat = fals
 
 // ---- Z. Belief-backed quoter swapped in (phase 4) ------------------------
 // The REAL P4 quoter (belief.js) replaces the placeholder via setBinaryQuoteSource,
-// stepped in lockstep with the race off the public ledger. Re-runs the two
-// load-bearing probes against it: (1) listing calibration -- day-0 mids equal the
-// listing base rate, two-sided; (2) full-corruption invariance -- corrupting every
-// continuous hidden field leaves the belief-backed quote bit-identical (B is built
-// from the ledger, so it never reads latent state). Restores the placeholder after.
+// stepped in lockstep with the race (advanceRace + stepControlRegime + stepTreaty
+// + stepBelief, the reader's loop). Re-runs the load-bearing probes against it:
+// (1) the base-rate gates (02a "Consensus binaries") -- each listing base rate
+// within 0.03 of the mean day-0 B quote over worlds, every day-0 mid two-sided,
+// and the mean day-0 mid within 8 points of the event's measured frequency (E0);
+// (2) full-corruption invariance -- corrupting every continuous hidden field
+// leaves the belief-backed quote bit-identical. Restores the placeholder after.
 
 let zListingOK = true, zInvarianceOK = true, zActiveOK = false;
+const zRows = [];
+const raceDay = (race) => { advanceRace(race); stepControlRegime(race); stepTreaty(race, {}); stepBelief(race); };
 {
     // initConsensus RESETS _quoteSource to the placeholder, so the belief source
     // must be installed AFTER every initConsensus (a helper enforces the order).
     const initBook = (race) => { initConsensus(race); initBelief(race); setBinaryQuoteSource(binaryQuoteFromBelief); };
 
-    // (1) Listing calibration with the belief quoter.
+    // (1) The base-rate gates with the belief quoter, over N worlds' day 0.
     {
-        const race = createRaceState((BASE_SEED + 91000) >>> 0);
-        initBook(race); refreshBinaryQuotes(race);
+        const mids = {};
+        for (let i = 0; i < N; i++) {
+            const race = createRaceState((BASE_SEED + 91000 + i) >>> 0);
+            initBook(race); refreshBinaryQuotes(race);
+            for (const c of consensus.contracts) {
+                const mid = getBinaryQuote(c.key).mid;
+                (mids[c.key] ||= []).push(mid);
+                if (!(mid > 0.05 && mid < 0.95)) { zListingOK = false; assert(false, `belief listing mid ${mid.toFixed(3)} not two-sided (key=${c.key})`); }
+            }
+        }
         for (const c of consensus.contracts) {
-            const mid = getBinaryQuote(c.key).mid;
-            const within = Math.abs(mid - c.baseRate) <= 0.08;
-            const twoSided = mid > 0.05 && mid < 0.95;
-            if (!within || !twoSided) zListingOK = false;
-            assert(within, `belief listing mid ${mid.toFixed(3)} not within 8pp of base ${c.baseRate} (key=${c.key})`);
-            assert(twoSided, `belief listing mid ${mid.toFixed(3)} not two-sided (key=${c.key})`);
+            const m = mids[c.key].reduce((a, b) => a + b, 0) / mids[c.key].length;
+            const measured = eventFreq[c.key];
+            const baseOK = Math.abs(c.baseRate - m) <= 0.03, measOK = Math.abs(m - measured) <= 0.08;
+            if (!baseOK || !measOK) zListingOK = false;
+            assert(baseOK, `base rate ${c.baseRate} not within 0.03 of the mean day-0 B quote ${m.toFixed(3)} (key=${c.key})`);
+            assert(measOK, `mean day-0 B quote ${m.toFixed(3)} not within 8pp of measured ${measured.toFixed(3)} (key=${c.key})`);
+            zRows.push({ key: c.key, rung: c.predicate.rung, base: c.baseRate, mean: m, min: Math.min(...mids[c.key]), max: Math.max(...mids[c.key]), measured });
         }
     }
 
@@ -666,7 +706,7 @@ let zListingOK = true, zInvarianceOK = true, zActiveOK = false;
     {
         const race = createRaceState((BASE_SEED + 91200) >>> 0);
         initBook(race);
-        for (let d = 0; d < 700; d++) { advanceRace(race); stepBelief(race); computeBinarySettlements(race); }
+        for (let d = 0; d < 700; d++) { raceDay(race); computeBinarySettlements(race); }
         refreshBinaryQuotes(race);
         const view = buildPublicView(race);
         let anyDiff = false;
@@ -686,13 +726,13 @@ let zListingOK = true, zInvarianceOK = true, zActiveOK = false;
         for (const D of DAYS) {
             const seed = (BASE_SEED + 91100 + s) >>> 0;
             const raceA = createRaceState(seed); initBook(raceA);
-            for (let d = 0; d < D; d++) { advanceRace(raceA); stepBelief(raceA); computeBinarySettlements(raceA); }
+            for (let d = 0; d < D; d++) { raceDay(raceA); computeBinarySettlements(raceA); }
             refreshBinaryQuotes(raceA);
             const qA = JSON.stringify(consensus.quotes);
 
             const raceB = createRaceState(seed); initBook(raceB);
-            for (let d = 0; d < D - 1; d++) { advanceRace(raceB); stepBelief(raceB); computeBinarySettlements(raceB); }
-            advanceRace(raceB); stepBelief(raceB);   // clean belief step off the day-D ledger
+            for (let d = 0; d < D - 1; d++) { raceDay(raceB); computeBinarySettlements(raceB); }
+            raceDay(raceB);                           // clean belief step off the day-D ledger
             corruptContinuous(raceB);                 // corrupt AFTER B has folded the clean ledger
             computeBinarySettlements(raceB);
             refreshBinaryQuotes(raceB);
@@ -739,7 +779,7 @@ line(`  coincident option-expiry (processExpiry skips binary): ${coincidentOK ? 
 line('\nD. Integrity (no hidden state in quote OR fresh settlement)');
 line(`  public-only view + quote+settlement invariant under full continuous corruption: ${integrityOK ? 'holds' : 'VIOLATED'}`);
 
-line('\nE. Listing calibration (day-0 mid vs measured, +-8pp, two-sided)');
+line('\nE. Listing calibration (day-0 mid vs the event frequency on the reader\'s loop, +-8pp, two-sided)');
 line('  key  rung   base    mid    measured   within8pp  two-sided');
 for (const r of listingRows) {
     line(`  ${String(r.key).padStart(3)}   R${r.rung}   ${r.base.toFixed(2)}   ${r.mid.toFixed(3)}   ${r.measured.toFixed(3)}      ${r.within ? 'yes' : 'NO '}        ${r.twoSided ? 'yes' : 'NO'}`);
@@ -762,7 +802,9 @@ line(`  cancelAllOrders clears the pending book:              ${cancelAllWorks ?
 line(`  restriction releasable after nationalization settles: ${releaseAfterNat ? 'ok' : 'FAIL'}`);
 
 line('\nZ. Belief-backed quoter (phase 4, swapped in via setBinaryQuoteSource)');
-line(`  listing mids == base rate, two-sided:                 ${zListingOK ? 'ok' : 'FAIL'}`);
+line('  key  rung   base   mean day-0 B (min-max)   measured   (base within 0.03 of mean; mean within 8pp of measured)');
+for (const r of zRows) line(`  ${String(r.key).padStart(3)}   R${r.rung}   ${r.base.toFixed(3)}  ${r.mean.toFixed(3)} (${r.min.toFixed(3)}-${r.max.toFixed(3)})       ${r.measured.toFixed(3)}`);
+line(`  base-rate gates + two-sided:                          ${zListingOK ? 'ok' : 'FAIL'}`);
 line(`  belief source really installed (diverges from placeholder): ${zActiveOK ? 'ok' : 'FAIL'}`);
 line(`  full-corruption invariance with the real quoter:      ${zInvarianceOK ? 'holds' : 'VIOLATED'}`);
 

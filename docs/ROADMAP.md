@@ -14,7 +14,7 @@ How a round runs:
 1. Ratify the design into 02a.
 2. Implement. Implementers flag interpretation calls rather than
    improvise.
-3. Run the nine harnesses at default N.
+3. Run the ten harnesses at default N.
 4. Get an independent Codex review of the round before committing.
 
 Player-facing prose and the score are authored, and a9 ratifies them.
@@ -96,84 +96,56 @@ the world that resolved.
   ruling that the ledger's `B` channel is closed, for dissemination only
   (section 2).
 
-### Measured baseline (2026-10-25 probes)
+### Measured in the reader round (2026-10-25)
 
-Throwaway probes against the race model, to be rebuilt as a harness in
-section 1. Both readers below are simple fits on public state only,
-trained on simulated worlds and tested on held-out ones.
+The reader and `B`'s rebuild are built. Their rulings are in 02a ("The
+reader", "Belief, η, and the firm", "The valuation layer"). What the
+measurements say about the direction:
 
-- **The family probe stays below the late-determination ceilings.** A
-  linear softmax on about 45 public features beats the prior's Brier
-  score by 16.5% at day 350 and 27.7% at day 700. The gates allow 25%
-  and 60%. The harness's four-feature bucket oracle gets 2.4% and 16.8%,
-  so the gate has been measured against a weak oracle. Passing with a
-  linear reader does not bound what is attainable: richer histories and
-  nonlinear predictors are untested.
-- **There is exploitable public structure in rung timing.** The event is
-  "does rung R certify this quarter", scored on 3,000 held-out worlds
-  after training on 3,000. Mean log loss per eligible rung-quarter:
-  - `B`'s own quarterly quote: 0.206 nats;
-  - `B`'s quote Platt-rescaled with elapsed time: 0.184;
-  - a logistic reader on public features plus `B`'s quote: 0.125.
+- **A calibrated market leaves a small public edge.** The 2.8 nats per
+  run the ideation probe found came mostly from the old heuristic `B`'s
+  own miscalibration. Part of it was statically exploitable. A
+  headline-only reader, calibrated, is nearly as good as one that reads
+  the whole record (0.004 nats per rung-quarter apart): today's quiet
+  record carries little timing information.
+- **The edge is the market's crude reading of the headlines.** That was
+  a9's ruling. The rule of thumb is calibrated only by day and claim
+  state, so nothing static beats it. A reader-copier then earns about
+  0.8 nats per run against `B` (validation worlds). The opportunity per
+  run is 0.70 nats in Act I, 0.19 in Act II and nothing in Act III. The
+  edge closes once a rung is claimed. `K_CRED` is 1.35.
+- **Luck still opens gates for a few.** Against a market this sharp, a
+  skilled record is about a nat. A static early caller has a negative
+  mean, but its heavy right tail clears the memo gate in about 5% of
+  worlds. A significance condition on the gates was tried and dropped.
+  It penalized the bold, skilled reader more than the lucky caller.
+- **Domains are where the designed quiet signal comes from.** The
+  demonstration channel (below) should widen the edge on information,
+  not on the market's error. Its round measures that.
+- **Late determination.** The reader's family head stays under the
+  knife-edge ceilings: it beats the prior's Brier by 16.7% at day 350 and
+  28.4% at day 700, against 25% and 60%. But at about 29% of act
+  boundaries it gives one family more than 0.60, against principle 1's
+  target of none. That target was unmeasured until now. It is a
+  diagnostic, and a question for the knife-edge's next retune.
 
-  That is roughly 2.8 nats per run, an estimate rather than a sum of
-  scored rows. The gain beyond Platt scaling is evidence of predictive
-  structure `B` doesn't use. It is not an attribution to particular
-  signals (claims, cadence, recency); that needs ablations. At `K_CRED`
-  1.8, a player with that mean skill would sit at credibility of about
-  tanh(2.8/1.8) ≈ 0.9. This is evaluated at estimated mean skill, not
-  measured credibility or gate reachability. Either way, the edge's size
-  is not a ratified number today.
+## 1. Next: the forecast as a standing policy, then domains
 
-## 1. Next: the reader, domains, and `B` as a designed inefficiency
+The reader, the public record and `B` as a designed inefficiency landed
+in the 2026-10-25 round. Two pieces of the approved section remain, in
+this order. Each refits the reader where it changes the record.
 
-Approved by a9. This supersedes the earlier "domains, and the market's
-belief rebuilt" round and keeps its contents. The reader is the
-measuring stick the later sections are tuned against.
+### The forecast as a standing policy
 
-### The reader
-
-A forecaster of the race fit on the simulator's own runs, from public
-state only. This is the standard technique of amortized simulation-based
-inference; even a logistic fit does well here.
-
-- **Inputs:** the public record — claims and certifications per lab and
-  domain, release cadence, detected incidents by severity and source,
-  disclosed thefts, the strait, the regime, and elapsed time. No hidden
-  field, so the corruption harnesses still pass by construction.
-- **Outputs:** per-rung (and per-domain) crossing laws, the family
-  distribution, and `E[m_f | survival, public state]` for the valuation
-  layer.
-- **Form:** fit offline into a generated constants file with its own
-  harness, the plan the old round already had for the valuation
-  estimator. It stays deterministic, small and gateable. The epilogue's
-  library of worlds (section 3) can be simulated in a worker after the
-  run ends.
-- **What this round delivers:** the data contract and the estimator.
-  Section 2's evidence archive will extend the inputs, and section 4's
-  licensing switches on the in-fiction product. The reader is refit
-  whenever dissemination (section 2) or intervention-bounded influence
-  (section 3) changes the distribution of runs it was trained on.
-
-### `B` as a designed inefficiency
-
-- **`B` is a mix**, by a weight ratified in 02a, of a legible-only quoter
-  and the reader. The legible-only quoter is today's `B` with a plateau
-  mass. In the fiction, the reader's share is the part of the market that
-  has licensed models (section 4). η becomes literal, and alpha decay
-  becomes a ratified curve: how big the public edge is in each act, and
-  how fast it closes.
-- **The edge closes decisively.** After the legible event that reveals
-  it (a claim, a demonstration, a certification), the gap between `B`
-  and the reader on that rung closes with a short half-life. To be paid,
-  you must act early. Unwinding later realizes the market's new price.
-- **A plateau mass per rung:** `F(t) = (1 − q)·σ((t − m)/w)`. With three
-  parameters, day-0 quotes can equal the listing priors *and* the medians
-  can match the measured certified medians. The player's curves gain the
-  same `q`, and the scoring stays proper. The listing priors in
-  `consensus.js` and `RUNG_BASE` in `belief.js` stay one number.
-- **The valuation layer reads the reader's survival-conditioned
-  expectation**, with a Deal term so V prices the treaty track.
+Sixteen of a run's 48 dispatches were forecast locks in the 2026-10-25
+play, and domains would multiply the curves. The quarterly lock becomes a
+standing policy the player sets: carry my curves or follow the market,
+plus follow the reader once section 4 licenses it. At each quarter's
+opening, the policy is snapshotted without a modal, as `scoreQuarter`
+expects today. That immutable snapshot is scored at the quarter's close,
+and revisions during the quarter affect only later snapshots. The
+dispatch returns only when the player asks to revise or an authored
+decision needs them.
 
 ### Domains: rungs observed through certification channels
 
@@ -217,38 +189,16 @@ an epistemic layer:
   for example cyber capability raising theft and incident rates. That
   touches kinematics.
 
-### The forecast as a standing policy
+### Gates for the rest of the section
 
-Sixteen of a run's 48 dispatches were forecast locks in the 2026-10-25
-play, and domains would multiply the curves. The quarterly lock becomes a
-standing policy the player sets: carry my curves or follow the market,
-plus follow the reader once section 4 licenses it. At each quarter's
-opening, the policy is snapshotted without a modal, as `scoreQuarter`
-expects today. That immutable snapshot is scored at the quarter's close,
-and revisions during the quarter affect only later snapshots. The
-dispatch returns only when the player asks to revise or an authored
-decision needs them.
-
-### Gates
-
-- **Calibration of the reader** on held-out seeds, per rung and domain,
-  and for the family.
-- **A learning floor beside the ceiling.** The full-public reader must
-  beat a prior-only reader by a ratified margin on rung timing, so the
-  evidence is worth reading. The late-determination ceiling stays, and is
-  measured against the reader instead of the bucket oracle.
-- **The edge curve.** The reader's edge over `B` per act falls inside
-  ratified bands. Its half-life after a revealing event is bounded above.
-  No static forecast preset earns positive mean skill.
-- **The valuation layer**, with the correction to the old round's gates.
-  An estimator fitted on compressed public state is not a martingale
-  automatically. Drift *within realized families* is expected, since a
-  good world's V should rise. The gates are held-out calibration and
-  conditional expected **level** increments under the stated measure,
-  across all worlds, plus a test for forecast errors that are exploitable
-  from information available at the time. Terminal reveal errors are a
-  separate diagnostic.
-- Recalibrate `K_CRED` against the new scale.
+- Domains change the record, so the reader is refit and its gates rerun.
+  The edge bands and `K_CRED` are re-derived on validation worlds, as in
+  02a.
+- The demonstration channel's edge is measured on its own: the edge with
+  domains, against the edge without them.
+- The standing policy's automatic locks match their declared policy
+  exactly. A policy lock snapshots at the quarter's opening, and no
+  forecast uses information from after its snapshot.
 
 ## 2. The decision chain: editions as evidence, spending the edge, Meridian
 
@@ -702,6 +652,13 @@ Deferred until the section 2 chain works.
 
 ## 9. The race's missing machinery
 
+- **Releases are phase-locked across worlds early.** Release policy is a
+  threshold on near-deterministic drift, so Act I releases fall on
+  nearly the same calendar in every world. Measured in the 2026-10-25
+  round over day mod 63: releases run ±20% by week, and claims run 65%
+  above average in days 42–48. A per-lab jitter on appetite, or a
+  release-review lag, would desynchronize them. The reader would then be
+  refit.
 - **Security levels**, SL1–SL4 per lab, with costs, research friction and
   observable tells (badge policies, a paper drought, the air-gap
   complaint). Theft success keys off the victim's level. Today every lab
@@ -820,3 +777,14 @@ autumn of 2026 (real events are calibration, never content):
 - Race-page labels collide where a claim, a certification and an
   in-house crossing fall within a few weeks of each other (around R2 in
   the 2026-10-25 run).
+- At an 800-pixel viewport, the Markets page's sandbox rail overlaps the
+  Options and Consensus panels; at desktop width it lays out cleanly.
+  Seen in the 2026-10-25 round. Check whether it predates the round.
+- The reader's known limits (02a, "The reader" and "The valuation
+  layer") all point to the same next step, a nonlinear model class over
+  the same features (boosted trees, or a martingale-corrected family
+  head):
+  - pre-claim cohorts misread within a day;
+  - `V` drifting predictably at about 0.027 a quarter.
+
+  Take it when a later round needs a tighter measuring stick.

@@ -118,15 +118,16 @@ import {
     finalizeComputeTerminal,
 } from './src/race/compute-market.js';
 import { closeoutBook } from './src/race/closeout.js';
-import { initValuation, stepValuation, lastValuation, resetValuation, r5ProbabilityFromBelief } from './src/race/valuation.js';
+import { initValuation, stepValuation, lastValuation, resetValuation } from './src/race/valuation.js';
 import {
     ROUNDS_TUNING, initRounds, resetRounds, stepRounds, lastPolarisRound,
     roundAllocation, halcyonOfferPrice, recordPrimaryAllocation, primaryInputs,
 } from './src/race/rounds.js';
 import {
-    belief, initBelief, resetBelief, deactivateBelief, stepBelief,
+    belief, initBelief, resetBelief, deactivateBelief, stepBelief, binaryProb,
     binaryQuoteFromBelief, computeCurveFromBelief,
-    isLockDay, lockForecast, scoreQuarter, draftCurves, presetCurves, curvesEqual, openRungs,
+    isLockDay, lockForecast, scoreQuarter, scoreOutstandingQuarter, draftCurves, presetCurves, curvesEqual, openRungs,
+    curveMedian, impliedTimeline,
     forecastRecord,
     playerPilled, stepFirmBelief, scrutinyGap, hasEverLocked, credibility,
     canSendMemos, canActAsFund, firmBelief, foldPlayerLeak,
@@ -232,7 +233,8 @@ function _stepRaceMarkets(capexWaves) {
             price: halcyonOfferPrice(sim.S),
         } });
     }
-    const pi = r5ProbabilityFromBelief(belief.rungs[5], belief.day);
+    // Pi is the R5 contract's quote: B's probability of R5 by day 1000 (02a rounds).
+    const pi = binaryProb(5, 1000);
     for (const round of stepRounds(raceState, pi)) _queuePopup({ category: 'rounds', _roundOffer: round });
 }
 /** Install / restore the belief-backed Consensus + compute quote sources (P4).
@@ -2187,6 +2189,7 @@ function _applyPopupChoice(event, choice) {
     // first", hold the day for the Markets panel's Lock.
     if (event._forecastLock && choice._lockMode) {
         if (choice._lockMode === 'adjust') _beginLockAdjust(event._lockDay);
+        else if (choice._lockMode === 'market') _recordLock(event._lockDay, null, 'market');
         else _recordLock(event._lockDay, choice._lockMode === 'drawn' ? draftCurves() : presetCurves(choice._lockMode));
     }
     // Reporting-regime lever (phase 5a): a policy choice enacts the mandatory
@@ -2302,6 +2305,9 @@ function _triggerGameOver(endingId) {
     if (raceState) {
         const geo = eventEngine ? eventEngine.world.geopolitical : null;
         resolution = resolveNow(raceState, geo);          // existing record, or extrapolate + latch (freezeLedger first)
+        // The outstanding quarter (02a "Scoring"): the unscored lock is scored once,
+        // against its original end date and the completed trajectory.
+        scoreOutstandingQuarter(raceState);
         closeout = _runTerminalCloseout(resolution, geo);
         // Agency/movability (05 OPEN): compute + STORE on the resolution, surface nothing.
         const _dP = resolution && resolution.axes ? Math.abs(resolution.axes.dP || 0) : 0;
@@ -2507,16 +2513,32 @@ function _composeLockDispatch(ev) {
     let ctx = 'The desk logs your timeline for the record — no retroactive edits — and scores it '
         + 'against the market’s at every quarter’s close: the rungs that certify, and the quiet quarters that don’t.';
     const shown = [3, 4, 5].filter(R => open.includes(R));
-    const days = R => [Math.round(draft[R].m), Math.round(mkt[R].m)];
+    // Both sides as conditional medians given nothing yet (null: not this term),
+    // never the curve's m, which is the median given the rung ever certifies.
+    const today = raceState.day, implied = impliedTimeline();
+    const round = d => d == null ? null : Math.round(d);
+    // A rung still on the market's projection is the market's call, whatever
+    // the projection's fitting error says about its median.
+    const same = R => curvesEqual(draft, mkt, R);
+    const days = R => [same(R) ? round(implied[R]) : round(curveMedian(draft[R], today, R)), round(implied[R])];
+    const by = (d, first) => d == null ? 'not this term' : `by ${first ? 'day ' : ''}${d}`;
     if (shown.length && shown.every(R => days(R)[0] === days(R)[1])) {
         // One sentence when the draft is the market's: a list, not a chorus.
-        ctx += ' Your curves match Consensus: ' + shown.map((R, i) => `R${R} by ${i ? '' : 'day '}${days(R)[1]}`).join(', ') + '.';
+        ctx += ' Your curves match Consensus: ' + shown.map((R, i) => `R${R} ${by(days(R)[1], !i)}`).join(', ') + '.';
     } else {
         for (const R of shown) {
             const [dm, mm] = days(R);
-            ctx += dm === mm
-                ? ` Consensus has R${R} by day ${mm}, and so do you.`
-                : ` Consensus has R${R} by day ${mm}; your curve has it by day ${dm}.`;
+            if (dm === mm) {
+                ctx += mm == null
+                    ? ` Consensus doesn’t see R${R} this term, and neither do you.`
+                    : ` Consensus has R${R} by day ${mm}, and so do you.`;
+            } else if (mm == null) {
+                ctx += ` Consensus doesn’t see R${R} this term; your curve has it by day ${dm}.`;
+            } else if (dm == null) {
+                ctx += ` Consensus has R${R} by day ${mm}; your curve doesn’t see it this term.`;
+            } else {
+                ctx += ` Consensus has R${R} by day ${mm}; your curve has it by day ${dm}.`;
+            }
         }
     }
     const rec = forecastRecord();
@@ -2537,9 +2559,10 @@ function _composeLockDispatch(ev) {
     ev.choices = choices;
 }
 
-/** Record a lock on `day` and report it. Returns the record, or null. */
-function _recordLock(day, curves) {
-    const rec = lockForecast(day, curves);
+/** Record a lock on `day` and report it ('market': a market-policy lock, 02a).
+ *  Returns the record, or null. */
+function _recordLock(day, curves, policy = 'own') {
+    const rec = lockForecast(day, curves, policy);
     _toast(rec ? 'Locked for the quarter.' : 'The lock window has passed — no forecast recorded this quarter.', 4000);
     redrawMarkets();
     if (currentPage() === 'race') setRaceVisible(true);   // the ladder's "Yours" column
@@ -2838,10 +2861,13 @@ function _onDayComplete() {
         // is untouched -- controls bind chips, never weights already released), and is
         // STORED on the race so the plateau detector and any extrapolation price the
         // same drift the kinematics did.
+        // The day's public world inputs: the race steps on them, and the public
+        // record (stepBelief, below) logs the same values (02a "The reader").
+        const _raceInputs = { straitTension: _straitTension(), exportControlStage: _exportControlStage() };
         advanceRace(raceState, {
-            straitTension: _straitTension(),
+            straitTension: _raceInputs.straitTension,
             playerCoupling: _playerCoupling,
-            exportControlStage: _exportControlStage(),
+            exportControlStage: _raceInputs.exportControlStage,
         });
         // Ledger the day's player-attributable dC to Halcyon (C channel; drops zero,
         // and the frozen ledger drops it outright post-latch -- belt and suspenders).
@@ -2861,7 +2887,8 @@ function _onDayComplete() {
         // Treaty track (P6): the hidden Reykjavik gauntlet. Consumes this tick's
         // detection ledger for the summit-week gate; public treatyStage (events)
         // is a pacing accelerator only. summitOpen is mirrored below to summitLive.
-        stepTreaty(raceState, { treatyStage: eventEngine.world.ai.treatyStage });
+        _raceInputs.treatyStage = eventEngine.world.ai.treatyStage;
+        stepTreaty(raceState, { treatyStage: _raceInputs.treatyStage });
         _syncRaceToWorld();
         // Live-day public rung snapshot -- taken here, BEFORE checkResolution's
         // extrapolation can move it (see the declaration above).
@@ -2880,11 +2907,11 @@ function _onDayComplete() {
         // rung -- unlocked at R3, armed set locked at R5. Synced here, before any
         // rule is evaluated below, so arming and firing agree about the world.
         syncStandingOrders(_frontierRung());
-        // Market belief B (overhaul phase 4): fold this completed day's LEGIBLE
-        // ledger (releases, certifications, detected incidents, published/leaked
-        // evidence) into B before anything reads a quote. Consumes ONLY
-        // race.lastTransitions -- never latent state.
-        stepBelief(raceState);
+        // Market belief B: fold this completed day's LEGIBLE ledger into the rule
+        // of thumb and step the public record with the day's public inputs, before
+        // anything reads a quote. Consumes ONLY race.lastTransitions and the public
+        // projection -- never latent state.
+        stepBelief(raceState, _raceInputs);
         // Consensus binaries: settle on this tick's certified crossings /
         // deadlines / impossibility (consumes race.lastTransitions.certifications
         // -- the ledger, never state-diffing), then refresh quotes off the public

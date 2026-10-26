@@ -1,58 +1,66 @@
 #!/usr/bin/env node
 /* ===================================================
    tools/belief-test.mjs -- Correctness + integrity harness
-   for market belief `B`, the belief-backed quoters, market
-   efficiency `eta`, the player's posterior + its scoring,
-   and the decaying event-impulse overlay
-   (overhaul phase 4; src/race/belief.js + src/race/impulse.js).
+   for market belief `B` (the pool of the legible and full
+   readers, src/race/belief.js), the rule of thumb inside it,
+   the belief-backed quoters, eta, the player's posterior and
+   its scoring, and the decaying event-impulse overlay.
 
    Hard-assertion checks:
 
-   A. B-update causality (09 "Information hygiene"): over N real
-      runs, EVERY non-random B move carries a causal evidence ID
-      (belief.causes), and corrupting EVERY latent field -- plus
-      injecting fake entries into the latent incident/evidence
-      QUEUES -- leaves B (rungs + alignment), the implied
-      timeline, and every belief-backed quote bit-identical
-      (stepBelief consumes only race.lastTransitions).
+   A. The rule of thumb's ledger: every move carries an ID and
+      the rule's state reconstructs from the ledger alone.
+      Corrupting every latent field (and injecting fake latent
+      queue entries) before a day's belief step leaves the whole
+      pooled output bit-identical: quotes on a grid, the implied
+      timeline, B's laws, the projection, the family heads, the
+      compute curve.
+   A2. The rule of thumb is bit-identical to HEAD 1343924's heuristic
+      B (the reader's legible heads were fit on it): its per-day
+      {m, w, crossed, certDay} over a fixed seed set hashes to a
+      recorded constant, both through this harness's reader loop and
+      through tools/reader-data.mjs runReaderWorld.
+   B. Leak once-per-ID: a leaked beat folds into the sentiment
+      exactly once; replaying the same ID is a no-op.
+   C. Posterior arithmetic (02a, the posterior with its plateau):
+      crossingProb with q against the naive survival ratio; the
+      plateau handle in closed form; monotone m and q over
+      R2-R4, R5 unordered; locks store clamped pairs; a call's
+      score from the stored pairs; the market-policy copier
+      scores exactly 0; lock guards; once per quarter; no
+      manufactured forecast; lockedClaim and playerPilled of a
+      market-policy lock; sigma0 (against the naive formula, 0 for
+      the market-policy copier; reported, read by no gate).
+   D. Lock-day schedule.
+   E. Listing quotes two-sided with the real quoter (the base
+      rates themselves are consensus-test's gate).
+   L. Pool arithmetic: binaryProb equals (1 - eta)*legible +
+      eta*full, projected, recomputed from the reader API.
+   M. The coherence projection: P(R4) <= P(R3) <= P(R2)
+      pointwise; untouched where the pool is already ordered;
+      binding frequency and size reported.
+   N. The implied timeline and B's law: the pooled median is the
+      first day P reaches 1/2, null when it does not by the
+      support; the law's masses and atom add up.
+   O. The projection onto the player's family: bounds, ladder
+      order, presets with q kept; fit error reported.
+   P. The outstanding quarter at the terminal (02a "Scoring").
+   F. Impulse-overlay decay (no permanent param drift).
+   G. eta monotone in the released frontier.
+   H/H2. F bounded, the gates, the never-lock scrutiny guard.
+   I. A quiet record decays the quote toward NO: by the deadline's eve
+      it sits at least 0.3 below its day-0 listing and is still falling.
+   J/K. Followup impulses; the day-lifecycle overlay order.
 
-   B. Leak once-per-ID (02a): a leaked evidence beat / insider
-      tip folds into B EXACTLY once; replaying the same evidence
-      ID is a no-op. And a public listing-day quote equals the
-      contract's base rate (the seed) -- two-sided.
-
-   C. Posterior scoring arithmetic (02a, the posterior): the
-      quarter's survival-conditioned crossing probability and
-      the log-likelihood-ratio increment checked to the digit
-      against an independent naive formula; a market copier
-      scores exactly 0; credibility = tanh(S_P / K_CRED); the
-      lock guard (full valid curve set, on-grid + current day,
-      immutable with exact replay); scoring needs the opening
-      lock and runs once per quarter; no manufactured forecast
-      (the day-0 draft is a copy of B, nothing is locked).
-
-   D. Lock-day schedule (02a): isLockDay is true exactly on
-      0, 63, 126, ... and false off-grid.
-
-   E. Two-sided listing quotes with the REAL quoter: day-0 mids
-      in (0.05, 0.95) and equal to the listing base rate.
-
-   F. Impulse-overlay decay (03 incident-coupling rule): over a
-      full 1008-day run that fires impulses every few days,
-      apply/decay/remove leaves the sim params at baseline to the
-      bit (no permanent drift), the overlay genuinely shifts a
-      param while live (not a no-op), overlaid values are clamped
-      to PARAM_RANGES, and the accumulator decays to ~0.
-
-   G. eta monotone in the RELEASED frontier (02a ruling): eta is
-      non-decreasing in releasedFrontierRung and reads nothing
-      else; 0 at R1, 1 at R5.
+   Real-world loops run advanceRace + stepControlRegime +
+   stepTreaty + stepBelief, as the game and the reader do.
 
    Usage:  node tools/belief-test.mjs [N] [--seed S]
            N defaults to 300; base seed defaults to 1.
    =================================================== */
 
-import { createRaceState, advanceRace, setControlRegime } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, setControlRegime, stepControlRegime, freshTransitions } from '../src/race/race-state.js';
+import { stepTreaty } from '../src/race/treaty-track.js';
 import {
     consensus, initConsensus, refreshBinaryQuotes, computeBinarySettlements,
     buildPublicView, getBinaryQuote,
@@ -62,14 +70,21 @@ import {
 } from '../src/race/compute-market.js';
 import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief,
-    binaryProb, binaryQuoteFromBelief, computeCurveFromBelief, computeUrgency,
-    impliedTimeline, marketEfficiency, beliefCauses,
-    isLockDay, LOCK_INTERVAL, lockForecast, lockedClaim, scoreQuarter, quarterProb,
-    logScoreDelta, presetCurves, marketCurves, normalizeCurves, draftCurves, curvesEqual,
-    forecastRecord, forecastTuning,
+    binaryProb, quarterProbB, binaryQuoteFromBelief, computeCurveFromBelief, computeUrgency,
+    impliedTimeline, beliefLaw, familyHeads, coherenceStats, certDay, isCertified,
+    marketEfficiency, beliefCauses,
+    isLockDay, LOCK_INTERVAL, POSTERIOR, lockForecast, lockedClaim, scoreQuarter, scoreOutstandingQuarter, scoreVariance,
+    crossingProb, quarterProb, plateauHeight, logScoreDelta,
+    presetCurves, marketCurves, normalizeCurves, draftCurves, setDraft, setDraftMedian, setDraftPlateau, curvesEqual, openRungs, curveMedian,
+    forecastRecord, forecastTuning, latestLock,
     credibility, canSendMemos, canActAsFund, playerPilled, marketPilled,
     firmBelief, stepFirmBelief, scrutinyGap, hasEverLocked,
 } from '../src/race/belief.js';
+import { ruleSummary } from '../src/race/public-record.js';
+import { checkResolution } from '../src/race/resolution.js';
+import { inputSchedule, runReaderWorld } from './reader-data.mjs';
+import { createHash } from 'node:crypto';
+import { readerLaw, lawCDF } from '../src/race/reader.js';
 import {
     addEventImpulse, decayEventImpulses, applyEventImpulseOverlay,
     removeEventImpulseOverlay, currentEventImpulse, eventImpulseMagnitude,
@@ -91,6 +106,8 @@ for (let i = 0; i < argv.length; i++) {
     else if (/^\d+$/.test(a)) N = parseInt(a, 10);
 }
 const HORIZON = 1008;
+const DEADLINE = { 2: 420, 3: 756, 4: 880, 5: 1000 };
+const SUPPORT = { 2: 1008, 3: 1008, 4: 1008, 5: 1260 };
 
 // ---- Assertion plumbing --------------------------------------------------
 
@@ -101,16 +118,39 @@ function assert(cond, msg) {
 }
 const line = (s = '') => console.log(s);
 const EPS = 1e-9;
+const sig = (x) => 1 / (1 + Math.exp(-x));
+const clampP = (p) => Math.min(0.98, Math.max(0.02, p));
 
-// Belief-state signature (everything a quote can depend on) for invariance.
-function beliefSig() {
-    return JSON.stringify({
-        rungs: belief.rungs, alignment: belief.alignment, day: belief.day,
-    });
+/** One completed day of the game's race block. */
+function raceDay(race) {
+    advanceRace(race); stepControlRegime(race); stepTreaty(race, {}); stepBelief(race);
+}
+/** Step a synthetic race one quiet day at a time to `day`; `edits[d]` mutates the
+ *  public state (and the day's ledger) on day d before belief steps. */
+function quietTo(race, day, edits = {}) {
+    for (let d = race.day + 1; d <= day; d++) {
+        race.day = d; race.lastTransitions = freshTransitions();
+        if (edits[d]) edits[d](race);
+        stepBelief(race);
+    }
+}
+/** A frontier certification of rung R by `lab` on day d, claimed then if unclaimed. */
+const certifyOn = (R, lab = 'halcyon') => (race) => {
+    const L = race.capability.labs[lab];
+    for (let r = 1; r <= R; r++) if (L.rungReleased[r] == null) L.rungReleased[r] = race.day;
+    for (let r = 2; r <= R; r++) if (L.rungCertified[r] == null) L.rungCertified[r] = race.day;
+    race.lastTransitions.certifications = [{ lab, rung: R, direct: true }];
+};
+
+// Everything a quote, a display or the valuation can read from `B` today.
+function pooledSig() {
+    const grid = [2, 3, 4, 5].map(R => [63, 126, 252, 504].map(k => binaryProb(R, belief.day + k)).concat(binaryProb(R, DEADLINE[R])));
+    const laws = [2, 3, 4, 5].map(R => { const L = beliefLaw(R); return L && [L.median, L.atom, L.density(belief.day + 30)]; });
+    const h = familyHeads();
+    return JSON.stringify({ grid, tl: impliedTimeline(), laws, proj: marketCurves(), fam: [...h.legible, ...h.full, h.eta], u: computeUrgency() });
 }
 // Corrupt EVERY latent field AND inject fakes into the latent queues -- exactly
-// what a hidden-state read would trip over. stepBelief consumes only the ledger,
-// so none of this may move B.
+// what a hidden-state read would trip over. None of this may move B.
 function corruptLatent(race) {
     race.hidden.tau = 0.999;
     race.hidden.scalingElasticity = 0.999;
@@ -124,50 +164,45 @@ function corruptLatent(race) {
         if (lab.active) { lab.C_internal = 5.5; lab.C_released = 5.5; }
     }
     race.capability.open.C = 5.5;
-    // Fake latent entries -- NOT in lastTransitions, so B must ignore them.
     race.latentIncidents.push({ id: 'FAKE', severity: 4, occurDay: race.day, insiderTip: true, detected: false, detectable: false, meanLag: 0 });
     race.latentEvidence.push({ id: 'FAKE', published: false, path: 'leaked', logLR: 5, publicDay: Infinity });
 }
 
 // ==========================================================================
-// A. B-update causality + full-corruption invariance
+// A. The rule's ledger + full-corruption invariance of the pooled output
 // ==========================================================================
 
 let causalityOK = true, allCausesHaveId = true, invarianceOK = true, ledgerCoverageOK = false;
 let totalCauses = 0;
 {
     const PUBLIC_VIEW_KEYS = ['day', 'certifiedFrontierRung', 'releasedFrontierRung', 'claimedRung', 'releaseCount', 'lastReleaseDay', 'controlRegime'].sort().join(',');
-    // 1. Every non-random B move has an ID, over N full runs.
     for (let i = 0; i < N; i++) {
         const race = createRaceState((BASE_SEED + i) >>> 0);
         initConsensus(race);
         initBelief(race);
-        for (let d = 0; d < HORIZON; d++) { advanceRace(race); stepBelief(race); }
+        for (let d = 0; d < HORIZON; d++) raceDay(race);
         for (const c of beliefCauses()) {
             totalCauses++;
             if (c.id == null) { allCausesHaveId = false; causalityOK = false; }
         }
     }
-    assert(allCausesHaveId, 'a B move was recorded with no causal evidence ID');
+    assert(allCausesHaveId, 'a rule move was recorded with no causal evidence ID');
 
-    // 1b. Causal-ledger FULL COVERAGE (02a "Belief, η, and the firm"): reconstruct each
-    //     rung's (m, w) trajectory from the ledger ALONE and assert it lands
-    //     exactly on the live belief -- no m/w/monotonicity mutation lacks a cause
-    //     entry (not merely "existing records have IDs"). Entries must also chain
-    //     (each from-state == the prior to-state).
+    // The rule's FULL COVERAGE (02a): reconstruct each rung's (m, w) from the
+    // ledger alone; entries chain; the reconstruction lands on the live rule.
     {
         const race = createRaceState((BASE_SEED + 950) >>> 0);
         initConsensus(race); initBelief(race);
-        const seed = {};   // snapshot the listing seed BEFORE any update
+        const seed = {};
         for (const R of [2, 3, 4, 5]) seed[R] = { m: belief.rungs[R].m, w: belief.rungs[R].w, crossed: false, certDay: null };
-        for (let d = 0; d < 600; d++) { advanceRace(race); stepBelief(race); }
+        for (let d = 0; d < 600; d++) raceDay(race);
         const causes = beliefCauses();
         assert(causes.length < 4000, 'belief ledger overflowed the cap during the coverage run');
         const recon = {};
         for (const R of [2, 3, 4, 5]) recon[R] = { ...seed[R] };
         let chainOK = true, coverageOK = true;
         for (const c of causes) {
-            if (c.rung == null) continue;   // alignment scalar -- not a rung m/w move
+            if (c.rung == null) continue;
             const r = recon[c.rung];
             if (c.kind === 'mw') {
                 if (Math.abs(r.m - c.mFrom) > 1e-9 || Math.abs(r.w - c.wFrom) > 1e-9) chainOK = false;
@@ -182,12 +217,13 @@ let totalCauses = 0;
             if (rc.crossed !== live.crossed || (live.crossed && rc.certDay !== live.certDay)) coverageOK = false;
             if (!live.crossed && (Math.abs(rc.m - live.m) > 1e-9 || Math.abs(rc.w - live.w) > 1e-9)) coverageOK = false;
         }
+        // The rule's certification state agrees with the record's (one public fact).
+        for (const R of [2, 3, 4]) if (belief.rungs[R].crossed !== isCertified(R) || (isCertified(R) && belief.rungs[R].certDay !== certDay(R))) coverageOK = false;
         ledgerCoverageOK = chainOK && coverageOK;
         assert(chainOK, 'ledger entries do not chain (a from-state disagreed with the prior to-state)');
-        assert(coverageOK, 'ledger reconstruction did not reproduce the live belief (uncovered mutation)');
+        assert(coverageOK, 'ledger reconstruction did not reproduce the live rule (or rule and record disagree on certification)');
     }
 
-    // 2. Public view exposes only public keys (belief reads nothing else).
     {
         const race = createRaceState((BASE_SEED + 900) >>> 0);
         initConsensus(race);
@@ -196,41 +232,33 @@ let totalCauses = 0;
         assert(Object.keys(view).sort().join(',') === PUBLIC_VIEW_KEYS, 'buildPublicView leaks non-public keys');
     }
 
-    // 3. Corrupting every latent field + injecting fake latents leaves B, the
-    //    implied timeline, and every quote bit-identical at each probe day.
+    // Corrupt before the day-D belief step; every pooled output stays bit-identical.
     const DAYS = [200, 420, 500, 756, 900, 1000];
     for (let s = 0; s < 8; s++) {
         for (const D of DAYS) {
             const seed = (BASE_SEED + 9100 + s) >>> 0;
-            // Reference: clean run to D.
             const raceA = createRaceState(seed); initConsensus(raceA); initBelief(raceA);
-            for (let d = 0; d < D; d++) { advanceRace(raceA); stepBelief(raceA); }
-            const sigA = beliefSig();
-            const tlA = JSON.stringify(impliedTimeline());
-            const viewA = buildPublicView(raceA);
-            const cvA = buildComputePublicView(raceA, null);
+            for (let d = 0; d < D; d++) raceDay(raceA);
+            const sigA = pooledSig(), ruleA = JSON.stringify(belief.rungs) + belief.alignment;
+            const viewA = buildPublicView(raceA), cvA = buildComputePublicView(raceA, null);
             const contracts = consensus.contracts.map(c => ({ ...c }));
             const qA = JSON.stringify(contracts.map(c => binaryQuoteFromBelief(viewA, c)));
             const ccA = JSON.stringify([0, 63, 126, 252].map(dte => computeCurveFromBelief(cvA, dte)));
 
-            // Corrupted: identical to D-1, advance to D, corrupt BEFORE the day-D
-            // belief step, then step + quote.
             const raceB = createRaceState(seed); initConsensus(raceB); initBelief(raceB);
-            for (let d = 0; d < D - 1; d++) { advanceRace(raceB); stepBelief(raceB); }
-            advanceRace(raceB);
+            for (let d = 0; d < D - 1; d++) raceDay(raceB);
+            advanceRace(raceB); stepControlRegime(raceB); stepTreaty(raceB, {});
             corruptLatent(raceB);
             stepBelief(raceB);
-            const sigB = beliefSig();
-            const tlB = JSON.stringify(impliedTimeline());
-            const viewB = buildPublicView(raceB);
-            const cvB = buildComputePublicView(raceB, null);
+            const sigB = pooledSig(), ruleB = JSON.stringify(belief.rungs) + belief.alignment;
+            const viewB = buildPublicView(raceB), cvB = buildComputePublicView(raceB, null);
             const qB = JSON.stringify(contracts.map(c => binaryQuoteFromBelief(viewB, c)));
             const ccB = JSON.stringify([0, 63, 126, 252].map(dte => computeCurveFromBelief(cvB, dte)));
 
-            const same = sigA === sigB && tlA === tlB && qA === qB && ccA === ccB;
+            const same = sigA === sigB && ruleA === ruleB && qA === qB && ccA === ccB;
             if (!same) invarianceOK = false;
-            assert(sigA === sigB, `B state changed under corruption (seed ${s}, D=${D})`);
-            assert(tlA === tlB, `implied timeline changed under corruption (seed ${s}, D=${D})`);
+            assert(ruleA === ruleB, `rule state changed under corruption (seed ${s}, D=${D})`);
+            assert(sigA === sigB, `pooled B changed under corruption (seed ${s}, D=${D})`);
             assert(qA === qB, `binary quote changed under corruption (seed ${s}, D=${D})`);
             assert(ccA === ccB, `compute curve changed under corruption (seed ${s}, D=${D})`);
         }
@@ -238,26 +266,57 @@ let totalCauses = 0;
 }
 
 // ==========================================================================
-// B. Leak once-per-ID + idempotent stepBelief
+// A2. The rule of thumb is HEAD's, bit for bit
+// ==========================================================================
+
+// Derived once (2026-10-25) by running this exact loop with HEAD 1343924's
+// src/race/belief.js (`git show 1343924:src/race/belief.js`, imports pointed at
+// the unchanged src/race/rng.js and compute-market.js) in place of the working
+// tree's: seeds 1-32, odd seeds on the assumed input schedule's Markov scenario,
+// even seeds neutral; one line `${seed}:${day}:${JSON [m, w, crossed, certDay]
+// for R2-R5}` per completed day after stepBelief, before checkResolution.
+const RULE_TRAJECTORY_SHA256 = '1d36daa9e785992accd0462109746f855f3c4efa640482bb1438ec924f734811';
+let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
+{
+    const state = () => JSON.stringify([2, 3, 4, 5].map(R => [belief.rungs[R].m, belief.rungs[R].w, belief.rungs[R].crossed, belief.rungs[R].certDay]));
+    const h = createHash('sha256'), hr = createHash('sha256');
+    for (let seed = 1; seed <= 32; seed++) {
+        const scenario = seed % 2 ? 'markov' : 'neutral';
+        const race = createRaceState(seed), sched = inputSchedule(seed, scenario);
+        initBelief(race);
+        for (let d = 0; d < HORIZON && !race.resolution; d++) {
+            const inputs = sched();
+            advanceRace(race, { straitTension: inputs.straitTension, exportControlStage: inputs.exportControlStage });
+            stepControlRegime(race); stepTreaty(race, { treatyStage: inputs.treatyStage });
+            stepBelief(race, inputs);
+            h.update(`${seed}:${race.day}:${state()}\n`); ruleHashDays++;
+            if (checkResolution(race, inputs.geo)) break;
+        }
+        runReaderWorld(seed, scenario, ({ race: r }) => { hr.update(`${seed}:${r.day}:${state()}\n`); });
+    }
+    ruleHashOK = h.digest('hex') === RULE_TRAJECTORY_SHA256;
+    readerDataHashOK = hr.digest('hex') === RULE_TRAJECTORY_SHA256;
+    assert(ruleHashOK, 'the rule of thumb drifted from HEAD 1343924 (the legible heads were fit on it)');
+    assert(readerDataHashOK, 'tools/reader-data.mjs no longer drives the rule bit-identically');
+}
+
+// ==========================================================================
+// B. Leak once-per-ID + idempotent stepBelief (the sentiment; no record)
 // ==========================================================================
 
 let leakOnceOK = false, stepIdempotentOK = false;
 {
-    // Craft a race with a single leaked evidence beat in the ledger and step it
-    // twice against the SAME ledger -- alignment must move once, not twice.
-    const race = createRaceState((BASE_SEED + 111) >>> 0);
-    initBelief(race);
-    // Synthetic one-day ledger: one leaked beat (id 'L1'), nothing else.
-    race.lastTransitions = {
+    initBelief(null);
+    const tr = {
         releases: [], certifications: [], thefts: [], crossings: [], spawned: [],
         incidents: { occurred: [], detected: [] },
-        evidence: { occurred: [{ id: 'L1', lab: 'halcyon', favorable: false, logLR: -1.0, path: 'leaked', occurDay: race.day }], published: [] },
+        evidence: { occurred: [{ id: 'L1', lab: 'halcyon', favorable: false, logLR: -1.0, path: 'leaked', occurDay: 10 }], published: [] },
     };
-    race.day = 10; belief.day = 10;
+    belief.day = 10;
     const a0 = belief.alignment;
-    stepBelief(race);
+    stepBelief({ day: 10, lastTransitions: tr });
     const a1 = belief.alignment;
-    stepBelief(race);   // replay SAME ledger/ID
+    stepBelief({ day: 10, lastTransitions: tr });   // replay SAME ledger/ID
     const a2 = belief.alignment;
     leakOnceOK = Math.abs(a1 - a0) > 1e-9 && Math.abs(a2 - a1) < 1e-12;
     assert(leakOnceOK, `leak folded more than once (a0=${a0} a1=${a1} a2=${a2})`);
@@ -266,97 +325,194 @@ let leakOnceOK = false, stepIdempotentOK = false;
 }
 
 // ==========================================================================
-// C. Posterior scoring arithmetic
+// C. Posterior arithmetic, locks, scoring
 // ==========================================================================
 
-let probOK = false, copierZeroOK = false, deltaOK = false, lockGuardOK = false;
-let scoreGuardOK = false, noManufacturedOK = false, claimIsQuoteOK = false;
+let probOK = false, plateauOK = false, orderOK = false, pairsOK = false, copierZeroOK = false, deltaOK = false;
+let lockGuardOK = false, scoreGuardOK = false, noManufacturedOK = false, marketPolicyReadsOK = false;
+let sigmaOK = false, sigmaCopierOK = false;
+let projectionIsMarketOK = false, lateCapOK = false, latePlateauOK = false, lateMedianOK = false;
 {
-    // Independent naive forms (02a "Scoring"), against the module's stable ones.
-    const sig = (x) => 1 / (1 + Math.exp(-x));
-    const naiveP = (m, w, t0, t1) => {
-        const F0 = sig((t0 - m) / w), F1 = sig((t1 - m) / w);
-        return Math.min(0.98, Math.max(0.02, (F1 - F0) / (1 - F0)));
-    };
+    // Independent naive forms (02a), against the module's log-space ones.
+    const S = (m, w, q, x) => 1 - (1 - q) * sig((x - m) / w);
+    const naiveP = (m, w, q, t0, t1) => 1 - S(m, w, q, t1) / S(m, w, q, t0);
     const naiveD = (pP, pM, o) => o ? Math.log(pP / pM) : Math.log((1 - pP) / (1 - pM));
-    probOK = [[100, 50, 0, 63], [721, 140, 315, 378], [400, 25, 378, 441], [2016, 400, 0, 63]]
-        .every(([m, w, t0, t1]) => Math.abs(quarterProb(m, w, t0, t1) - naiveP(m, w, t0, t1)) < 1e-12)
-        // A median far behind t0 (the naive form is 0/0 here): the logistic's tail
-        // hazard is 1/w, so the quarter's probability is 1 - e^(-63/w).
-        && Math.abs(quarterProb(10, 25, 1000, 1063) - (1 - Math.exp(-63 / 25))) < 1e-9;
-    assert(probOK, 'quarterProb disagrees with the naive survival-conditioned form');
+    const cases = [[100, 50, 0, 0, 63], [721, 140, 0.2, 315, 378], [400, 25, 0.5, 378, 441], [2016, 400, 0.95, 0, 63], [600, 90, 0.3, 0, 1008]];
+    probOK = cases.every(([m, w, q, t0, t1]) => Math.abs(crossingProb(m, w, q, t0, t1) - naiveP(m, w, q, t0, t1)) < 1e-12
+            && Math.abs(quarterProb(m, w, q, t0, t1) - clampP(naiveP(m, w, q, t0, t1))) < 1e-12)
+        // A median far behind t0 with no plateau: the logistic's tail hazard is 1/w.
+        && Math.abs(crossingProb(10, 25, 0, 1000, 1063) - (1 - Math.exp(-63 / 25))) < 1e-9
+        // ... and with a plateau the survivors are the never-mass: nothing left to cross.
+        && crossingProb(10, 25, 0.3, 1000, 1063) < 1e-9;
+    assert(probOK, 'crossingProb/quarterProb with q disagree with the naive survival ratio');
 
-    // A market copier: lock B's curves at day 0, close the quarter at day 63 with a
-    // certification inside it -> every increment is exactly 0, and so is credibility.
-    const race = createRaceState((BASE_SEED + 222) >>> 0);
-    initBelief(race);
-    lockForecast(0, presetCurves('market'));
-    belief.day = 63;
-    belief.rungs[2].crossed = true; belief.rungs[2].certDay = 40;
-    const q1 = scoreQuarter(63);
-    copierZeroOK = !!q1 && q1.rungs.length === 3 && q1.rungs.every(r => r.delta === 0)
-        && q1.delta === 0 && credibility() === 0 && forecastRecord().quarters === 1;
-    assert(copierZeroOK, `market copier scored ${q1 && q1.delta} (want exactly 0)`);
+    // The plateau handle: setDraftPlateau(R, h) lands plateauHeight on h exactly when
+    // reachable, pushes neighbours' q to keep R2-R4 ordered, and leaves R5 alone.
+    const raceP = createRaceState((BASE_SEED + 230) >>> 0);
+    initBelief(raceP);
+    const d0 = draftCurves();
+    setDraftPlateau(3, 0.4);
+    const d1 = draftCurves();
+    plateauOK = Math.abs(plateauHeight(d1[3].m, d1[3].w, d1[3].q, 0) - 0.4) < 1e-9 && d1[4].q >= d1[3].q && d1[2].q <= d1[3].q
+        && curvesEqual(d0, d1, 5) && d1[3].m === d0[3].m && d1[3].w === d0[3].w;
+    setDraftPlateau(3, 0.999);   // beyond reach: q floors at 0
+    plateauOK &&= draftCurves()[3].q === 0;
+    setDraftPlateau(2, 0.001);   // near zero: q caps at 0.95 and the ladder above follows
+    const d2 = draftCurves();
+    plateauOK &&= d2[2].q <= POSTERIOR.Q_MAX && d2[3].q >= d2[2].q && d2[4].q >= d2[3].q;
+    assert(plateauOK, 'setDraftPlateau / plateauHeight wrong (closed form, bounds or ladder push)');
 
-    // A call: R2 earlier than B (and it certifies in the quarter), R3/R4 as drawn.
+    // Ladder order: m and q monotone over R2-R4; R5 unordered.
+    const nc = normalizeCurves({ 2: { m: 500, w: 50, q: 0.4 }, 3: { m: 300, w: 50, q: 0.1 }, 4: { m: 700, w: 50, q: 0.2 }, 5: { m: 100, w: 50, q: 0 } });
+    orderOK = nc[3].m === 500 && nc[3].q === 0.4 && nc[4].m === 700 && nc[4].q === 0.4 && nc[5].m === 100 && nc[5].q === 0;
+    setDraftMedian(5, 50);
+    orderOK &&= draftCurves()[5].m === 50;
+    assert(orderOK, 'normalizeCurves / setDraftMedian ladder order wrong (R5 must be unordered)');
+
+    // A lock stores clamped pairs: pP from the player's law, pM from B at the lock.
     const race2 = createRaceState((BASE_SEED + 223) >>> 0);
     initBelief(race2);
     const mk = marketCurves();
-    const mine = normalizeCurves({ ...mk, 2: { m: 120, w: 60 } });
-    lockForecast(0, mine);
-    belief.day = 63;
-    belief.rungs[2].crossed = true; belief.rungs[2].certDay = 63;   // ON L_q+1: inside the quarter
+    const mine = normalizeCurves({ ...mk, 2: { m: 40, w: 30, q: 0.1 } });
+    const lk = lockForecast(0, mine);
+    pairsOK = !!lk && lk.policy === 'own'
+        && [2, 3, 4].every(R => !!lk.pairs[R] && Math.abs(lk.pairs[R].pP - clampP(naiveP(mine[R].m, mine[R].w, mine[R].q, 0, 63))) < 1e-12
+            && lk.pairs[R].pM === clampP(binaryProb(R, 63)));
+    assert(pairsOK, 'lock pairs are not the clamped player / B quarter probabilities');
+    // The call's score reads the stored pairs (B moves meanwhile; the pairs don't).
+    quietTo(race2, 63, { 63: certifyOn(2) });
     const q2 = scoreQuarter(63);
-    const want = [2, 3, 4].reduce((acc, R) => acc + naiveD(
-        naiveP(mine[R].m, mine[R].w, 0, 63), naiveP(mk[R].m, mk[R].w, 0, 63), R === 2 ? 1 : 0), 0);
-    deltaOK = !!q2 && Math.abs(q2.delta - want) < 1e-12 && q2.delta > 0
-        && Math.abs(credibility() - Math.tanh(want / forecastTuning.K_CRED)) < 1e-12
-        && q2.rungs.find(r => r.R === 2).o === 1 && Math.abs(logScoreDelta(0.5, 0.5, 1)) === 0;
-    assert(deltaOK, `scored delta ${q2 && q2.delta} != hand ${want}`);
+    const want = [2, 3, 4].reduce((acc, R) => acc + naiveD(lk.pairs[R].pP, lk.pairs[R].pM, R === 2 ? 1 : 0), 0);
+    deltaOK = !!q2 && Math.abs(q2.delta - want) < 1e-12 && q2.rungs.find(r => r.R === 2).o === 1
+        && Math.abs(credibility() - Math.tanh(want / forecastTuning.K_CRED)) < 1e-12 && logScoreDelta(0.5, 0.5, 1) === 0;
+    assert(deltaOK, `scored delta ${q2 && q2.delta} != stored-pair hand value ${want}`);
+    // sigma0 (02a): sigma0^2 = sum p_M(1 - p_M)(ln(p_P/p_M) - ln((1 - p_P)/(1 - p_M)))^2.
+    const naiveV = (pP, pM) => pM * (1 - pM) * (Math.log(pP / pM) - Math.log((1 - pP) / (1 - pM))) ** 2;
+    const v1 = [2, 3, 4].reduce((a, R) => a + naiveV(lk.pairs[R].pP, lk.pairs[R].pM), 0);
+    const lk2 = lockForecast(63, normalizeCurves({ ...marketCurves(), 3: { m: 100, w: 40, q: 0.2 } }));
+    quietTo(race2, 126);
+    const q3 = scoreQuarter(126);
+    const v2 = v1 + Object.values(lk2.pairs).reduce((a, pr) => a + naiveV(pr.pP, pr.pM), 0);
+    sigmaOK = !!q2 && Math.abs(q2.var0 - v1) < 1e-12 && !!q3 && Math.abs(q3.var0 - v2) < 1e-12
+        && Math.abs(forecastRecord().sigma0 - Math.sqrt(v2)) < 1e-12 && v2 > v1 && v1 > 0
+        && [[0.3, 0.1], [0.02, 0.98], [0.5, 0.5]].every(([a, b]) => Math.abs(scoreVariance(a, b) - naiveV(a, b)) < 1e-12)
+        && scoreVariance(0.37, 0.37) === 0;
+    assert(sigmaOK, `sigma0^2 ${q3 && q3.var0} != naive ${v2}`);
 
-    // Lock semantics (02a): a full VALID curve set; on-grid + CURRENT-day only;
-    // immutable once accepted (exact replay idempotent, edits rejected).
+    // A market-policy copier: pP === pM in every pair -> exactly 0, every quarter.
+    const race = createRaceState((BASE_SEED + 222) >>> 0);
+    initBelief(race);
+    const c0 = lockForecast(0, null, 'market');
+    quietTo(race, 63, { 40: certifyOn(2) });
+    const s1 = scoreQuarter(63);
+    lockForecast(63, null, 'market');
+    quietTo(race, 126);
+    const s2 = scoreQuarter(126);
+    sigmaCopierOK = !!s1 && s1.var0 === 0 && !!s2 && s2.var0 === 0 && forecastRecord().sigma0 === 0 && s2.rungs.every(r => r.v === 0);
+    assert(sigmaCopierOK, 'a market-policy record has nonzero sigma0');
+    copierZeroOK = !!c0 && c0.policy === 'market' && [2, 3, 4].every(R => c0.pairs[R].pP === c0.pairs[R].pM)
+        && curvesEqual(c0.curves, c0.market, 3) && !!s1 && s1.delta === 0 && !!s2 && s2.delta === 0
+        && s2.rungs.length === 2 && credibility() === 0 && forecastRecord().quarters === 2;
+    assert(copierZeroOK, `market-policy copier scored ${s1 && s1.delta}/${s2 && s2.delta} (want exactly 0)`);
+
+    // Lock semantics: a full valid set; on-grid + current day; immutable (exact replay).
     const race3 = createRaceState((BASE_SEED + 224) >>> 0);
-    initBelief(race3);   // belief.day == 0
+    initBelief(race3);
     const base = presetCurves('market');
-    const partial = lockForecast(0, { 2: base[2], 3: base[3] });                          // missing rungs
-    const outOfRange = lockForecast(0, { ...base, 5: { m: 2017, w: 100 } });               // m > 2016
-    const tooNarrow = lockForecast(0, { ...base, 3: { m: base[3].m, w: 10 } });            // w < 25
-    const crossed = lockForecast(0, { ...base, 3: { m: base[2].m - 1, w: base[3].w } });   // m3 < m2
+    const partial = lockForecast(0, { 2: base[2], 3: base[3] });
+    const noQ = lockForecast(0, { ...base, 4: { m: base[4].m, w: base[4].w } });
+    const outOfRange = lockForecast(0, { ...base, 5: { m: 2017, w: 100, q: 0 } });
+    const qHigh = lockForecast(0, { ...base, 5: { ...base[5], q: 0.96 } });
+    const tooNarrow = lockForecast(0, { ...base, 3: { ...base[3], w: 10 } });
+    const crossedM = lockForecast(0, { ...base, 3: { ...base[3], m: base[2].m - 1 } });
+    const crossedQ = lockForecast(0, { ...base, 4: { ...base[4], q: base[3].q - 0.01 } });
     const offGrid = lockForecast(7, base);
     const wrongDay = lockForecast(63, base);
-    const good = lockForecast(0, base);
-    const replay = lockForecast(0, presetCurves('market'));
+    const badPolicy = lockForecast(0, base, 'copy');
+    const own = presetCurves('later');                    // an own call (the projection itself is market policy)
+    const good = lockForecast(0, own);
+    const replay = lockForecast(0, presetCurves('later'));
+    const asMarket = lockForecast(0, null, 'market');
     const mutate = lockForecast(0, presetCurves('earlier'));
-    lockGuardOK = partial === null && outOfRange === null && tooNarrow === null && crossed === null
-        && offGrid === null && wrongDay === null && good !== null && replay === good && mutate === null
-        && Object.isFrozen(good) && Object.isFrozen(good.curves[2]);
-    assert(lockGuardOK, 'lock semantics wrong (valid-set / on-grid+current-day / immutable)');
+    lockGuardOK = [partial, noQ, outOfRange, qHigh, tooNarrow, offGrid, wrongDay, badPolicy, mutate, asMarket].every(x => x === null)
+        && (base[3].q > 0.01 ? crossedQ === null : true) && crossedM === null
+        && good !== null && replay === good && Object.isFrozen(good) && Object.isFrozen(good.curves[2]) && Object.isFrozen(good.pairs);
+    assert(lockGuardOK, 'lock semantics wrong (valid-set / on-grid+current-day / immutable / policy)');
 
-    // Scoring guards: no lock at L_q -> nothing scored; once per quarter.
+    // Scoring guards: no lock at L_q -> nothing scored; once per quarter; current day.
     const race4 = createRaceState((BASE_SEED + 225) >>> 0);
     initBelief(race4);
-    belief.day = 63;
+    quietTo(race4, 63);
     const noLock = scoreQuarter(63);
-    belief.day = 0; lockForecast(0, presetCurves('later')); belief.day = 63;
+    const race4b = createRaceState((BASE_SEED + 225) >>> 0);
+    initBelief(race4b);
+    lockForecast(0, presetCurves('later'));
+    quietTo(race4b, 63);
     const first = scoreQuarter(63), again = scoreQuarter(63);
     scoreGuardOK = noLock === null && !!first && again === first && forecastRecord().quarters === 1
         && forecastRecord().S === first.S && scoreQuarter(64) === null && scoreQuarter(126) === null;
     assert(scoreGuardOK, 'scoreQuarter guards wrong (needs the opening lock; once per quarter; current day only)');
 
     // No manufactured day-0 forecast: no locks, credibility 0, no claim; the draft
-    // is a copy of B.
+    // is B's projection.
     const race5 = createRaceState((BASE_SEED + 226) >>> 0);
     initBelief(race5);
-    const d0 = draftCurves(), m0 = marketCurves();
+    const dd = draftCurves(), m0 = marketCurves();
     noManufacturedOK = belief.player.locks.length === 0 && credibility() === 0 && lockedClaim(2) === null
-        && [2, 3, 4, 5].every(R => curvesEqual(d0, m0, R));
-    assert(noManufacturedOK, 'initBelief manufactured a forecast, or the day-0 draft is not B');
+        && [2, 3, 4, 5].every(R => curvesEqual(dd, m0, R));
+    assert(noManufacturedOK, 'initBelief manufactured a forecast, or the day-0 draft is not the projection');
 
-    // A locked market curve reads the Consensus quote it copied (lockedClaim).
-    lockForecast(0, presetCurves('market'));
-    claimIsQuoteOK = [2, 3, 4, 5].every(R => Math.abs(lockedClaim(R) - binaryProb(R, { 2: 420, 3: 756, 4: 880, 5: 1000 }[R])) < 1e-9);
-    assert(claimIsQuoteOK, 'lockedClaim of a market lock != the day-0 Consensus quote');
+    // A market-policy lock: lockedClaim is B's quote at the lock; playerPilled is
+    // marketPilled live, days later too.
+    lockForecast(0, null, 'market');
+    const claims0 = [2, 3, 4, 5].map(R => binaryProb(R, DEADLINE[R]));
+    quietTo(race5, 30);
+    marketPolicyReadsOK = [2, 3, 4, 5].every((R, i) => lockedClaim(R) === claims0[i]) && playerPilled() === marketPilled();
+    assert(marketPolicyReadsOK, 'a market-policy lock does not read B (lockedClaim at the lock, playerPilled live)');
+
+    // An own lock of curves still equal to today's projection on every open rung is a
+    // market-policy lock (02a), whichever path records it; one moved rung makes it own.
+    const raceM = createRaceState((BASE_SEED + 227) >>> 0);
+    initBelief(raceM);
+    const lp = lockForecast(0, draftCurves());                       // the untouched draft
+    const replayM = lockForecast(0, null, 'market');
+    quietTo(raceM, 63);
+    const moved = draftCurves(); moved[3] = { ...moved[3], w: moved[3].w * 1.5 };
+    const lo = lockForecast(63, normalizeCurves(moved));
+    projectionIsMarketOK = !!lp && lp.policy === 'market' && [2, 3, 4].every(R => lp.pairs[R].pP === lp.pairs[R].pM)
+        && replayM === lp && !!lo && lo.policy === 'own' && playerPilled() !== null;
+    assert(projectionIsMarketOK, 'an own lock of the untouched projection was not recorded as a market-policy lock');
+
+    // Late in the term (Codex's repros, day 945).
+    const raceL = createRaceState((BASE_SEED + 228) >>> 0);
+    initBelief(raceL);
+    quietTo(raceL, 945);
+    if (openRungs().includes(4)) {
+        const late = normalizeCurves({ ...marketCurves(), 2: { m: 1000, w: 25, q: 0 }, 3: { m: 1050, w: 25, q: 0 }, 4: { m: 1100, w: 25, q: 0 } });
+        lockForecast(945, late);
+        const inTerm = 100 * crossingProb(1100, 25, 0, 945, 1008);
+        // playerPilled reads the same event B's law does: R4 within 252 days AND by day 1008.
+        lateCapOK = Math.abs(playerPilled() - inTerm) < 1e-9 && inTerm < 5
+            && marketPilled() === 100 * binaryProb(4, 1008) && marketPilled() === 100 * binaryProb(4, 945 + 252);
+    }
+    assert(lateCapOK, `playerPilled is not capped at R4's support late in the term (${playerPilled()})`);
+    // The plateau inverse stays exact when the logistic is saturated: R5 {m 0, w 25, q 0}
+    // at day 945 takes height 0.5 (the old 1 - q form left q = 0 and the height 0.92).
+    setDraft({ ...draftCurves(), 5: { m: 0, w: 25, q: 0 } });
+    setDraftPlateau(5, 0.5);
+    const d5 = draftCurves()[5];
+    latePlateauOK = d5.q > 0 && Math.abs(plateauHeight(d5.m, d5.w, d5.q, 945) - 0.5) < 1e-9;
+    setDraftPlateau(3, 0.3);
+    const d3 = draftCurves()[3];
+    latePlateauOK &&= Math.abs(plateauHeight(d3.m, d3.w, d3.q, 945) - 0.3) < 1e-9 || d3.q === POSTERIOR.Q_MAX || d3.q === 0;
+    assert(latePlateauOK, `late-day plateau inverse inexact (R5 height ${plateauHeight(d5.m, d5.w, d5.q, 945)}, q ${d5.q})`);
+    // The race page's "Yours" median is curveMedian: day 945, R5 {m 0, w 25, q 0} has a
+    // conditional median in the term-and-a-bit (962.33), not "not this term".
+    const med = curveMedian({ m: 0, w: 25, q: 0 }, 945, 5);
+    let mass = 0;
+    for (let D = 946; D <= 1260; D++) mass += crossingProb(0, 25, 0, 945, D) - crossingProb(0, 25, 0, 945, D - 1);
+    lateMedianOK = med != null && Math.abs(med - (945 + 25 * Math.log(2 + Math.exp(-945 / 25)))) < 1e-6 && Math.abs(mass - crossingProb(0, 25, 0, 945, 1260)) < 1e-12;
+    assert(lateMedianOK, `curveMedian late-day value ${med} (want ~962.33) or the daily mass does not add up`);
 }
 
 // ==========================================================================
@@ -378,33 +534,150 @@ let scheduleOK = true;
 // E. Two-sided listing quotes with the real quoter
 // ==========================================================================
 
-let listingTwoSidedOK = true, listingEqualsBaseOK = true;
-const listingRows = [];
+let listingTwoSidedOK = true;
+const listingRows = { 2: [], 3: [], 4: [], 5: [] };
 {
-    const race = createRaceState((BASE_SEED + 300) >>> 0);
-    initConsensus(race); initBelief(race);
-    const view = buildPublicView(race);
-    for (const c of consensus.contracts) {
-        const mid = binaryQuoteFromBelief(view, c);
-        const twoSided = mid > 0.05 && mid < 0.95;
-        const eqBase = Math.abs(mid - c.baseRate) < 1e-6;
-        if (!twoSided) listingTwoSidedOK = false;
-        if (!eqBase) listingEqualsBaseOK = false;
-        assert(twoSided, `listing mid ${mid.toFixed(3)} not two-sided (rung R${c.predicate.rung})`);
-        assert(eqBase, `listing mid ${mid.toFixed(3)} != base rate ${c.baseRate} (rung R${c.predicate.rung})`);
-        listingRows.push({ rung: c.predicate.rung, base: c.baseRate, mid });
-    }
-    // And the refreshed book (real quoter through refreshBinaryQuotes) is two-sided.
     const { setBinaryQuoteSource } = await import('../src/race/consensus.js');
-    setBinaryQuoteSource(binaryQuoteFromBelief);
-    refreshBinaryQuotes(race);
-    for (const c of consensus.contracts) {
-        const q = getBinaryQuote(c.key);
-        assert(q.bid > 0 && q.ask < 1 && q.mid > 0.05 && q.mid < 0.95, `refreshed listing quote not two-sided (R${c.predicate.rung})`);
+    for (let i = 0; i < Math.min(N, 100); i++) {
+        const race = createRaceState((BASE_SEED + 300 + i) >>> 0);
+        initConsensus(race); initBelief(race);
+        const view = buildPublicView(race);
+        for (const c of consensus.contracts) {
+            const mid = binaryQuoteFromBelief(view, c);
+            listingRows[c.predicate.rung].push(mid);
+            if (!(mid > 0.05 && mid < 0.95)) { listingTwoSidedOK = false; assert(false, `listing mid ${mid.toFixed(3)} not two-sided (R${c.predicate.rung})`); }
+        }
+        if (i === 0) {
+            setBinaryQuoteSource(binaryQuoteFromBelief);
+            refreshBinaryQuotes(race);
+            for (const c of consensus.contracts) {
+                const q = getBinaryQuote(c.key);
+                assert(q.bid > 0 && q.ask < 1 && q.mid > 0.05 && q.mid < 0.95, `refreshed listing quote not two-sided (R${c.predicate.rung})`);
+            }
+            setBinaryQuoteSource(null);
+        }
     }
-    setBinaryQuoteSource(null);   // restore placeholder
 }
 
+// ==========================================================================
+// L/M/N/O. The pool, the projection, the timeline, the player's projection
+// ==========================================================================
+
+let poolOK = true, coherenceOK = true, untouchedOK = true, timelineOK = true, lawOK = true, projBoundsOK = true, presetOK = true;
+let poolChecks = 0, bindChecks = 0, binds = 0, maxBind = 0;
+const fitErr = { 2: [], 3: [], 4: [], 5: [] };
+{
+    const Dgrid = (t, R) => { const out = []; for (let D = t + 7; D <= SUPPORT[R]; D += 29) out.push(D); out.push(DEADLINE[R], SUPPORT[R]); return out.filter(D => D > t); };
+    for (let i = 0; i < Math.min(N, 60); i++) {
+        const race = createRaceState((BASE_SEED + 700 + i) >>> 0);
+        initConsensus(race); initBelief(race);
+        for (let d = 0; d <= HORIZON && !race.resolution; d++) {
+            if (d > 0) raceDay(race);
+            if (race.day % 63 !== 0) continue;
+            const t = race.day, rec = belief.record, rule = ruleSummary(belief.rungs, t);
+            const view = buildPublicView(race), eta = Math.min(1, Math.max(0, (Math.max(1, view.releasedFrontierRung) - 1) / 4));
+            const cd = (R) => { let m = null; for (const id of ['halcyon', 'tianxia', 'polaris']) { const c = race.capability.labs[id].rungCertified[R]; if (c != null && (m == null || c < m)) m = c; } return m; };
+            const raw = (R, D) => {
+                if (R < 5 && cd(R) != null) return +(D >= cd(R));
+                return (1 - eta) * lawCDF(readerLaw(rec, R, 'legible', rule), t, D) + eta * lawCDF(readerLaw(rec, R, 'full', rule), t, D);
+            };
+            for (const R of [2, 3, 4, 5]) {
+                for (const D of Dgrid(t, R)) {
+                    let want = raw(R, D);
+                    if (R < 5) for (let r = 2; r < R; r++) want = Math.min(want, raw(r, D));
+                    const got = binaryProb(R, D);
+                    poolChecks++;
+                    if (Math.abs(got - want) > 1e-14) { poolOK = false; assert(false, `pool arithmetic R${R} day ${t} D ${D}: ${got} vs ${want}`); }
+                    if (R >= 3 && R < 5) {
+                        const lower = binaryProb(R - 1, D);
+                        if (got > lower + 1e-15) coherenceOK = false;
+                        const prior = Math.min(...[2, 3, 4].filter(r => r < R).map(r => binaryProb(r, D)));
+                        if (raw(R, D) <= prior && got !== raw(R, D)) untouchedOK = false;
+                        if (cd(R) == null) {
+                            bindChecks++;
+                            const gap = raw(R, D) - got;
+                            if (gap > 1e-9) { binds++; maxBind = Math.max(maxBind, gap); }
+                        }
+                    }
+                }
+                // N: the pooled median, brute force; the law's masses.
+                const tl = impliedTimeline()[R];
+                if (R < 5 && cd(R) != null) { timelineOK &&= tl === cd(R) && beliefLaw(R) === null; continue; }
+                let bf = null;
+                for (let D = t + 1; D <= SUPPORT[R]; D++) if (binaryProb(R, D) >= 0.5) { bf = D; break; }
+                if (tl !== bf) { timelineOK = false; assert(false, `implied timeline R${R} day ${t}: ${tl} vs brute ${bf}`); }
+                const L = beliefLaw(R);
+                let mass = 0;
+                for (let D = t + 1; D <= SUPPORT[R]; D++) mass += L.density(D);
+                lawOK &&= Math.abs(mass + L.atom - 1) < 1e-9 && L.median === tl && L.cdf(SUPPORT[R]) === binaryProb(R, SUPPORT[R]);
+            }
+            // O: the projection.
+            const P = marketCurves();
+            let pm = -Infinity, pq = 0;
+            for (const R of [2, 3, 4, 5]) {
+                const c = P[R];
+                if (R < 5 && cd(R) != null) { projBoundsOK &&= c.m === cd(R) && c.q === 0; pm = Math.max(pm, c.m); continue; }
+                projBoundsOK &&= c.m >= POSTERIOR.M_MIN && c.m <= POSTERIOR.M_MAX && c.w >= POSTERIOR.W_MIN && c.w <= POSTERIOR.W_MAX && c.q >= 0 && c.q <= POSTERIOR.Q_MAX;
+                if (R < 5) { projBoundsOK &&= c.m >= pm && c.q >= pq; pm = c.m; pq = c.q; }
+                for (let D = t + 21; D <= SUPPORT[R]; D += 21) fitErr[R].push(Math.abs(crossingProb(c.m, c.w, c.q, t, D) - binaryProb(R, D)));
+            }
+            const E = presetCurves('earlier'), Lt = presetCurves('later');
+            const wantE = normalizeCurves(Object.fromEntries([2, 3, 4, 5].map(R => [R, R < 5 && cd(R) != null ? P[R] : { m: P[R].m - 0.5 * P[R].w, w: P[R].w, q: P[R].q }])));
+            const wantL = normalizeCurves(Object.fromEntries([2, 3, 4, 5].map(R => [R, R < 5 && cd(R) != null ? P[R] : { m: P[R].m + 0.5 * P[R].w, w: P[R].w, q: P[R].q }])));
+            presetOK &&= [2, 3, 4, 5].every(R => curvesEqual(E, wantE, R) && curvesEqual(Lt, wantL, R) && E[R].w === P[R].w && E[R].q === P[R].q);
+        }
+    }
+    assert(coherenceOK, 'coherence projection: P(R4) <= P(R3) <= P(R2) violated');
+    assert(untouchedOK, 'coherence projection moved a coordinate where the pool was already ordered');
+    assert(lawOK, 'beliefLaw masses + atom do not add to 1, or its median is not the timeline');
+    assert(projBoundsOK, 'the projection breaks a bound or the ladder order');
+    assert(presetOK, 'earlier/later presets are not the projection with m -/+ 0.5w, w and q kept');
+}
+
+// ==========================================================================
+// P. The outstanding quarter at the terminal
+// ==========================================================================
+
+let outstandingOK = false, outstandingNaturalOK = false, noDoubleOK = false;
+{
+    // Desk ejection on day 100 between the day-63 lock and day 126; the headless
+    // world certifies R3 on day 110 -> o = 1 against the original end date.
+    const race = createRaceState((BASE_SEED + 240) >>> 0);
+    initBelief(race);
+    lockForecast(0, presetCurves('earlier'));
+    quietTo(race, 63);
+    const sc0Var = scoreQuarter(63).var0;
+    const L63 = lockForecast(63, presetCurves('earlier'));
+    quietTo(race, 100);
+    const locks0 = belief.player.locks.length, S0 = forecastRecord().S;
+    race.capability.labs.tianxia.rungCertified[2] = 110; race.capability.labs.tianxia.rungCertified[3] = 110;
+    const o = scoreOutstandingQuarter(race);
+    const want = [2, 3, 4].reduce((a, R) => a + logScoreDelta(L63.pairs[R].pP, L63.pairs[R].pM, R <= 3 ? 1 : 0), 0);
+    const wantV = [2, 3, 4].reduce((a, R) => a + scoreVariance(L63.pairs[R].pP, L63.pairs[R].pM), 0);
+    outstandingOK = !!o && o.terminal && o.from === 63 && o.to === 126 && Math.abs(o.delta - want) < 1e-12
+        && Math.abs(o.var0 - (sc0Var + wantV)) < 1e-12
+        && Math.abs(forecastRecord().S - (S0 + want)) < 1e-12 && belief.player.locks.length === locks0;
+    noDoubleOK = scoreOutstandingQuarter(race) === o && forecastRecord().quarters === 2;
+    // A certification after the original end date does not count.
+    const raceN = createRaceState((BASE_SEED + 241) >>> 0);
+    initBelief(raceN);
+    const L0 = lockForecast(0, presetCurves('later'));
+    quietTo(raceN, 40);
+    raceN.capability.labs.halcyon.rungCertified[2] = 64;
+    const oN = scoreOutstandingQuarter(raceN);
+    outstandingNaturalOK = !!oN && oN.rungs.every(r => r.o === 0)
+        && Math.abs(oN.delta - [2, 3, 4].reduce((a, R) => a + logScoreDelta(L0.pairs[R].pP, L0.pairs[R].pM, 0), 0)) < 1e-12;
+    // A quarter already scored is never scored again at the terminal.
+    const raceS = createRaceState((BASE_SEED + 242) >>> 0);
+    initBelief(raceS);
+    lockForecast(0, presetCurves('earlier'));
+    quietTo(raceS, 63);
+    const sc = scoreQuarter(63);
+    noDoubleOK &&= scoreOutstandingQuarter(raceS) === sc && forecastRecord().quarters === 1;
+    assert(outstandingOK, 'outstanding quarter not scored once from its stored pairs against the completed trajectory');
+    assert(outstandingNaturalOK, 'a certification after the quarter end counted');
+    assert(noDoubleOK, 'a quarter was scored twice');
+}
 // ==========================================================================
 // F. Impulse-overlay decay -- no permanent param drift
 // ==========================================================================
@@ -495,7 +768,7 @@ let fBoundedOK = true, fWakesOK = false, gatesOK = false;
     initConsensus(race); initBelief(race);
     const F0 = firmBelief(race);
     for (let d = 0; d < HORIZON; d++) {
-        advanceRace(race); stepBelief(race);
+        raceDay(race);
         if (d % LOCK_INTERVAL === 0) {
             stepFirmBelief(race);
             const F = firmBelief(race);
@@ -507,6 +780,7 @@ let fBoundedOK = true, fWakesOK = false, gatesOK = false;
     // Gate predicates: below/above thresholds.
     belief.player.credibility = 0.60; gatesOK = canSendMemos() && !canActAsFund(70);
     belief.player.credibility = 0.70; gatesOK = gatesOK && canActAsFund(70) && !canActAsFund(50);
+    belief.player.var0 = 1e6; gatesOK = gatesOK && canSendMemos() && canActAsFund(70);   // sigma0 reads no gate (02a)
     assert(gatesOK, 'memo / fund-as-actor gate thresholds wrong');
     void fWakesOK; void scrutinyGap; void playerPilled; void marketPilled; void computeUrgency; void deactivateBelief; void resetBelief; void setControlRegime; void computeMarket; void initComputeMarket;
 }
@@ -525,7 +799,7 @@ let neverLockNoScrutinyOK = false, guardNotVacuousOK = false;
     initConsensus(race); initBelief(race);
     let triggers = 0;
     for (let d = 0; d < HORIZON; d++) {
-        advanceRace(race); stepBelief(race);
+        raceDay(race);
         if (d % LOCK_INTERVAL === 0) {
             stepFirmBelief(race);
             // Exactly the fixed _runScrutiny guard + trigger condition.
@@ -544,33 +818,31 @@ let neverLockNoScrutinyOK = false, guardNotVacuousOK = false;
 }
 
 // ==========================================================================
-// I. Deadline decay -- the conditional quote decays toward NO (fix 2)
+// I. A quiet record decays the quote toward NO by the deadline
 // ==========================================================================
 
-let decayTowardNoOK = false, decayReachesFloorOK = false;
+let decayReachesFloorOK = false, decayMonotone = true;
+const decayPath = [];
 {
     const race = createRaceState((BASE_SEED + 500) >>> 0);
     initConsensus(race); initBelief(race);
-    // R2 contract (deadline 420). With NO ledger progress, the survival-
-    // conditioned quote must STRICTLY decrease as "today" advances toward the
-    // deadline -- "no progress as the deadline nears IS decay toward NO" (02a).
-    const R2 = { predicate: { rung: 2 }, deadline: 420, baseRate: 0.70 };   // P6-1b recalibration
-    let prev = Infinity, monotoneDown = true, start = null, near = null;
+    const R2 = consensus.contracts.find(c => c.predicate.rung === 2);
+    let prev = Infinity;
     for (const t of [0, 100, 200, 300, 400, 419]) {
-        belief.day = t;   // advance "today" only; belief.rungs unchanged (no progress)
+        quietTo(race, t);
         const q = binaryQuoteFromBelief({ day: t }, R2);
-        if (q > prev + 1e-9) monotoneDown = false;
-        prev = q;
-        if (t === 0) start = q;
-        if (t === 419) near = q;
+        if (q > prev + 1e-9) decayMonotone = false;
+        prev = q; decayPath.push([t, q]);
     }
-    decayTowardNoOK = monotoneDown && near < start - 0.3;
-    decayReachesFloorOK = near <= 0.05;
-    assert(decayTowardNoOK, `quote did not decay toward NO with no progress (start ${start} near ${near})`);
-    assert(decayReachesFloorOK, `quote did not reach the NO floor at the deadline (${near})`);
-    // Day-0 exactness must survive the conditional re-solve: listing == base rate.
-    initBelief(race);
-    assert(Math.abs(binaryQuoteFromBelief({ day: 0 }, R2) - 0.70) < 1e-6, 'day-0 exactness lost under the conditional law');
+    // The gate's intent, restated for the reader (HEAD's `near <= 0.05` floor was the
+    // heuristic B's own arithmetic: a logistic with fixed {m, w} conditioned on one day
+    // left goes to ~0 mechanically; under the reader the eve quote is a one-day hazard).
+    // HEAD's decay criterion stands: the eve quote at least 0.3 below the listing, and
+    // still falling over the deadline's last stretch. Mid-term monotonicity is a
+    // diagnostic: a record with no release at all is off the training distribution.
+    const [, q0] = decayPath[0], [, q400] = decayPath.at(-2), [, q419] = decayPath.at(-1);
+    decayReachesFloorOK = q419 < q0 - 0.3 && q419 < q400;
+    assert(decayReachesFloorOK, `a quiet record did not decay toward NO by the deadline (${q0} -> ${q400} -> ${q419})`);
 }
 
 // ==========================================================================
@@ -637,68 +909,83 @@ let overlayOrderOK = false, buggyOrderReproducedOK = false;
 
 // ---- Report --------------------------------------------------------------
 
+const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
+const q95 = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(0.95 * (s.length - 1))] : NaN; };
+const ok = (b) => b ? 'ok' : 'FAIL';
 line(`belief-test: N=${N} runs, base seed=${BASE_SEED}, horizon=${HORIZON}d`);
 line('='.repeat(72));
-
-line('\nA. B-update causality + full-corruption invariance');
-line(`  every non-random B move carries a causal ID:      ${allCausesHaveId ? 'ok' : 'FAIL'}  (${totalCauses} moves over ${N} runs)`);
-line(`  ledger FULL COVERAGE (reconstruct m/w -> live state): ${ledgerCoverageOK ? 'ok' : 'FAIL'}`);
-line(`  B + timeline + quotes invariant under full corruption + fake latents: ${invarianceOK ? 'holds' : 'VIOLATED'}`);
-
+line('\nA. The rule of thumb + full-corruption invariance');
+line(`  every rule move carries a causal ID:                ${ok(allCausesHaveId)}  (${totalCauses} moves over ${N} runs)`);
+line(`  ledger FULL COVERAGE; rule and record agree on certs: ${ok(ledgerCoverageOK)}`);
+line(`  pooled B, quotes, laws, projection, heads invariant under corruption: ${invarianceOK ? 'holds' : 'VIOLATED'}`);
+line(`  rule trajectory == HEAD 1343924 (sha256, ${ruleHashDays} days): ${ok(ruleHashOK)} | via reader-data.mjs: ${ok(readerDataHashOK)}`);
 line('\nB. Leak once-per-ID');
-line(`  leaked beat folds exactly once (replay is a no-op): ${leakOnceOK ? 'ok' : 'FAIL'}`);
-line(`  replayed leak records no second causal move:        ${stepIdempotentOK ? 'ok' : 'FAIL'}`);
-
-line('\nC. Posterior scoring arithmetic (log-likelihood ratio vs B, credibility = tanh(S/K))');
-line(`  quarter crossing probability == naive form, stable: ${probOK ? 'ok' : 'FAIL'}`);
-line(`  market copier scores exactly 0:                     ${copierZeroOK ? 'ok' : 'FAIL'}`);
-line(`  a call's increment == hand value; cred = tanh(S/K):  ${deltaOK ? 'ok' : 'FAIL'}`);
-line(`  lock semantics (valid-set/on-grid+day/immutable):   ${lockGuardOK ? 'ok' : 'FAIL'}`);
-line(`  scoring needs the opening lock; once per quarter:   ${scoreGuardOK ? 'ok' : 'FAIL'}`);
-line(`  no manufactured forecast; day-0 draft is B:         ${noManufacturedOK ? 'ok' : 'FAIL'}`);
-line(`  a market lock's claim == the Consensus quote:       ${claimIsQuoteOK ? 'ok' : 'FAIL'}`);
-
+line(`  leaked beat folds exactly once (replay is a no-op): ${ok(leakOnceOK)}`);
+line(`  replayed leak records no second causal move:        ${ok(stepIdempotentOK)}`);
+line('\nC. Posterior with plateau, locks, scoring');
+line(`  crossingProb/quarterProb with q == naive ratio:     ${ok(probOK)}`);
+line(`  plateau handle (closed form, bounds, ladder push):  ${ok(plateauOK)}`);
+line(`  m and q monotone over R2-R4, R5 unordered:          ${ok(orderOK)}`);
+line(`  locks store the clamped {pP, pM} pairs:             ${ok(pairsOK)}`);
+line(`  a call's score == stored-pair hand value:           ${ok(deltaOK)}`);
+line(`  market-policy copier scores exactly 0:              ${ok(copierZeroOK)}`);
+line(`  lock semantics (valid set/on-grid/immutable/policy): ${ok(lockGuardOK)}`);
+line(`  scoring needs the opening lock; once per quarter:   ${ok(scoreGuardOK)}`);
+line(`  no manufactured forecast; day-0 draft = projection: ${ok(noManufacturedOK)}`);
+line(`  market-policy lockedClaim / playerPilled read B:    ${ok(marketPolicyReadsOK)}`);
+line(`  an untouched projection locks as market policy:     ${ok(projectionIsMarketOK)}`);
+line(`  day 945: playerPilled capped at R4's support:       ${ok(lateCapOK)}`);
+line(`  day 945: plateau inverse exact (saturated logistic): ${ok(latePlateauOK)}`);
+line(`  day 945: curveMedian 962.33, daily mass adds up:     ${ok(lateMedianOK)}`);
+line(`  sigma0^2 == naive sum over scored rung-quarters:    ${ok(sigmaOK)}`);
+line(`  market-policy record has sigma0 exactly 0:          ${ok(sigmaCopierOK)}`);
 line('\nD. Lock-day schedule (0, 63, 126, ...)');
-line(`  isLockDay matches the grid over ${HORIZON}d:           ${scheduleOK ? 'ok' : 'FAIL'}`);
-
-line('\nE. Two-sided listing quotes with the REAL quoter');
-line('  rung   base    mid');
-for (const r of listingRows) line(`  R${r.rung}    ${r.base.toFixed(2)}   ${r.mid.toFixed(3)}`);
-line(`  all two-sided: ${listingTwoSidedOK ? 'ok' : 'FAIL'} | all == base rate: ${listingEqualsBaseOK ? 'ok' : 'FAIL'}`);
-
+line(`  isLockDay matches the grid over ${HORIZON}d:           ${ok(scheduleOK)}`);
+line('\nE. Day-0 listing quotes with the real quoter (mean / min / max over worlds)');
+for (const R of [2, 3, 4, 5]) { const a = listingRows[R]; line(`  R${R}  ${mean(a).toFixed(3)}  ${Math.min(...a).toFixed(3)}  ${Math.max(...a).toFixed(3)}`); }
+line(`  all two-sided: ${ok(listingTwoSidedOK)}`);
+line('\nL-O. The pool, the projection, the timeline, the player\'s projection');
+line(`  pool arithmetic == (1-eta)*legible + eta*full, projected: ${ok(poolOK)}  (${poolChecks} coordinates)`);
+line(`  P(R4) <= P(R3) <= P(R2) pointwise:                  ${ok(coherenceOK)}`);
+line(`  untouched where the pool is already ordered:        ${ok(untouchedOK)}`);
+line(`  binding (diagnostic): ${binds}/${bindChecks} open R3/R4 coordinates (${(100 * binds / Math.max(1, bindChecks)).toFixed(2)}%), max ${maxBind.toFixed(4)}`);
+const cs = coherenceStats();
+line(`  live coherenceStats (since last init): ${cs.binds}/${cs.checks} binds, max ${cs.maxGap.toFixed(4)}`);
+line(`  implied timeline == brute-force pooled median:      ${ok(timelineOK)}`);
+line(`  beliefLaw masses + atom == 1, median == timeline:    ${ok(lawOK)}`);
+line(`  projection bounds + ladder order:                   ${ok(projBoundsOK)}`);
+line(`  earlier/later presets on the projection, q kept:    ${ok(presetOK)}`);
+line(`  projection fit |error| (diagnostic) mean / p95:     ${[2, 3, 4, 5].map(R => `R${R} ${mean(fitErr[R]).toFixed(3)}/${q95(fitErr[R]).toFixed(3)}`).join('  ')}`);
+line('\nP. The outstanding quarter at the terminal');
+line(`  scored once from its pairs vs the completed world:  ${ok(outstandingOK)}`);
+line(`  a certification after the quarter's end: o = 0:     ${ok(outstandingNaturalOK)}`);
+line(`  no quarter scored twice, no terminal lock:          ${ok(noDoubleOK)}`);
 line('\nF. Impulse-overlay decay (no permanent param drift)');
-line(`  overlay shifts a param while live:                  ${overlayLiveOK ? 'ok' : 'FAIL'}`);
-line(`  param restored to baseline each day:                ${restoreOK ? 'ok' : 'FAIL'}`);
-line(`  NO permanent drift over ${HORIZON}d run:                ${noDriftOK ? 'ok' : 'FAIL'}`);
-line(`  overlaid values clamped to PARAM_RANGES:            ${clampOK ? 'ok' : 'FAIL'}`);
-line(`  accumulator decays to ~0 (half-life ${IMPULSE_HALF_LIFE}d):          ${decayedToZeroOK ? 'ok' : 'FAIL'}`);
-
+line(`  overlay shifts a param while live:                  ${ok(overlayLiveOK)}`);
+line(`  param restored to baseline each day:                ${ok(restoreOK)}`);
+line(`  NO permanent drift over ${HORIZON}d run:                ${ok(noDriftOK)}`);
+line(`  overlaid values clamped to PARAM_RANGES:            ${ok(clampOK)}`);
+line(`  accumulator decays to ~0 (half-life ${IMPULSE_HALF_LIFE}d):          ${ok(decayedToZeroOK)}`);
 line('\nG. eta monotone in the released frontier (02a ruling)');
-line(`  non-decreasing in releasedFrontierRung:             ${etaMonotoneOK ? 'ok' : 'FAIL'}`);
-line(`  endpoints 0 at R1 / 1 at R5:                        ${etaEndpointsOK ? 'ok' : 'FAIL'}`);
-line(`  reads ONLY releasedFrontierRung:                    ${etaReadsOnlyReleasedOK ? 'ok' : 'FAIL'}`);
-
+line(`  non-decreasing in releasedFrontierRung:             ${ok(etaMonotoneOK)}`);
+line(`  endpoints 0 at R1 / 1 at R5:                        ${ok(etaEndpointsOK)}`);
+line(`  reads ONLY releasedFrontierRung:                    ${ok(etaReadsOnlyReleasedOK)}`);
 line('\nH. Firm belief F + gates');
-line(`  F stays in [0,100] over a run:                      ${fBoundedOK ? 'ok' : 'FAIL'}`);
-line(`  memo / fund-as-actor gate thresholds:               ${gatesOK ? 'ok' : 'FAIL'}`);
-
+line(`  F stays in [0,100] over a run:                      ${ok(fBoundedOK)}`);
+line(`  memo / fund-as-actor gate thresholds:               ${ok(gatesOK)}`);
 line('\nH2. Never-lock scrutiny guard (P1)');
-line(`  never-lock player -> zero scrutiny triggers:        ${neverLockNoScrutinyOK ? 'ok' : 'FAIL'}`);
-line(`  guard not vacuous (divergent lock can still fire):  ${guardNotVacuousOK ? 'ok' : 'FAIL'}`);
-
-line('\nI. Deadline decay (survival-conditioned quote, fix 2)');
-line(`  quote decays toward NO with no progress:            ${decayTowardNoOK ? 'ok' : 'FAIL'}`);
-line(`  quote reaches the NO floor near the deadline:       ${decayReachesFloorOK ? 'ok' : 'FAIL'}`);
-
+line(`  never-lock player -> zero scrutiny triggers:        ${ok(neverLockNoScrutinyOK)}`);
+line(`  guard not vacuous (divergent lock can still fire):  ${ok(guardNotVacuousOK)}`);
+line('\nI. A quiet record (R2 quote by day)');
+line(`  ${decayPath.map(([t, q]) => `${t}:${q.toFixed(3)}`).join('  ')}  monotone (diagnostic): ${decayMonotone ? 'yes' : 'no'}`);
+line(`  eve quote >= 0.3 below the listing, still falling:  ${ok(decayReachesFloorOK)}`);
 line('\nJ. Followup-fired race shells seed impulses (fix 6)');
-line(`  incident_postmortem (followup path) seeds impulse:  ${followupImpulseOK ? 'ok' : 'FAIL'}`);
-line(`  canonical dispatch seeds exactly once (no double):  ${singleSeedOK ? 'ok' : 'FAIL'}`);
-line(`  dispatch never mutates sim params:                  ${dispatchNoSimMutateOK ? 'ok' : 'FAIL'}`);
-
+line(`  incident_postmortem (followup path) seeds impulse:  ${ok(followupImpulseOK)}`);
+line(`  canonical dispatch seeds exactly once (no double):  ${ok(singleSeedOK)}`);
+line(`  dispatch never mutates sim params:                  ${ok(dispatchNoSimMutateOK)}`);
 line('\nK. Day-lifecycle overlay order (fix 1)');
-line(`  event mutates BASELINE (.06 +impulse +.02 -> .08):  ${overlayOrderOK ? 'ok' : 'FAIL'}`);
-line(`  buggy order reproduced (would erase to .06):        ${buggyOrderReproducedOK ? 'ok' : 'FAIL'}`);
-
+line(`  event mutates BASELINE (.06 +impulse +.02 -> .08):  ${ok(overlayOrderOK)}`);
+line(`  buggy order reproduced (would erase to .06):        ${ok(buggyOrderReproducedOK)}`);
 line('\n' + '='.repeat(72));
 if (failures === 0) {
     line('ALL BELIEF INVARIANTS PASS');

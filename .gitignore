@@ -23,3 +23,7 @@ Thumbs.db
 
 # Worktrees
 .worktrees/
+
+# Reader refit diagnostics (compact fit report remains tracked)
+tools/reader-fit-detail.json
+tools/reader-test-report.json

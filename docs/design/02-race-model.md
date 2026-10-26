@@ -96,15 +96,27 @@ single-track by construction — release *is* its mode of existence.)
   choices — backing export controls heats; advising the deal in the room
   cools.
 - **Market belief `B`** — the market's posterior over the timeline, held
-  as a curve per rung (a crossing-date law), not a scalar; the displayed
-  "implied timeline" is derived from it. Its timeline moves on
-  *legible* events only — releases, rung claims and certifications — and
-  never on hidden truth. Detected incidents, insider-tip whispers,
-  published or leaked evidence and disclosed thefts fold into a bounded
-  alignment sentiment that `B` records and nothing prices. True `C`
-  never enters the interface; it only generates evidence and,
-  eventually, settlement. `B` catching up to reality *is* alpha decay,
-  mechanically, and the valuation layer is where the tape shows it.
+  as a crossing-date law per rung, not a scalar; the displayed "implied
+  timeline" is derived from it. It is a designed inefficiency, a pool of
+  two forecasters weighted by η, the share of the market that runs
+  licensed models.
+  - The first is the **market's rule of thumb**: a heuristic updater
+    that moves on releases, rung claims and certifications only. It is
+    recalibrated by day and claim state, so nothing static beats it, and
+    is otherwise as crude as it reads.
+  - The second is the **reader**: a forecaster fit on the simulator's own
+    runs, which reads the whole public record — cadence, incidents,
+    thefts, the strait, the regime, the treaty's beats.
+
+  Neither ever sees hidden truth. The edge a player can earn is what the
+  record holds beyond the rule's reading. It is widest before the claim
+  that reveals a rung and shrinks as η rises. Detected incidents,
+  insider-tip whispers, published or leaked evidence and disclosed
+  thefts also fold into a bounded alignment sentiment that `B` records
+  and nothing prices. True `C` never enters the interface; it only
+  generates evidence and, eventually, settlement. `B` catching up to
+  reality *is* alpha decay, mechanically, and the valuation layer is
+  where the tape shows it.
 - **Control regime `controlRegime`** — the state's grip on the frontier,
   an ordered enum: `private → supervised → mobilized → nationalized |
   classified` (the two terminal peers never swap). Transitions ratchet on

@@ -23,7 +23,7 @@
    ended and the epilogue reveals them.
    ===================================================== */
 
-import { belief, latestLock } from './race/belief.js';
+import { belief, latestLock, beliefLaw, isCertified, crossingProb, curveMedian } from './race/belief.js';
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
 
@@ -176,25 +176,28 @@ function _size() {
 // Drawing
 // ---------------------------------------------------------------------------
 
-const sig = (x) => 1 / (1 + Math.exp(-x));
-
 /** Height for a place in the band of rung `r`. A track that has not reached R1
  *  (a Tianxia far behind) sits in a narrow strip just under the R1 rule. */
 const _bandV = (r, frac) => (r >= 1 ? r + frac : 0.66 + 0.3 * frac);
 
-/** Conditional crossing law of rung R from belief B (or from `curve`, a locked
- *  {m, w} of the player's), given no crossing by `t0`. */
+/** Conditional crossing law of rung R given no crossing by today: belief B's
+ *  pooled law (beliefLaw: the daily mass and the pooled conditional median), or,
+ *  given `curve`, a locked {m, w, q} of the player's conditioned on `t0`: its
+ *  daily mass from the log-space crossing probability, and its conditional
+ *  median from curveMedian (null, "not this term", when less than half the
+ *  conditional mass lands inside the support, as for B). Null once R is
+ *  certified. */
 function _law(R, t0, curve) {
-    const b = belief.rungs[R];
-    if (!b || b.crossed) return null;
-    const r = curve || b;
-    const a = (t0 - r.m) / r.w, F0 = sig(a);
-    // The conditional median m + w*logit((1 + F0)/2) = m + w*ln(1 + 2e^a), in a
-    // form that stays finite when the median is far behind t0 (a lock can be).
-    const lift = a > 0 ? a + Math.log(2 + Math.exp(-a)) : Math.log1p(2 * Math.exp(a));
+    if (isCertified(R)) return null;
+    if (!curve) {
+        const b = beliefLaw(R);
+        return b && { dens: (d) => b.density(Math.round(d)), median: b.median };
+    }
+    const { m, w, q } = curve;
+    const cdf = (D) => crossingProb(m, w, q, t0, D);
     return {
-        dens: (d) => { const s = sig((d - r.m) / r.w); return s * (1 - s) / r.w / (1 - F0); },
-        median: r.m + r.w * lift,
+        dens: (d) => { const D = Math.round(d); return D <= t0 ? 0 : cdf(D) - cdf(D - 1); },
+        median: curveMedian(curve, t0, R),
     };
 }
 
@@ -311,7 +314,7 @@ export function drawRace() {
             c.closePath();
             c.fillStyle = _r(ind, document.documentElement.dataset.theme === 'dark' ? 0.26 : 0.17); c.fill();
             c.strokeStyle = _r(ind, 0.6); c.lineWidth = 0.8; c.stroke();
-            if (law.median >= today && law.median <= HORIZON) {
+            if (law.median != null && law.median >= today && law.median <= HORIZON) {
                 const mx2 = Math.round(X(law.median)) + 0.5;
                 c.strokeStyle = ind; c.lineWidth = 1.2;
                 c.beginPath(); c.moveTo(mx2, y - amp - 3); c.lineTo(mx2, y + amp + 3); c.stroke();
@@ -454,11 +457,11 @@ function _caption(today, frontier) {
             + (bits.length ? bits.join('; ') : 'no rung past R2 in house') + '.');
         return;
     }
-    const next = [2, 3, 4, 5].find(R => belief.rungs[R] && !belief.rungs[R].crossed);
+    const next = belief.active ? [2, 3, 4, 5].find(R => !isCertified(R)) : null;
     let tail = '';
     if (next) {
         const law = _law(next, today);
-        tail = law ? ` Consensus’s median for R${next} is day ${Math.round(law.median)}.` : '';
+        tail = law && law.median != null ? ` Consensus’s median for R${next} is day ${Math.round(law.median)}.` : '';
     }
     _st.cap(`Day ${today}. The released frontier claims R${frontier || 1}.${tail} Hollow diamonds are claims nobody has adjudicated; the thick rule to a filled one is the certification lag.`);
 }
@@ -478,10 +481,10 @@ function _table() {
         const t0 = race ? (_st.ended ? _pub.lastDay : Math.min(race.day, HORIZON)) : 0;
         const law = race && belief.active ? _law(R, t0) : null;
         // Yours: the latest lock's median, conditioned on today like the market's
-        // beside it, so a lock of the market's curves reads the market's number.
+        // beside it. A market-policy lock reads the market's own law (02a).
         const lock = race && belief.active ? latestLock() : null;
-        const mine = lock ? _law(R, t0, lock.curves[R]) : null;
-        const med = (l) => l ? String(Math.round(l.median)) : cert ? 'certified' : '—';
+        const mine = lock ? (lock.policy === 'market' ? law : _law(R, t0, lock.curves[R])) : null;
+        const med = (l) => l ? (l.median != null ? String(Math.round(l.median)) : 'not this term') : cert ? 'certified' : '—';
         const cells = [`R${R}`, claim ? `${claim.day}, ${LAB[claim.lab].name}` : '—', cert ? String(cert.day) : '—', med(law), lock ? med(mine) : '—'];
         cells.forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (!i) td.className = 'l'; tr.appendChild(td); });
         tb.appendChild(tr);

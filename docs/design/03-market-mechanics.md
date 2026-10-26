@@ -73,19 +73,30 @@ constants are in [02a-tuning.md](02a-tuning.md).
 ## The posterior and the implied timeline
 
 The **market's implied timeline** is `B`, per rung a crossing-date law
-whose quotes are the binaries. The **player's posterior** is the same
-object, drawn: on the Markets page's Consensus panel, "Your curves"
-draws the player's draft over the market's curves. A median handle per
-uncertified rung drags along the timeline and up or down for width;
-arrow keys move it 5 days (21 with Shift) and tighten or loosen it, and
-Tab moves between rungs. Edit mode suspends the panel's sandbox picks.
-The draft is locked each quarter through the forecast-lock dispatch — as
-drawn, the market's, earlier or later than the market, or "adjust
-first", which holds the quarter until the panel's Lock is pressed.
+whose quotes are the binaries; its implied date is the day the law is
+even odds, or "not this term". The **player's posterior** is a
+logistic per rung with a plateau, drawn: on the Markets page's Consensus
+panel, "Your curves" draws the player's draft over the market's curves,
+starting from a fit of `B` into the player's family. A median handle per
+uncertified rung drags along the timeline and up or down for width; a
+square at the term's end sets the chance the rung lands this term at
+all. Arrow keys move the median 5 days (21 with Shift) and tighten or
+loosen it, Page Up and Page Down move the plateau, and Tab moves between
+rungs. Edit mode suspends the panel's sandbox picks. The draft is locked
+each quarter through the forecast-lock dispatch — as drawn, the
+market's, earlier or later than the market, or "adjust first", which
+holds the quarter until the panel's Lock is pressed. Locking the
+market's curves is a policy, not a drawing: it scores exactly what the
+market scores.
 
 At each quarter's close, every open rung is scored for the player and
-for the market's snapshot alike: the log-likelihood of what certified,
-and of the quiet quarters that didn't. Credibility is the player's
+for the market's snapshot alike, from the probabilities both stored at
+the lock: the log-likelihood of what certified, and of the quiet
+quarters that didn't. A quarter still open when the run ends is scored
+once, against the world that happened. Against a market this sharp the
+record is small, a fraction of a nat to a couple of nats a run for a
+skilled reader, so it moves slowly and luck can still carry a bold
+early caller through a gate. Credibility is the player's
 demonstrated edge over the market (copying the market scores exactly
 zero), and it is the currency that converts the firm and unlocks
 agency. The Desk shows the track record and credibility; the Race page

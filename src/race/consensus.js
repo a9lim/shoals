@@ -108,15 +108,13 @@ export function disputeAdjudicator(regime) {
 // adjudication path activates when a dispute event class exists (P5) --
 // certification disputes are meanwhile resolved upstream in stepCertification.
 //
-// `baseRate` is the public LISTING prior -- a per-contract base rate is
-// legitimately public information (Consensus lists at market-consistent priors),
-// calibrated to the measured settlement frequencies. RECALIBRATED (P6-1b re-gate,
-// 2026-07-24) under the final retuned kinematics -- the velocity/drag/follower
-// legs shifted the certified-crossing rates: R2 0.57->0.70, R3 0.56->0.62,
-// R4 0.57->0.60 YES (measured 0.705 / 0.625 / 0.600 at N=2000; all two-sided,
-// within the harness's 8pp invariant). The R5 base rate 0.70 is the designed
-// crossing expectation (measured crossing 0.712); the closeout-recovery multiplier
-// is a later-phase (endings) refinement.
+// `baseRate` is the public LISTING prior (02a "Consensus binaries"): the
+// population mean of `B`'s day-0 quote, re-derived at each refit of the reader.
+// Measured 2026-10-25 on the validation seeds 2,000,001-2,002,000 under reader
+// schema 11: R2 0.6995, R3 0.5811, R4 0.5205, R5 0.6275. Every validation world
+// opens with the released frontier at R1 (eta 0, the same legible features), so
+// the day-0 quote does not vary by world under the current kinematics. It lives
+// only here; the rule of thumb's seed priors are belief.js's RUNG_SEED.
 
 function contractDefs() {
     const cert = (key, rung, deadline, disputeDeadline, baseRate) => ({
@@ -148,10 +146,10 @@ function contractDefs() {
         terminal: true,
     });
     return [
-        cert(0, 2, 420, 450, 0.70),
-        cert(1, 3, 756, 786, 0.62),
-        cert(2, 4, 880, 910, 0.60),
-        terminal(3, 5, 1000, 1008, 0.70),   // resolution territory -> terminal closeout, never NO-against-crossing
+        cert(0, 2, 420, 450, 0.700),
+        cert(1, 3, 756, 786, 0.581),
+        cert(2, 4, 880, 910, 0.521),
+        terminal(3, 5, 1000, 1008, 0.628),   // resolution territory -> terminal closeout, never NO-against-crossing
     ];
 }
 

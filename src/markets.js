@@ -22,10 +22,12 @@
    per open rung with a bead at its median. "Your curves"
    puts the panel in edit mode: the beads become handles
    (drag across for the median, up and down for the
-   width; arrows on a focused panel), and sandbox picks
-   are off until edit mode ends. A lock the player chose
-   to adjust first holds edit mode on and shows the
-   panel's Lock. The draft itself lives in belief.js.
+   width; arrows on a focused panel), a second handle at
+   the term's end sets the plateau (drag up and down;
+   PageUp/PageDown), and sandbox picks are off until edit
+   mode ends. A lock the player chose to adjust first
+   holds edit mode on and shows the panel's Lock. The
+   draft itself lives in belief.js.
    ===================================================== */
 
 import { market } from './market.js';
@@ -35,8 +37,9 @@ import { unitPrice } from './position-value.js';
 import { consensus, BINARY_NOTIONAL } from './race/consensus.js';
 import { computeMarket, buildComputePublicView, isComputeTradeable } from './race/compute-market.js';
 import {
-    belief, binaryProb, computeCurveFromBelief, crossingProb,
-    draftCurves, marketCurves, curvesEqual, openRungs, setDraftMedian, setDraftWidth,
+    belief, binaryProb, computeCurveFromBelief, crossingProb, plateauHeight,
+    draftCurves, openRungs, setDraftMedian, setDraftWidth, setDraftPlateau,
+    certDay, impliedTimeline, curveMedian, marketCurves, curvesEqual,
 } from './race/belief.js';
 import { HORIZON } from './race/resolution.js';
 
@@ -115,12 +118,12 @@ export function takeSnapshot(ctx, smileIdx) {
     // Consensus: P(rung R certified by day D), from belief B, today to the horizon.
     snap.consensus = null;
     if (race && consensus.active && belief.active) {
-        const curves = {};
+        const curves = {}, med = impliedTimeline();
         for (const R of [2, 3, 4, 5]) {
-            const rung = belief.rungs[R];
+            const cd = certDay(R);
             const pts = [];
             for (let i = 0; i <= 44; i++) { const D = race.day + (HORIZON - race.day) * i / 44; pts.push([D, binaryProb(R, D)]); }
-            curves[R] = { pts, crossed: !!(rung && rung.crossed), certDay: rung ? rung.certDay : null, m: rung ? rung.m : null, w: rung ? rung.w : null };
+            curves[R] = { pts, crossed: cd != null, certDay: cd, median: med[R] };
         }
         snap.consensus = {
             raceDay: race.day, frozen: consensus.frozen, curves,
@@ -248,9 +251,11 @@ const _st = {
 
 // Editor steps (UNRATIFIED feel numbers, 02a gives only the keys): ←/→ move a
 // median 5 days, Shift 21 (ratified); ↑/↓ scale the width by 10%; a vertical drag
-// scales it by e per 90 px, up tighter.
+// scales it by e per 90 px, up tighter. The plateau handle (unratified binding):
+// PageUp/PageDown move the term-end height 0.05, Shift 0.01; a drag follows the axis.
 const EDIT_STEP = 5, EDIT_STEP_BIG = 21, EDIT_W_STEP = 1.1, EDIT_W_PX = 90;
-const _EDIT_HELP = 'Drag a median; up and down to tighten or loosen.';
+const EDIT_H_STEP = 0.05, EDIT_H_STEP_FINE = 0.01;
+const _EDIT_HELP = 'Drag a median; up and down to tighten or loosen. The square at the term’s end sets the chance it lands at all.';
 
 const _ease = (t) => t < 0.5 ? 4 * t * t * t : 1 - Math.pow(-2 * t + 2, 3) / 2;
 
@@ -350,7 +355,7 @@ export function resetMarkets() {
 function _label(p) {
     const { spec } = p;
     p.canvas.setAttribute('aria-label', spec.key === 'cons' && _st.edit
-        ? `${spec.title}, your curves over the market’s. Tab chooses a rung; left and right move its median, with Shift for larger steps; up and down tighten or loosen it.`
+        ? `${spec.title}, your curves over the market’s. Tab chooses a rung; left and right move its median, with Shift for larger steps; up and down tighten or loosen it; Page Up and Page Down raise or lower the chance it lands this term.`
         : `${spec.title}, ${spec.sub}. ${spec.what} Arrow keys choose a contract; Enter adds it to the sandbox, again to go short, a third time to remove it.`);
 }
 
@@ -480,7 +485,7 @@ function _draw(p) {
     }
     const X = (x) => g.l + (g.r - g.l) * (x - x0) / (x1 - x0);
     const Y = (y) => g.t + (g.b - g.t) * (1 - (y - lo) / (hi - lo));
-    p.geom = { x0, x1, gl: g.l, gr: g.r };
+    p.geom = { x0, x1, gl: g.l, gr: g.r, lo, hi, gt: g.t, gb: g.b };
 
     if (empty && !cur.length) {
         c.strokeStyle = _r(text, 0.12); c.lineWidth = 1;
@@ -513,7 +518,6 @@ function _draw(p) {
     // The player's draft (02a, the posterior), read live from belief.js: it moves
     // under the pointer, not once a day like the snapshot.
     const draft = cons && s.consensus && belief.active ? draftCurves() : null;
-    const mkt = draft ? marketCurves() : null;
     const tNow = draft ? s.consensus.raceDay : 0;
     const open = draft ? openRungs() : [];
     const consDash = { 2: [], 3: [], 4: [5, 3], 5: [1.5, 2.5] }, consW = { 2: 1.1, 3: 1.6, 4: 1.4, 5: 1.4 };
@@ -528,14 +532,13 @@ function _draw(p) {
         c.setLineDash([]);
     }
     c.lineJoin = 'round';
-    // The draft, beneath B: solid, in the text ink. A rung whose draft is B's own
-    // curve is left to B's line; its bead below still marks the median.
+    // The draft, beneath B: solid, in the text ink. Drawn even where it is B's
+    // projection, since the projection is a fit to B's curve, not B's curve.
     if (draft) {
         c.strokeStyle = text; c.lineWidth = 1.5;
         for (const R of open) {
-            if (curvesEqual(draft, mkt, R)) continue;
-            const { m, w } = draft[R], pts = [];
-            for (let i = 0; i <= 120; i++) { const D = x0 + (x1 - x0) * i / 120; pts.push([D, crossingProb(m, w, tNow, D)]); }
+            const { m, w, q } = draft[R], pts = [];
+            for (let i = 0; i <= 120; i++) { const D = x0 + (x1 - x0) * i / 120; pts.push([D, crossingProb(m, w, q, tNow, D)]); }
             line(pts);
         }
     }
@@ -574,15 +577,30 @@ function _draw(p) {
     }
 
     // The draft's medians: a bead on each open rung, a handle in edit mode. A
-    // median outside the panel's span sits on the nearer edge with a chevron.
+    // median outside the panel's span sits on the nearer edge with a chevron. In
+    // edit mode each open rung also has a plateau handle at the term's end: the
+    // curve's height there, a square (02a: the plateau handle).
     p.handles = [];
     if (draft) {
         for (const R of open) {
-            const { m, w } = draft[R];
+            const { m, w, q } = draft[R];
             const xm = Math.max(x0, Math.min(x1, m));
-            p.handles.push({ R, sx: X(xm), sy: Y(crossingProb(m, w, tNow, xm)), off: m < x0 ? -1 : m > x1 ? 1 : 0 });
+            p.handles.push({ R, sx: X(xm), sy: Y(crossingProb(m, w, q, tNow, xm)), off: m < x0 ? -1 : m > x1 ? 1 : 0 });
+        }
+        if (editing) {
+            for (const R of open) {
+                const { m, w, q } = draft[R];
+                p.handles.push({ R, plateau: true, sx: X(x1), sy: Y(plateauHeight(m, w, q, tNow)), off: 0 });
+            }
         }
         for (const hd of p.handles) {
+            if (hd.plateau) {
+                const sel = hd.R === _st.sel, r = sel ? 4 : 3.3;
+                c.beginPath(); c.rect(hd.sx - r, hd.sy - r, 2 * r, 2 * r);
+                c.fillStyle = sel ? text : pal.canvas; c.fill();
+                c.strokeStyle = text; c.lineWidth = 1.5; c.stroke();
+                continue;
+            }
             const sel = editing && hd.R === _st.sel;
             c.beginPath(); c.arc(hd.sx, hd.sy, editing ? (sel ? 4.6 : 3.8) : 2.4, 0, Math.PI * 2);
             if (!editing) { c.fillStyle = text; c.fill(); continue; }
@@ -630,7 +648,13 @@ function _draw(p) {
     // The reading, top left; a label for the hovered or focused contract.
     c.font = font(12, true); c.fillStyle = muted; c.textAlign = 'left'; c.textBaseline = 'alphabetic';
     const sd = editing && draft && draft[_st.sel] ? _st.sel : 0;
-    c.fillText(sd ? `R${sd} by day ${Math.round(draft[sd].m)} · Consensus by day ${Math.round(mkt[sd].m)}` : spec.read(s), g.l, 11);
+    // Both as conditional medians given nothing yet; the draft's m is the median
+    // given the rung ever certifies, a different measure from the market's.
+    const by = (d) => d == null ? 'not this term' : `by day ${Math.round(d)}`;
+    const bMed = sd ? s.consensus.curves[sd].median : null;
+    // A rung still on the market's projection reads as the market's own date.
+    const dMed = !sd ? null : curvesEqual(draft, marketCurves(), sd) ? bMed : curveMedian(draft[sd], s.consensus.raceDay, sd);
+    c.fillText(sd ? `R${sd} yours ${by(dMed)} · Consensus ${by(bMed)}` : spec.read(s), g.l, 11);
     const lab = editing ? null : p.hover || (p.focus >= 0 && document.activeElement === p.canvas ? pts[p.focus] : null);
     if (lab) {
         const side = _st.legState(lab.id);
@@ -689,7 +713,7 @@ function _wirePanel(p) {
         const d = draftCurves();
         if (!h || !d) return;
         _st.sel = h.R;
-        p.drag = { R: h.R, x, y, m0: d[h.R].m, w0: d[h.R].w };
+        p.drag = { R: h.R, plateau: !!h.plateau, x, y, m0: d[h.R].m, w0: d[h.R].w };
         p.canvas.setPointerCapture(e.pointerId);
         p.canvas.style.cursor = 'grabbing';
         e.preventDefault();
@@ -699,9 +723,15 @@ function _wirePanel(p) {
         if (_editing(p)) {
             const [x, y] = local(e);
             if (p.drag && p.geom) {
-                const perPx = (p.geom.x1 - p.geom.x0) / Math.max(1, p.geom.gr - p.geom.gl);
-                setDraftMedian(p.drag.R, p.drag.m0 + (x - p.drag.x) * perPx);
-                setDraftWidth(p.drag.R, p.drag.w0 * Math.exp((y - p.drag.y) / EDIT_W_PX));
+                const G = p.geom;
+                if (p.drag.plateau) {
+                    // The plateau follows the pointer on the probability axis.
+                    setDraftPlateau(p.drag.R, G.lo + (G.hi - G.lo) * (1 - (y - G.gt) / Math.max(1, G.gb - G.gt)));
+                } else {
+                    const perPx = (G.x1 - G.x0) / Math.max(1, G.gr - G.gl);
+                    setDraftMedian(p.drag.R, p.drag.m0 + (x - p.drag.x) * perPx);
+                    setDraftWidth(p.drag.R, p.drag.w0 * Math.exp((y - p.drag.y) / EDIT_W_PX));
+                }
                 _draw(p);
             } else {
                 p.canvas.style.cursor = _nearestHandle(p, x, y) ? 'grab' : '';
@@ -764,6 +794,10 @@ function _editKey(p, e) {
         setDraftMedian(R, d[R].m + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? EDIT_STEP_BIG : EDIT_STEP));
     } else if (e.key === 'ArrowUp') setDraftWidth(R, d[R].w / EDIT_W_STEP);
     else if (e.key === 'ArrowDown') setDraftWidth(R, d[R].w * EDIT_W_STEP);
+    else if (e.key === 'PageUp' || e.key === 'PageDown') {
+        const h = plateauHeight(d[R].m, d[R].w, d[R].q, belief.day);
+        setDraftPlateau(R, h + (e.key === 'PageUp' ? 1 : -1) * (e.shiftKey ? EDIT_H_STEP_FINE : EDIT_H_STEP));
+    }
     else if (e.key === 'Tab') { if (!_selectOpen(e.shiftKey ? -1 : 1)) return; }
     else if (e.key === 'Home') _st.sel = open[0];
     else if (e.key === 'End') _st.sel = open[open.length - 1];
@@ -779,8 +813,11 @@ function _announceEdit() {
     const live = document.getElementById('sb-live');
     const d = draftCurves();
     if (!live || !d || !d[_st.sel]) return;
-    const R = _st.sel, mk = marketCurves();
-    live.textContent = `R${R}: your median day ${Math.round(d[R].m)}, width ${Math.round(d[R].w)} days. Consensus median day ${Math.round(mk[R].m)}.`;
+    const R = _st.sel, bMed = impliedTimeline()[R], t = belief.day;
+    const dMed = curvesEqual(d, marketCurves(), R) ? bMed : curveMedian(d[R], t, R);
+    const h = plateauHeight(d[R].m, d[R].w, d[R].q || 0, t);
+    const by = (x) => x == null ? 'not this term' : `by day ${Math.round(x)}`;
+    live.textContent = `R${R}: yours ${by(dMed)}, width ${Math.round(d[R].w)} days, ${Math.round(100 * h)}% this term. Consensus ${by(bMed)}.`;
 }
 
 function _announce(p) {

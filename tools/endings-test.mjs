@@ -17,7 +17,7 @@
      A. Family distribution vs the 02a tuning contract
      B. Liveness (every family >= 2% marginally)
      C. Knife-edge concentration: median |d| ~ 0.10
-     D. Late determination (day-350 / day-700 oracle Brier)
+     D. Late determination (day-350 / day-700 full-reader family-head Brier)
      E. Ratchets bind sometimes, never always
      F. Plateau regressions (saturation FP, joint capture, cap)
      G. Determinism + resolution latch
@@ -62,7 +62,7 @@ import {
     appendLedger, ledgerTotals, ledgerEntries, applyRaceEffects,
 } from '../src/race/ledger.js';
 import { COUPLING_TUNING } from '../src/race/coupling.js';
-import { belief, initBelief, stepFirmBelief, credibility } from '../src/race/belief.js';
+import { belief, initBelief, stepBelief, familyHeads, stepFirmBelief, credibility } from '../src/race/belief.js';
 
 const clampFn = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const PLAYER_CLIP_FRAC = 3 / 7;   // 02a bounded-influence clip (mirrors resolution.js)
@@ -101,6 +101,10 @@ function quantile(arr, p) {
 // ---- Run one seed to resolution (full orchestrated loop) -----------------
 function runSeed(seed, capture) {
     const race = createRaceState(seed >>> 0);
+    // The full reader's family head reads the public record and the rule of thumb
+    // (02a knife-edge 3), stepped like the game: after the ratchet and the treaty,
+    // on this loop's neutral inputs.
+    if (capture) initBelief(race);
     let detCount = 0, maxHeat = 0, sawSup = false, sawBlockade = false;
     let snap350 = null, snap700 = null, sawSummit = false;
     for (let d = 0; d < HORIZON && !race.resolution; d++) {
@@ -114,8 +118,9 @@ function runSeed(seed, capture) {
         if (race.lastTransitions.strait.blockadeStart) sawBlockade = true;   // for the blockade|f4 anti-correlation
         if (race.treaty.summitOpen) sawSummit = true;
         if (capture) {
-            if (race.day === 350) snap350 = snapshot(race, detCount);
-            if (race.day === 700) snap700 = snapshot(race, detCount);
+            stepBelief(race, { straitTension: 0, exportControlStage: 0, treatyStage: 0 });
+            if (race.day === 350) snap350 = snapshot();
+            if (race.day === 700) snap700 = snapshot();
         }
         if (checkResolution(race, null)) break;
     }
@@ -123,15 +128,10 @@ function runSeed(seed, capture) {
     return { race, res: race.resolution, snap350, snap700, sawSummit, maxHeat, sawSup, sawBlockade };
 }
 
-/** Observable-only snapshot for the oracle (public view + public heat proxy). */
-function snapshot(race, detCount) {
-    const v = buildPublicView(race);
-    return {
-        releasedRung: v.releasedFrontierRung,
-        certifiedRung: v.certifiedFrontierRung,
-        regimeRank: { private: 0, supervised: 1, mobilized: 2, nationalized: 3, classified: 3 }[v.controlRegime] || 0,
-        detBucket: detCount < 20 ? 0 : detCount < 45 ? 1 : 2,   // coarse detected-incident tercile-ish
-    };
+/** The full reader's family distribution from today's public record (families
+ *  1..6 at index k - 1), before checkResolution can extrapolate the race. */
+function snapshot() {
+    return { p: Array.from(familyHeads().full) };
 }
 
 // ---- Main ensemble -------------------------------------------------------
@@ -155,7 +155,7 @@ const f4comp = { velocity: 0, drag: 0, theft: 0 };
 // Blockade anti-correlation diagnostic (02a "The strait": blockades concentrate in
 // slow-velocity worlds, family 4 in fast ones -- intended anti-correlation).
 let blockadeRuns = 0, blockadeAndF4 = 0;
-// Late-determination oracle (section D).
+// Late determination (section D): the full reader's family head.
 const oracleRows350 = [], oracleRows700 = [];
 // P6-2 section J: no-player identity. The headless world passes no player input, so
 // every resolution must carry d_P == 0, d_W == d_actual, and d_eff == d_actual (the
@@ -220,11 +220,11 @@ for (let i = 0; i < N; i++) {
 const elapsed = ((Date.now() - t0) / 1000).toFixed(1);
 const resolved = N - unresolved;
 
-// ---- Late-determination oracle (section D) -------------------------------
-// Frequency table over coarse OBSERVABLE buckets (released rung x certified rung
-// x regime rank x detected-tercile), train/test split across seeds; must NOT beat
-// the prior's Brier by too much (knife-edge #3: determination is late).
-function bucketKey(snap) { return [snap.releasedRung, snap.certifiedRung, snap.regimeRank, snap.detBucket].join('|'); }
+// ---- Late determination (section D) ---------------------------------------
+// Knife-edge 3 (02a): the full reader's family head, fit offline on the training
+// seeds and read here off day-350 / day-700 public state, must NOT beat the
+// prior's Brier by too much. The prior is the train half's family frequencies;
+// both are scored on the test half (world split across these seeds).
 function oracleImprovement(rows) {
     const train = rows.filter(r => r.split === 'train');
     const test = rows.filter(r => r.split === 'test');
@@ -232,12 +232,6 @@ function oracleImprovement(rows) {
     const prior = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
     for (const r of train) prior[r.fam]++;
     for (const k of [1, 2, 3, 4, 5, 6]) prior[k] /= train.length;
-    const buckets = {};
-    for (const r of train) {
-        const key = bucketKey(r.snap);
-        if (!buckets[key]) buckets[key] = { n: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
-        buckets[key].n++; buckets[key][r.fam]++;
-    }
     const brier = (probsFor) => {
         let sum = 0;
         for (const r of test) {
@@ -248,10 +242,8 @@ function oracleImprovement(rows) {
     };
     const priorBrier = brier(() => prior);
     const oracleBrier = brier((r) => {
-        const b = buckets[bucketKey(r.snap)];
-        if (!b || b.n < 8) return prior;
         const p = {};
-        for (const k of [1, 2, 3, 4, 5, 6]) p[k] = b[k] / b.n;
+        for (const k of [1, 2, 3, 4, 5, 6]) p[k] = r.snap.p[k - 1];
         return p;
     });
     const improvement = priorBrier > 0 ? (priorBrier - oracleBrier) / priorBrier : 0;
@@ -348,11 +340,12 @@ for (const k of [1, 2, 3, 4, 5, 6]) {
 const medAbsD = quantile(absD, 0.50);
 check('C: median |d| in [0.06, 0.15]', medAbsD >= 0.06 && medAbsD <= 0.15, `median |d| = ${f3(medAbsD)}`);
 
-// D: late determination -- oracle beats prior Brier by < 25% (day 350), < 60% (day 700).
-dist('D: day-350 oracle improvement < 25%', or350.improvement < 0.25,
-    `impr ${pct(or350.improvement)} (prior ${f3(or350.priorBrier)} -> oracle ${f3(or350.oracleBrier)})`);
-dist('D: day-700 oracle improvement < 60%', or700.improvement < 0.60,
-    `impr ${pct(or700.improvement)} (prior ${f3(or700.priorBrier)} -> oracle ${f3(or700.oracleBrier)})`);
+// D: late determination -- the full reader's family head beats the prior's Brier
+// by < 25% (day 350), < 60% (day 700).
+dist('D: day-350 full-reader improvement < 25%', or350.improvement < 0.25,
+    `impr ${pct(or350.improvement)} (prior ${f3(or350.priorBrier)} -> reader ${f3(or350.oracleBrier)})`);
+dist('D: day-700 full-reader improvement < 60%', or700.improvement < 0.60,
+    `impr ${pct(or700.improvement)} (prior ${f3(or700.priorBrier)} -> reader ${f3(or700.oracleBrier)})`);
 
 // E (HARD): ratchet set {nationalized, classified, permanent max-heat} each < 50%,
 // controlRegime terminals jointly < 25%. Heat is the RUN MAXIMUM.
@@ -491,6 +484,16 @@ check('K: freeze/inactive is a mutation gate (applyRaceEffects full no-op)', fre
 // while F still moved -- and (lastFWake + lastFConvert) == the applied delta exactly.
 let fDecompOK = true, fDecompDetail = '';
 const fail = (m) => { if (fDecompOK) { fDecompOK = false; fDecompDetail = m; } };
+// marketPilled() pinned exactly through the public record: B is re-initialized on a
+// race whose R4 (-> 0) or R2-R4 (-> 100) certification day is set, so B's R4 law is
+// a step at that day. The race F steps on is separate.
+function pinMarketPilled(v) {
+    const r = createRaceState(BASE_SEED >>> 0);
+    const certs = r.capability.labs.halcyon.rungCertified;
+    if (v === 0) certs[4] = Number.MAX_SAFE_INTEGER;
+    else { certs[2] = 0; certs[3] = 0; certs[4] = 0; }
+    initBelief(r);
+}
 {
     const race = createRaceState(BASE_SEED >>> 0);
     initBelief(race);                       // fresh player: credibility 0, no locks
@@ -510,12 +513,12 @@ const fail = (m) => { if (fDecompOK) { fDecompOK = false; fDecompDetail = m; } }
 
     // EXACT CANCELLATION (the amended-ruling regression): wake and conversion exactly
     // oppose in an unclamped interior step -- the player PREVENTED the autonomous move.
-    // Construction: force marketPilled() == 0 (crossed R4, far-future certDay), F0=12.5,
+    // Construction: force marketPilled() == 0 (R4 certified, far-future day), F0=12.5,
     // credibility 1/6, playerPilled=100 -> wake = 0.08*(0-12.5) = -1, convert = 6*(1/6)*(+1)
     // = +1, rawTotal == 0 exactly, F unchanged. The OLD `applied/rawTotal` form set
     // scale=0 and erased BOTH stamps (laundering the involvement). The fix records the
     // raw offsetting terms.
-    belief.rungs[4] = { crossed: true, certDay: Number.MAX_SAFE_INTEGER };   // marketPilled == 0
+    pinMarketPilled(0);
     belief.player.credibility = 1 / 6;
     race.F = 12.5;
     stepFirmBelief(race, { playerPilled: 100 });
@@ -525,7 +528,7 @@ const fail = (m) => { if (fDecompOK) { fDecompOK = false; fDecompDetail = m; } }
 
     // UPPER RAIL: both terms positive, unclamped target > 100 -> clamp binds -> the two
     // stamps apportion the haircut and still sum to the applied (+1) delta.
-    belief.rungs[4] = { crossed: true, certDay: 0 };   // marketPilled == 100
+    pinMarketPilled(100);
     belief.player.credibility = 0.5;
     race.F = 99; F0 = race.F;
     stepFirmBelief(race, { playerPilled: 100 });        // wake +0.08, convert +3 -> Fraw 102.08 -> clamp 100
@@ -536,7 +539,7 @@ const fail = (m) => { if (fDecompOK) { fDecompOK = false; fDecompDetail = m; } }
 
     // LOWER RAIL: both terms negative, unclamped target < 0 -> clamp binds -> stamps
     // apportion and sum to the applied (-1) delta.
-    belief.rungs[4] = { crossed: true, certDay: Number.MAX_SAFE_INTEGER };   // marketPilled == 0
+    pinMarketPilled(0);
     belief.player.credibility = 0.5;
     race.F = 1; F0 = race.F;
     stepFirmBelief(race, { playerPilled: 0 });          // wake -0.08, convert -3 -> Fraw -2.08 -> clamp 0
@@ -1055,7 +1058,7 @@ line(`  low-E family-6 capture: ${lowE ? pct(lowEfam6 / lowE) : '--'} (in-horizo
 line(`  ratchets (run-max): nationalized ${pct(natCount / N)}  classified ${pct(clsCount / N)}  max-heat>=0.95 ${pct(maxHeatRatchetCount / N)}`);
 line(`  treaty: dealPossible ${pct(dealPossibleRuns / N)}  Deal ${pct(dealRate)}  completion|eligible ${f3(completion)}  `
     + `window ${pct(windowRate)}  summit pass ${f3(summitPass)}  P(deal|window) ${f3(leakPosterior)}`);
-line(`  late-determination oracle: day350 impr ${pct(or350.improvement)}  day700 impr ${pct(or700.improvement)}`);
+line(`  late determination (full reader): day350 impr ${pct(or350.improvement)}  day700 impr ${pct(or700.improvement)}`);
 line(`\n  P6-2 player channels (cap ${CAP}, halflife ${COUPLING_TUNING.halflife}d):`);
 line(`    no-player identity (J): ${playerInertOK ? 'inert (d_P == 0 all runs)' : 'VIOLATED'}`);
 line(`    constraint 2 (M): world |d_W| median ${f3(medDW)}  |  max reachable |d_P| p90 ${f3(maxReachableDP)}  |  coverage ${pct(coverage)} (>= 40%)`);

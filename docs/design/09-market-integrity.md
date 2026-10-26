@@ -154,10 +154,16 @@ unbounded parking orbit.
 
 ## Information hygiene
 
-Every non-random `B` mutation records a causal evidence ID pointing at a
-public in-game event. Quotes, the valuation layer and round prices are
-functions of `B` and public records (claims, certifications, releases,
-the regime), so they move only when those do. No price may read
+`B` is a function of the public record and the day. The record holds
+what the Brief prints: claims, certifications, releases, detected
+incidents as the wire shows them, disclosed thefts, the strait, the
+regime, the treaty's beats and the public world inputs. `B` also reads
+the rule of thumb's state, and every mutation of that state records a
+causal evidence ID pointing at a public in-game event. Quotes, the
+valuation layer and round prices are functions of `B` and the public
+view, so they move only when the record does or the clock turns. The
+reader is fit offline and only evaluated in play, and a harness rebuilds
+the record from the logged public projection alone. No price may read
 `C_internal`, undetected incidents, or the event queue: a market that
 front-runs latent truth is a hidden tax, and it is barred. Hidden state
 — the Polaris terminal leader included — reaches a price only at

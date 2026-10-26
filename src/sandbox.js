@@ -16,10 +16,12 @@
    the HCN move is given; variance follows Heston's mean
    reversion with a leverage shock; each newly certified
    rung lifts the long-run rate by the capex channel's
-   0.005 (02a) and pulls the next rung's median forward
-   the way belief B does; compute reprices off the public
-   curve with the new certified rung. Hidden state is
-   never read.
+   0.005 (02a); Consensus reprices off belief B evaluated
+   on a copy of the public record a quarter out, with the
+   row's certification added, or on the quiet row each
+   lab's routine releases at its trailing cadence
+   (scenarioBelief, display only); compute reprices off the public curve with the
+   new certified rung. Hidden state is never read.
    ===================================================== */
 
 import { market } from './market.js';
@@ -28,19 +30,12 @@ import { allocTree, prepareTree, priceWithTree, vasicekBondPrice, computeEffecti
 import { unitPrice } from './position-value.js';
 import { contractByKey, BINARY_NOTIONAL } from './race/consensus.js';
 import { computeMarket, buildComputePublicView, placeholderCurve } from './race/compute-market.js';
-import { belief, computeCurveFromBelief } from './race/belief.js';
+import { belief, computeCurveFromBelief, certDay, scenarioBelief } from './race/belief.js';
 
 const TY = TRADING_DAYS_PER_YEAR;
 const H = 63;                                    // the horizon: one quarter
 const COLS = [-0.3, -0.2, -0.1, 0, 0.1, 0.2, 0.3];
 const CAPEX_B = 0.005;                           // 02a "Rates: the capex channel", per rung rise
-const RUNG_SPACING = 150;                        // belief.js: implied days between crossings
-const sigmoid = (x) => 1 / (1 + Math.exp(-x));
-const condProb = (m, w, t, D) => {
-    if (D <= t) return 0;
-    const Ft = sigmoid((t - m) / w), FD = sigmoid((D - m) / w);
-    return Math.max(0, Math.min(1, (FD - Ft) / (1 - Ft)));
-};
 
 const _st = { legs: [], ctx: null, hooks: null, el: {}, mine: false, qty: 1, tree: null, touched: false };
 
@@ -105,7 +100,7 @@ export function resetSandbox() {
 
 function _certifiedRung() {
     let c = 1;
-    for (const R of [2, 3, 4]) if (belief.rungs[R] && belief.rungs[R].crossed) c = R;
+    for (const R of [2, 3, 4]) if (certDay(R) != null) c = R;
     return c;
 }
 
@@ -132,7 +127,7 @@ function _scenario(m, row, base) {
     const vBar = market.theta + (market.v - market.theta) * Math.exp(-market.kappa * H / TY);
     const shock = 1 + 1.6 * Math.max(-m, 0) + 0.5 * Math.abs(m);
     const vH = vBar * shock * shock * (row.vMul || 1) * Math.pow(1.15, Math.max(0, dRung));
-    return { S: market.S * (1 + m), rH, b2, vH, rung: row.rung, dRung };
+    return { S: market.S * (1 + m), rH, b2, vH, rung: row.rung, dRung, B: row.B || null };
 }
 
 function _value(leg, sc, base) {
@@ -156,11 +151,7 @@ function _value(leg, sc, base) {
             const R = c.predicate.rung, hR = base.raceDay + H;
             if (R <= sc.rung) return BINARY_NOTIONAL;
             if (c.deadline <= hR) return 0;
-            const br = belief.rungs[R];
-            if (!br) return leg.entry;
-            let mR = br.m;
-            if (sc.dRung > 0) mR = Math.min(mR, hR + RUNG_SPACING * (R - sc.rung));
-            return condProb(mR, br.w, hR, c.deadline) * BINARY_NOTIONAL;
+            return sc.B ? sc.B(R, c.deadline) * BINARY_NOTIONAL : leg.entry;
         }
         case 'computefuture': {
             if (!base.cview || sc.rung == null) return leg.entry;
@@ -223,6 +214,11 @@ export function renderSandbox() {
         base.relPerQ = race.day > 0 ? base.cview.releaseCount / race.day * H : 1;
     }
     const rows = _rows(race);
+    // B a quarter out on each row's copy of the record (display only).
+    for (const row of rows) {
+        // The quiet row keeps each lab's routine release cadence (a quiet quarter is not a silent one).
+        if (row.rung != null && row.rung < 5) row.B = row.rung > base.c ? scenarioBelief(base.raceDay + H, row.rung) : scenarioBelief(base.raceDay + H, null, { routine: true });
+    }
     const cells = rows.map(row => COLS.map(m => {
         const sc = _scenario(m, row, base);
         let v = 0;

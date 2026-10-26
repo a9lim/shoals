@@ -434,14 +434,14 @@ bond display scale). Listed contracts, each an oracle tuple per
 | R5 | 1000 | 1008 | 0.70 | terminal resolution only |
 
 Deadlines are calibrated against the measured *certified* KM medians so
-each certifiable contract is genuinely two-sided, and the listing base
-rates are derived from the world they describe: the gate is that each
-listing mid sits within 8 points of its measured settlement frequency
-(`consensus-test`). R2's 70% is still two-sided enough for a live NO
-book, and no contract is degenerate. `belief.js` `RUNG_BASE` holds the
-same four numbers: day-0 conditional-law seeding makes quote = listing
-prior *exactly*, so they are one number stored in two places and move in
-lockstep or not at all.
+each certifiable contract is genuinely two-sided. The listing base rate
+is the contract's published prior, and it lives only in `consensus.js`.
+It equals `B`'s day-0 quote, which is the same in every world because
+every world opens with the released frontier at R1. It is re-derived at
+each refit of the reader. Gates (`consensus-test`): each base rate within 0.03 of the mean
+day-0 quote, and each listing mid within 8 points of its measured *YES*
+frequency. The fallback branch is outside that comparison ("Belief, η,
+and the firm": the settlement tree). No contract is degenerate.
 
 Binary longs are cash-funded (no leverage); shorts post full-notional
 collateral with the premium sequestered. Binaries carry no greeks, no
@@ -497,6 +497,319 @@ creation from the `nationalization` substream (outside `race.streams`, so
 race trajectories are identical with the market on or off). The two
 multipliers never mix.
 
+## The reader
+
+A forecaster of the race, fit on the simulator's own runs and fed the
+public record only. This is amortized simulation-based inference, a
+standard technique. `B`, the valuation layer and every gate on what is
+knowable are built on it. Ratified 2026-10-25 (ROADMAP §1).
+
+**The public record** (`src/race/public-record.js`) is the data contract.
+It is a per-run accumulator, initialized from the race's public state at
+creation (initial claims are not in any day's transitions) and stepped
+once per completed day. Each step runs after `stepControlRegime` and
+`stepTreaty`, reads `race.lastTransitions` and `buildPublicView`, and
+ignores a same-day replay. It also takes the day's public world inputs
+from the orchestrator. Its contents are what the Brief prints:
+
+- the clock;
+- per frontier lab: whether it is active, and Polaris's spawn day; the
+  first day each rung was claimed (released) and each certification day;
+  the release count and recent release days;
+- the open ecosystem's rung, and the released and certified frontier
+  rungs;
+- detected incidents by severity, source lab and class, with their
+  detection lags, as totals and as a trailing 126-day count. Under
+  `classified`, read at the day's close after the ratchet, a detection of
+  severity ≤ 3 enters only as a classified brief, flagged grave at
+  severity 3, as the wire shows it;
+- disclosed thefts (count and last day);
+- the strait: gray-zone scares, and a blockade's start and end;
+- the control regime and the day it last moved;
+- the treaty track's public beats (the window opening, the outcome);
+- the public world inputs: strait tension, the export-control stage and
+  the treaty stage (0 headless).
+
+Nothing else enters. That rules out continuous capability, latent
+queues, τ, `S`, heat, truth records and insider tips (a tip is the
+player's channel, not the record). It also rules out published and
+leaked evidence: no wire item prints it, and the record holds only what
+the player can read. The evidence archive (section 2 of the roadmap) may
+put it on the page, and a refit follows. The player's own leak stays out
+of the record this round; dissemination is section 2's.
+
+**Feature sets.** One function (`recordFeatures`), shared by the fit tool
+and the live game, builds:
+
+- **legible**: the market's rule of thumb, `B`'s heuristic updater
+  ("Belief, η, and the firm"), as it reads the headlines. For a rung,
+  this is the rule's own crossing law, plus the clock and the rung's claim
+  state (claimed or not; for R5, R4's, since R5 is never claimed before
+  the world resolves), and nothing else. Claim *age* is not in it. For
+  the family head, it is the old valuation rule's inputs: the rule's R5
+  law, each lab's claimed rung and the clock.
+- **full**: everything legible, plus the whole record, claim ages
+  included.
+- **prior-only**: the clock and the rung, for the learning floor.
+
+legible ⊂ full, so the information is nested. Each head has one explicit
+feature list, exported with the constants. Every evaluator, gate and
+fairness test of a reader uses that reader's list and nothing else.
+
+**Outputs**, per feature set:
+
+- For each open rung, a law over the days its event can still occur,
+  plus an atom at the support's boundary. `T` is the frontier
+  certification day for R2–R4 (any frontier lab, direct or implied),
+  with support through day 1008. There the atom means *never*: no
+  certification happens after day 1008. For R5, `T` is the frontier's
+  internal crossing day, extrapolation included as the R5 contract
+  settles, with support through day 1260 so the compute market's
+  252-day horizon is covered. The R5 atom means *not by day 1260*. It
+  includes crossings later in the extrapolation, and it is not "never".
+  Event likelihoods are integer-day interval masses, and the atom is the
+  survival remaining at the boundary. A world that resolves naturally
+  before the event can no longer reach it. Resolution is a competing
+  event: such a world stays in the risk set and lands in the atom. It is
+  never treated as independent censoring. Labels come from natural
+  resolution only. Desk ejection exists only in live play, where the
+  world continues headless.
+- **The legible rung heads are the rule, rescaled** (a9's ruling,
+  2026-10-25: the crude rule). They are the rule's own cumulative hazard,
+  `H_rule(t, D) = −ln(1 − P_rule(T ≤ D | T > t))`, cut at the support and
+  floored to stay finite, passed through the calibration stage below.
+  The rule's reading of a world enters only through `H_rule`. So the head
+  is calibrated in the large, by day, by claim state and at every horizon
+  that prices something. That leaves no static or calendar exploit, and
+  it keeps the rule's misreading within a day, which is the designed
+  inefficiency.
+- The full and prior-only rung heads are a piecewise-exponential hazard
+  in residual time `s = T − t`
+  over fixed bins (0–21, 21–63, 63–126, 126–252, 252–504 and 504 days or
+  more, cut at the support). Each bin's log hazard is linear in the
+  head's standardized features, with its own intercept. Each rung has its
+  own weights, and so does each claim state (claimed or not; for R5,
+  R4's). The two states are separate sub-models with their own λ,
+  because before a claim the wait depends on hidden capability and
+  after it the wait is a competing-timer lag. A shared fit lets the much
+  larger pre-claim population set the post-claim slopes. The features are a
+  fixed basis over the head's information. It holds transforms (the
+  rule's probabilities enter as its log cumulative hazards,
+  `ln(−ln(1 − p))`), hinge terms with knots at training quantiles, a
+  piecewise-linear clock with a knot at every lock day (before a claim
+  the hazard turns sharply with time, and three quantile knots cannot
+  follow it). The prior-only head gets the same clock basis, so the
+  learning floor compares like with like. The basis is written into the
+  constants. The legible and full readers'
+  bases are not nested, but their information is: `H_rule` is a function
+  of the rule's state, which the full set sees. Certification after a
+  claim is a competing-timer process: exponential lags, the minimum
+  across labs, R3's dispute mixture, implied certification from a higher
+  rung. Coarse constant-hazard bins approximate these mechanisms; they do
+  not represent them exactly.
+  `P(T ≤ t + s | record_t)` is closed-form, and the quarter's probability
+  is its value at s = 63: the law is already conditional on the record at
+  t, so nothing is conditioned twice.
+- **The calibration stage** ends every rung head: legible, full and
+  prior-only. It rescales the head's cumulative hazard on nested
+  **horizon segments**, with one scale per segment. The boundaries are
+  the scored quarter's end `t + 63`, the rung's contract deadline `D_R`
+  (420, 756, 880, 1000) while it is ahead, and the support's end. Sorted,
+  they cut `(t, support]` into two or three segments. On each segment `k`
+  the head's own hazard increment is multiplied by `exp(σ_k)`, so the law
+  stays continuous and monotone in D and keeps the head's shape within
+  a segment.
+
+  The scales `exp(σ)` are piecewise linear in the clock, with a **knot
+  every 21 days** (the sampling grid), per rung, claim state (R5 on R4's) and
+  head. They are set by **moment matching** at each knot. On the training
+  worlds sampled that day in that state, the mean predicted probability
+  equals the observed rate at each segment boundary in turn:
+  - the quarter;
+  - the deadline, the price that trades;
+  - the support, which pilledness, compute urgency and the plateau read.
+
+  The horizons are nested, so the observed rates are ordered and each
+  scale solves a one-dimensional monotone equation, given the ones
+  before it. A segment whose cell has fewer than five events *within the
+  segment*, or fewer than five worlds surviving it, would solve to a
+  near-certain or empty law. Its scale instead holds the nearest valid
+  knot's value, as does every scale at a knot whose cell has too few
+  worlds. Knots are added on each rung's crossing day `D_R − 63` and on `D_R`
+  itself, so no interpolation spans a change in a segment's role. A
+  segment that disappears at a role knot keeps a separate limit on each
+  side. The days before the knot interpolate toward its last
+  pre-crossing value, never toward a scale borrowed from after it. The
+  prior-only head's stage pools the claim states, because that head
+  sees only the clock and the rung.
+
+  Earlier forms failed in ways this one avoids:
+  - Likelihood fits traded the horizons off, leaving lock days five to
+    eight points out.
+  - A rescale with an exponent, `exp(α)·H^β`, matched any two horizons
+    but not three. Codex proved that three moments are infeasible for it
+    once the quarter crosses the deadline.
+  - Knots on lock days alone left the deadline quote unconstrained over
+    each contract's last 63 days, and 5 to 25 points rich there. "Short
+    every binary in its last six weeks" would have paid in every run.
+  - The full heads' earlier `a·H^b` layer, fit on quarter events,
+    missed the deadline by up to 10 points on some lock days.
+- The family distribution `p₁ … p₆`: a linear softmax, with a separate
+  head for each act (the released frontier: R2 or below, R3, R4 and
+  above). A single head over the whole run cannot carry how much more
+  determined the outcome is late, and its increments were predictable
+  from its own inputs.
+
+**The fit.** `tools/reader-fit.mjs` simulates headless no-player runs with
+`endings-test`'s loop: `advanceRace`, `stepControlRegime`, `stepTreaty`,
+`checkResolution`, with the heuristic `B` stepped alongside. Seeds are
+split by world:
+
+| Split | Seeds | Use |
+|---|---|---|
+| train | 1,000,001–1,008,000 | the fit |
+| validation | 2,000,001–2,002,000 | the bands, φ and `K_CRED` |
+| test | the harnesses' (base 1) | the gates |
+
+Half the training worlds run neutral (no strait tension, stage 0, treaty
+stage 0). The other half run under a declared **assumed input schedule**:
+strait tension, the export-control stage and the treaty stage each step
+as a slow Markov process over their public ranges. The fit tool states
+the schedule.
+
+Each run is sampled every 21 days from day 0 while it is unresolved,
+and again every 21 days from its own offset (the seed mod 21), before
+any extrapolation mutates the race. Early releases fall on nearly the
+same calendar in every world (on days 1, 46 and 91 in nine worlds in
+ten), and the treaty window opens on day 700 in a third of worlds, so a
+fixed grid would never train on those phases. The hazard heads train on
+both series, and the calibration stage matches on the grid series. Every
+hazard and family head is fit by maximum likelihood with an L2 penalty
+and a deterministic optimizer: SciPy's L-BFGS-B on one BLAS thread,
+through `tools/reader-optimizer.py`. The calibration stage is then solved
+by moment matching. NumPy
+and SciPy come from the shared venv's `data` column and are needed only
+to refit. Every head must converge; none may stop on its iteration
+budget. The fit then writes `src/race/reader-constants.js`, which is
+generated and never hand-edited. That file is compact and holds only
+what evaluation needs: the record's schema version, the input schedule,
+the basis and its knots, the feature standardization and the weights.
+A compact validation report goes beside the tool, in
+`tools/reader-fit-report.json`: what `reader-test` reads, plus a summary.
+The full detail goes to `tools/reader-fit-detail.json`, which git
+ignores. The same code always writes the same file; a cold refit takes
+about 18 minutes, and a rebuild that reuses the converged hazard heads
+takes under one. The game and the harnesses only evaluate it; nothing is
+fit at runtime.
+
+**Refit rule.** The reader is refit whenever a change moves the
+distribution of runs or the record's contents. That includes kinematics,
+incidents, certification, the regime ratchet, the treaty track, new
+record fields (domains, the evidence archive), dissemination,
+intervention-bounded influence, and the replayable headless runs of
+section 3, which replace the assumed input schedule with the event
+engine's own. A schema mismatch fails `reader-test` outright; a stale fit
+fails its calibration gates.
+
+**Known limits.** Within a lock day, the reader misreads some pre-claim
+cohorts. The clearest case is legible R2 before its claim at days
+315–378: worlds the head puts at 0.25–0.35 certify within the quarter at
+0.35–0.69, and at day 252 the same predictions run high. The full heads
+show smaller misses of the same kind. Each day's mean is right. The
+basis was tried up to clock × rule interactions without closing the
+gap, because a linear basis cannot carry how the rule's pre-claim state,
+a proxy for release history, changes meaning over time. In the legible
+half this is part of the rule's crudeness, and so part of the edge. In
+the full half it means the measuring stick understates what a richer
+reader would find. The calibration stage fixes the calendar and the
+priced horizons; it cannot fix misreadings within a day. Nor can it fix
+the full heads off the sampling grid early in a run. Releases land in
+lockstep on days 1, 46 and 91, and a linear clock basis cannot carry a
+one-day spike, so full deadline quotes miss by up to eight points on
+those days (R4 at day 1: +0.085). Through those weeks the released
+frontier is R1 in nearly every world, η is 0, and `B` is its legible
+half, which is calibrated there. A nonlinear model class (boosted trees over the same
+features) is the next step if a later round needs a tighter stick. The
+assumed input schedule is not the event engine's,
+and the player's channels are absent from training, so live worlds sit
+off the training distribution by an amount nothing measures yet. The
+reader is linear in its features. It is a measuring stick, not a bound
+on what a richer reader could learn. The ceiling gates are measured
+against it, and passing them does not establish when a world becomes
+inferentially determined.
+
+Gates (`reader-test`, test seeds, reported separately for neutral worlds
+and for each scenario of the input schedule, never averaged together):
+
+- **Calibration.** On quarter events (rung R certifies within the next
+  63 days) and live deadline events, at the sampled days, per rung and
+  for the legible and full sets,
+  with tolerances that are the larger of the stated number and two
+  world-bootstrap standard errors:
+  - in the large, within 0.01;
+  - **by day** (no calendar exploit), at every 21-day sampled day
+    holding at least 200 samples, both on the quarter and on the live
+    deadline, the price that trades: within 0.03. Here the noise term is
+    three standard errors, not two: some 700 day cells are checked, and
+    at two standard errors about one in twenty would fail by chance. The
+    standard error is the combination, √(SE_test² + SE_train²). Each knot
+    is matched to a finite training cell, so the prediction carries that
+    cell's sampling error as well as the test cell's;
+  - **off the grid**: the offset-sampled days, pooled per 21-day window
+    between knots, on the same terms, for the legible heads. Live quotes
+    are evaluated daily. The full heads' windows are reported, not
+    gated (Known limits);
+  - **by day and claim state**, the cells the stage is matched on,
+    holding at least 200 distinct worlds: on the same terms. The pooled
+    legible cells run each seed under both scenarios, so samples double
+    count worlds;
+  - **at the support**, in the large, within 0.01;
+  - **by claim state**, within 0.02 for claimed and for unclaimed rungs;
+  - **across predicted deciles**, the n-weighted mean absolute error
+    within 0.013 (set on validation), for the full heads. For the legible
+    heads it is reported, not gated: their misreading within a day is
+    the designed inefficiency.
+
+  Family: each class's mean predicted share within 0.02 of its
+  frequency, over all acts. Each act's head is reported separately, not
+  gated. Bootstrap intervals are taken by world, because snapshots
+  of one world are not independent. The worst single decile is reported,
+  not gated (see Known limits).
+
+  The legible heads cannot see the world inputs, which are not part of
+  the rule's state, so they cannot tell a neutral world from a scheduled
+  one. They are gated on the training mixture, both scenarios pooled,
+  with each scenario reported. The full heads see the inputs and are
+  gated per scenario.
+- **The learning floor.** The full reader's mean log loss on
+  rung-quarter events sits at least φ = 0.221 below the prior-only
+  reader's (set on validation worlds; the fit reprints its current
+  suggestion beside it).
+- **Purity.** A record rebuilt from the logged public projection alone
+  evaluates bit-identically to the live one. That projection is the
+  ledger's public rows, the public snapshots and the inputs: the rows
+  alone do not carry Polaris's initial claims or the open ecosystem's
+  rung. Corrupting every hidden field leaves the record unchanged. That
+  includes the hidden fields that public ledger rows carry (a theft's
+  true thief, a release's continuous capability, an incident's insider
+  flag), so a row that stopped whitelisting would fail the check.
+- **Challengers.** On world-split halves of the test seeds, two richer
+  readers are fit to the full reader's residuals: claim-age splines and
+  nearest neighbours. Neither improves held-out rung-quarter log loss by
+  more than 0.001 nats per event (set on validation). Planted defects
+  show they can fail: each must catch, by more than that bound, a full
+  head degraded to the legible one, a doubled odds and a planted
+  claim-age term. A pairwise-products challenger was dropped, because it
+  overfits by more than the defects it should catch. Each challenger's
+  subgroup residual bias (by act, rung, claim state and regime) is
+  reported.
+
+The edge and its decay are gated under `B`, below.
+
+Diagnostic: the knife-edge principle's act-boundary target (no family's
+posterior over 0.60, none reachable under 0.02), read off the full
+reader's family head.
+
 ## Belief, η, and the firm
 
 **η reads the released frontier:**
@@ -509,123 +822,287 @@ day, rung claims, certifications, public releases, `controlRegime`) —
 never continuous C, latents, or τ — and the harnesses corrupt every hidden
 field and assert that quotes and settlements do not move.
 
-**`B`** is a per-rung logistic hazard `{m, w}` over crossing dates. Widths
-at listing `w = {90, 140, 120, 160}` for R2–R5; `RUNG_SPACING = 150` days
-for rungs pulled forward by a certification below them. Medians are
-seeded so day-0 `F_R(deadline)` equals the listing base rate *exactly*,
-solved against the survival-conditioned law (day-zero implied medians
-{341, 686, 831, 863} against measured KM {405, 736, 860}). The law runs
-early by construction: two parameters cannot hold both the median and
-the deadline probability of an outcome with a long "not this term"
-tail; a plateau mass per rung is on the [roadmap](../ROADMAP.md). Widths
-**tighten with evidence** — `w ← w·(1 − 0.15·α)` on each timeline update,
-floor 25 — so the market sharpens as the race resolves: Act III's
-"repricing all at once" in mechanism form. The quoted probability is
-**survival-conditioned**, `P(T ≤ D | T > today)` — no progress as the
-deadline nears IS decay toward NO; the unconditional CDF is a seeding
-device only. Every `m`/`w`/monotonicity mutation is ledgered under its
-originating event ID (monotonicity corrections are consequences of their
-trigger, not anonymous drift), and the harness reconstructs live state
-from that ledger alone.
+**`B` is a designed inefficiency.** It pools two forecasts. One is the
+market's rule of thumb, recalibrated. The other is the full reader ("The
+reader", above).
 
-**Two-channel routing:** the crossing-date timeline moves only on
-releases and certifications — a claim blends at `A_CLAIM = 0.55`; a
-certification marks its rung crossed and pulls the next rung toward
-`day + 150` at `A_CERT_NEXT = 0.35`; a routine release nudges at
-`A_ROUTINE = 0.06`; monotone `m` is re-enforced each step. Incidents,
-insider tips, and evidence fold into a **bounded alignment sentiment**
-(±log 19): published evidence adds its `logLR`; a detected incident
-subtracts `0.06·(severity + 1)`; leaks blend `0.7·B + 0.3·L(leakedSignal)`,
-once per evidence ID; a theft disclosure subtracts 0.20. Leaks update by
-evidence, never by interpolating toward truth (that would couple `B` to
-latent state and let a handful of leaks reveal most of the gap). Reason
-for two channels: some 60 flagged occurrences a run would walk an
-every-event timeline into runaway, and the player's timeline edge dies
-if every tip moves `B`. The alignment sentiment is recorded but
-unpriced: no quote, valuation or display reads it. Belief noise is
-**off**: every `B` move is causal, and the `belief` substream is
-reserved.
+**The rule of thumb** is the heuristic updater that was all of `B` before
+the reader. It keeps its mechanics: a per-rung logistic `{m, w}` over
+crossing dates, widths at listing `w = {90, 140, 120, 160}` for R2–R5,
+and `RUNG_SPACING = 150` days for rungs pulled forward by a certification
+below them. Medians are seeded so that day-0 `F_R(deadline)` equals the
+rule's seed priors `{0.70, 0.62, 0.60, 0.70}` (`RUNG_SEED`, the old
+listing base rates), solved against the survival-conditioned law. Widths
+**tighten with evidence**: `w ← w·(1 − 0.15·α)` on each timeline update,
+floor 25.
+
+The timeline moves only on releases and certifications. A claim blends
+at `A_CLAIM = 0.55`. A certification marks its rung crossed and pulls the
+next rung toward `day + 150` at `A_CERT_NEXT = 0.35`. A routine release
+nudges at `A_ROUTINE = 0.06`. Monotone `m` is re-enforced each step.
+Every `m`/`w`/monotonicity mutation is ledgered under its originating
+event ID, and the harness reconstructs the rule's state from that ledger
+alone.
+
+The rule runs early, and it reads the headlines crudely. That is the
+point: it is the inefficiency. Its raw probabilities reach nothing priced.
+
+**The legible reader** recalibrates the rule, and only by day and claim
+state ("The reader": the legible rung heads are the rule, rescaled). It
+is calibrated in the large, per lock day and per claim state, and is
+otherwise as crude as the rule. The full reader reads the whole record.
+
+**The pool.** For each rung, every probability a quote, a snapshot or a
+display reads is
+
+```
+P_B(T ≤ D | record_t) = (1 − η)·P_legible + η·P_full
+```
+
+with η the released-frontier dial above. In the fiction, the full
+reader's share is the part of the market that runs licensed models, so η
+is literal. The pooled CDFs are then made coherent across the ladder:
+`P_B(R4 ≤ D) ≤ P_B(R3 ≤ D) ≤ P_B(R2 ≤ D)` pointwise, by taking running
+minima up the ladder, because certification is nested.
+
+**What the pool guarantees, and what it doesn't.** With exact conditional
+readers on nested information, no forecast measurable on the legible
+information beats the *unprojected* pool in expected log score. That
+holds for any state-dependent weight in [0, 1]. The pool lies between
+the two readers, and moving from the legible reader toward the full one
+never raises the expected loss. Clamping preserves this only against
+forecasts clamped the same way. The coherence projection breaks the
+statement wherever it binds. There, a projected rung's quote can leave
+the interval between its two readers, because a lower rung's estimate
+was too low. The fitted readers are approximations as well. So the
+guarantee is empirical: every gate below runs on the projected output
+the market actually quotes, and the projection's frequency and size are
+reported.
+
+Two strategies are explicit baselines, not exploits the construction
+rules out:
+
+- **Headline-plus-quote.** A player who knew `P_legible` could read
+  `P_full = (P_B − (1 − η)·P_legible)/η` off the quote wherever η > 0 and
+  the coherence projection does not bind. That is reading the market,
+  and it is synthesis.
+- **The settlement tree.** Quotes price the *event*. Fallback settlement
+  at 0.50 under `nationalized` or `classified`, and on an unresolved
+  dispute, is institutional mispricing the market leaves in place, and
+  it is excluded from the no-exploit claim.
+
+**The close.** The target is for the edge on a rung to be widest before
+the claim that reveals it, and mostly gone after. At the claim, both
+readers update on a headline, and η steps up with the released frontier
+on the same day. To be paid you act before the claim, and unwinding
+after it realizes the market's new price. That is a target the gate
+below measures, not a consequence of the construction. There is no
+gradual reveal term: a known delayed correction would itself be a
+momentum trade. R5 is never claimed; its edge narrows only through η.
+
+`B` stays a function of the public record, the rule's ledgered state and
+the day. It has no noise, and the `belief` substream stays reserved.
+
+The **alignment sentiment** is unchanged and still unpriced. Published
+evidence adds its `logLR`; a detected incident subtracts
+`0.06·(severity + 1)`; leaks blend `0.7·B + 0.3·L(leakedSignal)`, once per
+evidence ID; a theft disclosure subtracts 0.20; the clamp is ±log 19.
+Leaks update by evidence, never by interpolating toward truth. The
+player's leak verb folds there, under the detection's id. No quote,
+valuation or display reads it.
+
+**Displays.** The Markets page draws `B`'s pooled crossing curve. Its
+implied date is the pooled conditional median, or "not this term" when
+less than half the mass lands within the support. The posterior editor
+starts from `B`'s **projection** onto the player's family (below): a
+deterministic least-squares fit to the pooled conditional CDF at days
+`t + 21k`, within the support. The projection is only a starting point
+for drawing. Copying the market is a lock policy, not a drawing.
+
+**The edge, gated** (`reader-test`, test seeds). These gates are
+provisional: their bands are chosen on validation worlds once the
+ratified hazard family is fit, because a multi-horizon recalibration can
+close more of the gap than the quarter-only probe did, and the numbers
+are recorded here then. An eligible rung-quarter is a rung in R2–R4
+uncertified at a lock day. Its edge is the log loss of `B`'s projected
+snapshot minus the full reader's. The act is the released frontier at the
+lock: R2 or below, R3, or R4 and above. Per event the edge can peak in
+Act II, where certifications cluster. The per-run **opportunity**, the
+sum of the edge over a world's eligible rung-quarters in the act averaged
+over worlds, is front-loaded, because Act I holds most of the quarters.
+The edge shrinks faster than `1 − η`: near agreement, a log-score
+advantage is about quadratic in the gap.
+
+- Front-loaded: per-run opportunity in Act I ≥ Act II ≥ Act III.
+- Bands: Acts I and II, opportunity and per-event edge, each within
+  ±max(30%, 0.005 nats) of its validation value. Those values are about
+  0.71 nats per run (Act I) and 0.18 (Act II) of opportunity, and 0.023
+  and 0.06 nats per event. Act III holds too few
+  open rung-quarters for a band, so it is bounded absolutely instead:
+  |opportunity| ≤ 0.02 nats per run.
+- Big enough to act on: a reader-copier, scoring the full reader's
+  quarter probabilities against `B`'s snapshot every quarter, clears the
+  memo gate by day 882 in at least half of worlds at the calibrated
+  `K_CRED`.
+- Closes decisively: on each rung, the mean edge per rung-quarter over
+  quarters locked while the rung is claimed but uncertified is at most a
+  third of the mean over quarters locked while it is unclaimed, or 0.005
+  nats, whichever is larger. Both are
+  states at the lock. A window defined by when the claim later lands
+  would condition on the future, and a sharper reader loses there by
+  construction.
+- No static preset pays: locking *earlier*, *later* or the market's
+  projection every quarter earns mean skill ≤ +0.05 nats per run, and
+  clears the memo gate in ≤ 10% of worlds (the calibration targets
+  under the posterior).
+
+Diagnostics: the headline-plus-quote baseline (a recalibration on `B`'s
+own quote, the clock and the claim state), its edge per act, and the
+fallback-tree mispricing per contract. Also the coherence projection's
+binding frequency and size, and an inversion baseline restricted to
+coordinates where the projection does not bind.
 
 **Event impulses** are a decaying overlay on the sim parameters
 (half-life 5 trading days), carried as `impulse: {…}` on race shells and
 dispatched inside `_fireEvent` on every path. Bridge-fired impulses are
 scaled by `(1 − 0.6·η)`, so the market's reaction to a race headline
-damps as the released frontier rises; that is η's only consumer. Signs
+damps as the released frontier rises. η's other consumers are the pools
+in `B` and `V`. Signs
 are binding; per-shell magnitudes live on the
 shells and are tunable. Overlays are removed before day-complete
 processing, so events mutate baseline parameters and day-complete
 valuations never price through a transient overlay; permanent additive
 deltas on the race stream remain forbidden ([03](03-market-mechanics.md)).
 
-**The posterior.** The player's timeline is held in the same form as
-`B`: for each tracked rung R2–R5, a logistic law `{m, w}` over the
-*certified* crossing day (R5: the terminal crossing). Bounds:
-`w ∈ [25, 400]`, `m ∈ [0, 2016]`, medians monotone
-`m₂ ≤ m₃ ≤ m₄ ≤ m₅` (dragging one pushes its neighbours), and a
-certified rung is frozen at its certification day. The player edits a
-standing **draft** at any time on the Markets page. Day 0's draft is a
-copy of `B`.
+**The posterior.** The player holds, for each tracked rung R2–R5, a
+logistic law with a plateau over the *certified* crossing day (R5: the
+terminal crossing):
+
+```
+F(x) = (1 − q)·σ((x − m)/w)
+```
+
+`m` is the median *given that the rung ever certifies*, and `q` is the
+mass on never. "Not this term" is larger: `q` plus the logistic's tail
+past day 1008, since nothing certifies after the term. Bounds:
+`w ∈ [25, 400]`, `m ∈ [0, 2016]`, `q ∈ [0, 0.95]`. Medians and plateaus
+are monotone over the certification rungs (`m₂ ≤ m₃ ≤ m₄`,
+`q₂ ≤ q₃ ≤ q₄`), and dragging one pushes its neighbours. R5 is not
+ordered against them: an internal R5 crossing can end a world before R4
+certifies. A certified rung is frozen at its certification day. The
+player edits a standing **draft** at any time on the Markets page:
+median, width, and plateau. The plateau handle edits the conditional
+curve's height at the term's end, `1 − S(1008)/S(t)`, the chance of a
+crossing this term given none yet, and `q` follows from it given `m` and
+`w`. Day 0's draft is `B`'s projection.
 
 **Locks** stay quarterly: days 0, 63, 126, …, on-grid, immutable, with
-idempotent replay only. Each lock day raises the lock dispatch, which
+idempotent replay only. This round keeps the lock dispatch; the standing
+policy that replaces it (ROADMAP §1) is the next round. Each lock day
+raises the lock dispatch, which
 holds the day (it counts in `_popupBarrier`) until a lock is recorded.
 The choices are *as drawn*, *the market's curves*, *earlier than the
-market* (`m_B − 0.5·w_B` on each uncertified rung, `w_B` kept), *later
-than the market* (`m_B + 0.5·w_B`), or *adjust first*. Adjust first
-dismisses the dispatch, opens the Markets page with the editor focused,
-and keeps the day held until the panel's Lock is pressed. Every lock
-stores the player's curves together with a snapshot of `B`'s `{m, w}`
-for the same rungs.
+market* (`B`'s projection with `m − 0.5·w` on each uncertified rung,
+`w` and `q` kept), *later than the market* (`m + 0.5·w`), or *adjust
+first*. Adjust first dismisses the dispatch, opens the Markets page with
+the editor focused, and keeps the day held until the panel's Lock is
+pressed.
+
+A lock stores, for every rung it will score, the quarter's probability
+from each side: `p_P` from the player's law and `p_M` from `B` at the
+lock. It also stores the player's curves and `B`'s projection for
+display. `scoreQuarter` reads the stored pair and never re-evaluates
+`B`. *The market's curves* records a **market-policy** lock: `p_P ≡ p_M`,
+and its pilledness and claims read `B`'s own (below). So does any lock,
+from the dispatch or the panel, of a draft still equal to today's
+projection on every open rung: an untouched drawing is the market's
+call, and the Brief says so.
 
 **Scoring.** At each lock day `L_{q+1}`, every rung R ∈ {2, 3, 4} that
-was uncertified at `L_q` is scored for the quarter `[L_q, L_{q+1})`,
-under the lock recorded at `L_q`, for both the player and the snapshotted
-`B`. The quarter's crossing probability is
-`p = (F(L_{q+1}) − F(L_q)) / (1 − F(L_q))`, clamped to [0.02, 0.98], and
-`o = 1` if R was certified in the quarter. The skill increment is the
-log-likelihood ratio, in nats:
+was uncertified at `L_q` is scored for the quarter `(L_q, L_{q+1}]` from
+the pair stored at `L_q`. A lock is recorded after its day's close, so a
+certification on `L_q` was already known to it. The player's quarter
+probability is the survival-conditioned `p = 1 − S(L_{q+1})/S(L_q)`, with
+`S = 1 − F`, computed in log space. `B`'s is its pooled law at 63
+residual days. Both are clamped to [0.02, 0.98] before they are stored,
+so the two sides compare the same scalars. `o = 1` if R certified in the
+quarter.
+
+**The outstanding quarter is scored at the terminal.** When the run ends
+between locks, the existing unscored lock is scored once, against its
+original end date and the authoritative completed trajectory. After desk
+ejection, the world continues headless, so a certification in the
+extrapolation before that end date scores `o = 1`. After natural
+resolution, nothing certifies later. No terminal lock is created, no
+quarter is scored twice, and skill scored after the end unlocks nothing.
+Dropping that quarter would select the scored quarters on outcomes. The skill increment is the log-likelihood
+ratio, in nats:
 `Δ = o·ln(p_P/p_M) + (1 − o)·ln((1 − p_P)/(1 − p_M))`. Cumulative skill
-is `S_P = ΣΔ`, and **credibility = tanh(S_P / K_CRED)**, with K_CRED set
-in calibration. R5 is not scored, because nothing certifies
-it.
+is `S_P = ΣΔ`, and **credibility = tanh(S_P / K_CRED)**. R5 is not
+scored, because nothing certifies it.
 
 These properties are gated by the harness:
 
-- A player who locks the market's curves scores exactly 0 every quarter.
-- The score is proper: the expected Δ under the true law is maximized by
-  reporting that law.
+- A market-policy lock scores exactly 0 every quarter.
+- The score is proper over the clamped range: among probabilities in
+  [0.02, 0.98], the expected Δ is maximized by reporting the true one,
+  clamped. That holds for a fixed process generating outcomes. It is not
+  incentive-compatible where the player's forecasts or actions change
+  the process.
 - A quarter without a crossing is information. The early caller pays a
   little every quiet quarter and collects when the crossing lands, so
   being early is indistinguishable from being wrong until it isn't.
 
 A run scores up to sixteen quarters. The gates are memos > 0.55 and
-fund-as-actor > 0.65 ∧ `F` > 60. Calibration targets (gated by
-`forecast-test`):
+fund-as-actor > 0.65 ∧ `F` > 60. The record also carries σ₀, how far it
+would swing by luck if the market were right:
 
-- An oracle that locks the true certification days (`w` 30) clears the
-  fund gate by day 756 in ≥ 80% of the worlds that certify a rung by
-  then.
-- An informed player halfway between `B` and the truth (`w = 0.7·w_B`)
-  clears the memo gate by day 882 in roughly half of worlds (band
-  30–70%).
-- The market copier stays at 0.
-- No static preset (earlier or later) earns more than a bounded edge.
-  Because `B` runs early (above), a static *later* caller earns about
-  +0.14 nats over a run from Act I's quiet quarters and clears the memo
-  gate in about 4% of worlds; the gate is ≤ 0.25 nats and ≤ 10%.
+```
+σ₀² = Σ p_M(1 − p_M)·(ln(p_P/p_M) − ln((1 − p_P)/(1 − p_M)))²
+```
 
-**K_CRED = 1.8** (calibrated by `forecast-test`). Diagnostic: the
-informed rate is steep in K (about 94% at 1.5 and 31% at 2.0), so retune
-with care. Early
-quarters carry little score, because both laws clamp at 0.02 until a
-rung is in reach.
+The sum runs over every scored rung-quarter, and a market-policy lock
+adds nothing to it. σ₀ is reported (`forecastRecord`); no gate reads it.
+A significance condition on the gates, `S_P ≥ z·σ₀`, was ratified and
+measured this round, then dropped. A bold, skilled record has a large σ₀:
+the reader-copier's averages 1.47 against a mean `S_P` of 0.80. So any
+`z` ≥ 0.75 shut out the honest reader, while the early caller's heavy
+right tail, which σ₀ under the market's own law understates, still came
+through.
+
+Calibration targets (gated by `forecast-test`):
+
+- The reader-copier clears the memo gate by day 882 in at least half of
+  worlds (the edge gate under `B`, above). This target sets `K_CRED`.
+- No static preset earns positive mean skill (≤ +0.05 nats per run), or
+  clears the memo gate in more than 10% of worlds. An early caller pays a
+  little each quiet quarter and collects when a crossing lands, so luck
+  opens the gate for a few. That is the property above, and the bound is
+  the one ratified before this round.
+- The oracle, which locks the true certification days (`w` 30, `q` 0),
+  earns more mean skill than the reader-copier. Its fund-gate rate is
+  reported. The old target of ≥ 80% by day 756 assumed the heuristic
+  `B`; against a market this sharp after a claim, a `w`-30 law leaks
+  mass into the wrong quarter and the 0.98 clamp caps what being right
+  pays.
+- The market-policy player stays at 0.
+
+Diagnostic: an informed player halfway between `B`'s projection and the
+truth (`w = 0.7·w_B`), the calibration target before the reader existed.
+
+**K_CRED = 1.35**, set on validation worlds against the reader-copier
+(53.1% clear the memo gate there; the "earlier" preset 5.6%). It was 1.8
+against the heuristic `B`, whose larger but statically exploitable edge
+set the old scale. Early quarters carry little score, because both laws clamp at 0.02
+until a rung is in reach.
 
 `lockedClaim(R)` is the latest lock's P(T_R ≤ D_R) at the contract
-deadline. `playerPilled` mirrors `marketPilled` exactly: 100 × the
-latest lock's P(R4 within 252 days of today | not yet crossed). A player
-who locks the market's curves therefore reads exactly the market's
-pilledness, and draws no scrutiny gap or trait for copying. Consensus
-settlement scores nothing. The editor and the record's display are in
+deadline; for a market-policy lock it is `B`'s quote at the lock.
+`marketPilled` is 100 × `P_B`(R4 within 252 days of today | not yet
+crossed), and `playerPilled` reads the same measure off the latest lock.
+A market-policy lock reads `marketPilled` itself, live, so copying the
+market draws no scrutiny gap or trait. Consensus settlement scores
+nothing. The editor and the record's display are in
 [03](03-market-mechanics.md).
 
 **Firm belief `F`** lives on `race.F`: starts 15, clamped [0, 100]; wakes
@@ -809,68 +1286,113 @@ weight to the worlds in which no one is left to collect. That is pillar
 valuation rule. The systematic mispricing has a reason, and the doom
 short's non-settlement is the same fact seen from the other side.
 
-`V` is a survival-conditioned expected terminal multiple, read from
-public state only (`buildPublicView` and `belief`):
+`V` is a survival-conditioned expected terminal multiple, pooled the way
+`B` is from the two readers' family heads:
 
 ```
-V = Π·[Λ·m_W + (1 − Λ)·m_C] + (1 − Π)·m_F
+V   = (1 − η)·V_legible + η·V_full
+V_x = Σ_{k ≠ 3} p_{x,k}·m_k / (1 − p_{x,3})
 ```
 
-- `Π = F₅(1000)` is the market's *unconditional* belief that R5 lands
-  this term, read off `B`'s own R5 law `{m, w}`. It is 0 from day 1000
-  on without a crossing. Unconditional, because `B` moves only on
-  legible events, so `Π` moves only on news: certifications and rung
-  claims pull the median in, and routine releases with no claim drift it
-  out, which is how a stall unwinds the AGI trade. A survival-conditioned
-  quote would decay toward the deadline in every world and make shorting
-  HCN a free trade.
-- `Λ = σ(λ₀ + (r_W − r_T)/0.75)` is the public lead, with `λ₀ = 1.0`
-  (the market's prior that Tianxia trails). `r_W` is the highest
-  *claimed* released rung of Halcyon or Polaris, and `r_T` is Tianxia's
-  (below the ladder counts as 0). Without the prior, tied R1 claims
-  (30% of day-0 worlds) read as a coin flip.
-- `m_W = 1.40` (the family-1/2 blend of 1.60 and 1.25, weighted 14:21),
-  `m_C = 0.35` (family 4's recovery), and `m_F = 0.55` (the fizzle
-  centre).
-- Misalignment (family 3) is absent by construction; that is the
-  survival conditioning. The Deal has no term.
+- `p_{x,k}` is reader x's family distribution ("The reader"). The
+  legible family head reads the rule of thumb's own valuation inputs:
+  its R5 law, the claimed rungs behind the old claim lead, and the clock.
+  So `V_legible` is the old valuation rule, recalibrated. `V_full` is
+  the reference.
+- `m_k` are the closeout's family marks, read from `CLOSEOUT_TUNING` so
+  they live in one place: 1.60 (family 1), 1.25 (2), 1.00 (5, the Deal),
+  0.35 (4) and 0.55 (6, the fizzle's centre).
+- Misalignment (family 3) gets no weight. That is the survival
+  conditioning. The Deal now has a term, so `V` prices the treaty track.
+- The conversion regimes redeem at the nationalization reference
+  (closeout cell 3), not at a family mark, and stay outside `V` as
+  before.
+- η is the released-frontier dial. The pool is of the two readers'
+  survival-conditioned *expectations*, the investors' shares of capital
+  weighting their prices. It is not a pool of family probabilities
+  conditioned afterwards, which would reweight η by each reader's
+  survival probability. The pool is an explicit designed mispricing;
+  changing η does not make it a full-information martingale.
 
-Day 0 reads Π 0.70, so V ≈ 1.08 with a one-rung Western claim lead and
-≈ 0.95 with claims tied (gate, `valuation-test`).
+The clock enters `V` through the readers. A quiet quarter is
+information, and the target is that each reader's drift between events
+is compensated by its expected jumps at events. The gates below check
+that target; it does not follow from calibration. This retires
+the old rules that only the deadline moved `V` and that `Π` read `B`'s
+*unconditional* R5 law. They existed because the heuristic `B` decayed
+in every world. `VALUATION_TUNING` keeps only the gap clamp.
 
 `V` is recomputed at day close, after `stepBelief` and the bridge pass.
 The authoritative price takes the change as a level gap before the next
 open: `S ← S·ratio`, where `ratio = V_t / V_applied` is clamped to
 [0.75, 1.30] and `V_applied` is the last level actually embedded in the
 price, so a clamped remainder carries into later days. Resting orders are
-checked at the post-gap price, and the resolving day takes no gap.
-A Halcyon certification lifts Π and Λ, and a Tianxia claim of parity
-cuts Λ. Routine releases that claim nothing drift `B`'s R5 median out,
-and day 1000 without a crossing drops Π to 0, so the AGI trade unwinds
-on the tape in the worlds that stall. The gap reaches every downstream
-mark the normal way (`_syncAll`), and the markets snapshot is taken
-after it. Classic has no `V`. The decaying impulses stay, as texture:
-vol, jump intensity and a hair of drift.
+checked at the post-gap price, and the resolving day takes no gap. The
+gap reaches every downstream mark the normal way (`_syncAll`), and the
+markets snapshot is taken after it. Classic has no `V`. The decaying
+impulses stay, as texture: vol, jump intensity and a hair of drift.
 
-Gates (`valuation-test`):
+Gates (`valuation-test` and `reader-test`, test seeds). The survival
+measure is the test worlds that do not end misaligned. Every series is
+the **stopped process**: after resolution, `V` is the realized mark
+`m_f`, so a world that resolves inside a window is never dropped from
+it.
 
-- Corrupting every latent field leaves `V` bit-identical.
-- No silent drift: across seeds, V is unchanged on every day without a
-  legible event that moved `B` or a claim, apart from the day-1000 step.
-- `V ∈ [m_C, m_W]`, and the ratio stays inside its clamp.
-- `V` is constant in Classic.
+- Corrupting every latent field leaves `V` bit-identical, and `V` is
+  constant in Classic.
+- `V ∈ [0.35, 1.60]`, and the ratio stays inside its clamp.
 - No-player race trajectories are untouched, because nothing under
   `src/race/` reads `sim`.
+- **Calibration.** Under the survival measure, binned by each reader's
+  `V_x` into deciles holding at least 200 samples, the mean realized
+  `m_f` sits within 0.05 of the bin's mean `V_x`.
+- **Fairness on own information.** Under the survival measure, the
+  increment `V_x,t+63 − V_x,t` of each reader is regressed, on world-split
+  halves, on what that reader could see at t. That is its own value plus
+  its own feature list; for the full reader it also includes the
+  readers' disagreement and the quote history. The held-out mean
+  absolute predicted increment is at most 0.03. Cell means in (act,
+  `V_x` decile) are reported. This is an empirical requirement.
+  Calibration does not imply it, because predictions from successively
+  lossy summaries of the record need not form a martingale.
+- **The pool's advantage, measured.** Under the survival measure, the
+  pooled `V`'s increments are predictable from the full reader. That is
+  the designed edge, reported per act. Predictability from the legible
+  information alone, by the same regression on the legible features, is
+  held to 0.03.
+- **Exploitable errors.** Several challengers (pairwise products,
+  claim-age splines, nearest neighbours) fit the full reader's terminal
+  residual `m_f − V_full,t` on world-split halves. None reaches a
+  held-out R² over a bound set on validation worlds, and each one's
+  subgroup residual bias is reported.
 
-Diagnostics (`valuation-test`): gaps over 2% fall on under 1% of days;
-the largest daily move is the 25% clamp floor.
+Diagnostics: the median terminal reveal `m_f/V_T` by family; the share of
+days with gaps over 2%; the largest daily move. Static long and short
+log-return diagnostics are reported, net of spread, as drift
+indicators. They are not position accounting: no margin, liquidation or
+conversion. Predictable drift is not by itself arbitrage. Costing a
+strategy with full position accounting is section 3's replayable runs.
 
-**Known bias:** `B` is a heuristic updater, not a martingale, so V
-inherits its drift. Routine releases pull R5 out in every world, and mean
-log V falls about 0.29 over a run even in family 1. The terminal reveal
-is correspondingly large: the median `m_f/V_T` is about 1.85 for family 1
-and 0.42 for family 3. The calibrated public estimator on the
-[roadmap](../ROADMAP.md) removes it.
+**Known limit: V drifts predictably.** The bound of 0.03 sits above the
+target this round set out with (0.02), because the linear family heads
+are not martingales. On test worlds, the held-out mean absolute
+predicted 63-day increment is 0.0265 for the legible reader and 0.028
+for the full reader; a permutation placebo gives 0.002–0.009. The pool,
+predicted from the legible information, measures 0.021. Both readers'
+values are calibrated in level. A per-act linear recalibration was fit
+and measured: its slopes came out near 1 (0.99–1.04), it left the
+predictability where it was, and it pushed `V` under its 0.35 floor, so
+it was removed. A headline reader can therefore anticipate about two
+points of HCN's race-driven drift a quarter, against quarterly moves
+many times that. The fix is a family head whose increments are
+unpredictable by construction, such as a nonlinear head or a
+martingale-corrected one, at a later refit.
+
+**Conversion regimes.** Calibration against family marks says nothing
+about HCN's actual payoff in worlds that end `nationalized` or
+`classified`, where shares redeem at the conversion reference. Those
+worlds are reported apart, as the hypothetical family factor they
+are.
 
 The terminal HCN mark is closeout cell 1 (below): `spot·m_f / V_T`
 outside the conversion regimes, where `V_T` is the last applied level.
@@ -960,7 +1482,7 @@ a run nobody participates in is bit-identical to one without rounds. The
 founding round prices a unit at 1.00. Each later round prices at
 `P_k = P_{k−1}·clamp(exp(0.8·Δr + 1.0·ΔΠ − 0.15), 0.5, 3.0)`, where `Δr`
 is Polaris's claimed-rung gain since the last round and `ΔΠ` the change
-in the valuation layer's Π. A quiet half-year is a flat-to-down round.
+in `B`'s probability of R5 by day 1000 (the R5 contract's quote). A quiet half-year is a flat-to-down round.
 
 Meridian is offered an allocation of up to min(20% of equity, 2,000k)
 per round, by dispatch: take it all, take half, or pass.
@@ -1338,18 +1860,20 @@ what `endings-test` checks of each:
    marginally (gate), and — conditional on observable state at each act
    boundary, before a terminal has actually fired — no family's
    posterior exceeds 0.60 and no reachable family falls below 0.02 (a
-   design target no harness measures yet). A run can *lean*; it cannot
-   be over early.
+   design target; `reader-test` reports it from the full reader). A run
+   can *lean*; it cannot be over early.
 2. **Resolution concentrates at the threshold.** `d = margin −
    required` has median |d| in [0.06, 0.15] (gate; diagnostic ≈ 0.14),
    and ≥ 40% of runs land within the player's maximum reachable |d_P|
    (gate): the sample decides *whether* it's close, play decides the
    close ones. This is how knife-edge coexists with bounded influence —
    the 30% clip matters because many worlds end inside it.
-3. **Determination is late.** An oracle predicting the final family
-   from day-350 observable state beats the prior's Brier by < 25%;
-   from day-700, by < 60% (gates). Most outcome
-   variance resolves in Act III, where the player is watching.
+3. **Determination is late.** The full reader's family head, on test
+   seeds, beats the prior's Brier by < 25% from day-350 public state and
+   by < 60% from day-700 (gates, `endings-test`). It replaced a
+   four-feature bucket oracle that measured the ceiling against a weak
+   predictor. The reader stays below the prescribed ceilings; that does
+   not establish when a world becomes inferentially determined.
 4. **Ratchets bind sometimes, never always.** No one-way mechanism
    (`controlRegime`, the heat floor, proliferation) may make its
    terminal state the attractor of most runs — nationalization,
