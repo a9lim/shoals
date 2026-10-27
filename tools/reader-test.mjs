@@ -1,51 +1,52 @@
 #!/usr/bin/env node
 /* ===================================================
-   Tenth headless harness. 02a "The reader".
-   A. Schema, public-row reconstruction, hidden corruption, replay
-   B. Grid/off-grid quarter/deadline calendar and day-state gates; support; deciles
-   C. Learning floor relative to prior-only (ratified phi; validation suggestion)
-   D. World-split age-spline/kNN challengers and planted-defect power checks
-   E. Family calibration, 350/700 Brier, act-boundary knife edge
-   F. Legible-to-full edge by act (eta=0 diagnostic)
-   G. Quarter/live-deadline/support diagnostics at every 21-day sampled day
-   H-K. Phase B: B's edge per act and its bands, the close, the reader-copier and
-        static presets, diagnostics (V's gates are in valuation-test).
-   Run: node tools/reader-test.mjs [N=2000] [--seed S] [--json PATH] [--sections A-G]
-   N worlds PER scenario; legible calibration pools the training mixture. Any gate fails
-   the process. Reports unmodified bands, even for a provisional fit.
+   tools/reader-test.mjs -- 02a "The reader".
+   A. The fit report against the constants; schema, the
+      evaluator's arithmetic (states, stage, segments, the
+      rule, the family's acts); public-row reconstruction,
+      hidden corruption, same-day replay, information
+      isolation, masses
+   B. Each head calibrated in the large (rungs R2-R5 per
+      scenario, the family head pooled over both, legible and
+      full); the full head's quarterly log loss no worse than
+      the legible's
+   H. B's edge over the full reader: positive in Act I,
+      closed by Act III (|opportunity| <= 0.02 nats per run)
+   J. The reader-copier's edge over B is positive
+   Run: node tools/reader-test.mjs [N=200] [--seed S]
+   N worlds PER scenario (neutral, engine). Any gate fails
+   the process.
    =================================================== */
-import { writeFileSync, readFileSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { READER_CONSTANTS as constants } from '../src/race/reader-constants.js';
 import { assertReaderSchema, readerLaw, readerFamily, lawQuarter, lawCDF, lawRawCDF, lawMass, lawAtom, evaluateReaderFeatures } from '../src/race/reader.js';
-import { RECORD_SCHEMA, READER_CLOCK_DAYS, readerCalibrationDays, RULE_HAZARD_FLOOR, expandReaderFeatures, createRecordFromSnapshot, foldPublicRecordRow, publicRecordRow, recordFeatures, createPublicRecord, stepPublicRecord, ruleSummary, ruleLogHazard } from '../src/race/public-record.js';
+import { RECORD_SCHEMA, READER_CLOCK_DAYS, readerCalibrationDays, RULE_HAZARD_FLOOR, expandReaderFeatures, createRecordFromSnapshot, foldPublicRecordRow, publicRecordRow, recordFeatures, createPublicRecord, stepPublicRecord, ruleSummary } from '../src/race/public-record.js';
 import { createRaceState } from '../src/race/race-state.js';
 import { belief, initBelief } from '../src/race/belief.js';
-import { WORLD_SCENARIOS, runReaderWorld, sampleFeatures } from './reader-data.mjs';
+import * as BB from '../src/race/belief.js';
+import { checkResolution } from '../src/race/resolution.js';
+import { WORLD_SCENARIOS, runReaderWorld, worldInputs, stepWorld } from './reader-data.mjs';
 import { ensureEngineWorlds } from './engine-worlds.mjs';
-import { quarterEntries, quarterMetrics, challengerMetrics, familyMetrics, familyMetricsFromRows, deadlineMetrics, legibleHorizonMetrics, calendarHorizonMetrics, plantedDefectMetrics } from './reader-metrics.mjs';
+import { quarterEntries, quarterMetrics, familyMetrics, familyMetricsFromRows, loss } from './reader-metrics.mjs';
 const fitReport = JSON.parse(readFileSync(new URL('./reader-fit-report.json', import.meta.url), 'utf8'));
-// 02a: ratified gates are fixed here; refits report validation suggestions separately.
-const RATIFIED_PHI = .221, RATIFIED_CHALLENGER_BOUND = .001;
 
 const args = process.argv.slice(2);
-let N = 2000, base = 1, json = null, readerOnly = false;
+let N = 200, base = 1;
 for (let i = 0; i < args.length; i++) {
     if (args[i] === '--seed') base = Number(args[++i]);
-    else if (args[i] === '--sections') { if (args[++i] !== 'A-G') throw new Error('Supported section selection: A-G'); readerOnly = true; }
-    else if (args[i] === '--json') json = args[++i];
     else if (args[i] === '--n' || args[i] === '-n') N = Number(args[++i]);
     else if (/^\d+$/.test(args[i])) N = Number(args[i]);
     else throw new Error(`Unknown argument ${args[i]}`);
 }
 if (!Number.isInteger(N) || N < 1 || !Number.isInteger(base) || base < 0) throw new Error('N and seed must be nonnegative integers; N must be positive');
 const t0 = performance.now();
-// The engine scenario's worlds: bystander runs' tapes (tools/engine-worlds.mjs).
-await ensureEngineWorlds(Array.from({ length: Math.max(N, 94) }, (_, i) => base + i));
+// Each scenario on its own seeds (the two share their races on a seed); the
+// engine scenario's worlds are bystander runs' tapes (tools/engine-worlds.mjs).
+const seedOf = (scenario, i) => base + (scenario === 'engine' ? N : 0) + i;
+await ensureEngineWorlds([...Array.from({ length: N }, (_, i) => seedOf('engine', i)), base + 93]);
 let failures = 0;
-const checks = [], report = { N, base, schema: RECORD_SCHEMA, sections: readerOnly ? 'A-G' : 'A-K', scenarios: {} };
-report.bands = { phi: RATIFIED_PHI, challengerBound: RATIFIED_CHALLENGER_BOUND, suggestedPhi: fitReport.suggestedPhi, suggestedChallengerBound: fitReport.suggestedChallengerBound };
-console.log(`Validation suggestions: phi=${fitReport.suggestedPhi}, challenger bound=${fitReport.suggestedChallengerBound}; ratified gates phi=${RATIFIED_PHI}, challenger bound=${RATIFIED_CHALLENGER_BOUND}`);
+const checks = [];
 function check(name, ok, detail) { checks.push({ name, ok, detail }); if (!ok) failures++; console.log(`${ok ? 'PASS' : 'FAIL'} ${name}: ${detail}`); }
 const close = (a, b) => Math.abs(a - b) <= 1e-12;
 const sig = x => JSON.stringify(x);
@@ -301,183 +302,82 @@ check('A R5 reads R4 claim', r5ClaimOK, 'R5 claim flag follows the released R4 f
     check('A integer masses/support/atom', massOK, 'all heads/sets sum to 1 including the atom');
 }
 
-function reportCalibration(scenario, R, set, v, gated) {
-    const emit = gated ? check : (name, ok, detail) => console.log(`DIAGNOSTIC ${name}: ${ok ? 'within band' : 'outside band'}; ${detail}`);
-    emit(`B ${scenario} R${R} ${set} in-large`, Math.abs(v.bias) <= 0.01, `${v.bias.toFixed(6)} <= ±0.010; CI [${v.interval.map(x => x?.toFixed(6))}]`);
-    const eceEmit = gated && set === 'full' ? check : (name, ok, detail) => console.log(`DIAGNOSTIC ${name}: ${ok ? 'within band' : 'outside band'}; ${detail}`);
-    eceEmit(`B ${scenario} R${R} ${set} ECE`, Number.isFinite(fitReport.eceBound) && v.ece <= fitReport.eceBound,
-        `${v.ece.toFixed(6)} <= ${fitReport.eceBound}; CI [${v.eceInterval.map(x => x?.toFixed(6))}]`);
-
-    const worst = v.worstDecile;
-    console.log(`  DECILE DIAGNOSTIC ${scenario} R${R} ${set}: ${JSON.stringify(worst)}`);
-    console.log(`  WORST ABSOLUTE DECILE (including small cells) ${scenario} R${R} ${set}: ${JSON.stringify(v.worstDecileAll)}`);
-    for (const d of v.failingDeciles) {
-        console.log(`  DECILE OUTSIDE DIAGNOSTIC BAND ${scenario} R${R} ${set} bin=${d.bin}: predicted=${d.predicted.toFixed(6)}, observed=${d.observed.toFixed(6)}, n=${d.n}, worlds=${d.worlds}, SE=${d.se.toFixed(6)}, band=${d.band.toFixed(6)}`);
-        for (const state of d.states) console.log(`    day=${state.day}, R${state.claimRung} claimed=${state.claimed}, n=${state.n}, worlds=${state.worlds}, predicted=${state.predicted.toFixed(6)}, observed=${state.observed.toFixed(6)}`);
-    }
-}
-function reportCalendar(scope,R,set,v,gated) {
-    const emit=gated?check:(name,ok,detail)=>console.log(`DIAGNOSTIC ${name}: ${ok?'within band':'outside band'}; ${detail}`);
-    emit(`G ${scope} R${R} ${set} support in-large`,Math.abs(v.support.bias)<=.01,JSON.stringify(v.support));
-    for(const horizon of ['quarter','deadline']) {
-        const metric=v[horizon],eligible=metric.days.filter(c=>c.eligible),failed=eligible.filter(c=>!c.passed);
-        emit(`B ${scope} R${R} ${set} ${horizon} all21 calendar`,!failed.length,
-            `${failed.length}/${eligible.length} eligible cells fail; max(0.03,3 sqrt(SE_test²+SE_train²))`);
-        for (const [label, cells] of [['day × claim state', metric.dayClaimStates], ['off-grid calendar', metric.offGrid]]) {
-            const eligible = cells.filter(c => c.eligible), failed = eligible.filter(c => !c.passed);
-            const calendarEmit = label === 'off-grid calendar' && set === 'full'
-                ? (name, ok, detail) => console.log(`DIAGNOSTIC ${name}: ${ok?'within band':'outside band'}; ${detail}`) : emit;
-            calendarEmit(`B ${scope} R${R} ${set} ${horizon} ${label}`, !failed.length,
-                `${failed.length}/${eligible.length} eligible cells fail; max(0.03,3 sqrt(SE_test²+SE_train²))`);
-        }
-        const states=metric.claimStates.filter(c=>c.eligible),failedStates=states.filter(c=>!c.passed);
-        emit(`B ${scope} R${R} ${set} ${horizon} claim states`,!failedStates.length,
-            `${failedStates.length}/${states.length} states fail; max(0.02,2 world SE)`);
-        for(const cell of metric.days) if(Math.abs(cell.bias)>.02 || (cell.eligible&&!cell.passed))
-            console.log(`  CALENDAR OVER .02 ${scope} R${R} ${set} ${horizon}: ${JSON.stringify(cell)}`);
-        for(const cell of metric.claimStates) if(Math.abs(cell.bias)>.02 || (cell.eligible&&!cell.passed))
-            console.log(`  CLAIM STATE OVER .02 ${scope} R${R} ${set} ${horizon}: ${JSON.stringify(cell)}`);
-        for(const cell of metric.offGrid) if(Math.abs(cell.bias)>.02 || (cell.eligible&&!cell.passed))
-            console.log(`  OFF GRID OVER .02 ${scope} R${R} ${set} ${horizon}: ${JSON.stringify(cell)}`);
-        for(const cell of metric.dayClaimStates) if(cell.bias!=null && (Math.abs(cell.bias)>.02 || (cell.eligible&&!cell.passed)))
-            console.log(`  DAY CLAIM STATE OVER .02 ${scope} R${R} ${set} ${horizon}: ${JSON.stringify(cell)}`);
-    }
-}
-function reportFamily(scenario, set, head, gated) {
-    for (const cell of head.classBias) {
-        const detail = `bias=${cell.bias.toFixed(6)} <= ±0.020; CI [${cell.interval.map(x => x?.toFixed(6))}]`;
-        if (gated) check(`E ${scenario} ${set} aggregate family${cell.family}`, Math.abs(cell.bias) <= .02, detail);
-        else console.log(`DIAGNOSTIC E ${scenario} ${set} aggregate family${cell.family}: ${detail}`);
-    }
-    for (const act of head.perAct) for (const cell of act.classBias) console.log(`DIAGNOSTIC E ${scenario} ${set} act${act.act} family${cell.family}: bias=${cell.bias.toFixed(6)}, n=${act.n}, worlds=${act.worlds}; CI [${cell.interval.map(x => x?.toFixed(6))}]`);
-}
-
-const pooledEntries = [], pooledFamilyRows = [];
-for (const scenario of WORLD_SCENARIOS.scenarios) {
-    console.log(`Simulating ${N} ${scenario} worlds...`);
-    const samples = [], boundaries = [];
-    for (let i = 0; i < N; i++) {
-        const w = runReaderWorld(base + i, scenario);
-        // A role/offset sample may also be a 350/700 diagnostic; count that day once.
-        samples.push(...new Map([...w.samples, ...w.diagnostics].map(s => [s.day, s])).values()); boundaries.push(...w.boundaries);
-    }
-    const entries = quarterEntries(samples, constants), metrics = quarterMetrics(entries), challengers = challengerMetrics(entries), family = familyMetrics(samples, constants, true, pooledFamilyRows);
-    for (const entry of entries) pooledEntries.push(entry);
-    const boundary = boundaries.map(s => ({ world: s.world, act: s.act, probabilities: Array.from(evaluateReaderFeatures('family', 'full', sampleFeatures(s, 'family', 'full'), s.day, constants, s.act)) }));
-    const knife = { n: boundary.length, above060: boundary.filter(s => Math.max(...s.probabilities) > 0.6).length,
-        below002: boundary.filter(s => Math.min(...s.probabilities) < 0.02).length, note: 'All six families treated as reachable; diagnostic only. Terminal/outcome reachability is not supplied by the public model.' };
-    const calendar=calendarHorizonMetrics(entries,['legible','full'],true,fitReport.calibrationStage),planted=plantedDefectMetrics(entries);
-    const out = { ...metrics, challengers, planted, calendar, family, knifeEdge: knife, deadlines: deadlineMetrics(entries) };
-    report.scenarios[scenario] = out;
-    for (const R of [2, 3, 4, 5]) {
-        const m = metrics.rungs[R];
-        for (const set of ['legible', 'full']) { reportCalibration(scenario,R,set,m[set],set==='full'); reportCalendar(scenario,R,set,calendar[R][set],set==='full'); }
-        check(`C ${scenario} R${R} learning floor`, RATIFIED_PHI > 0 && m.full.logLoss <= (1 - RATIFIED_PHI) * m.prior.logLoss,
-            `full=${m.full.logLoss.toFixed(6)}, prior=${m.prior.logLoss.toFixed(6)}, relative=${m.relativeImprovement.toFixed(4)} >= phi=${RATIFIED_PHI}`);
-    }
-    for (const [name, c] of Object.entries(challengers)) {
-        check(`D ${scenario} ${name}`, Number.isFinite(RATIFIED_CHALLENGER_BOUND) && c.improvement <= RATIFIED_CHALLENGER_BOUND,
-            `held-out improvement=${c.improvement.toFixed(6)} <= ${RATIFIED_CHALLENGER_BOUND}; CI [${c.interval.map(x => x?.toFixed(6))}]`);
-        for (const [R, cell] of Object.entries(c.groups.R)) check(`D ${scenario} ${name} R${R}`, Number.isFinite(RATIFIED_CHALLENGER_BOUND) && cell.improvement <= RATIFIED_CHALLENGER_BOUND,
-            `${cell.improvement.toFixed(6)} <= ${RATIFIED_CHALLENGER_BOUND}`);
-    }
-    for(const [defect,result] of Object.entries(planted)) for(const [name,value] of Object.entries(result.challengers))
-        check(`D ${scenario} planted ${defect} ${name}`,Number.isFinite(value.improvement)&&value.improvement>RATIFIED_CHALLENGER_BOUND,
-            `held-out improvement=${value.improvement} > ${RATIFIED_CHALLENGER_BOUND}; degraded-minus-shipped loss=${result.degradedMinusShippedLoss}`);
-    for (const set of ['legible', 'full']) reportFamily(scenario, set, family[set], set === 'full');
-    console.log(`E ${scenario} Brier ${JSON.stringify(family.full.brier)}; knife ${JSON.stringify(knife)}`);
-    console.log(`F ${scenario} eta=0 edge ${JSON.stringify(metrics.edgeByAct)}`);
-    console.log(`G ${scenario} raw/calibrated contract deadlines ${JSON.stringify(out.deadlines)}`);
-}
-report.pooled = { ...quarterMetrics(pooledEntries, true, ['legible']),
-    family: familyMetricsFromRows(pooledFamilyRows, true, ['legible']), deadlines: deadlineMetrics(pooledEntries) };
-report.pooled.horizons = legibleHorizonMetrics(pooledEntries);
-report.pooled.calendar=calendarHorizonMetrics(pooledEntries,['legible'],true,fitReport.calibrationStage);
-report.pooling = 'Equal world counts per scenario; concatenate observations, cluster paired neutral/engine trajectories by their shared world seed. Legible calibration pooled; scenario-specific legible metrics diagnostic only. Full calibration, learning floors and challengers remain per scenario.';
-for(const R of [2,3,4,5]) { reportCalibration('pooled',R,'legible',report.pooled.rungs[R].legible,true); reportCalendar('pooled',R,'legible',report.pooled.calendar[R].legible,true); }
-reportFamily('pooled', 'legible', report.pooled.family.legible, true);
-console.log(`G pooled raw/calibrated contract deadlines ${JSON.stringify(report.pooled.deadlines)}`);
-console.log(`G pooled quarter/deadline/support horizons ${JSON.stringify(report.pooled.horizons)}`);
-console.log(`G pooled every-21-day calendar ${JSON.stringify(report.pooled.calendar)}`);
-console.log(`A calibration fallback map ${JSON.stringify(fitReport.calibrationStage.fallbacks)}`);
-report.readerRuntimeSeconds = (performance.now() - t0) / 1000;
-console.log(`Reader A-G: ${report.readerRuntimeSeconds.toFixed(2)} s`);
 // ==========================================================================
-// Phase B: B on the reader (02a "Belief, η, and the firm": the edge, gated)
-//   H. The edge per act: front-loaded; Acts I and II, per-run opportunity and
-//      per-event edge, each within ±max(30%, 0.005 nats) of its validation value;
-//      Act III bounded absolutely, |opportunity| <= 0.02 nats per run
-//   I. The close, by state at the lock: the edge over quarters locked while the
-//      rung is claimed but uncertified is at most max(1/3 of the edge over
-//      quarters locked while it is unclaimed, 0.005 nats)
-//   J. Big enough to act on (the reader-copier at K_CRED); no static preset pays
-//   K. Diagnostics: headline-plus-quote, the coherence projection and the
-//      inversion baseline, the fallback-tree mispricing
+// B. Each head calibrated in the large; the full head no worse than the legible
+// ==========================================================================
+// 2026-10-27: describes the game (a9: the map fits the territory). The rung
+// heads sit within about 0.01 of their outcomes at this N (02a's 0.01 was read at
+// 2000 worlds per scenario); the family head's worst family is about 0.03 off
+// on neutral worlds at 1000 per scenario, plus one outcome per world of noise
+// here, so its band is read pooled over both scenarios and loose.
+const IN_LARGE = 0.02, FAMILY_IN_LARGE = 0.08;
+const familyRows = [];
+for (const scenario of WORLD_SCENARIOS.scenarios) {
+    const samples = [];
+    for (let i = 0; i < N; i++) {
+        const w = runReaderWorld(seedOf(scenario, i), scenario);
+        // A role/offset sample may also be a 350/700 diagnostic; count that day once.
+        samples.push(...new Map([...w.samples, ...w.diagnostics].map(s => [s.day, s])).values());
+    }
+    const entries = quarterEntries(samples, constants), metrics = quarterMetrics(entries, false);
+    for (const R of [2, 3, 4, 5]) for (const set of ['legible', 'full']) {
+        const v = metrics.rungs[R][set];
+        check(`B ${scenario} R${R} ${set} in-large`, Math.abs(v.bias) <= IN_LARGE, `${v.bias.toFixed(4)} <= ±${IN_LARGE} (n ${v.n})`);
+    }
+    familyMetrics(samples, constants, false, familyRows);
+    const lock = entries.filter(e => e.day % 63 === 0), mean = a => a.reduce((s, x) => s + x, 0) / a.length;
+    const lossL = mean(lock.map(e => loss(e.legible, e.y))), lossF = mean(lock.map(e => loss(e.full, e.y)));
+    check(`B ${scenario} full no worse than legible`, lossF <= lossL, `quarterly log loss full ${lossF.toFixed(5)} <= legible ${lossL.toFixed(5)} (${lock.length} rung-quarters)`);
+}
+{
+    const family = familyMetricsFromRows(familyRows, false);
+    for (const set of ['legible', 'full']) {
+        const worst = Math.max(...family[set].classBias.map(c => Math.abs(c.bias)));
+        check(`B pooled family ${set} in-large`, worst <= FAMILY_IN_LARGE, `worst family bias ${worst.toFixed(4)} <= ±${FAMILY_IN_LARGE}`);
+    }
+}
+console.log(`Reader A-B: ${((performance.now() - t0) / 1000).toFixed(2)} s`);
+
+// ==========================================================================
+// Phase B: B on the reader (02a "Belief, η, and the firm")
+//   H. B's edge over the full reader per act: positive in Act I, closed by
+//      Act III
+//   J. The reader-copier's edge over B, scored on the clamped pairs
 // Worlds mirror runReaderWorld's loop, with the day's inputs handed to stepBelief
 // so B's own record carries them. Lock days are 0, 63, ...; a lock on the day the
-// world resolves is not recorded (the terminal latch discards its dispatch). On
-// the validation seeds (--seed 2000001) the band values are printed and the
-// bands are reported, not gated.
+// world resolves is not recorded (the terminal latch discards its dispatch).
 // ==========================================================================
-if (!readerOnly) {
-    const BB = await import('../src/race/belief.js');
-    const { checkResolution } = await import('../src/race/resolution.js');
-    const { worldInputs, stepWorld } = await import('./reader-data.mjs');
-    const { loss } = await import('./reader-metrics.mjs');
-    const VALIDATION = base === 2000001;
-    // Validation values (seeds 2,000,001-2,002,000, N=2000 per scenario, reader
-    // schema 16, neutral and engine worlds), 2026-10-27; the gate is ±max(30%,
-    // 0.005 nats) of each (02a).
-    // Opportunity is nats per run summed over the act's eligible rung-quarters;
-    // perEvent is nats per eligible rung-quarter. Acts I / II; Act III holds too few
-    // open rung-quarters for a band and is bounded absolutely (ACT3_OPPORTUNITY).
-    const EDGE_BANDS = {
-        neutral: { opportunity: [0.72016, 0.16039], perEvent: [0.02325, 0.05319] },
-        engine: { opportunity: [0.71963, 0.15941], perEvent: [0.02323, 0.05283] },
-    };
-    const ACT3_OPPORTUNITY = 0.02, CLOSE_FLOOR = 0.005, PRESET_SKILL = 0.05, PRESET_MEMO = 0.10;
-    const H = 1008, Q = 63, ACTS = ['I', 'II', 'III'], MEMO = 0.55, MEMO_BY = 882;
-    const DEADLINE = { 2: 420, 3: 756, 4: 880, 5: 1000 };
+{
+    const ACT3_OPPORTUNITY = 0.02;
+    const H = 1008, Q = 63, ACTS = ['I', 'II', 'III'];
     const clampP = p => Math.min(0.98, Math.max(0.02, p));
     const mean = a => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
     const actOf = rr => rr <= 2 ? 0 : rr === 3 ? 1 : 2;
-    const K = BB.forecastTuning.K_CRED;
-    const phaseB = report.phaseB = { K, validation: VALIDATION, scenarios: {} };
     const t1 = performance.now();
     for (const scenario of WORLD_SCENARIOS.scenarios) {
-        const rows = [], worlds = [], fallbacks = { 2: [], 3: [], 4: [], 5: [] };
+        const rows = [], worlds = [];
         for (let i = 0; i < N; i++) {
-            const seed = base + i, race = createRaceState(seed), sched = worldInputs(seed, scenario);
+            const seed = seedOf(scenario, i), race = createRaceState(seed), sched = worldInputs(seed, scenario);
             BB.initBelief(race);
             const wrows = [];
-            let inputs = null, converted = false;
+            let inputs = null;
             const collect = (L) => {
-                const rec = BB.belief.record, rule = ruleSummary(BB.belief.rungs, L), eta = BB.beliefEta();
+                const rec = BB.belief.record, rule = ruleSummary(BB.belief.rungs, L);
                 const act = actOf(rec.snapshot.view.releasedFrontierRung);
-                const pre = { E: BB.presetCurves('earlier'), L: BB.presetCurves('later'), P: BB.presetCurves('market') };
                 const out = [];
                 for (const R of [2, 3, 4]) {
                     if (BB.isCertified(R)) continue;
-                    const pB = BB.binaryProb(R, L + Q);
-                    const pF = lawQuarter(readerLaw(rec, R, 'full', rule), L), pL = lawQuarter(readerLaw(rec, R, 'legible', rule), L);
-                    const unproj = (1 - eta) * pL + eta * pF;
-                    out.push({ world: i, L, R, act, eta, pB, pF, pL, bind: unproj - pB, claimed: +(rec.snapshot.view.releasedFrontierRung >= R),
-                        presets: Object.fromEntries(Object.entries(pre).map(([k, c]) => [k, BB.quarterProb(c[R].m, c[R].w, c[R].q, L, L + Q)])) });
+                    out.push({ L, R, act, pB: BB.binaryProb(R, L + Q), pF: lawQuarter(readerLaw(rec, R, 'full', rule), L) });
                 }
                 return out;
             };
             wrows.push(...collect(0));
-            let endDay = H;
             for (let d = 0; d < H && !race.resolution; d++) {
                 inputs = sched();
                 stepWorld(race, inputs);
                 BB.stepBelief(race, inputs);
-                if (!converted && (race.controlRegime === 'nationalized' || race.controlRegime === 'classified')) {
-                    converted = true;
-                    for (const R of [2, 3, 4, 5]) if (DEADLINE[R] > race.day && !BB.isCertified(R)) fallbacks[R].push(clampP(BB.binaryProb(R, DEADLINE[R])) - 0.5);
-                }
                 const lock = race.day % Q === 0 ? collect(race.day) : null;
-                if (checkResolution(race, inputs.geo)) { endDay = race.day; break; }
+                if (checkResolution(race, inputs.geo)) break;
                 if (lock) wrows.push(...lock);
             }
             if (!race.resolution) checkResolution(race, inputs?.geo);
@@ -488,103 +388,20 @@ if (!readerOnly) {
                 T[R] = m <= H ? m : Infinity;
             }
             for (const r of wrows) { r.o = +(T[r.R] > r.L && T[r.R] <= r.L + Q); r.edge = loss(r.pB, r.o) - loss(r.pF, r.o); rows.push(r); }
-            worlds.push({ i, T, endDay, rows: wrows });
+            worlds.push({ rows: wrows });
         }
-        // H. The edge per act.
-        const perEvent = ACTS.map((_, a) => mean(rows.filter(r => r.act === a).map(r => r.edge)));
+        // H. The edge per act: per-run opportunity, nats summed over the act's open rung-quarters.
         const opportunity = ACTS.map((_, a) => mean(worlds.map(w => w.rows.filter(r => r.act === a).reduce((s, r) => s + r.edge, 0))));
-        const out = phaseB.scenarios[scenario] = { worlds: N, rungQuarters: rows.length, perEvent, opportunity,
-            perEventN: ACTS.map((_, a) => rows.filter(r => r.act === a).length) };
-        check(`H ${scenario} edge front-loaded: per-run opportunity I >= II >= III`, opportunity[0] >= opportunity[1] && opportunity[1] >= opportunity[2],
-            `opportunity ${opportunity.map(x => x.toFixed(4)).join(' / ')} nats per run; per event ${perEvent.map(x => x.toFixed(4)).join(' / ')}`);
-        check(`H ${scenario} Act III |opportunity| <= ${ACT3_OPPORTUNITY} nats per run`, Math.abs(opportunity[2]) <= ACT3_OPPORTUNITY,
-            `${opportunity[2].toFixed(5)} (per event ${perEvent[2].toFixed(5)}, n ${out.perEventN[2]}; reported)`);
-        for (const [kind, vals] of [['opportunity', opportunity], ['perEvent', perEvent]]) for (let a = 0; a < 2; a++) {
-            const v = EDGE_BANDS?.[scenario]?.[kind]?.[a];
-            const name = `H ${scenario} ${kind} Act ${ACTS[a]} within ±max(30%, 0.005) of validation`;
-            const tol = v == null ? NaN : Math.max(0.3 * Math.abs(v), 0.005);
-            if (VALIDATION || v == null) console.log(`${VALIDATION ? 'VALIDATION' : 'PENDING'} ${name}: ${vals[a].toFixed(5)}${v != null ? ` (band ${v})` : ''}`);
-            else check(name, Math.abs(vals[a] - v) <= tol, `${vals[a].toFixed(5)} vs ${v} ± ${tol.toFixed(5)}`);
-        }
-        // I. The close, by state at the lock (02a): on each rung, quarters locked while
-        //    it is claimed but uncertified against quarters locked while unclaimed;
-        //    at most a third of the unclaimed edge, or 0.005 nats, whichever is larger.
-        out.close = {};
-        for (const R of [2, 3, 4]) {
-            const mine = rows.filter(r => r.R === R);
-            const claimed = mine.filter(r => r.claimed).map(r => r.edge), unclaimed = mine.filter(r => !r.claimed).map(r => r.edge);
-            const c = mean(claimed), u = mean(unclaimed);
-            out.close[R] = { claimed: c, unclaimed: u, nClaimed: claimed.length, nUnclaimed: unclaimed.length };
-            const bound = Math.max(u / 3, CLOSE_FLOOR);
-            check(`I ${scenario} R${R} closes: claimed-uncertified edge <= max(1/3 of the unclaimed edge, ${CLOSE_FLOOR})`, claimed.length > 0 && unclaimed.length > 0 && c <= bound,
-                `claimed ${c.toFixed(4)} (n ${claimed.length}) <= ${bound.toFixed(4)}; unclaimed ${u.toFixed(4)} (n ${unclaimed.length}) nats per rung-quarter`);
-        }
-        // J. The reader-copier and the static presets, scored on the clamped pairs.
-        const skill = (pick) => worlds.map(w => {
-            let S = 0, memo = false;
-            const byL = new Map();
-            for (const r of w.rows) byL.set(r.L, (byL.get(r.L) || 0) + BB.logScoreDelta(clampP(pick(r)), clampP(r.pB), r.o));
-            for (const L of [...byL.keys()].sort((a, b) => a - b)) {
-                S += byL.get(L);
-                if (L + Q <= MEMO_BY && L + Q <= w.endDay && Math.tanh(S / K) > MEMO) memo = true;
-            }
-            return { S, memo };
-        });
-        const reader = skill(r => r.pF);
-        out.readerMemo = mean(reader.map(x => +x.memo)); out.readerSkill = mean(reader.map(x => x.S));
-        check(`J ${scenario} reader-copier clears the memo gate by day ${MEMO_BY} in >= 50% of worlds (K ${K})`, out.readerMemo >= 0.5,
-            `${(100 * out.readerMemo).toFixed(1)}%, mean skill ${out.readerSkill.toFixed(3)} nats`);
-        out.presets = {};
-        for (const [k, name] of [['E', 'earlier'], ['L', 'later'], ['P', 'projection']]) {
-            // 02a: an untouched projection drawing locks as market policy, so pP is pM.
-            const s = skill(r => k === 'P' ? r.pB : r.presets[k]), m = mean(s.map(x => x.S)), memo = mean(s.map(x => +x.memo));
-            out.presets[name] = { skill: m, memo };
-            check(`J ${scenario} static "${name}" pays nothing (mean skill <= +${PRESET_SKILL} nats per run, memo by ${MEMO_BY} <= ${100 * PRESET_MEMO}%)`, m <= PRESET_SKILL && memo <= PRESET_MEMO,
-                `${m.toFixed(3)} nats, memo ${(100 * memo).toFixed(1)}%`);
-        }
-        // K. Diagnostics.
-        const fitHQ = (train) => {      // logistic o ~ logit(pB) + clock + claimed, Newton with a small ridge
-            const X = train.map(r => [1, Math.log(clampP(r.pB) / (1 - clampP(r.pB))), r.L / H, r.claimed]), y = train.map(r => r.o);
-            let wv = [0, 1, 0, 0];
-            for (let it = 0; it < 25; it++) {
-                const g = [0, 0, 0, 0], Hm = Array.from({ length: 4 }, () => [0, 0, 0, 0]);
-                for (let n = 0; n < X.length; n++) {
-                    const z = X[n].reduce((s, x, j) => s + x * wv[j], 0), p = 1 / (1 + Math.exp(-z)), v = p * (1 - p);
-                    for (let a = 0; a < 4; a++) { g[a] += (p - y[n]) * X[n][a]; for (let b = 0; b < 4; b++) Hm[a][b] += v * X[n][a] * X[n][b]; }
-                }
-                for (let a = 0; a < 4; a++) { Hm[a][a] += 1e-6 * X.length; g[a] += 1e-6 * X.length * wv[a]; }
-                const M = Hm.map((row, a) => [...row, g[a]]);
-                for (let c = 0; c < 4; c++) { let p = c; for (let r2 = c + 1; r2 < 4; r2++) if (Math.abs(M[r2][c]) > Math.abs(M[p][c])) p = r2; [M[c], M[p]] = [M[p], M[c]]; for (let r2 = c + 1; r2 < 4; r2++) { const f = M[r2][c] / M[c][c]; for (let k = c; k <= 4; k++) M[r2][k] -= f * M[c][k]; } }
-                const step = [0, 0, 0, 0];
-                for (let r2 = 3; r2 >= 0; r2--) { let s = M[r2][4]; for (let k = r2 + 1; k < 4; k++) s -= M[r2][k] * step[k]; step[r2] = s / M[r2][r2]; }
-                wv = wv.map((v, j) => v - step[j]);
-            }
-            return r => 1 / (1 + Math.exp(-[1, Math.log(clampP(r.pB) / (1 - clampP(r.pB))), r.L / H, r.claimed].reduce((s, x, j) => s + x * wv[j], 0)));
-        };
-        const hq = [];
-        for (const R of [2, 3, 4]) for (const held of [0, 1]) {
-            const sub = rows.filter(r => r.R === R), train = sub.filter(r => ((r.world >>> 1) & 1) !== held), test = sub.filter(r => ((r.world >>> 1) & 1) === held);
-            if (train.length < 100 || !test.length) continue;
-            const f = fitHQ(train);
-            for (const r of test) hq.push({ act: r.act, gain: loss(r.pB, r.o) - loss(f(r), r.o) });
-        }
-        out.headlinePlusQuote = ACTS.map((_, a) => mean(hq.filter(x => x.act === a).map(x => x.gain)));
-        const binds = rows.filter(r => r.bind > 1e-9);
-        out.projection = { share: binds.length / rows.length, meanSize: mean(binds.map(r => r.bind)), maxSize: Math.max(0, ...binds.map(r => r.bind)) };
-        const inv = rows.filter(r => r.eta > 0 && !(r.bind > 1e-9));
-        const invErr = Math.max(0, ...inv.map(r => Math.abs((r.pB - (1 - r.eta) * r.pL) / r.eta - r.pF)));
-        out.inversion = { share: inv.length / rows.length, edgePerAct: ACTS.map((_, a) => mean(inv.filter(r => r.act === a).map(r => r.edge))), maxRecoveryError: invErr };
-        out.fallback = Object.fromEntries([2, 3, 4, 5].map(R => [R, { worlds: fallbacks[R].length, share: fallbacks[R].length / N, meanQuoteMinusHalf: mean(fallbacks[R]) }]));
-        console.log(`K ${scenario} headline-plus-quote edge (B minus baseline log loss) per act ${out.headlinePlusQuote.map(x => x.toFixed(4)).join(' / ')}`);
-        console.log(`K ${scenario} coherence projection binds on ${(100 * out.projection.share).toFixed(2)}% of rung-quarters (mean ${out.projection.meanSize.toFixed(4)}, max ${out.projection.maxSize.toFixed(4)}); inversion recoverable on ${(100 * out.inversion.share).toFixed(1)}%, its edge per act ${out.inversion.edgePerAct.map(x => x.toFixed(4)).join(' / ')} (max recovery error ${invErr.toExponential(2)})`);
-        console.log(`K ${scenario} fallback tree at conversion (share of worlds; mean quote - 0.50): ${[2, 3, 4, 5].map(R => `R${R} ${(100 * out.fallback[R].share).toFixed(1)}%/${Number.isFinite(out.fallback[R].meanQuoteMinusHalf) ? out.fallback[R].meanQuoteMinusHalf.toFixed(3) : '--'}`).join('  ')}; no event opens a dispute in play`);
-        console.log(`H ${scenario} per rung: ${[2, 3, 4].map(R => `R${R} ${mean(rows.filter(r => r.R === R).map(r => r.edge)).toFixed(4)}`).join('  ')}; I close ${JSON.stringify(out.close)}`);
+        check(`H ${scenario} B's edge positive in Act I`, opportunity[0] > 0,
+            `opportunity ${opportunity.map(x => x.toFixed(4)).join(' / ')} nats per run (Acts I / II / III)`);
+        check(`H ${scenario} B's edge closed by Act III: |opportunity| <= ${ACT3_OPPORTUNITY} nats per run`, Math.abs(opportunity[2]) <= ACT3_OPPORTUNITY,
+            `${opportunity[2].toFixed(5)}`);
+        // J. The reader-copier, scored on the clamped pairs.
+        const skill = mean(worlds.map(w => w.rows.reduce((s, r) => s + BB.logScoreDelta(clampP(r.pF), clampP(r.pB), r.o), 0)));
+        check(`J ${scenario} reader-copier's edge positive`, skill > 0, `mean skill ${skill.toFixed(3)} nats per run`);
         BB.initBelief(null);
     }
-    if (VALIDATION) console.log(`VALIDATION EDGE_BANDS = ${JSON.stringify(Object.fromEntries(Object.entries(phaseB.scenarios).map(([s, v]) => [s, { opportunity: v.opportunity.slice(0, 2).map(x => +x.toFixed(5)), perEvent: v.perEvent.slice(0, 2).map(x => +x.toFixed(5)) }])))}`);
     console.log(`Phase B sections: ${((performance.now() - t1) / 1000).toFixed(1)} s`);
 }
-report.checks = checks; report.failures = failures; report.runtimeSeconds = (performance.now() - t0) / 1000;
-if (json) writeFileSync(json, JSON.stringify(report, null, 2) + '\n');
-console.log(`${checks.length - failures}/${checks.length} gates passed; ${report.runtimeSeconds.toFixed(2)} s; phi=${RATIFIED_PHI}, challenger bound=${RATIFIED_CHALLENGER_BOUND}`);
+console.log(`${checks.length - failures}/${checks.length} gates passed; ${((performance.now() - t0) / 1000).toFixed(2)} s`);
 process.exitCode = failures ? 1 : 0;
