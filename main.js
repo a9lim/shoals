@@ -765,7 +765,7 @@ function _loadFlatten() {
             strike: keyed ? undefined : pos.strike, key: keyed ? pos.strike : undefined, expiryDay: pos.expiryDay,
         });
     }
-    loadFlatten(legs, off);
+    loadFlatten(legs, off, portfolio.orders.length + workingOrderCount());
     showPage('markets');
     _haptic('light');
 }
@@ -2269,7 +2269,7 @@ function _triggerGameOver(endingId) {
     let resolution = null, closeout = null, overlay = 'bystander';
     if (raceState) {
         const geo = eventEngine ? eventEngine.world.geopolitical : null;
-        const deskDay = raceState.day;                    // the desk's last day, before any extrapolation
+        const deskDay = _relDay();                        // the desk's last day: the race clock may already be extrapolated
         resolution = resolveNow(raceState, geo);          // existing record, or extrapolate + latch (freezeLedger first)
         // The outstanding quarter (02a "Scoring"): the unscored lock is scored once,
         // against its original end date and the completed trajectory; the

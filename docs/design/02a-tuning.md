@@ -1842,7 +1842,11 @@ storage the almanac is empty and the game is unchanged.
 - A flatten loads a fractional holding rounded up to a whole unit, and
   execution caps it at the holding. Its estimate prices every leg at
   today's mid, so two legs sharing an impact pool are estimated as if
-  they didn't.
+  they didn't. A leg that cannot trade now (frozen or disputed
+  Consensus, a restricted account) adds nothing to the estimate and is
+  named under the ticket. A flatten with nothing left to close still
+  sends while orders are working, to cancel them, and a holding larger
+  than the ratio control's typed range loads whole.
 
 **Interruption counters.** Development-only counters in `main.js`, read
 from the console (`shoalsCounts()`) in a9's play-tests and never shown:

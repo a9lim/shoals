@@ -594,6 +594,28 @@ const closeLeg = (p) => ({ posId: p.id, side: p.qty > 0 ? 'short' : 'long', qty:
         est.cost > 0 && est.cost < gross * 0.2 && est.cost > est1.cost, `cost ${est.cost.toFixed(3)} at x2.5, ${est1.cost.toFixed(3)} at x1`);
     resetRegulations();
 }
+{
+    // J8. A leg that cannot trade now adds nothing to the estimate and is named,
+    //     as execution rejects it: a frozen Consensus contract, a restricted account.
+    boot(BASE_SEED); freshBook();
+    buy('stock', 'long', 20);
+    const key = consensus.contracts.find(c => !consensus.quotes[c.key]?.settled).key;
+    book.executeBinaryTrade(key, 'long', 10);
+    const legs = P.positions.map(closeLeg);
+    const bin = P.positions.find(p => p.type === 'binary');
+    const live = estimate(legs, 1);
+    consensus.quotes[key] = { ...consensus.quotes[key], frozen: true };
+    const frozen = estimate(legs, 1);
+    const rej = reduce(bin.id, 'short', bin.qty, 1).status;
+    P.restricted = true;
+    const restricted = estimate(legs, 1);
+    P.restricted = false;
+    check('J: a frozen or restricted leg adds nothing to the estimate and is named, as execution rejects it',
+        live.blocked.length === 0 && frozen.blocked.length === 1 && frozen.blocked[0] === bin.id
+        && frozen.released < live.released && rej === 'rejected'
+        && restricted.blocked.length === 2 && restricted.released === 0,
+        `live ${live.released.toFixed(2)}, frozen ${frozen.released.toFixed(2)} [${frozen.blocked}], restricted [${restricted.blocked}]`);
+}
 
 // ---- K. The skip's stop classifier ---------------------------------------------------
 {
@@ -665,7 +687,7 @@ const closeLeg = (p) => ({ posId: p.id, side: p.qty > 0 ? 'short' : 'long', qty:
         f ? f.legs.map(l => `${l.side} ${l.qty} #${l.posId} ${l.strategyName}`).join('; ') : 'nothing sent');
     const cost = el('tk-cost').innerHTML;
     check('L: the readout shows the cost apart from the cash released, and names what is left off',
-        /^Cost <b>\$[\d.]+k<\/b> · releases <b>−?\$[\d.]+k<\/b><br><span class="tk-off">Not on the ticket: Polaris, private\.<\/span>$/.test(cost), cost);
+        /^Cost <b>\$[\d,.]+k<\/b> · releases <b>−?\$[\d,.]+k<\/b><br><span class="tk-off">Not on the ticket: Polaris, private\.<\/span>$/.test(cost), cost);
     ticket.pickPoint({ id: 'stock', type: 'stock', desc: 'HCN shares' });   // a click removes the short stock leg
     ticket.tradeTicket();
     const o = trades.at(-1);

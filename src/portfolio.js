@@ -972,19 +972,23 @@ export function reduceOnlyClose(sim, posId, side, qty, currentPrice, currentVol,
  * earlier legs' accrued impact in its fill cost, but its mark does not move with
  * the overlay as it would at execution; with no shared pool the estimate is what
  * immediate execution does, to the cent.
+ * A leg that cannot trade now (a restricted account; a Consensus contract frozen,
+ * pending, disputed or settled; compute frozen or settled) adds nothing and is
+ * named in `blocked`, as execution would reject it.
  * @param {Array<{posId: number, side: string, qty: number}>} legs
- * @returns {{ cost: number, released: number }}
+ * @returns {{ cost: number, released: number, blocked: number[] }}
  */
 export function estimateReduceOnly(legs, currentPrice, currentVol, currentRate, currentDay, q, spreadMult) {
     const sMult = getRegulationEffect('spreadMult', 1) * (spreadMult || 1);
-    const rows = [], trades = [];
+    const rows = [], trades = [], blocked = [];
     for (const L of legs) {
         const t = _reduceTarget(L.posId, L.side, L.qty);
         if (t.status !== 'ok' || !(t.n > 0) || t.pos.type === 'privatestake') continue;
+        if (portfolio.restricted) { blocked.push(L.posId); continue; }
         const pos = t.pos, n = t.n, buy = pos.qty < 0;
         if (pos.type === 'binary') {
             const quote = getBinaryQuote(pos.strike);
-            if (!quote) continue;
+            if (!quote || consensus.frozen || quote.settled || quote.frozen || quote.pending || quote.disputed) { blocked.push(L.posId); continue; }
             // executeBinaryTrade's own widening: about the mid, clamped to [0, 1].
             const raw = buy ? quote.ask : quote.bid;
             const mult = spreadMult > 1 ? spreadMult : 1;
@@ -993,7 +997,7 @@ export function estimateReduceOnly(legs, currentPrice, currentVol, currentRate, 
             rows.push({ pos, n, buy, mid: quote.mid * BINARY_NOTIONAL, fill: px * BINARY_NOTIONAL, trade: -1 });
             continue;
         }
-        if (pos.type === 'computefuture' && (computeMarket.frozen || computeMarket.settled[pos.strike])) continue;
+        if (pos.type === 'computefuture' && (computeMarket.frozen || computeMarket.settled[pos.strike])) { blocked.push(L.posId); continue; }
         const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
         const sv = _spreadVol(pos.type, currentVol);
         const opt = pos.type === 'call' || pos.type === 'put';
@@ -1019,7 +1023,7 @@ export function estimateReduceOnly(legs, currentPrice, currentVol, currentRate, 
                 currentRate, currentDay, r.pos.strike, r.pos.expiryDay));
         released += (r.n < absQty ? reserved * (r.n / absQty) : reserved) - fill * r.n;
     }
-    return { cost, released };
+    return { cost, released, blocked };
 }
 
 // ---------------------------------------------------------------------------

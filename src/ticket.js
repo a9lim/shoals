@@ -50,7 +50,7 @@ import { consensus, contractByKey, BINARY_NOTIONAL } from './race/consensus.js';
 import { computeMarket, buildComputePublicView, placeholderCurve } from './race/compute-market.js';
 import { belief, computeCurveFromBelief, certDay, scenarioBelief } from './race/belief.js';
 import { listStrategies, getStrategy, saveStrategy, deleteStrategy, resolveLegs, legsToRelative, nextAutoName } from './strategy-store.js';
-import { contractName, fmtSpan, fmtSigned } from './format-helpers.js';
+import { contractName, fmtSpan, fmtSigned, fmtDollar } from './format-helpers.js';
 import { getVxhcnImpact } from './price-impact.js';
 
 const TY = TRADING_DAYS_PER_YEAR;
@@ -61,7 +61,7 @@ const STRATEGY_TYPES = new Set(['stock', 'bond', 'vxhcnfuture', 'call', 'put']);
 const MARKET_ONLY = new Set(['binary', 'computefuture']);
 const DASH = [[], [6, 3], [1.5, 2.5]];
 const GREEKS = [['delta', 'Δ'], ['gamma', 'Γ'], ['theta', 'Θ'], ['vega', 'ν'], ['rho', 'ρ']];
-const RATIO_MAX = 9999;                           // a whole position's quantity fits a leg's ratio (the flatten)
+const RATIO_MAX = 9999;                           // what a player types; a flatten leg may hold more
 
 const _st = {
     legs: [], size: 1, order: 'market', trigger: 100, name: '', stratId: null,
@@ -212,13 +212,16 @@ export function ticketLegCount() { return _st.legs.length; }
  * are bound to their positions, so the size resets to one and the order to
  * market. INTERPRETATION: a fractional holding (a primary allocation) loads its
  * quantity rounded up to a whole unit; execution caps it at what the position
- * holds, so the leg closes all of it.
+ * holds, so the leg closes all of it. A holding past the ratio control's range
+ * loads whole (RATIO_MAX bounds what a player types). `orders` counts the resting
+ * orders and working entries the flatten cancels, so a flatten with no positions
+ * left can still be sent to cancel them.
  */
-export function loadFlatten(legs, off) {
+export function loadFlatten(legs, off, orders = 0) {
     _st.legs = legs.map(l => Object.assign(
-        _leg(l.type, l.strike, l.expiryDay, l.key, Math.sign(l.qty) * Math.max(1, Math.min(RATIO_MAX, Math.ceil(Math.abs(l.qty) - 1e-9)))),
+        _leg(l.type, l.strike, l.expiryDay, l.key, Math.sign(l.qty) * Math.max(1, Math.ceil(Math.abs(l.qty) - 1e-9))),
         { posId: l.posId, strategyName: l.strategyName || null }));
-    _st.flat = { off: off.slice() };
+    _st.flat = { off: off.slice(), orders };
     _st.name = '';
     _st.stratId = null;
     _st.order = 'market';
@@ -398,11 +401,11 @@ function _ordersAllowed() {
 
 /** Send the ticket to the desk (main.js routes it through the ladder). */
 export function tradeTicket() {
-    if (!_st.legs.length) return;
-    if (_st.flat) {
+    if (_st.flat && (_st.legs.length || _st.flat.orders)) {
         _st.hooks.onTrade({ kind: 'flatten', legs: _flatLegs() });
         return;
     }
+    if (!_st.legs.length) return;
     const order = _ordersAllowed() === 'all' ? _st.order : 'market';
     const trigger = _st.trigger;
     if (_st.name.trim() && _strategyable()) {
@@ -496,7 +499,7 @@ function _renderLegs() {
         const q = _quote(L);
         return `<tr><td class="l">${nameHtml}</td>`
             + `<td><button type="button" class="link-btn tk-side${L.ratio < 0 ? ' short' : ''}" data-act="side" data-i="${i}" aria-label="${name}: ${L.ratio > 0 ? 'long' : 'short'}; switch side">${L.ratio > 0 ? 'long' : 'short'}</button></td>`
-            + `<td><input class="tk-ratio" type="number" min="1" max="${RATIO_MAX}" step="1" value="${Math.abs(L.ratio)}" data-ratio="${i}" aria-label="${name}: ratio"></td>`
+            + `<td><input class="tk-ratio" type="number" min="1" max="${Math.max(RATIO_MAX, Math.abs(L.ratio))}" step="1" value="${Math.abs(L.ratio)}" data-ratio="${i}" aria-label="${name}: ratio"></td>`
             + `<td>${_px(L, q.mid)}</td>`
             + `<td><button type="button" class="link-btn x" data-act="remove" data-i="${i}" aria-label="Remove ${name}">×</button></td></tr>`;
     });
@@ -539,8 +542,10 @@ function _renderControls() {
         el['tk-trigger-lbl'].textContent = below ? 'HCN ≤' : 'HCN ≥';
     }
     const named = !!_st.name.trim();
-    el['tk-trade'].disabled = !_st.legs.length;
-    el['tk-trade'].textContent = !_st.legs.length ? 'Trade'
+    const cancelOnly = !!_st.flat && !_st.legs.length && _st.flat.orders > 0;
+    el['tk-trade'].disabled = !_st.legs.length && !cancelOnly;
+    el['tk-trade'].textContent = cancelOnly ? `Cancel ${_st.flat.orders} order${_st.flat.orders > 1 ? 's' : ''}`   /* PROSE */
+        : !_st.legs.length ? 'Trade'
         : _st.order !== 'market' ? `Place ${_st.order} order`
         : named && _strategyable() && !_st.flat ? `Trade ${_st.size}k ${_st.name.trim()}`
         : `Trade ${_st.legs.length} leg${_st.legs.length > 1 ? 's' : ''}`;
@@ -574,16 +579,21 @@ function _renderCost() {
  */
 function _renderFlattenCost() {
     const el = _st.el, s = _st.ctx.sim;
-    const parts = [];
+    const parts = [], blocked = [];
     if (_st.legs.length) {
         const mult = _st.ctx.spreadMult ? _st.ctx.spreadMult() : 1;
-        const est = estimateReduceOnly(_flatLegs(), market.S, market.sigma, s.r, s.day, s.q, mult);
-        const money = (v) => `${v < -0.005 ? '−' : ''}$${Math.abs(v).toFixed(2)}k`;
+        const legs = _flatLegs();
+        const est = estimateReduceOnly(legs, market.S, market.sigma, s.r, s.day, s.q, mult);
+        for (const id of est.blocked) { const L = legs.find(l => l.posId === id); if (L) blocked.push(L.desc); }
+        const money = (v) => (v < -0.005 ? '−' : '') + fmtDollar(Math.abs(v));
         parts.push(`Cost <b>${money(est.cost)}</b> · releases <b>${money(est.released)}</b>`);   /* PROSE */
     }
+    const esc = (t) => t.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
     if (_st.flat.off.length) {
-        const names = _st.flat.off.join(', ').replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
-        parts.push(`<span class="tk-off">Not on the ticket: ${names}.</span>`);   /* PROSE */
+        parts.push(`<span class="tk-off">Not on the ticket: ${esc(_st.flat.off.join(', '))}.</span>`);   /* PROSE */
+    }
+    if (blocked.length) {
+        parts.push(`<span class="tk-off">Not tradeable now: ${esc(blocked.join(', '))}.</span>`);   /* PROSE */
     }
     el['tk-cost'].innerHTML = parts.join('<br>');
 }
