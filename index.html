@@ -419,15 +419,14 @@
         <!-- Race: the rung ladder, after Epoch's Capabilities Index, and your forecast -->
         <section class="page page-race" id="page-race" role="tabpanel" aria-labelledby="folio-race" hidden>
             <figure class="race-fig">
-                <div class="figure-box race-box"><canvas id="race-canvas" tabindex="0" role="img" aria-label="The capability ladder from R1 to R5 over the four-year term: releases by lab, certifications, claims, the released frontier, Consensus's distributions for when each rung ahead is crossed, and your forecast over them. Focus it to edit your forecast: left and right move the selected rung's median, with Shift for larger steps; up and down tighten or loosen it; Page Up and Page Down raise or lower the chance it lands this term; Tab moves between rungs."></canvas></div>
+                <div class="figure-box race-box"><canvas id="race-canvas" tabindex="0" role="img" aria-label="The capability ladder from R1 to R5 over the four-year term: releases by lab, certifications, claims, the released frontier, Consensus's distributions for when each rung ahead is crossed, and your forecast over them. Focus it to edit your forecast: left and right move the selected rung's median, with Shift for larger steps; up and down tighten or loosen it; Page Up and Page Down raise or lower the chance it lands this term; Delete returns it to the market; Tab moves between rungs."></canvas></div>
                 <p class="caption"><span class="caption-n">Fig. 3</span><span id="cap-race"></span></p>
             </figure>
             <aside class="race-notes" aria-label="Your forecast and the ladder">
                 <section data-dynamic>
-                <h3 class="col-h">Your forecast</h3>
+                <h3 class="col-h">Your forecast <button class="info-trigger" type="button" data-info="forecast" aria-label="Info: Your forecast">?</button></h3>
                 <div class="race-actions">
-                    <button class="ghost-btn primary" id="race-lock" type="button" hidden>Lock this forecast</button>
-                    <button class="ghost-btn" id="race-match" type="button">Match the market</button>
+                    <button class="ghost-btn" id="race-match" type="button">Follow the market</button>
                 </div>
                 <h3 class="col-h">The ladder</h3>
                 <table class="agate race-tbl" aria-label="Rungs: the first claim and certification, and the median crossing day by the market, by your draft and by your last lock">
@@ -456,6 +455,11 @@
                         <thead><tr><th class="l">Quarter</th><th>Rungs</th><th>Nats</th></tr></thead>
                         <tbody></tbody>
                     </table>
+                    <section id="handover-section" hidden>
+                        <h3 class="col-h">The handover</h3>
+                        <p class="handover-memo" id="handover-memo"></p>
+                        <p class="handover-left" id="handover-left"></p>
+                    </section>
                 </section>
                 <section class="mer-col" data-dynamic aria-label="Your standing, standing orders and convictions">
                     <h3 class="col-h">Your standing</h3>
@@ -490,6 +494,26 @@
                     </section>
                 </section>
             </div>
+            <section class="mer-almanac" id="almanac-section" data-dynamic aria-labelledby="almanac-h" hidden>
+                <h3 class="col-h" id="almanac-h">The almanac <button class="info-trigger" type="button" data-info="almanac" aria-label="Info: The almanac">?</button></h3>
+                <div class="almanac-grid">
+                    <div class="almanac-runs">
+                        <div class="almanac-sum" id="almanac-sum"></div>
+                        <table class="agate" id="almanac-runs" aria-label="Recent runs: the hand, the family, quarters stated, your score and the reader's">
+                            <thead><tr><th class="l">Run</th><th class="l">Hand</th><th class="l">Family</th><th>Stated</th><th>Yours</th><th>Reader</th></tr></thead>
+                            <tbody></tbody>
+                        </table>
+                    </div>
+                    <figure class="almanac-fig">
+                        <div class="figure-box almanac-box"><canvas id="almanac-rel" role="img" aria-label="Reliability of your stated quarter probabilities: each decile's mean probability against how often the rung certified that quarter"></canvas></div>
+                        <figcaption class="caption"><span class="caption-n">Fig. 4</span><span id="cap-almanac"></span></figcaption>
+                    </figure>
+                    <table class="agate almanac-fam" id="almanac-families" aria-label="Families seen, beside the neutral-input baseline">
+                        <thead><tr><th class="l">Family</th><th>Seen</th><th>Baseline</th></tr></thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </section>
             <section class="mer-settings" aria-labelledby="settings-h">
                 <h3 class="col-h" id="settings-h">Settings</h3>
                 <div class="settings-grid">
