@@ -40,9 +40,8 @@ import { PRESETS } from '../src/config.js';
 import { computeVXHCNSpot } from '../src/pricing.js';
 import { roundDispatch } from '../src/events/rounds.js';
 import { fmtDollar } from '../src/format-helpers.js';
-import * as counters from '../src/counters.js';
+import { run, setSink, barrier, runInternals } from '../src/run.js';
 import { readFileSync } from 'node:fs';
-import { createContext, runInContext } from 'node:vm';
 
 const argv = process.argv.slice(2);
 let N = 300, BASE_SEED = 1;
@@ -350,40 +349,24 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     check('G: null initialization keeps rounds inactive', stepRounds(fixture(), 0.7).length === 0 && lastPolarisRound() === null);
 }
 
-// ---- H. Run the actual orchestrator helpers without the DOM bootstrap -----
-// Keep main's functions intact; replace only browser initialization/rendering.
-// This exercises the choice and pricing chokepoints, not a duplicate of them.
+// ---- H. The run's own transitions (src/run.js), driven one at a time -------
+// The real gap, choice and restriction paths, not a duplicate of them.
 {
-    const source = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
-    const main = source.replace(/^import[\s\S]*?from '[^']+';\n/gm, '')
-        .replace(/^cacheDOMElements\(\$\);[\s\S]*?^init\(\);/m, '');
+    const source = readFileSync(new URL('../src/run.js', import.meta.url), 'utf8');
     const messages = [];
-    const context = createContext({
-        Simulation: class { constructor() { Object.assign(this, { S: 100, v: 0.04, r: 0.04, day: 283, q: 0, kappa: 2, theta: 0.04, xi: 0.3, rho: -0.5, a: 0.5, b: 0.04, sigmaR: 0.01 }); } },
-        ExpiryManager: class {},
-        portfolio: book.portfolio, market, syncMarket, computeVXHCNSpot,
-        portfolioValue: book.portfolioValue,
-        allocatePrivateStake: book.allocatePrivateStake, allocatePrimaryStock: book.allocatePrimaryStock,
-        cancelAllOrders: book.cancelAllOrders, checkPendingOrders: book.checkPendingOrders,
-        ROUNDS_TUNING, stepRounds, stepValuation, binaryProb, belief,
-        halcyonOfferPrice, recordPrimaryAllocation, applyRaceEffects, raceChannelsLive,
-        consensus: { active: false }, computeMarket: { active: false },
-        showToast: message => messages.push(message), fmtDollar,
-        ...counters,
-    });
-    runInContext(main + `
-        updateUI = () => {};
-        globalThis.mainTest = {
-            sim, queue: _popupQueue,
-            race(value) { raceState = value; },
-            open(value) { dayInProgress = value; },
-            gap: _stepRaceMarkets, choice: _applyPopupChoice,
-            restrict: _applyRestriction, stuck: _hasStuckLegs,
-            playing() { return playing; }, isOpen() { return dayInProgress; }, barrier: _popupBarrier,
-            play: togglePlay, step,
-        };
-    `, context, { filename: 'main.js (headless helpers)' });
-    const api = context.mainTest;
+    setSink({ toast: message => messages.push(message) });
+    Object.assign(run.sim, { S: 100, v: 0.04, r: 0.04, day: 283, q: 0, kappa: 2, theta: 0.04, xi: 0.3, rho: -0.5, a: 0.5, b: 0.04, sigmaR: 0.01 });
+    run.engine = null;
+    run.race = null;
+    run.queue.length = 0;
+    const api = {
+        sim: run.sim, queue: run.queue,
+        race(value) { run.race = value; },
+        open(value) { run.dayOpen = value; },
+        gap: runInternals.stepRaceMarkets, choice: runInternals.applyPopupChoice,
+        restrict: runInternals.applyRestriction, stuck: runInternals.hasStuckLegs,
+        barrier,
+    };
     book.resetPortfolio(1000); resetRounds(); resetValuation(); deactivateLedger();
     syncMarket(api.sim);
     api.gap(1);
@@ -407,7 +390,7 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     check('H: main queues post-gap offer and founding through one queue', near(halcyon.price, api.sim.S * T.halcyonDiscount) && polaris.founding && api.queue.length === 2);
     const pipeline = source.slice(source.indexOf('function _onDayComplete()'));
     check('H: bridge precedes gap; gap precedes snapshot', pipeline.indexOf('runRaceBridge(') < pipeline.indexOf('_stepRaceMarkets(capexWaves)')
-        && pipeline.indexOf('_stepRaceMarkets(capexWaves)') < pipeline.indexOf('marketsDayClose('));
+        && pipeline.indexOf('_stepRaceMarkets(capexWaves)') < pipeline.indexOf('run.sink.marketsClose('));
 
     api.open(true);
     let rejected = false;
@@ -471,6 +454,8 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     //    barrier is down and a finished day closes.
     api.queue.length = 0;
     check('H: nothing holds a day for the forecast (no barrier without a dispatch)', !api.barrier());
+    run.race = null;
+    setSink(null);
 }
 
 console.log(`\nRounds gate: N=${N}, base seed=${BASE_SEED}, ${((Date.now() - t0) / 1000).toFixed(2)}s`);

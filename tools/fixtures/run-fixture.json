@@ -1,0 +1,802 @@
+{
+ "source": "headless-generated (interim): tools/run-test.mjs --record-interim, the scripted policy. Replace with a browser recording (window.shoalsJournal()) of trades, a strategy, a flatten, resting orders, an exercise, dispatch answers, forecast edits, a standing order and a government action.",
+ "header": {
+  "v": 1,
+  "seed": 20261027,
+  "preset": 5,
+  "hand": true
+ },
+ "journal": [
+  {
+   "day": 254,
+   "substeps": 0,
+   "cmd": {
+    "kind": "answer",
+    "occ": 1,
+    "choice": 0
+   }
+  },
+  {
+   "day": 254,
+   "substeps": 0,
+   "cmd": {
+    "kind": "trade",
+    "order": {
+     "kind": "legs",
+     "order": "market",
+     "trigger": null,
+     "legs": [
+      {
+       "type": "stock",
+       "side": "long",
+       "qty": 10,
+       "desc": "stock"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "day": 254,
+   "substeps": 0,
+   "cmd": {
+    "kind": "setting",
+    "param": "mu",
+    "value": 0.49
+   }
+  },
+  {
+   "day": 255,
+   "substeps": 0,
+   "cmd": {
+    "kind": "trade",
+    "order": {
+     "kind": "strategy",
+     "name": "Bull call",
+     "size": 2,
+     "order": "market",
+     "trigger": null,
+     "legs": [
+      {
+       "type": "call",
+       "qty": 1,
+       "strike": 105,
+       "expiryDay": 315
+      },
+      {
+       "type": "call",
+       "qty": -1,
+       "strike": 115,
+       "expiryDay": 315
+      }
+     ]
+    }
+   }
+  },
+  {
+   "day": 256,
+   "substeps": 0,
+   "cmd": {
+    "kind": "trade",
+    "order": {
+     "kind": "legs",
+     "order": "limit",
+     "trigger": 73,
+     "legs": [
+      {
+       "type": "stock",
+       "side": "long",
+       "qty": 5,
+       "desc": "stock"
+      }
+     ]
+    }
+   }
+  },
+  {
+   "day": 257,
+   "substeps": 0,
+   "cmd": {
+    "kind": "cancel",
+    "id": 1
+   }
+  },
+  {
+   "day": 257,
+   "substeps": 8,
+   "cmd": {
+    "kind": "trade",
+    "order": {
+     "kind": "legs",
+     "order": "market",
+     "trigger": null,
+     "legs": [
+      {
+       "type": "call",
+       "side": "long",
+       "qty": 5,
+       "desc": "call",
+       "strike": 95,
+       "expiryDay": 378
+      }
+     ]
+    }
+   }
+  },
+  {
+   "day": 258,
+   "substeps": 0,
+   "cmd": {
+    "kind": "exercise",
+    "id": 4
+   }
+  },
+  {
+   "day": 259,
+   "substeps": 0,
+   "cmd": {
+    "kind": "close",
+    "id": 2
+   }
+  },
+  {
+   "day": 260,
+   "substeps": 0,
+   "cmd": {
+    "kind": "unwind",
+    "name": "Bull call"
+   }
+  },
+  {
+   "day": 261,
+   "substeps": 0,
+   "cmd": {
+    "kind": "forecast",
+    "state": {
+     "policy": {
+      "2": "carry",
+      "3": "follow",
+      "4": "follow",
+      "5": "follow"
+     },
+     "carried": {
+      "2": {
+       "m": 400,
+       "w": 79.9452007177551,
+       "q": 0.14435300920429106
+      },
+      "3": null,
+      "4": null,
+      "5": null
+     }
+    }
+   }
+  },
+  {
+   "day": 262,
+   "substeps": 0,
+   "cmd": {
+    "kind": "lobby",
+    "action": "pac_federalist"
+   }
+  },
+  {
+   "day": 263,
+   "substeps": 0,
+   "cmd": {
+    "kind": "standing",
+    "id": "severity_cut",
+    "on": true
+   }
+  },
+  {
+   "day": 264,
+   "substeps": 0,
+   "cmd": {
+    "kind": "trade",
+    "order": {
+     "kind": "legs",
+     "order": "market",
+     "trigger": null,
+     "legs": [
+      {
+       "type": "binary",
+       "side": "long",
+       "qty": 3,
+       "desc": "binary",
+       "key": 0
+      },
+      {
+       "type": "computefuture",
+       "side": "short",
+       "qty": 2,
+       "desc": "computefuture",
+       "key": 63
+      },
+      {
+       "type": "bond",
+       "side": "long",
+       "qty": 4,
+       "desc": "bond",
+       "expiryDay": 441
+      }
+     ]
+    }
+   }
+  },
+  {
+   "day": 266,
+   "substeps": 0,
+   "cmd": {
+    "kind": "trade",
+    "order": {
+     "kind": "flatten",
+     "legs": [
+      {
+       "type": "vxhcnfuture",
+       "side": "short",
+       "qty": 364,
+       "expiryDay": 756,
+       "desc": "vxhcnfuture",
+       "posId": 1,
+       "strategyName": null
+      },
+      {
+       "type": "binary",
+       "side": "short",
+       "qty": 3,
+       "key": 0,
+       "expiryDay": 420,
+       "desc": "binary",
+       "posId": 5,
+       "strategyName": null
+      },
+      {
+       "type": "computefuture",
+       "side": "long",
+       "qty": 2,
+       "key": 63,
+       "expiryDay": 63,
+       "desc": "computefuture",
+       "posId": 6,
+       "strategyName": null
+      },
+      {
+       "type": "bond",
+       "side": "short",
+       "qty": 4,
+       "expiryDay": 441,
+       "desc": "bond",
+       "posId": 7,
+       "strategyName": null
+      }
+     ]
+    }
+   }
+  },
+  {
+   "day": 268,
+   "substeps": 0,
+   "cmd": {
+    "kind": "setting",
+    "param": "rho",
+    "value": -0.65
+   }
+  },
+  {
+   "day": 314,
+   "substeps": 0,
+   "cmd": {
+    "kind": "answer",
+    "occ": 2,
+    "choice": 0
+   }
+  },
+  {
+   "day": 362,
+   "substeps": 0,
+   "cmd": {
+    "kind": "answer",
+    "occ": 3,
+    "choice": 0
+   }
+  },
+  {
+   "day": 363,
+   "substeps": 0,
+   "cmd": {
+    "kind": "answer",
+    "occ": 4,
+    "choice": 0
+   }
+  }
+ ],
+ "endpoint": {
+  "day": 372,
+  "phase": "between",
+  "substeps": 0,
+  "commands": 19
+ },
+ "digests": [
+  {
+   "day": 253,
+   "h": "87b9644ece430580"
+  },
+  {
+   "day": 254,
+   "h": "8776e7b1da7690eb"
+  },
+  {
+   "day": 255,
+   "h": "53963e79f18bfd37"
+  },
+  {
+   "day": 256,
+   "h": "38b303c819b0d849"
+  },
+  {
+   "day": 257,
+   "h": "ed4cf5dacd36593d"
+  },
+  {
+   "day": 258,
+   "h": "337454fa64ee0c7e"
+  },
+  {
+   "day": 259,
+   "h": "42be79c011065f02"
+  },
+  {
+   "day": 260,
+   "h": "0b2a60dfb7894dd7"
+  },
+  {
+   "day": 261,
+   "h": "8d1b98f3440f597b"
+  },
+  {
+   "day": 262,
+   "h": "fe6d9585b27bf956"
+  },
+  {
+   "day": 263,
+   "h": "c0f627a1cb0157cf"
+  },
+  {
+   "day": 264,
+   "h": "36554965962d8ad8"
+  },
+  {
+   "day": 265,
+   "h": "f455942a108a7a9f"
+  },
+  {
+   "day": 266,
+   "h": "ca368f00de1bf186"
+  },
+  {
+   "day": 267,
+   "h": "43cf64674c3d5296"
+  },
+  {
+   "day": 268,
+   "h": "90328f93b46bb6e8"
+  },
+  {
+   "day": 269,
+   "h": "9d5d93b504101211"
+  },
+  {
+   "day": 270,
+   "h": "cf6233d5a601774d"
+  },
+  {
+   "day": 271,
+   "h": "6b0ef3f613261a4e"
+  },
+  {
+   "day": 272,
+   "h": "5395417e4dbf709b"
+  },
+  {
+   "day": 273,
+   "h": "5a2bbd5b59dee040"
+  },
+  {
+   "day": 274,
+   "h": "2af1ed6e6461bfad"
+  },
+  {
+   "day": 275,
+   "h": "9d3e9e876a67259d"
+  },
+  {
+   "day": 276,
+   "h": "9a8cd0ba4d6c506d"
+  },
+  {
+   "day": 277,
+   "h": "5b6b3a799c2c188a"
+  },
+  {
+   "day": 278,
+   "h": "7fa14fa67f4f754a"
+  },
+  {
+   "day": 279,
+   "h": "574f96781150cfbb"
+  },
+  {
+   "day": 280,
+   "h": "7358872da0ef17da"
+  },
+  {
+   "day": 281,
+   "h": "b1a2093a0e29ef68"
+  },
+  {
+   "day": 282,
+   "h": "9b78308f3511ca72"
+  },
+  {
+   "day": 283,
+   "h": "cdcab77d205451e5"
+  },
+  {
+   "day": 284,
+   "h": "7256c2a0f59752d0"
+  },
+  {
+   "day": 285,
+   "h": "5e12b0ffea2717da"
+  },
+  {
+   "day": 286,
+   "h": "6e1f8fe5cc0060ac"
+  },
+  {
+   "day": 287,
+   "h": "4c650a5f1733121f"
+  },
+  {
+   "day": 288,
+   "h": "4b9a966860455157"
+  },
+  {
+   "day": 289,
+   "h": "4b56f1f7862aeec7"
+  },
+  {
+   "day": 290,
+   "h": "d5b29045088cae76"
+  },
+  {
+   "day": 291,
+   "h": "08c2328196aa4b33"
+  },
+  {
+   "day": 292,
+   "h": "eb29672de57624db"
+  },
+  {
+   "day": 293,
+   "h": "073f915d1211b443"
+  },
+  {
+   "day": 294,
+   "h": "1e1367f7d27d268e"
+  },
+  {
+   "day": 295,
+   "h": "e5f4d32d519289dd"
+  },
+  {
+   "day": 296,
+   "h": "1db6eded31b06ec0"
+  },
+  {
+   "day": 297,
+   "h": "60e86cf8c113be4c"
+  },
+  {
+   "day": 298,
+   "h": "39cf4ca145f0f2fd"
+  },
+  {
+   "day": 299,
+   "h": "4cdda20b8d8fb904"
+  },
+  {
+   "day": 300,
+   "h": "3c3723001b82302d"
+  },
+  {
+   "day": 301,
+   "h": "2eb7f3ff6587b484"
+  },
+  {
+   "day": 302,
+   "h": "72ea409535d204c5"
+  },
+  {
+   "day": 303,
+   "h": "96bb7f91f421343a"
+  },
+  {
+   "day": 304,
+   "h": "f3f69042f96dbbe8"
+  },
+  {
+   "day": 305,
+   "h": "1da74aa87eb9d2c1"
+  },
+  {
+   "day": 306,
+   "h": "dbc45f870b8a3537"
+  },
+  {
+   "day": 307,
+   "h": "5335467c7aa442f1"
+  },
+  {
+   "day": 308,
+   "h": "6239f694f6a850f1"
+  },
+  {
+   "day": 309,
+   "h": "66fd3e77f490043c"
+  },
+  {
+   "day": 310,
+   "h": "5c6877bbdfbb4b76"
+  },
+  {
+   "day": 311,
+   "h": "e40b60ced4c5ec06"
+  },
+  {
+   "day": 312,
+   "h": "d570ae336adc5775"
+  },
+  {
+   "day": 313,
+   "h": "6c301327f0df0aac"
+  },
+  {
+   "day": 314,
+   "h": "9805619799ba136f"
+  },
+  {
+   "day": 315,
+   "h": "a954f8e12c174145"
+  },
+  {
+   "day": 316,
+   "h": "82faf8a98b88d7c2"
+  },
+  {
+   "day": 317,
+   "h": "1075e15e09bbf96c"
+  },
+  {
+   "day": 318,
+   "h": "2157d09f414c0b93"
+  },
+  {
+   "day": 319,
+   "h": "15308d90964afbfd"
+  },
+  {
+   "day": 320,
+   "h": "663980cc3738ad36"
+  },
+  {
+   "day": 321,
+   "h": "8445c9425f471563"
+  },
+  {
+   "day": 322,
+   "h": "65f42fae0f617046"
+  },
+  {
+   "day": 323,
+   "h": "0f9a5285ef1ec864"
+  },
+  {
+   "day": 324,
+   "h": "ffea7f4efee18fee"
+  },
+  {
+   "day": 325,
+   "h": "67da572ee96c4089"
+  },
+  {
+   "day": 326,
+   "h": "b3c9f4b98f06d11c"
+  },
+  {
+   "day": 327,
+   "h": "e9c6d4cc4666bca3"
+  },
+  {
+   "day": 328,
+   "h": "5e519a3fa84e99ad"
+  },
+  {
+   "day": 329,
+   "h": "bf3746623d5c929f"
+  },
+  {
+   "day": 330,
+   "h": "acd2057c6ce6c39b"
+  },
+  {
+   "day": 331,
+   "h": "eb4925bd0ad5c681"
+  },
+  {
+   "day": 332,
+   "h": "2c5d075e2a8ec7e1"
+  },
+  {
+   "day": 333,
+   "h": "b420d9d277a95b50"
+  },
+  {
+   "day": 334,
+   "h": "aa8de92324795b63"
+  },
+  {
+   "day": 335,
+   "h": "7b10ce9b30dfa180"
+  },
+  {
+   "day": 336,
+   "h": "08ad777c3ba2eb7b"
+  },
+  {
+   "day": 337,
+   "h": "6d30e28a49b1b2c5"
+  },
+  {
+   "day": 338,
+   "h": "fc6238708db96ef2"
+  },
+  {
+   "day": 339,
+   "h": "4289218f1cea776c"
+  },
+  {
+   "day": 340,
+   "h": "dfa7e42760ba961e"
+  },
+  {
+   "day": 341,
+   "h": "8ffcd5c5d7793701"
+  },
+  {
+   "day": 342,
+   "h": "0bef39e53071da82"
+  },
+  {
+   "day": 343,
+   "h": "0df5a71b486917e1"
+  },
+  {
+   "day": 344,
+   "h": "f4349ce387040c1d"
+  },
+  {
+   "day": 345,
+   "h": "06b2f717696780b9"
+  },
+  {
+   "day": 346,
+   "h": "b17483a2f593f2ff"
+  },
+  {
+   "day": 347,
+   "h": "a6c2f1c94f0fdeda"
+  },
+  {
+   "day": 348,
+   "h": "4c226a39b77144b3"
+  },
+  {
+   "day": 349,
+   "h": "ac1070289f03cf06"
+  },
+  {
+   "day": 350,
+   "h": "7ceb1d900f596d92"
+  },
+  {
+   "day": 351,
+   "h": "c77c6a724a4a8a4a"
+  },
+  {
+   "day": 352,
+   "h": "27369c1edcbb3045"
+  },
+  {
+   "day": 353,
+   "h": "1ee7302377fa6876"
+  },
+  {
+   "day": 354,
+   "h": "043e80abf2ec5845"
+  },
+  {
+   "day": 355,
+   "h": "fe4af6fe3a03e397"
+  },
+  {
+   "day": 356,
+   "h": "4fcb289e389d6e07"
+  },
+  {
+   "day": 357,
+   "h": "0fcaa13a768cf1d3"
+  },
+  {
+   "day": 358,
+   "h": "fbf5a27295a8dbf0"
+  },
+  {
+   "day": 359,
+   "h": "4f7df8907f06d9c5"
+  },
+  {
+   "day": 360,
+   "h": "dea5ca17d1509f31"
+  },
+  {
+   "day": 361,
+   "h": "9779c0551fe696b6"
+  },
+  {
+   "day": 362,
+   "h": "0db7b4029230983d"
+  },
+  {
+   "day": 363,
+   "h": "557b5cea3dcc9f05"
+  },
+  {
+   "day": 364,
+   "h": "0f6a1e3ded0d14a2"
+  },
+  {
+   "day": 365,
+   "h": "295f6836d4474e83"
+  },
+  {
+   "day": 366,
+   "h": "b411dd41d31427c8"
+  },
+  {
+   "day": 367,
+   "h": "3069e696139ac86d"
+  },
+  {
+   "day": 368,
+   "h": "7fcada3a44ae6fac"
+  },
+  {
+   "day": 369,
+   "h": "e02e1f975cb877ee"
+  },
+  {
+   "day": 370,
+   "h": "800c73962c34973f"
+  },
+  {
+   "day": 371,
+   "h": "45cdbfd23a8c1ee7"
+  },
+  {
+   "day": 372,
+   "h": "38c5427e2a3c46be"
+  }
+ ]
+}

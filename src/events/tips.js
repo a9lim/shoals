@@ -44,10 +44,12 @@ export const INSIDER_TIPS = [
 
 const _usedTips = new Set();
 
-export function pickTip() {
+/** The tip a scheduling choice passes on, drawn from the tip's own slot (`rng`:
+ *  the `tips` stream, 02a "The run, headless"). */
+export function pickTip(rng) {
     const available = INSIDER_TIPS.filter(t => !_usedTips.has(t.hint));
     const pool = available.length > 0 ? available : INSIDER_TIPS;
-    const tip = pool[Math.floor(Math.random() * pool.length)];
+    const tip = pool[rng.int(pool.length)];
     _usedTips.add(tip.hint);
     return tip;
 }

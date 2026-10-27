@@ -14,8 +14,8 @@
    G. The forced sale: pro rata, floors, bypasses, what it
       never touches, the zero quote, the margin remainder
    H. The terminal pays what is unpaid; Classic stays cash
-   I. main.js: notice, pause, payment and the forced
-      sale's cost at the close
+   I. The run at the close (src/run.js): notice, pause,
+      payment and the forced sale's cost
    J. The flatten's reduce-only legs: the cap by id, the
       reversal skip, partial shorts, the estimate's
       non-mutation and its agreement with execution
@@ -23,6 +23,7 @@
    L. The ticket's flatten: size one, bound legs, an edit
       unbinds them, the readout and the names left off
    M. main.js: the skip's latch, its stop and its pause
+      (the shell's clock, over the run module)
 
    Usage: node tools/opening-test.mjs [N] [--seed S]
           N worlds, default 400; base seed defaults to 1.
@@ -52,6 +53,8 @@ import { INITIAL_CAPITAL as E0, INITIAL_PRICE, ROGUE_TRADING_THRESHOLD, REG_T_MA
 import { closeStop, majorSince, SKIP_CAUSES } from '../src/pacing.js';
 import * as ticket from '../src/ticket.js';
 import { fmtBook } from '../src/format-helpers.js';
+import { run, setSink, barrier, runInternals } from '../src/run.js';
+import { portfolioEquity } from '../src/run-state.js';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 
@@ -450,31 +453,21 @@ const seatAtMark = (type, qty, strike, expiryDay) =>
     check('H: the dealt hand is the seed\'s draw, readable by its getter', dealtFixture() === fx && fx === drawFixture(race.seed));
 }
 
-// ---- I. main.js at the close ----------------------------------------------------
+// ---- I. The run at the close ----------------------------------------------------
 {
-    const source = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
-    const main = source.replace(/^import[\s\S]*?from '[^']+';\n/gm, '')
-        .replace(/^cacheDOMElements\(\$\);[\s\S]*?^init\(\);/m, '');
-    const log = [];
-    const context = createContext({
-        Simulation: class { constructor() { Object.assign(this, { S: 100, v: 0.06, r: 0.04, day: BOOT_DAY, q: 0 }); } },
-        ExpiryManager: class {},
-        portfolio: P, market, settleObligation: book.settleObligation, shiftFaction, fmtBook,
-        currentPage: () => 'front', updatePlayBtn: () => {}, showToast: () => {},
-        countDevelopment: () => {}, countPause: () => {},
-    });
-    runInContext(main + `
-        chart = { dayOrigin: ${BOOT_DAY} };
-        eventEngine = { _logEvent(day, ev, p, magnitude) { const e = { day, headline: ev.headline, category: ev.category, magnitude }; globalThis.__log.push(e); return e; } };
-        _updateWire = () => {};
-        globalThis.mainTest = {
-            sim, close: _settleObligations,
-            set(p, r) { playing = p; _resumeAfterDispatch = r; },
-            state() { return { playing, resume: _resumeAfterDispatch }; },
-        };
-    `, Object.assign(context, { __log: log }), { filename: 'main.js (headless helpers)' });
-    const api = context.mainTest;
-    const run = (rel, cash, amount = 2500) => {
+    // The run's own obligations' close on the run's sim, with a stand-in wire and
+    // a sink that records the notice's pause (the shell's clock takes it).
+    const log = [], notices = [];
+    setSink({ notice: () => notices.push(1) });
+    run.engine = { _logEvent(day, ev, p, magnitude) { const e = { day, headline: ev.headline, category: ev.category, magnitude }; log.push(e); return e; } };
+    run.origin = BOOT_DAY;
+    Object.assign(run.sim, { S: 100, v: 0.06, r: 0.04, day: BOOT_DAY, q: 0 });
+    const api = {
+        sim: run.sim, close: runInternals.settleObligations,
+        state() { return { playing: notices.length === 0, resume: notices.length === 0 }; },
+        set() { notices.length = 0; },
+    };
+    const closeAt = (rel, cash, amount = 2500) => {
         freshBook(); resetFactions();
         P.cash = cash;
         P.obligations = [OB(amount, 40, 'the Ostrander redemption')];
@@ -485,15 +478,15 @@ const seatAtMark = (type, qty, strike, expiryDay) =>
         api.close();
         return { items: log.map(e => e.headline), state: api.state(), dFirm: getFaction('firmStanding') - fs0, cats: log.map(e => `${e.category}/${e.magnitude}`) };
     };
-    const n = run(35, 1000);
+    const n = closeAt(35, 1000);
     check('I: five sessions out, a short desk gets the notice, and the desk pauses with no automatic resume',
         n.items[0] === 'The Ostrander redemption, $2,500k, is due in five sessions; the desk holds $1,000k in cash.'
         && n.cats[0] === 'desk/minor' && !n.state.playing && !n.state.resume && P.obligations.length === 1, n.items[0]);
-    const c = run(35, 3000);
+    const c = closeAt(35, 3000);
     check('I: a covered obligation gives no notice', c.items.length === 0 && c.state.playing);
-    const other = run(34, 1000);
+    const other = closeAt(34, 1000);
     check('I: the notice is checked only at the close due on dueDay - 5', other.items.length === 0);
-    const paid = run(40, 3000);
+    const paid = closeAt(40, 3000);
     check('I: due today, a covered obligation is paid with its wire item',
         paid.items[0] === 'The Ostrander redemption is paid in full; $2,500k leaves the desk in cash.'
         && P.obligations.length === 0 && near(P.cash, 500) && paid.dFirm === 0, paid.items[0]);
@@ -510,6 +503,8 @@ const seatAtMark = (type, qty, strike, expiryDay) =>
     check('I: a short desk is force-sold with its wire item and costs firmStanding 8, without pausing',
         forced.items[0] === 'Operations sells a slice of the book to meet the Ostrander redemption; the desk was $2,400k short on the day, and the risk committee has noted it.'
         && forced.dFirm === -8 && forced.state.playing && P.obligations.length === 0, forced.items[0]);
+    run.engine = null;
+    setSink(null);
 }
 
 // ---- J. The flatten's reduce-only legs ---------------------------------------------
@@ -709,27 +704,36 @@ const closeLeg = (p) => ({ posId: p.id, side: p.qty > 0 ? 'short' : 'long', qty:
     const main = source.replace(/^import[\s\S]*?from '[^']+';\n/gm, '')
         .replace(/^cacheDOMElements\(\$\);[\s\S]*?^init\(\);/m, '');
     const pauses = [], developments = [], lerp = [];
+    // The run's state is the real run module's; the shell's skip and clock are main.js's.
+    run.engine = { eventLog: [], _logEvent(day, ev, p, magnitude) { const e = { day, headline: ev.headline, category: ev.category, magnitude }; this.eventLog.push(e); return e; } };
+    run.origin = BOOT_DAY;
+    run.gameOver = false;
+    run.queue.length = 0;
+    run.current = null;
+    Object.assign(run.sim, { S: 100, v: 0.06, r: 0.04, day: BOOT_DAY + 10, q: 0 });
     const context = createContext({
-        Simulation: class { constructor() { Object.assign(this, { S: 100, v: 0.06, r: 0.04, day: BOOT_DAY + 10, q: 0 }); } },
-        ExpiryManager: class {},
-        portfolio: P, market, portfolioValue: book.portfolioValue, settleObligation: book.settleObligation, shiftFaction, fmtBook,
-        closeStop, majorSince, SPEED_OPTIONS: [0.125, 0.25, 0.5, 1, 2], SKIP_DAYS_PER_SEC, INTRADAY_STEPS: 16,
+        run, barrier, portfolioEquity, relDay: () => run.sim.day - run.origin, ExpiryManager,
+        portfolio: P, market, closeStop, majorSince, SPEED_OPTIONS: [0.125, 0.25, 0.5, 1, 2], SKIP_DAYS_PER_SEC, INTRADAY_STEPS: 16,
         performance: { now: () => 5000 },
         currentPage: () => 'front', updatePlayBtn: () => {}, showToast: () => {},
-        countDevelopment: (k) => developments.push(k), countPause: (c) => pauses.push(c),
+        countPause: (c) => pauses.push(c),
     });
     runInContext(main + `
         chart = { dayOrigin: ${BOOT_DAY}, setSubstepInterval(v) { globalThis.__lerp.push(v); } };
-        eventEngine = { eventLog: [], _logEvent(day, ev, p, magnitude) { const e = { day, headline: ev.headline, category: ev.category, magnitude }; this.eventLog.push(e); return e; } };
         _updateWire = () => {};
         globalThis.mainTest = {
-            sim, skip: skipToNextEdition, develop: _develop, close: _skipClose, settle: _settleObligations,
+            sim, sink: SINK, skip: skipToNextEdition, develop: SINK.develop, close: _skipClose,
             toggle: togglePlay, step, worth: _worthReading,
-            over(v) { _gameOver = v; },
+            over(v) { run.gameOver = v; },
             state() { return { playing, skipping: _skipping, resume: _resumeAfterDispatch, rate: _daysPerSec() }; },
         };
     `, Object.assign(context, { __lerp: lerp }), { filename: 'main.js (headless skip)' });
     const api = context.mainTest;
+    // The run reports to the page's sink: a development counts in the run and
+    // latches in the skip; an obligation's notice pauses the page's clock.
+    setSink({ develop: (k) => { developments.push(k); api.sink.develop(k); }, notice: () => api.sink.notice() });
+    api.develop = (k) => { developments.push(k); api.sink.develop(k); };
+    api.settle = runInternals.settleObligations;
     freshBook(); resetFactions();
     api.close();                                        // a close before the skip: the baseline
     api.develop('fill');                                // seen before the skip: never stops it
@@ -765,9 +769,11 @@ const closeLeg = (p) => ({ posId: p.id, side: p.qty > 0 ? 'short' : 'long', qty:
     api.over(true); api.skip();
     check('M: the skip does nothing in a finished run', !api.state().skipping && !api.state().playing);
     api.over(false);
-    const queue = source.slice(source.indexOf('function _processPopupQueue()'), source.indexOf('function _resumeAfterDispatches()'));
+    const queue = source.slice(source.indexOf('function _showDispatch('), source.indexOf('function _onLastEdition('));
     check('M: a shown dispatch stops a skip at once and never arms the resume',
         /if \(_skipping\) _endSkip\('dispatch'\);\s*else if \(playing\) _resumeAfterDispatch = true;/.test(queue));
+    run.engine = null;
+    setSink(null);
 }
 
 // ---- The built books -------------------------------------------------------------

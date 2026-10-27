@@ -4,9 +4,10 @@
    free: importable headless in Node so Monte-Carlo
    verification can drive the race deterministically.
 
-   The sim's own Math.random paths (simulation.js etc.)
-   are untouched; this stream is exclusively the race
-   layer's, seeded from a per-run seed.
+   The race layer's streams are seeded from the run seed by
+   name (deriveSeed); the rest of the run draws per slot
+   through keyedRng (02a "The run, headless"). randomSeed()
+   at a new run is the one ambient draw.
 
    The mulberry32 core is the codebase's canonical PRNG
    (matches shared/utils.js bit-for-bit) so seeded race
@@ -158,3 +159,42 @@ export function deriveSeed(seed, name) {
     x = Math.imul(x ^ (x >>> 15), 0x735a2d97) >>> 0;
     return (x ^ (x >>> 15)) >>> 0;
 }
+
+/** FNV-1a of a string key (a keyed slot's non-integer keys). */
+function _hashKey(s) {
+    let h = 0x811c9dc5 >>> 0;
+    for (let i = 0; i < s.length; i++) {
+        h ^= s.charCodeAt(i);
+        h = Math.imul(h, 0x01000193) >>> 0;
+    }
+    return h;
+}
+
+/**
+ * A fresh stream for one slot (02a "The run, headless"): hashed from the run
+ * seed, the stream's name and the slot's keys, in order. A draw is addressed by
+ * its semantic identity (the day and substep of a price step, an event's id and
+ * occurrence) rather than by its place in a shared sequence, so adding or
+ * removing a draw relabels only the slots keyed on it. Integer keys mix as
+ * integers; any other key (a string id) mixes through its FNV-1a hash.
+ * @param {number} seed  32-bit run seed
+ * @param {string} name  the stream's name ('price', 'events.pick', ...)
+ * @param {...(number|string)} keys  the slot's identity
+ */
+export function keyedRng(seed, name, ...keys) {
+    let x = deriveSeed(seed, name);
+    for (const k of keys) {
+        const v = Number.isInteger(k) ? (k >>> 0) : _hashKey(String(k));
+        x = (x ^ Math.imul(v, 0x9E3779B1)) >>> 0;
+        x = Math.imul(x ^ (x >>> 16), 0x21f0aaad) >>> 0;   // splitmix32 finalizer per key
+        x = Math.imul(x ^ (x >>> 15), 0x735a2d97) >>> 0;
+        x = (x ^ (x >>> 15)) >>> 0;
+    }
+    const rng = createRng(x);
+    return _keyedTap ? _keyedTap(seed, name, keys, rng) : rng;
+}
+
+let _keyedTap = null;
+/** A harness's tap on every keyed slot (run-test's coupling gate): `fn(seed,
+ *  name, keys, rng)` returns the rng the slot uses. null removes it. */
+export function tapKeyedRng(fn) { _keyedTap = fn; }

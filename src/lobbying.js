@@ -88,9 +88,9 @@ const LOBBY_ACTIONS = [
         desc: 'Feed information to shape the narrative. High risk if traced.',
         baseCost: 0,
         gate: () => getFaction('mediaTrust') > 70,
-        execute: (world) => {
+        execute: (world, rng) => {
             const traceChance = hasTrait('ghost_protocol') ? 0.25 : 0.5;
-            const traced = Math.random() < traceChance;
+            const traced = rng.next() < traceChance;
             if (traced) {
                 shiftFaction('mediaTrust', -20);
                 shiftFaction('regulatoryExposure', 15);
@@ -125,12 +125,15 @@ export function getAvailableActions(day, cash) {
         }));
 }
 
-export function executeLobbyAction(actionId, day, world) {
+/** Take one action on `day`. `rng` is the action's own slot (the `lobby`
+ *  stream keyed by the action and day, 02a "The run, headless"). The caller
+ *  admits it first (getAvailableActions: the gate, the cost, the cooldown). */
+export function executeLobbyAction(actionId, day, world, rng) {
     const action = LOBBY_ACTIONS.find(a => a.id === actionId);
     if (!action) return null;
     const costMult = getTraitEffect('lobbyingCostMult', 1);
     const cost = Math.round(action.baseCost * costMult);
-    action.execute(world);
+    action.execute(world, rng);
     _lastLobbyDay = day;
     return { cost, action, playerFlag: action.playerFlag || null };
 }

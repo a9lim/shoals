@@ -1189,6 +1189,91 @@ export function setDraftPlateau(R, h) {
     return draftCurves();
 }
 
+// -- The draft's state (02a "The run, headless") --------------------------
+// The forecast editor works on a copy during a gesture and commits it on the
+// gesture's end, so the run's draft changes only by command (run.js 'forecast')
+// and a lock never sees a half-finished drag. A state is every rung's policy and
+// carried curve; the edits below are the setters above applied to a copy, so
+// their clamping is unchanged.
+
+const _copyCarried = (src) => {
+    const out = {};
+    for (const R of RUNG_LIST) out[R] = src[R] ? { m: src[R].m, w: src[R].w, q: src[R].q } : null;
+    return out;
+};
+
+/** The draft's whole state, copied: { policy: {R: 'follow'|'carry'}, carried:
+ *  {R: {m, w, q} | null} } (null outside Dynamic). */
+export function draftState() {
+    const P = belief.player;
+    return P ? { policy: { ...P.policy }, carried: _copyCarried(P.carried) } : null;
+}
+
+/** Run `fn` with the player's policy and carried curves swapped for a copy of
+ *  `state`; returns the copy as `fn` left it. The draft itself is untouched. */
+function _onCopy(state, fn) {
+    const P = belief.player;
+    if (!P || !state) return null;
+    const saved = { policy: P.policy, carried: P.carried };
+    P.policy = { ...state.policy };
+    P.carried = _copyCarried(state.carried);
+    try {
+        fn();
+        return { policy: { ...P.policy }, carried: _copyCarried(P.carried) };
+    } finally {
+        P.policy = saved.policy;
+        P.carried = saved.carried;
+    }
+}
+
+/**
+ * A pure edit: `state` with one editor edit applied under the setters' own rules
+ * (the carry on a first edit, the neighbours pushed, the clamps). `edit` is
+ * { op: 'median' | 'width' | 'plateau', R, v }, or { op: 'follow', R } (R null:
+ * every rung). Returns the new state; the draft is untouched.
+ */
+export function editDraftState(state, edit) {
+    return _onCopy(state, () => {
+        if (edit.op === 'median') setDraftMedian(edit.R, edit.v);
+        else if (edit.op === 'width') setDraftWidth(edit.R, edit.v);
+        else if (edit.op === 'plateau') setDraftPlateau(edit.R, edit.v);
+        else if (edit.op === 'follow') followMarket(edit.R ?? null);
+    });
+}
+
+/** A state's effective curves and policy, as draftCurves() and draftPolicy()
+ *  read the draft's (the editor draws its copy mid-gesture). */
+export function draftStateView(state) {
+    let view = null;
+    _onCopy(state, () => { view = { curves: draftCurves(), policy: draftPolicy() }; });
+    return view;
+}
+
+/**
+ * Commit `state` as the draft, validated: every rung's policy 'follow' (no
+ * carried curve) or 'carry' (a finite curve), and the result passing the lock's
+ * own validation. Returns true when set; a rejected state leaves the draft as it
+ * was.
+ */
+export function setDraftState(state) {
+    const P = belief.player;
+    if (!P || !state || !state.policy || !state.carried) return false;
+    const T = { policy: {}, carried: {} };
+    for (const R of RUNG_LIST) {
+        const pol = state.policy[R], c = state.carried[R];
+        if (pol === 'follow') { T.policy[R] = 'follow'; T.carried[R] = null; continue; }
+        if (pol !== 'carry' || !c || !Number.isFinite(c.m) || !Number.isFinite(c.w) || !Number.isFinite(c.q)) return false;
+        T.policy[R] = 'carry';
+        T.carried[R] = { m: c.m, w: c.w, q: c.q };
+    }
+    const mk = _projection(), eff = {};
+    for (const R of RUNG_LIST) eff[R] = T.policy[R] === 'carry' && certDay(R) == null ? T.carried[R] : mk[R];
+    if (!_validPolicy(T, eff)) return false;
+    P.policy = T.policy;
+    P.carried = T.carried;
+    return true;
+}
+
 /** Validation (02a "The standing policy"): every effective curve present, finite
  *  and inside the bounds, and medians and plateaus monotone among the carried,
  *  uncertified rungs of R2-R4 only. */
