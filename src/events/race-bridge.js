@@ -84,7 +84,8 @@ const RUNG_NAME = {
     1: 'reliable agency', 2: 'autonomous engineering', 3: 'autonomous research',
     4: 'recursive self-improvement', 5: 'takeoff',
 };
-// {n}: a count the Brief spells out (house style: "seven hundred papers").
+// {n}: a withdrawal's dependents, spelled out with their noun ("one later result",
+//      "two later results"; house style spells counts: "seven hundred papers").
 const NUMBER_WORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
 /** Canonical entity id from a raceMeta: incidents carry `source`, releases
@@ -138,7 +139,7 @@ export function substituteTokens(str, meta, shellId) {
     }
     if (out.includes('{n}')) {
         const n = meta ? meta.n : null;
-        if (n != null) out = out.replaceAll('{n}', NUMBER_WORD[n] ?? String(n)); else warnToken(shellId, '{n}');
+        if (n != null) out = out.replaceAll('{n}', `${NUMBER_WORD[n] ?? String(n)} later result${n === 1 ? '' : 's'}`); else warnToken(shellId, '{n}');
     }
     if (out.includes('{lag}')) {
         const l = meta ? meta.lag : null;

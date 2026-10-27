@@ -3263,7 +3263,7 @@ let bystanderPool = 0, bystanderBridgeIds = new Set(), bystanderBridgeShown = 0;
     runRaceBridge(engine, race, { day: 0 }, 0, 0);
     const w = fired.filter(e => e.id === 'demo_withdrawn');
     check('R4: a withdrawal alone takes the plain item; with dependents the {n} variant, spelled out',
-        w.length === 2 && w[0].headline.startsWith('Polaris withdraws') && w[1].headline.includes('takes two later results'),
+        w.length === 2 && w[0].headline.startsWith('Polaris withdraws') && w[1].headline.includes('takes two later results down'),
         w.map(e => e.headline.slice(0, 60)).join(' | '));
 }
 

@@ -29,7 +29,7 @@
      {rungName} autonomous engineering / autonomous research /
                 recursive self-improvement / takeoff
      {lag}      days the incident stayed latent
-     {n}        a withdrawal's dependents, as a number word
+     {n}        a withdrawal's dependents, spelled out with their noun
    The demonstration shells (02a "Demonstrations") ride the
    'release' category; their prose is a draft awaiting a9.
    High-frequency shells use `headlines: [...]` variant pools
@@ -223,7 +223,7 @@ export const RACE_EVENTS = [
         /* PROSE: draft, awaiting a9 */
         headline: '{lab} withdraws its catalogue’s central result: a lemma on page eleven fails, and the proofs that leaned on it fall with it. The retraction notice is two sentences long. Sharma: “One bad lemma is a typo. A citation graph is a margin call.”',
         /* PROSE: draft, awaiting a9 */
-        headlineDependents: 'A flawed lemma in an earlier {lab} catalogue takes {n} later results down with it; each cited the one before. The withdrawal is careful, complete and public, which is more than most retractions manage, and it still leaves the market not knowing what the model can actually do.',
+        headlineDependents: 'A flawed lemma in an earlier {lab} catalogue takes {n} down with it: the citations ran through the one proof that failed. The withdrawal is careful, complete and public, which is more than most retractions manage, and it still leaves the market not knowing what the model can actually do.',
         params: {},
         impulse: reversed(ROUTINE_FRONTIER_IMPULSE),
     },
