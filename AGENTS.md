@@ -39,7 +39,7 @@ node tools/forecast-test.mjs   # [N] [--seed S] [--calibrate], N=500/scenario: p
 node tools/valuation-test.mjs  # [N] [--seed S] [--validation], N=1000/scenario: V's corruption invariance, calibration, fairness, reconciliation (~54 s)
 node tools/rounds-test.mjs     # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~28 s)
 node tools/reader-test.mjs     # [N] [--seed S] [--sections A-G], N=2000/scenario: the reader's gates, B's edge and its close (~2 min)
-node tools/opening-test.mjs    # N=400 worlds: the inherited desks, obligations and their netting, the forced sale, the close (~3 s)
+node tools/opening-test.mjs    # N=400 worlds: the inherited desks, obligations and their netting, the forced sale, the close, reduce-only closes, the skip's stops, the flatten ticket (~4 s)
 node tools/reader-fit.mjs      # the reader's offline fit; needs NumPy/SciPy (shared venv). Run only under 02a's refit rule
 ```
 
@@ -80,6 +80,7 @@ src/endings.js         ending triggers, family/overlay selection, slot-based 5-p
 src/opening.js         the inherited desks (fixtures), the draw and the takeover (DOM-free)
 src/almanac.js, almanac-view.js  the almanac's records and summary (DOM-free); its Meridian view
 src/counters.js        development-only interruption counters (`shoalsCounts()` in the console)
+src/pacing.js          the skip's stop classifier: what makes a close worth reading (DOM-free)
 src/race/              hidden race model and its markets (DOM-free; see below), the public
                        record and the reader (reader-constants.js is generated; never edit it)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
@@ -298,6 +299,12 @@ key is `shoals-theme`.
   archived reports (dated `Archive`, no news day) under it. Classic starts on cash.
   There is no forecast dispatch: the desk snapshots the standing policy at each lock
   day's close (02a "The standing policy").
+- **Pacing.** *To the next edition worth reading* (`#skip-btn`, `n`) plays at
+  `SKIP_DAYS_PER_SEC` without touching the speed setting and stops on 02a's list: a
+  dispatch at once, the rest latched through the day and taken at the close
+  (`pacing.js` `closeStop`). Every development site goes through `_develop(kind)`,
+  which counts it and feeds the latch. A stop pauses and stays paused; answering a
+  dispatch the skip stopped on does not resume play.
 - **Dispatches and the last edition.** Popups keep their single path
   (`_queuePopup`/`_processPopupQueue`/`showPopupEvent`); only the markup and styles
   changed. The epilogue overlay is the last edition, with a "The race, revealed" button
@@ -330,7 +337,13 @@ key is `shoals-theme`.
   certification added (the quiet row carries routine releases forward at each lab's
   cadence), and compute repriced by `placeholderCurve` at the new certified rung.
   Strategies load at the Options panel's expiry (`strategy-store.js`) and save
-  relative to it when their legs share one expiry.
+  relative to it when their legs share one expiry. The flatten (`#book-flatten`, `x`)
+  loads a reduce-only closing leg per position, bound to its id and strategy name, at
+  size one, with its estimated cost beside the cash it releases (`estimateReduceOnly`,
+  `previewImpact`: nothing mutates). Sending it cancels resting orders and working
+  Act III entries and sends each leg through `_deferManual` as a `'reduce'`, capped at
+  what the position holds when it executes and skipped if it has reversed. Any edit to
+  the legs makes it an ordinary ticket.
 - **Race page.** `recordRaceDay` (after the day's events) appends public records to
   `_pub` (releases with the rung they claim, released-rung claims, certifications, the
   open ecosystem's rung, the Fixedpoint Index's publication day) and the continuous
@@ -486,9 +499,9 @@ key is `shoals-theme`.
 `docs/ROADMAP.md` is the queue, in order, and opens with the direction set on
 2026-10-25: know, commit, lose your grip, and an honest accounting, read through
 embedded agency. The 2026-10-27 review reordered it around how the game plays for an
-evening, and a9 ratified it the same day (its rulings are listed there). Next is
-the evening (an inherited desk with a dated obligation as the opening hand, the
-forecast as a standing policy, pacing, a minimal almanac), then one decision chain end
+evening, and a9 ratified it the same day (its rulings are listed there). The evening
+landed on 2026-10-27 (the forecast as a standing policy, the inherited desks with
+their obligations, pacing, the flatten, the almanac). Next is one decision chain end
 to end (a demonstration, a disputed inference, a position, a financing commitment with
 the terminal clip retired, a disclosure, the firm's response), with the transitions
 extracted from `main.js` alongside it so whole runs play headless and replay from a

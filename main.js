@@ -2317,6 +2317,7 @@ function _runTerminalCloseout(resolution, geo) {
     // Compute futures: the P3b cash path, driven by the terminal finalizer.
     const cSettle = finalizeComputeTerminal(raceState, geo);
     const compute = cSettle.length ? settleComputeFutures(cSettle, raceState) : [];
+    for (let i = 0; i < compute.length; i++) _develop('settlement');   // as the daily pass counts them
     // HCN stock / options / VXHCN / bonds: impact-free authoritative marks (09 -- the
     // impact overlay and the CRR tree never touch settlement). sim.S is the
     // authoritative process price; market.vxhcn is the last-valid VXHCN spot (Heston,

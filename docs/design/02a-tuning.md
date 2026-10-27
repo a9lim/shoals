@@ -1819,6 +1819,31 @@ with counts); and the families seen beside the neutral-input baseline,
 labelled as that. Every read and write is wrapped in try/catch. Without
 storage the almanac is empty and the game is unchanged.
 
+**Implementation readings** (the round's interpretation calls, kept):
+
+- A certified rung's stored curve is its certification day at the minimum
+  width with `q` 0, classified like any rung, so a carried R4 that later
+  certifies still counts as stated.
+- The quarter's close line counts every scored quarter in `n`, followed
+  ones included.
+- A working order sized as a fraction of E₀ is sized at the takeover
+  mark; an unsized stop covers the whole holding, and the insurance's
+  puts cover the HCN holding.
+- The memo and the archived reports post as minor; archived items mark
+  no news day on the tape. An obligation is paid at the first close at
+  or past its due day.
+- A machinery close (the forced sale, a flatten leg's cap) counts no
+  trade.
+- The option-expiry stop falls at the close after which the edition on
+  screen is the option's last trading day; the expiry close itself is a
+  development. The skip's latch fills only while a skip runs, and the
+  first close measures the book move from the takeover's equity. A notice
+  during a skip is counted as the skip's stop.
+- A flatten loads a fractional holding rounded up to a whole unit, and
+  execution caps it at the holding. Its estimate prices every leg at
+  today's mid, so two legs sharing an impact pool are estimated as if
+  they didn't.
+
 **Interruption counters.** Development-only counters in `main.js`, read
 from the console (`shoalsCounts()`) in a9's play-tests and never shown:
 

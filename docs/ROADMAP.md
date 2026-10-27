@@ -9,8 +9,9 @@ The direction was set in the 2026-10-25 ideation round (a9, Claude, and an
 independent read from Codex). The 2026-10-27 review (Claude, with two
 independent reads from Codex) reordered the queue around how the game plays
 for an evening, and a9 ratified it the same day, with the rulings listed
-under "Rulings (2026-10-27)". Sections 1–8 are the main line, in order; the
-sections after them are the backlog, grouped by subject.
+under "Rulings (2026-10-27)". Sections 1–8 are the main line, in order
+(section 1 has landed); the sections after them are the backlog, grouped
+by subject.
 
 How a round runs:
 
@@ -224,112 +225,30 @@ a9 ratified the review's recommendations:
 8. **The epilogue's share row goes now**, ahead of the accounting that
    replaces it (section 5).
 
-## 1. The evening: an opening hand, the forecast held lightly
+## 1. The evening: landed 2026-10-27
 
-The first thirty minutes ask for confidence before giving a reason to
-care. This section gives the opening something to hold and takes the
-interruptions out of the forecast. It is mostly authoring and wiring, with
-no refit. Its rulings were ratified into 02a on 2026-10-27 ("The evening",
-and the standing policy under "Belief, η, and the firm"), including a9's
-four calls: an inherited book counts as the player's from the takeover,
-the coupling channel included; a missed obligation's forced sale takes
-three times the spread; Classic starts on cash; and revising is drawing,
-so no revision dispatch.
+The forecast became a standing policy per rung, snapshotted each quarter
+without a dispatch; a Dynamic run opens on one of four inherited desks
+with a dated obligation; *to the next edition worth reading* skips quiet
+days; the flatten loads the ticket; the almanac keeps every run beside a
+reference reader's; and development counters measure interruptions.
+Rulings are in 02a ("The evening", and "The standing policy" under
+"Belief, η, and the firm"); descriptions are in 03 and 05.
 
-### The forecast as a standing policy
+Carried forward from this section:
 
-The quarterly lock becomes a standing policy the player sets: carry my
-curves or follow the market, plus follow the reader once section 6 licenses
-it, and follow my book once section 4 can read one. At each quarter's
-opening the policy is snapshotted without a modal, as `scoreQuarter`
-expects today. That immutable snapshot is scored at the quarter's close,
-and revisions during the quarter affect only later snapshots.
-
-- **Day 0 opens without a dispatch.** The policy starts as "follow the
-  market", which scores exactly zero, and the draft starts on the market's
-  curves. Drawing away from them is the player's first forecast.
-- **A quarter's close is one line in the Brief**, the score against
-  Consensus, not a notification.
-- The dispatch returns only when the player asks to revise or an authored
-  decision needs them.
-- **Gates:** automatic locks match their declared policy exactly; a
-  snapshot is taken at the quarter's opening, and no forecast uses
-  information from after it.
-
-### The opening hand: an inherited desk
-
-Codex's proposal. Instead of cash and a timeline to declare, the player
-takes over a small existing book. Vasquez brought them in (`lore.md`), and
-the book belonged to a portfolio manager who has left. The desk opens on a
-living frame: positions already marked, a working order, an approaching
-option expiry, a dated cash obligation, and two of the predecessor's
-archived reports that supported the book. The predecessor's memo states
-their thesis. It is authored and fallible.
-
-The player can liquidate, hedge, keep or replace it. Nothing recommends
-one. The first question is concrete: what do I believe enough to keep?
-
-- **Fixtures, not a takeover system.** Three to five authored starting
-  books, drawn per run from their own named stream. They give returning
-  players different problems:
-  - a profitable HCN position with a cash payment due before the
-    anticipated catalyst;
-  - a defensive book whose insurance is expiring;
-  - a large position in an illiquid instrument with little free
-    collateral.
-- **Liabilities with dates.** A publicly specified, mundane obligation
-  (an investor redemption, a financing maturity) that must be met in cash
-  by its day, with a stated consequence for missing it: a forced
-  liquidation at the ladder's cost and a firm-standing loss. Being right
-  about next year doesn't meet next month's obligation, which is the
-  timeline trade's oldest lesson. Obligations never touch the hidden race.
-  In Act III they are the affirmative objective that makes losing your
-  hands cost something specific (section 6).
-- **Evaluation starts at the takeover.** P&L, the comparison with holding
-  HCN, and the ledger all measure from the takeover marks, never from the
-  predecessor's entries.
-- **`B`'s day-0 quote is the same in every world**, so a fixture's memo
-  can name a timeline and stay true to the market it was written against.
-- The predecessor's memo and book are the first stated thesis and the
-  first bet the player can compare (section 4), and they are someone
-  else's.
-- **Open question for the round:** whether Classic mode starts on a book
-  too.
-
-### Pacing and the player's hands
-
-- **To the next edition worth reading.** A control that plays at top
-  speed until something the player would read: a dispatch, an extra, an
-  obligation coming due, a fill, a news day that moves the book past a
-  threshold. Quiet weeks pass quickly without a setting.
-- **A flatten control.** `liquidateAll` has no player entry point. A
-  flatten takes the latency ladder like any manual order.
 - **Save and resume** come from section 3: a run is its seed and its
   journal.
-
-### Across evenings: a minimal almanac
-
-The run's record is mostly noise; a career's may not be. The almanac is
-local to the browser, written by the last edition: each run's world (seed,
-family, the sampled variables) and its scored record, beside the
-reader-copier's on the same world, recorded at each lock.
-
-- Across runs it shows the cumulative score, a reliability diagram of the
-  player's quarter probabilities, and the families they have seen against
-  the game's target distribution. Section 4 adds the book's record.
-- Learning to read the record is how a player gets better, and the
-  almanac is where that shows. How many runs a skilled record needs to
-  stand clear of luck is measured on whole-run distributions (section 3),
-  not read off σ₀.
-- Storage follows the root's rules: wrapped in try/catch, and the game
-  works without it.
-
-### Interruptions, counted in live play
-
-Dispatches by cause, repeated choices, and actionable developments
-between decisions can be counted in live play now, without waiting for
-section 3's headless runs: a development-only counter in `main.js`, read
-in a9's play-tests. It is the measure the political pool's trim waits on.
+- **Later obligations** become Act III's affirmative objective in section
+  6, and **follow the reader** and **follow my book** join the policy in
+  sections 6 and 4.
+- **The book-move stop is too eager on a levered desk.** Measured in the
+  round: on the catalyst's book, the 3% stop fired 7 times in the first
+  40 days, so the skip reads as "the next few days". A threshold scaled
+  to the book's own daily volatility is the likely fix; it waits on a9's
+  play-test.
+- **Prose to ratify**: the four memos and their archived reports, the
+  obligation and quarter-close lines, and the flatten's ticket lines.
 
 ## 2. One chain, end to end
 

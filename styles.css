@@ -236,6 +236,8 @@ input[type="checkbox"] { accent-color: var(--text); width: 14px; height: 14px; m
 .folio-tools { display: flex; gap: 6px; flex-shrink: 0; }
 .folio-tools .hbtn { border-color: transparent; padding: 3px 8px; }
 .folio-tools .hbtn:hover { border-color: var(--rule); }
+.folio-tools .hbtn[aria-pressed="true"] { color: var(--text); border-color: var(--rule-strong); }
+.folio-tools .hbtn:disabled { color: var(--text-muted); border-color: transparent; cursor: default; }
 #speed-btn { min-width: 3em; }
 
 /* --- Pages --- */
@@ -472,6 +474,7 @@ body.rail-off .page-front .rail { display: none; }
 .tk-lbl { font-style: italic; color: var(--text-muted); font-size: var(--font-base); white-space: nowrap; display: inline-flex; align-items: baseline; gap: 2px; }
 .tk-cost { margin: 10px 0 0; font-size: var(--font-base); color: var(--text-secondary); min-height: 1.3em; }
 .tk-cost b { font-weight: 600; color: var(--text); }
+.tk-cost .tk-off { font-size: var(--font-sm); font-style: italic; color: var(--text-muted); }
 #tk-greeks { margin-top: 2px; font-size: var(--font-sm); min-height: 1.2em; }
 .tk-actions { display: flex; justify-content: space-between; gap: 8px; margin: 10px 0 0; }
 .tk-actions .primary { min-width: 9em; }
