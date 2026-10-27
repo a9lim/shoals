@@ -144,6 +144,18 @@ function legacyRoundDays(seed, spawnDay, untilDay) {
 }
 let roundsChecked = 0, roundsMismatch = 0, roundsTotal = 0;
 
+// ---- Demonstrations (02a "Demonstrations") ---------------------------------
+// The gate: of Halcyon's internal Rk crossings whose release falls within the
+// horizon, the share with a first publication of Rk before that release
+// (withdrawn ones included), in [0.35, 0.65] for R3 and R4; R2 is reported.
+const demoBefore = { halcyon: { 2: [0, 0], 3: [0, 0], 4: [0, 0] }, polaris: { 2: [0, 0], 3: [0, 0], 4: [0, 0] } };
+const demoCount = { halcyon: { 2: 0, 3: 0, 4: 0 }, polaris: { 2: 0, 3: 0, 4: 0 } };
+const demoPerRun = [], disputesPerRun = [];
+let demoTotal = 0, demoOverScoped = 0, demoFlawed = 0, demoDisputed = 0;
+const demoOutcome = { upheld: 0, narrowed: 0, withdrawnFlawed: 0, withdrawnDependent: 0, pending: 0 };
+let withdrawals = 0, withdrawalsWithDeps = 0, depsTaken = 0, depsMax = 0;
+let polarisDemos = 0, polarisInWindow = 0, polarisDemoRuns = 0;
+
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
     const race = createRaceState((BASE_SEED + i) >>> 0);
@@ -157,6 +169,11 @@ for (let i = 0; i < N; i++) {
         advanceRace(race);
         for (const round of stepRounds(race, 0)) roundDays.push(round.day);
         if (race.lastTransitions.spawned.includes('polaris')) spawnDay = race.day;
+        for (const row of race.lastTransitions.demonstrations) {
+            if (row.kind !== 'withdrawal') continue;
+            withdrawals++; depsTaken += row.took.length; depsMax = Math.max(depsMax, row.took.length);
+            if (row.took.length) withdrawalsWithDeps++;
+        }
         for (const rel of race.lastTransitions.releases) {
             const week = Math.floor((race.day % 63) / 7);
             releaseWeeks[week]++;
@@ -181,6 +198,36 @@ for (let i = 0; i < N; i++) {
         const legacy = legacyRoundDays(race.seed, spawnDay, HORIZON);
         const nominal = polarisRoundDays(race.seed, spawnDay, HORIZON).filter(d => d <= HORIZON);
         if (JSON.stringify(roundDays) !== JSON.stringify(legacy) || JSON.stringify(roundDays) !== JSON.stringify(nominal)) roundsMismatch++;
+    }
+
+    // Demonstrations: the hidden list, read only here (the harness is the reveal).
+    const demos = race.demonstrations.list;
+    demoPerRun.push(demos.length);
+    disputesPerRun.push(demos.filter(d => d.disputeId).length);
+    for (const d of demos) {
+        demoTotal++; demoCount[d.lab][d.rung]++;
+        if (d.truth.reach === 'overScoped') demoOverScoped++;
+        if (d.truth.flawed) demoFlawed++;
+        if (d.disputeId) demoDisputed++;
+        if (d.status === 'withdrawn') demoOutcome[d.root === d.id ? 'withdrawnFlawed' : 'withdrawnDependent']++;
+        else if (d.status === 'upheld' || d.status === 'narrowed') demoOutcome[d.status]++;
+        else demoOutcome.pending++;
+        if (d.lab === 'polaris') {
+            polarisDemos++;
+            if ((race.demonstrations.polarisRounds || []).some(s => s > d.day && s <= d.day + 42)) polarisInWindow++;
+        }
+    }
+    if (demos.some(d => d.lab === 'polaris')) polarisDemoRuns++;
+    for (const id of ['halcyon', 'polaris']) {
+        const lab = cap.labs[id];
+        for (const k of [2, 3, 4]) {
+            const tRel = lab.rungReleased[k];
+            if (lab.rungInternal[k] == null || tRel == null || tRel > HORIZON) continue;
+            if (id === 'polaris' && lab.rungInternal[k] === lab.rungReleased[k]) continue;   // crossed at spawn
+            demoBefore[id][k][1]++;
+            const first = demos.find(d => d.lab === id && d.rung === k);
+            if (first && first.day < tRel) demoBefore[id][k][0]++;
+        }
     }
 
     // Incident occurrence / detection / evidence per-run summaries.
@@ -314,6 +361,23 @@ let jitterIsolationPass;
     RACE_TUNING.releaseCooldownMin = saved.lo; RACE_TUNING.releaseCooldownMax = saved.hi;
 }
 
+// ---- Demonstrations on vs off (02a "Demonstrations") -----------------------
+// Under identical (neutral) inputs the race core is bit-identical with the chain
+// on or off, and every other stream sits at the same draw afterwards: the chain
+// consumes streams.demonstrations alone.
+const demoCoreOn = coreFingerprint(ISO_SEEDS), demoCoreOff = coreFingerprint(ISO_SEEDS, r => { r.demonstrationsEnabled = false; });
+let demoStreamsPass = true;
+for (let s = 1; s <= ISO_SEEDS; s++) {
+    const on = createRaceState(s), off = createRaceState(s);
+    off.demonstrationsEnabled = false;
+    for (let d = 0; d < HORIZON; d++) { advanceRace(on); advanceRace(off); }
+    for (const name of Object.keys(on.streams)) {
+        if (name !== 'demonstrations' && on.streams[name].next() !== off.streams[name].next()) demoStreamsPass = false;
+    }
+    if (off.demonstrations.list.length !== 0) demoStreamsPass = false;
+}
+const demoIsolationPass = demoCoreOn === demoCoreOff && demoStreamsPass;
+
 /** Week-of-cycle excess: each bin over the weekly mean, minus one. */
 function weekExcess(bins) {
     const m = bins.reduce((a, b) => a + b, 0) / bins.length;
@@ -446,6 +510,25 @@ line(`  zero width reproduces HEAD 43d677c's race core (seeds 1-50): ${jitterIso
 line('\nPolaris rounds: the nominal schedule vs the old clock');
 line(`  ${roundsChecked} spawned worlds, ${roundsTotal} rounds, ${roundsMismatch} world(s) whose rounds moved`);
 
+const share = ([a, b]) => b ? `${pct(a / b)} (${a}/${b})` : '--';
+line('\nDemonstrations (02a "Demonstrations"; hidden truth read by the harness only)');
+line(`  per run   mean ${f2(mean(demoPerRun))}   p10 ${d0(quantile(demoPerRun, 0.10))}   p50 ${d0(quantile(demoPerRun, 0.50))}   p90 ${d0(quantile(demoPerRun, 0.90))}`);
+for (const id of ['halcyon', 'polaris']) {
+    line(`  ${id.padEnd(8)} per run by rung   R2 ${f3(demoCount[id][2] / N)}   R3 ${f3(demoCount[id][3] / N)}   R4 ${f3(demoCount[id][4] / N)}`);
+}
+line(`  over-scoped ${pct(demoOverScoped / Math.max(1, demoTotal))}   flawed ${pct(demoFlawed / Math.max(1, demoTotal))}   disputed ${pct(demoDisputed / Math.max(1, demoTotal))}   (n=${demoTotal})`);
+line(`  disputes per run   mean ${f2(mean(disputesPerRun))}   p90 ${d0(quantile(disputesPerRun, 0.90))}`);
+line(`  outcomes   upheld ${pct(demoOutcome.upheld / Math.max(1, demoTotal))}   narrowed ${pct(demoOutcome.narrowed / Math.max(1, demoTotal))}   `
+    + `withdrawn flawed ${pct(demoOutcome.withdrawnFlawed / Math.max(1, demoTotal))}   withdrawn as dependents ${pct(demoOutcome.withdrawnDependent / Math.max(1, demoTotal))}   `
+    + `unevaluated at 1008 ${pct(demoOutcome.pending / Math.max(1, demoTotal))}`);
+line(`  withdrawals ${withdrawals} (${f3(withdrawals / N)}/run), with dependents ${withdrawalsWithDeps}; dependents taken ${depsTaken}, most in one ${depsMax}`);
+line(`  Polaris: ${polarisDemos} demonstrations in ${polarisDemoRuns} runs; in a funding window (42 days before a nominal round) ${pct(polarisInWindow / Math.max(1, polarisDemos))}`);
+line('  demonstrated before the lab released the rung (crossings released within the horizon):');
+for (const id of ['halcyon', 'polaris']) {
+    line(`    ${id.padEnd(8)} R2 ${share(demoBefore[id][2])}   R3 ${share(demoBefore[id][3])}   R4 ${share(demoBefore[id][4])}`);
+}
+line(`  race core bit-identical with demonstrations on/off, other streams undrawn (${ISO_SEEDS} seeds): ${demoIsolationPass ? 'PASS' : 'FAIL'}`);
+
 // ---- Calibration PASS/MISS against 02a targets ---------------------------
 
 line('\n' + '='.repeat(70));
@@ -504,6 +587,14 @@ if (!isolationPass) allPass = false;
 }
 line(`  ${'jitter stream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(jitterIsolationPass ? 'yes' : 'no').padStart(6)}    ${jitterIsolationPass ? 'PASS' : 'MISS'}`);
 if (!jitterIsolationPass) allPass = false;
+// Demonstrations (02a): Halcyon's R3 and R4 crossings demonstrated before their
+// release in [35%, 65%] each, and the chain isolated from the race core.
+for (const k of [3, 4]) {
+    const [a, b] = demoBefore.halcyon[k];
+    checkBand(`Halcyon R${k} shown pre-release`, b ? a / b : NaN, '35-65%', 0.35, 0.65);
+}
+line(`  ${'demonstrations isolated'.padEnd(28)} ${'ident.'.padStart(6)}   ${(demoIsolationPass ? 'yes' : 'no').padStart(6)}    ${demoIsolationPass ? 'PASS' : 'MISS'}`);
+if (!demoIsolationPass) allPass = false;
 {
     const pass = roundsMismatch === 0 && roundsChecked > 0;
     if (!pass) allPass = false;

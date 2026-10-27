@@ -45,6 +45,7 @@ import {
 } from './capability.js';
 import { freezeConsensus, isFreezeRegime } from './consensus.js';
 import { freezeComputeMarket } from './compute-market.js';
+import { freshDemonstrationState, stepDemonstrations } from './demonstrations.js';
 
 // Re-export the control-regime enum so existing importers of race-state.js
 // (main.js, harnesses) keep working after the definition moved to
@@ -249,6 +250,9 @@ export function freshTransitions() {
         // track; occurrence stays in `thefts` and stays silent). Rows carry the
         // SAMPLED public attribution, never the record's true one.
         theftDisclosures: [],
+        // 02a "Demonstrations": the chain's public rows this tick, in phase
+        // order (withdrawal, evaluation, dispute, publication). No hidden truth.
+        demonstrations: [],
         regimeChange: null,   // { from, to } on a forward controlRegime move this tick
         // P6-2: this tick's player-attributable dC to Halcyon (the coupling's
         // Halcyon-C contribution). main.js ledgers it under the C channel; 0 headless.
@@ -338,6 +342,10 @@ export function resetRaceState(race, seed) {
     // ---- Evidence machinery round: theft disclosure track ----------------
     race.latentThefts = freshTheftQueue();      // two-track theft queue (commit -> disclose | rumor forever)
     race.theftDisclosureEnabled = true;         // MC toggle for the on/off bit-identity arm; always true in-game
+
+    // ---- 02a "Demonstrations": the chain's hidden list (truth stays here) --
+    race.demonstrations = freshDemonstrationState();
+    race.demonstrationsEnabled = true;          // MC toggle for the on/off bit-identity arm; always true in-game
     // Orchestrator-passed export-control stage (world.ai.exportControlStage 0..3),
     // STORED so the plateau detector and the extrapolation path read the same value
     // the kinematics did (the playerCoupling precedent -- one drift, one stage).
@@ -638,6 +646,13 @@ export function advanceRace(race, inputs = {}) {
     // 4. Certification settlement (nested; Consensus consumes rungCertified phase 3).
     const certRes = stepCertification(cap, endDay);
     tr.certifications.push(...certRes.certifications);
+
+    // 4b. Demonstrations (02a "Demonstrations"), at the close after the day's
+    //     releases and certifications. Draw ONLY from streams.demonstrations and
+    //     read C_int, the released rungs and Polaris's nominal round days; they
+    //     move no capability, heat, S, schedule or hazard, so the race core is
+    //     bit-identical with them on or off (race-mc).
+    if (race.demonstrationsEnabled !== false) tr.demonstrations = stepDemonstrations(race, tr, day, endDay);
 
     // 5. Heat floor recompute (idempotent; the commit ops already updated it).
     race.heat.floor = computeFloor(race);
