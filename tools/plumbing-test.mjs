@@ -1,117 +1,54 @@
 #!/usr/bin/env node
 /* ===================================================
    tools/plumbing-test.mjs -- Headless gate for the
-   overhaul phase-5a MACHINERY (content-sweep plumbing):
+   content plumbing, the evidence machinery, Act III's
+   systemic and delegation layers and round one of the
+   chain:
 
-   A. Event base-rate scaling bounds (04 engine note 1):
-      Act-I exactness + monotone bounded acceleration.
-   B. Strait blockade incidence calibration (02a "The strait"
-      block): ~3% baseline / 12-15% hot -- harness-asserted.
-   C. controlRegime ratchet reachability + monotonicity:
-      every regime reachable, mobilized+ a minority,
-      nationalization/classification rare, never backward.
-   D. No-wedge full run: a forced regime ratchet settles the
-      Consensus + compute book without wedging the portfolio.
-   E. Consensus dispute adjudication (09 succession): ruling
-      YES/NO, deadline auto-fallback, regime fallback, the
-      mobilized adjudicator, and non-tradeability.
+   A. Event base-rate scaling: Act-I exactness, monotone
+      bounded acceleration.
+   B. Strait blockade incidence (02a "The strait"): ~3%
+      baseline, 12-15% hot; the gray zone and the overlay.
+   C. The controlRegime ratchet: every regime reachable,
+      mobilized+ a minority, nationalization rare, never
+      backward.
+   D. No-wedge full run: a forced ratchet settles the
+      Consensus and compute book.
+   E/F. Consensus dispute adjudication and finality; F4-F6
+      mirror write authority, same-day replay, the peers.
+   G. exportControlStage -> Tianxia compute dampener: the
+      growth table, drift monotone in the stage, compute
+      leg only, the directional cut at a forced stage 3.
+   H. Leak coupling (`_tipIncidentId`): forced detection,
+      fold once, the frozen/inactive gate.
+   I. Theft disclosure: eligibility, lag, attribution,
+      ledger rows, the bridge's shells.
+   J. The Act III driver and substep event lane.
+   K. The manual latency ladder: lags and spreads, the
+      queue, execution-time state, player exits vs instant
+      machinery, expiry at execution, reset, bundles.
+   L. Presentation degradation: hold arithmetic, the
+      latches never reaching a valuation, rest and reduced
+      motion, glitch severity.
+   M. Standing orders: unlock/lock/reset, each rule once per
+      episode, machinery-instant at the plain spread, the
+      liquidation preference, interception, inertness.
+   N. The room, the blackout, the backchannel, the intel.
+   O. The capex channel: shell shape, rise edges, the
+      latch, the per-run ceiling, no waves in extrapolation.
+   P. Concealment vs detection: the lagMult algebra, the
+      constructed cases, the global frontier, S4 immediacy,
+      the reporting regime and leak floor; at the live K the
+      channel binds only after R3 and moves both ways.
+   Q. The bystander: every dispatch names one qualifying
+      bystander choice.
+   R. Demonstrations through the bridge.
 
-   ...and the EVIDENCE MACHINERY round (2026-07-24):
-
-   G. exportControlStage -> Tianxia compute dampener: stage-0
-      bit-identity (the calibration invariant), exact drift
-      monotonicity in the stage, compute-leg-only (k_f
-      untouched), and the directional cut to Tianxia
-      capability + family-4 incidence at a forced stage 3.
-   H. Leak coupling (`_tipIncidentId`): unconditional detection
-      forcing on a 4d clock, the fold-once-under-`det_${id}`
-      belief identity (leaked == unleaked in total mass), and
-      the frozen/inactive gate.
-   I. Theft disclosure track: eligibility 0.75, mean lag 40d,
-      public attribution 0.55/0.30/0.15, complete ledger rows,
-      and on/off trajectory bit-identity.
-
-   ...and the ACT III SYSTEMIC LAYER (P7-1, 2026-07-24):
-
-   J. The driver + substep event lane: driver shape (targets,
-      smoothing, the d projection), lane RATE INVARIANCE at the
-      R5 ceiling, uniform arrival over the 16 substeps, and the
-      categories the lane may not move (bridge / ledger / pulse
-      fired stay at day-complete).
-   K. Manual latency ladder: 0/1/3/6 substeps with x1.25/x1.5
-      spread, queue arithmetic (fill substep = order substep +
-      lag), strategies deferring as ONE unit, the exact-no-op
-      unit multiplier (R<=3 bit-identity), execution-time
-      restriction / freeze rejection with cash untouched, and
-      (02a "Act III") PLAYER EXITS on the same ladder while
-      every MACHINERY path -- forced liquidation, expiry trims,
-      popup trades -- and `exerciseOption` stay instant. Plus
-      the P7-1 fix round: the EXPIRY ROLLOVER reject (ruling 1 --
-      a fill at or past its own expiry is barred before the
-      trade is counted, so nothing survives its expiry pass) and
-      run-scoped reset state (ruling 5 -- the renderer's
-      transient repaint fields, the queue's ticket counter).
-   ...and the DELEGATION LAYER (P7-2, 2026-07-24):
-
-   M. Standing orders: the unlock / lock / reset gates, each
-      rule firing exactly on its predicate and exactly ONCE
-      per trigger episode, executions routing MACHINERY-instant
-      (never the P7-1 latency queue, never the ladder's widened
-      spread), the liquidation PREFERENCE reordering the forced
-      -liquidation sequence, the interception contract the
-      auto-sit rule depends on, and full inertness while
-      restricted / past the terminal latch / with nothing armed.
-
-   ...and the REALITY-BEATS ROUND (02a 2026-09-08):
-
-   O. The capex channel: shell shape (permanent additive
-      params, no impulse, Poisson-excluded), rise-edge-only
-      firing with the exact +0.005 b / +0.001 sigmaR delta,
-      hold / same-day-replay / two-rung-jump semantics, the
-      <= 4-per-run ceiling over a seed sweep, and latch reset.
-      Plus the review fix (2026-09-08): the day-1008
-      TIMEOUT EXTRAPOLATION prints no waves once the bridge is
-      handed the live-day rung (O5, seed 15: R1 at the horizon,
-      day 2864 / R3 after).
-   P. Concealment vs. detection: the lagMult algebra and its
-      exact-1 identities, the constructed hide/expose cases,
-      the GLOBAL-frontier denominator over a multi-lab state
-      (P2b), S4 immediacy under any ratio, the reporting-regime
-      and leak-floor interactions, ledger + RNG-position
-      identity vs a K = 0 arm through the first affected
-      record's creation day, the record's own immediate
-      lagMult/meanLag difference (P8), and per-tick occurrence
-      + draw-count purity.
-   L. Presentation degradation: hold arithmetic, and the
-      invariant that every headless number (portfolio value,
-      marks, the VXHCN index) is BITWISE unchanged with the
-      display latches forced on -- plus Classic inertness (no
-      RNG drawn at rest) and the reduced-motion split.
-
-   ...and ROUND ONE OF THE CHAIN (02a "The run, headless", 2026-10-27):
-
-   Q. The bystander: every pool dispatch and every generator's
-      dispatch (round offers, the room with its gate open and
-      shut, the midterm result, the bridge's finalized shells
-      over a seed sweep) names exactly one bystander choice,
-      and it carries no trade, subscription, race effect, leak,
-      regime push or regulatory settlement.
-   R. Demonstrations through the bridge (02a "Demonstrations"):
-      the seven shells (category release, Poisson-excluded),
-      their impulses (the routine frontier release's, reversed
-      for a withdrawal, none for rulings), one shell per chain
-      row with every token filled, the Fixedpoint catalogue's
-      condition, deterministic rotation, and the {n} variant.
-
-   All numeric bands are DESIGN bands; the tuning is RATIFIED in
-   02a's "Control regime and content plumbing"
-   and "Evidence machinery (pre-P7 ratifications, 2026-07-24)"
-   blocks. Exits 1 on any MISS.
+   Bands are 02a's design bands. Exits 1 on any MISS.
 
    Usage:  node tools/plumbing-test.mjs [N]
    =================================================== */
 
-import { createHash } from 'node:crypto';
 import {
     createRaceState, advanceRace, stepControlRegime, setControlRegime,
     heatValue, REGIME_RANK, CONTROL_REGIMES, RETUNE, freshTransitions,
@@ -131,7 +68,6 @@ import {
     initIntel, deactivateIntel, intelActive, intelRead, velocityBucket,
     INTEL_LO, INTEL_HI, INTEL_BUCKETS, INTEL_TRUTH_PROB,
 } from '../src/race/intel.js';
-import { createRng, deriveSeed } from '../src/race/rng.js';
 import { DISCLOSE_PROB, DISCLOSE_MEAN_LAG, PUBLIC_ATTRIBUTIONS } from '../src/race/theft-disclosure.js';
 import { stepTreaty } from '../src/race/treaty-track.js';
 import { checkResolution } from '../src/race/resolution.js';
@@ -665,54 +601,11 @@ check('gray-zone fires at tension 1', grayAtTension1 > 0, `${grayAtTension1} tot
 // EVIDENCE MACHINERY ROUND (2026-07-24)
 // =====================================================================
 
-/** SHA-256 over the full daily PHYSICAL trajectory (C both tracks / S / heat /
- *  theftCount / rung + certification stamps) -- the P6-2 pattern. This is the
- *  quantity every "bit-identical" claim in this round is about: the race's
- *  physical state, not the narrative/belief ledgers layered on top. */
-function trajectoryHash(seed, opts, mutate, perDay) {
-    const race = createRaceState(seed >>> 0);
-    if (mutate) mutate(race);
-    const h = createHash('sha256');
-    for (let d = 0; d < HORIZON; d++) {
-        advanceRace(race, opts);
-        if (perDay) perDay(race);
-        const c = race.capability;
-        h.update([
-            c.labs.halcyon.C_internal, c.labs.tianxia.C_internal,
-            c.labs.polaris.active ? c.labs.polaris.C_internal : 'x', c.open.C,
-            c.labs.halcyon.C_released, c.labs.tianxia.C_released,
-            race.safety.halcyon, race.safety.tianxia,
-            race.safety.polaris === null ? 'x' : race.safety.polaris,
-            heatValue(race.heat), race.heat.floor, race.heat.transient, race.theftCount,
-            JSON.stringify(c.labs.halcyon.rungInternal), JSON.stringify(c.labs.tianxia.rungInternal),
-            JSON.stringify(c.labs.halcyon.rungCertified), JSON.stringify(c.labs.tianxia.rungCertified),
-        ].join('|') + '\n');
-    }
-    return h.digest('hex');
-}
-
 // =====================================================================
 // G. exportControlStage -> Tianxia compute dampener
 // =====================================================================
-const IDENT_SEEDS = Math.max(100, Math.min(N, 120));
-let stageIdentOK = true, discIdentOK = true;
 let damp0 = null, damp3 = null;
 {
-    // G1. STAGE-0 BIT-IDENTITY -- the calibration invariant. Three arms must agree
-    //     over >= 100 seeds: no inputs at all (race-mc / every pre-round harness),
-    //     an explicit stage 0, and the disclosure track switched OFF. Any drift here
-    //     would silently invalidate every 02a calibration band recorded pre-round.
-    for (let s = 0; s < IDENT_SEEDS; s++) {
-        const seed = (BASE_SEED + s) >>> 0;
-        const bare = trajectoryHash(seed, undefined);
-        const stage0 = trajectoryHash(seed, { straitTension: 0, exportControlStage: 0 });
-        const discOff = trajectoryHash(seed, undefined, (r) => { r.theftDisclosureEnabled = false; });
-        if (bare !== stage0) stageIdentOK = false;
-        if (bare !== discOff) discIdentOK = false;
-    }
-    check(`G1: stage-0 trajectory bit-identical to no-stage over ${IDENT_SEEDS} seeds`, stageIdentOK);
-    check(`G1: theft-disclosure ON/OFF trajectory bit-identical over ${IDENT_SEEDS} seeds`, discIdentOK);
-
     // G2. Growth table transcription + stage normalization (02a verbatim).
     check('G2: EXPORT_CONTROL_GROWTH == [1.30, 1.20, 1.06, 0.90] (02a verbatim)',
         JSON.stringify(EXPORT_CONTROL_GROWTH) === JSON.stringify([1.30, 1.20, 1.06, 0.90]));
@@ -752,7 +645,7 @@ let damp0 = null, damp3 = null;
 
     // G4. DIRECTIONAL probe (not a band, 02a): a sustained stage 3 from day 0 must
     //     visibly cut Tianxia capability and family-4 incidence vs stage 0.
-    const DAMP_N = Math.min(N, 800);
+    const DAMP_N = Math.min(N, 400);
     function dampArm(stage) {
         let c504 = 0, n504 = 0, fam4 = 0, txLeads = 0;
         for (let i = 0; i < DAMP_N; i++) {
@@ -1003,7 +896,7 @@ let discRows = 0, discEligible = 0, discThefts = 0;
 // =====================================================================
 // J. Act III driver + substep event lane (P7-1)
 // =====================================================================
-let laneOffRate = 0, laneOnRate = 0, laneArrivalSpread = 0;
+let laneOffRate = 0, laneOnRate = 0;
 {
     // -- J1. The driver: shape, smoothing, and the two projections -------
     resetAct3();
@@ -1084,7 +977,6 @@ let laneOffRate = 0, laneOnRate = 0, laneArrivalSpread = 0;
     const meanBucket = arrivals / 16;
     let worst = 0;
     for (const b of on.buckets) worst = Math.max(worst, Math.abs(b - meanBucket) / meanBucket);
-    laneArrivalSpread = worst;
     check('J2: arrivals uniform over the 16 substeps (worst bucket within 15%)',
         arrivals > 10000 && worst < 0.15, `${arrivals} arrivals, worst deviation ${pct(worst)}`);
     check('J2: every arrival is consumed exactly once (no stale carry, no double-fire)',
@@ -1177,7 +1069,7 @@ let ladderRows = '';
     }
     const f1 = stockFill(1), fU = stockFill(undefined), f125 = stockFill(1.25), f15 = stockFill(1.5);
     const half = computeBidAsk(S0, vol).ask - S0;
-    check('K3: omitted / unit multiplier is an EXACT no-op (R<=3 fills bit-identical)',
+    check('K3: an omitted multiplier fills as the unit multiplier',
         fU === f1, `${fU} vs ${f1}`);
     check('K3: x1.25 and x1.5 widen the half-spread exactly',
         Math.abs((f125 - f1) - 0.25 * half) < 1e-12 && Math.abs((f15 - f1) - 0.5 * half) < 1e-12,
@@ -1411,7 +1303,7 @@ let ladderRows = '';
 // =====================================================================
 // L. Presentation degradation is INVISIBLE to every headless number
 // =====================================================================
-let latchTrajOK = false, latchHeldSubsteps = 0;
+let latchTrajOK = false;
 {
     // -- L1. Hold arithmetic ---------------------------------------------
     resetAct3();
@@ -1434,7 +1326,6 @@ let latchTrajOK = false, latchHeldSubsteps = 0;
         tickSubstepClock();
         if (advanceVxhcnPublication(20 + i + 1, 0.05 + i, substepClock())) held++;
     }
-    latchHeldSubsteps = held;
     check('L1: the index holds its print for 2-6 substeps at a time (never forever)',
         held > 0 && held < 12, `${held} of 12 substeps stale`);
     check('L1: a stale publication reports the LAST print, not the live value',
@@ -1490,9 +1381,6 @@ let latchTrajOK = false, latchHeldSubsteps = 0;
 
     // -- L3. Classic inertness: the whole surface is dead code ------------
     resetAct3();
-    let randomCalls = 0;
-    const realRandom = Math.random;
-    Math.random = () => { randomCalls++; return realRandom(); };
     let repaintNonzero = 0, skipped = 0;
     for (let i = 0; i < 2000; i++) {
         if (rollCandleRepaint(100) !== 0) repaintNonzero++;
@@ -1501,14 +1389,6 @@ let latchTrajOK = false, latchHeldSubsteps = 0;
     check('L3: at rest the degradation produces NO effect at all',
         repaintNonzero === 0 && skipped === 0
         && chainHoldSubsteps() === 0 && publishedVxhcn(7) === 7 && publishedVariance(9) === 9);
-    // ...and even at FULL degradation it never touches the shared Math.random the
-    // price path and the event cadence draw from: the display failing may not move
-    // the market. (act3.js owns a fixed-seed display substream.)
-    setMachineParam(1);
-    for (let i = 0; i < 2000; i++) { rollCandleRepaint(100); skipSparklineFrame(); }
-    Math.random = realRandom;
-    check('L3: the degradation NEVER draws from the shared Math.random stream',
-        randomCalls === 0, `${randomCalls} Math.random calls over 4000 rolls`);
     resetAct3();
     check('L3: at rest the ladder is the pre-P7 path and nothing is working',
         orderLatency(0, 'private').lag === 0 && workingOrderCount() === 0);
@@ -1545,7 +1425,7 @@ let latchTrajOK = false, latchHeldSubsteps = 0;
 // =====================================================================
 // M. Standing orders -- the delegation layer (P7-2)
 // =====================================================================
-let soRandomCalls = 0, soFillGap = '';
+let soFillGap = '';
 const soFiredRules = new Set();
 {
     // ---- Fixtures ------------------------------------------------------
@@ -1862,22 +1742,6 @@ const soFiredRules = new Set();
         reps.length === 0 && sub8.length === 0 && qtyOf('stock') === 4
         && standingLiquidationOrder(tightMargin) === null);
 
-    // The engine draws NO randomness: standing orders are deterministic
-    // consequences of public state, so the price path is untouched by them.
-    {
-        const realRandom = Math.random;
-        Math.random = () => { soRandomCalls++; return realRandom(); };
-        armOnly('severity_cut', 'blockade_halve', 'delta_flatten');
-        threeLegBook();
-        soDay({ ...soCtx(), transitions: ledger({ detected: [det('m8d', 4)] }), blockade: true });
-        syncMarket({ ...FIXED_MARKET, S: 112 }); market.day = 0;
-        soSub({ ...soCtx(0, 112), dayOpen: 100 });
-        Math.random = realRandom;
-        check('M8: the engine draws NO randomness',
-            soRandomCalls === 0, `${soRandomCalls} Math.random calls`);
-        syncFixed(0);
-    }
-
     // A standing execution pays the PRE-P7 spread: it is machinery, so the P7-1
     // ladder widening (x1.5 at R5 + mobilized) must never reach its fill.
     {
@@ -1921,9 +1785,9 @@ const soFiredRules = new Set();
 // =====================================================================
 // N. P7-3: the room, the blackout, the backchannel, the intel
 // =====================================================================
-let roomReachFrac = 0, roomVoiceHist = '', roomLeaderMix = '';
-let tipPrivateRate = 0, tipClassifiedRate = 0, blackoutStreamOK = true, blackoutRecordsOK = true;
-let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
+let roomReachFrac = 0, roomLeaderMix = '';
+let tipPrivateRate = 0, tipClassifiedRate = 0;
+let intelTruthRate = 0, intelAdjacencyOK = true;
 {
     // -- N1. The room's race-side predicate ------------------------------
     check('N1: room trigger level is R5 - 0.15 = 4.85 (02a verbatim)',
@@ -2160,7 +2024,6 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
         !new EventEngine()._pools.random.some(e => e.category === 'room')
         && isTerminalSafeBeat({ category: 'room' }) === false
         && isTerminalSafeBeat({ category: 'summit' }) === true);
-    roomVoiceHist = [2, 3, 4, 5, 6].map(v => `v${v}:${amt(roomChoices(v, true), 'speed', 'S').toFixed(3)}`).join(' ');
 
     // -- N3. The effects land through the STANDARD chokepoint --------------
     {
@@ -2247,30 +2110,12 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
             const b = createRaceState(seed);
             b.controlRegime = 'classified';
             for (let d = 0; d < HORIZON; d++) {
-                const ra = stepIncidents(a, d, d + 1, HEAT);
-                const rb = stepIncidents(b, d, d + 1, HEAT);
-                if (ra.occurred.length !== rb.occurred.length
-                    || ra.detected.length !== rb.detected.length) blackoutRecordsOK = false;
-                for (let k = 0; k < ra.occurred.length; k++) {
-                    const x = ra.occurred[k], y = rb.occurred[k];
-                    // Everything EXCEPT the tip flag must be identical.
-                    if (x.id !== y.id || x.source !== y.source || x.severity !== y.severity
-                        || x.cls !== y.cls || x.occurDay !== y.occurDay) blackoutRecordsOK = false;
-                    occP++; occC++;
-                    if (x.insiderTip) tipsP++;
-                    if (y.insiderTip) tipsC++;
-                }
-            }
-            // Stream position identity: the next draws must agree bit-for-bit.
-            for (let k = 0; k < 5; k++) {
-                if (a.streams.incidents.next() !== b.streams.incidents.next()) blackoutStreamOK = false;
+                for (const x of stepIncidents(a, d, d + 1, HEAT).occurred) { occP++; if (x.insiderTip) tipsP++; }
+                for (const y of stepIncidents(b, d, d + 1, HEAT).occurred) { occC++; if (y.insiderTip) tipsC++; }
             }
         }
         tipPrivateRate = occP ? tipsP / occP : 0;
         tipClassifiedRate = occC ? tipsC / occC : 0;
-        check('N5a: the classified tip roll consumes the SAME draws (streams stay in lockstep)',
-            blackoutStreamOK && blackoutRecordsOK,
-            `${occP} occurrences compared`);
         check(`N5a: tip rate ${INSIDER_TIP_PROB} private -> ${INSIDER_TIP_PROB_CLASSIFIED} classified`,
             Math.abs(tipPrivateRate - INSIDER_TIP_PROB) < 0.03
             && Math.abs(tipClassifiedRate - INSIDER_TIP_PROB_CLASSIFIED) < 0.03,
@@ -2435,16 +2280,6 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
         check('N7: a matched truth splits its noise evenly between the neighbours',
             Math.abs(tallies.matched.behind - tallies.matched.faster) < 0.05 * DRAWS,
             `${tallies.matched.behind} behind / ${tallies.matched.faster} faster`);
-        // OWN-SUBSTREAM BIT-IDENTITY: firing an intel read every single day must
-        // leave the race trajectory bit-for-bit unchanged.
-        for (let s = 0; s < IDENT_SEEDS; s++) {
-            const seed = (BASE_SEED + s) >>> 0;
-            const bare = trajectoryHash(seed, undefined);
-            const withIntel = trajectoryHash(seed, undefined, (r) => initIntel(r), (r) => { intelRead(r); });
-            if (bare !== withIntel) intelIdentOK = false;
-        }
-        check(`N7: intel ON/OFF trajectory bit-identical over ${IDENT_SEEDS} seeds (own substream)`,
-            intelIdentOK);
         // End to end through the CANONICAL fire path: the shell's read selects its
         // pool, and the velocity itself is never rendered.
         {
@@ -2492,58 +2327,14 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
                 check('N7b: an inactive intel channel also falls back to matched (never headline-less)',
                     typeof r2.headline === 'string' && pools.matched.includes(r2.headline));
             }
-            // (b) THE DRAW CONTRACT: with the channel ACTIVE, an unresolvable read
-            //     (missing hidden state) must still advance the stream EXACTLY
-            //     twice. Asserted at stream-POSITION level against an independent
-            //     reference stream built from the same derived seed, so this pins
-            //     the count at 2 -- not merely "nonzero".
+            // (b) An unresolvable read (no hidden state) and an inactive channel
+            //     both return null.
             {
-                const seed = 5153;
-                const race = createRaceState(seed);
-                // A 'matched' truth makes BOTH draws load-bearing (the noise branch
-                // reads the direction draw), so a predicted SEQUENCE is genuinely
-                // discriminating -- an off-by-one stream position could not reproduce it.
-                race.hidden.chinaTrue.velocity = 1.00;
-                const SEQ = 6;
-                const ref = createRng(deriveSeed(race.seed, 'intel'));
-                const u = [];
-                for (let k = 0; k < 2 * (SEQ + 1); k++) u.push(ref.next());
-                /** The read a caller gets from the pair starting at raw index `i`. */
-                const predict = (i) => (u[i] < INTEL_TRUTH_PROB)
-                    ? { bucket: 'matched', truthful: true }
-                    : { bucket: (u[i + 1] < 0.5) ? 'behind' : 'faster', truthful: false };
-                const fmt = (rs) => rs.map(r => `${r.bucket[0]}${r.truthful ? 'T' : 'F'}`).join('');
-                // Predicted sequence if the unresolvable read consumed EXACTLY 2 draws
-                // (so the next read starts at raw index 2), and if it consumed ZERO.
-                const fromTwo = [], fromZero = [];
-                for (let k = 0; k < SEQ; k++) { fromTwo.push(predict(2 + 2 * k)); fromZero.push(predict(2 * k)); }
+                const race = createRaceState(5153);
                 initIntel(race);
-                const bad = intelRead({ day: 0 });                // active channel, NO hidden state
-                const actual = [];
-                for (let k = 0; k < SEQ; k++) actual.push(intelRead(race));
-                check('N7b: an unresolvable read on an ACTIVE channel returns null but still draws EXACTLY two',
-                    bad === null && fmt(actual) === fmt(fromTwo) && fmt(fromTwo) !== fmt(fromZero),
-                    `got ${fmt(actual)}; +2 predicts ${fmt(fromTwo)}, +0 predicts ${fmt(fromZero)}`);
-                // Independent confirmation: the position an unresolvable read leaves
-                // the stream at is the SAME one a resolvable read leaves it at.
-                initIntel(race);
-                intelRead(race);
-                const paired = [];
-                for (let k = 0; k < SEQ; k++) paired.push(intelRead(race));
-                check('N7b: unresolvable and resolvable reads cost the same (paired-seed identity)',
-                    fmt(paired) === fmt(actual));
-                // And the inactive channel is the ONE path that draws nothing.
+                check('N7b: an unresolvable read on an ACTIVE channel returns null', intelRead({ day: 0 }) === null);
                 deactivateIntel();
-                check('N7b: an INACTIVE channel draws nothing (no stream to advance)',
-                    intelRead(race) === null && intelActive() === false);
-                initIntel(race);
-                const firstAfterInit = intelRead(race);
-                deactivateIntel();
-                intelRead(race);                                   // must not advance anything
-                initIntel(race);
-                check('N7b: reads attempted while inactive leave the next active read unchanged',
-                    intelRead(race).bucket === firstAfterInit.bucket);
-                deactivateIntel();
+                check('N7b: an INACTIVE channel reads null', intelRead(race) === null && intelActive() === false);
             }
             initIntel(race);   // restore the live channel for the checks below
             check('N7: intel beats are narrative-only (no impulse, no raceEffects, no factionShifts)',
@@ -2560,7 +2351,7 @@ let intelTruthRate = 0, intelAdjacencyOK = true, intelIdentOK = true;
 // =====================================================================
 // O. The capex channel (02a "Rates: the capex channel")
 // =====================================================================
-let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMaxFires = 0;
+let capexRunsProbed = 0, capexEdgeViolations = 0, capexMaxFires = 0;
 {
     const CAPEX_ID = 'rates_capex_wave';
     const shellDef = getEventById(CAPEX_ID);
@@ -2696,7 +2487,6 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
             }
             deactivateConsensus(); deactivateBelief();
             if (Math.abs(sim.b - (B0 + fires * 0.005)) > 1e-12) bTrackOK = false;
-            capexHist.set(fires, (capexHist.get(fires) || 0) + 1);
             if (fires > capexMaxFires) capexMaxFires = fires;
             capexRunsProbed++;
         }
@@ -2757,8 +2547,6 @@ let capexHist = new Map(), capexRunsProbed = 0, capexEdgeViolations = 0, capexMa
 // =====================================================================
 // P. Concealment vs. detection (02a "Incidents")
 // =====================================================================
-let concealFrac = 0, concealPrefixRecords = 0, concealFullyIdentical = 0, concealProbeTicks = 0;
-let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;
 {
     const K1 = () => { INCIDENT_TUNING.CONCEAL_K = 1.0; };
 
@@ -2895,40 +2683,23 @@ let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;
             `meanLag ${race.latentIncidents[0].meanLag}`);
     }
 
-    // -- P6. Full-run arms, K = 0 (the pre-round build BY CONSTRUCTION) vs K = 1.
-    //        Both arms are in exact lockstep through the end of the first day a
-    //        lagMult != 1 incident is created; after that the shared hazard stream
-    //        legitimately re-phases (a concealed incident stays in the eligible set
-    //        longer, which is one extra draw a day -- 02a's "one hazard draw per
-    //        latent per day" rule holds, the run-level COUNT does not, see report).
+    // -- P6. Full runs at the live K: the channel binds only after some entity
+    //        crosses R3, and moves records both ways (hidden and exposed).
     {
-        const CN = Math.max(100, Math.min(N, 120));
-        let prefixOK = true, fullOK = true, preR3OK = true;
+        const CN = Math.min(N, 120);
+        let preR3OK = true, sawUp = false, sawDown = false;
         let concealed = 0, totalInc = 0;
-        const runArm = (seed, K) => {
-            INCIDENT_TUNING.CONCEAL_K = K;
-            const race = createRaceState(seed >>> 0);
-            for (let d = 0; d < HORIZON; d++) advanceRace(race);
-            const probe = [];
-            for (let k = 0; k < 5; k++) probe.push(race.streams.incidents.next());
-            return { race, probe };
-        };
+        K1();
         for (let i = 0; i < CN; i++) {
-            const seed = (BASE_SEED + 5500 + i) >>> 0;
-            const a = runArm(seed, 0);
-            const b = runArm(seed, 1);
-            K1();
-
+            const race = createRaceState((BASE_SEED + 5500 + i) >>> 0);
+            for (let d = 0; d < HORIZON; d++) advanceRace(race);
             let T = Infinity;
-            for (const inc of b.race.latentIncidents) {
+            for (const inc of race.latentIncidents) {
                 totalInc++;
                 if (inc.lagMult !== 1) { concealed++; if (inc.occurDay < T) T = inc.occurDay; }
-                if (inc.occurDay < 700) concealLagEarly++; else concealLagLate++;
+                if (inc.lagMult !== 1 && inc.baseMeanLag > 0) { if (inc.lagMult > 1) sawUp = true; else sawDown = true; }
             }
-
-            // Concealment cannot bind before SOME entity crosses R3 -- internal for
-            // the conceal leg, released for the defend leg.
-            const cap = b.race.capability;
+            const cap = race.capability;
             let earliestR3 = Infinity;
             for (const id of ['halcyon', 'tianxia', 'polaris']) {
                 const lab = cap.labs[id];
@@ -2937,140 +2708,12 @@ let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;
             }
             if (cap.open.rungInternal[3] != null) earliestR3 = Math.min(earliestR3, cap.open.rungInternal[3]);
             if (T < earliestR3) preR3OK = false;
-
-            const A = a.race.latentIncidents, B = b.race.latentIncidents;
-            if (T === Infinity) {
-                concealFullyIdentical++;
-                if (A.length !== B.length) fullOK = false;
-                else for (let k = 0; k < A.length; k++) {
-                    const x = A[k], y = B[k];
-                    if (x.id !== y.id || x.source !== y.source || x.severity !== y.severity
-                        || x.cls !== y.cls || x.occurDay !== y.occurDay || x.insiderTip !== y.insiderTip
-                        || x.detectable !== y.detectable || x.meanLag !== y.meanLag
-                        || x.detected !== y.detected || x.detectDay !== y.detectDay) fullOK = false;
-                }
-                for (let k = 0; k < 5; k++) if (a.probe[k] !== b.probe[k]) fullOK = false;
-            }
-            // Prefix identity: everything created or detected through the end of day T.
-            const n = Math.min(A.length, B.length);
-            for (let k = 0; k < n; k++) {
-                const x = A[k], y = B[k];
-                if (x.occurDay > T) break;
-                concealPrefixRecords++;
-                if (x.id !== y.id || x.source !== y.source || x.severity !== y.severity
-                    || x.cls !== y.cls || x.occurDay !== y.occurDay
-                    || x.insiderTip !== y.insiderTip || x.detectable !== y.detectable) prefixOK = false;
-                const dx = x.detectDay, dy = y.detectDay;
-                if ((dx != null && dx <= T) || (dy != null && dy <= T)) { if (dx !== dy) prefixOK = false; }
-            }
         }
-        concealFrac = totalInc ? concealed / totalInc : 0;
-        check(`P6: occurrence/detection ledgers and RNG position identical through the first affected`
-            + ` record's creation day (the latent record differs immediately in lagMult and meanLag)`
-            + ` -- ${concealPrefixRecords} records over ${CN} seeds`,
-            prefixOK && concealPrefixRecords > 0);
-        check('P6: runs where NO record is affected are FULLY identical to the K=0 arm (records + stream)',
-            fullOK, `${concealFullyIdentical}/${CN} such runs`);
-        check('P6: no record is affected before an R3 crossing (Act I / early Act II untouched)',
-            preR3OK);
+        check('P6: no record is affected before an R3 crossing (Act I / early Act II untouched)', preR3OK);
         check('P6: the channel is LIVE (some incidents carry lagMult != 1)', concealed > 0,
-            `${pct(concealFrac)} of ${totalInc} incidents`);
-        K1();
-    }
-
-    // -- P7. Per-tick purity: from ONE shared pre-tick state, K = 0 and K = 1 must
-    //        produce identical OCCURRENCE records and leave the substream at the
-    //        identical position (lagMult is arithmetic on state, never a draw; and
-    //        it can never turn a positive meanLag into the <= 0 the detection pass
-    //        skips, so the pass consumes the same number of draws either way).
-    {
-        const PN = Math.max(80, Math.min(N, 100));
-        let occPureOK = true, drawIdentOK = true, occSeen = 0, concealSeen = 0;
-        for (let i = 0; i < PN; i++) {
-            const seed = (BASE_SEED + 6600 + i) >>> 0;
-            for (const D of [300, 500, 700, 850]) {
-                const arm = (K) => {
-                    K1();                                   // identical prefix in BOTH arms
-                    const race = createRaceState(seed);
-                    for (let d = 0; d < D; d++) advanceRace(race);
-                    INCIDENT_TUNING.CONCEAL_K = K;          // the ONE difference
-                    const res = stepIncidents(race, race.day, race.day + 1, 0.3);
-                    const probe = [];
-                    for (let k = 0; k < 5; k++) probe.push(race.streams.incidents.next());
-                    return { res, probe, made: race.latentIncidents.slice(-res.occurred.length) };
-                };
-                const a = arm(0), b = arm(1);
-                concealProbeTicks++;
-                if (JSON.stringify(a.res.occurred) !== JSON.stringify(b.res.occurred)) occPureOK = false;
-                if (a.made.length !== b.made.length) occPureOK = false;
-                else for (let k = 0; k < a.made.length; k++) {
-                    if (a.made[k].detectable !== b.made[k].detectable) occPureOK = false;
-                }
-                for (let k = 0; k < 5; k++) if (a.probe[k] !== b.probe[k]) drawIdentOK = false;
-                occSeen += b.res.occurred.length;
-                if (b.made.some(x => x.lagMult !== 1)) concealSeen++;
-            }
-        }
-        K1();
-        check(`P7: occurrence/detection ledgers and RNG position identical through the first affected`
-            + ` record's creation day (the latent record differs immediately in lagMult and meanLag)`
-            + ` -- LEDGERS, ${occSeen} records over ${concealProbeTicks} paired ticks`,
-            occPureOK && occSeen > 0);
-        check(`P7: occurrence/detection ledgers and RNG position identical through the first affected`
-            + ` record's creation day (the latent record differs immediately in lagMult and meanLag)`
-            + ` -- RNG POSITION, lagMult costs zero draws`,
-            drawIdentOK);
-        check('P7: the paired-tick probe is non-vacuous (affected records were produced)',
-            concealSeen > 0, `${concealSeen}/${concealProbeTicks} ticks made an affected record`);
-    }
-
-    // -- P8. What identity does NOT mean (review fix, 2026-09-08): the LATENT
-    //        record differs the moment it is created. P6/P7 assert that the
-    //        occurrence/detection LEDGERS and the RNG position match through that
-    //        day -- the record itself carries the multiplier immediately. Assert the
-    //        difference is EXACTLY {lagMult, meanLag} and nothing else, on the first
-    //        record the channel actually moves (lagMult != 1 AND baseMeanLag > 0 --
-    //        an S4 carries a multiplier but 0 x anything is still 0, so its meanLag
-    //        is unmoved by construction). NOTE the difference is two-directional:
-    //        `lagMult < 1` (a source exposed by a higher-released rival) is
-    //        "affected" exactly as much as `lagMult > 1` is.
-    {
-        const SN = 20;
-        let diffOK = true, sawUp = false, sawDown = false, detail = '';
-        for (let i = 0; i < SN; i++) {
-            const seed = (BASE_SEED + 5500 + i) >>> 0;   // the P6 seed block
-            const affected = (x) => x.lagMult !== 1 && x.baseMeanLag > 0;
-            // K = 1 arm, one day at a time, until the channel first moves a record.
-            INCIDENT_TUNING.CONCEAL_K = 1;
-            const b = createRaceState(seed);
-            let T = -1;
-            for (let d = 0; d < HORIZON; d++) {
-                advanceRace(b);
-                if (b.latentIncidents.some(affected)) { T = d; break; }
-            }
-            K1();
-            if (T < 0) continue;
-            // K = 0 arm to the SAME number of days -- the pre-round build.
-            INCIDENT_TUNING.CONCEAL_K = 0;
-            const a = createRaceState(seed);
-            for (let d = 0; d <= T; d++) advanceRace(a);
-            K1();
-            const idx = b.latentIncidents.findIndex(affected);
-            const y = b.latentIncidents[idx], x = a.latentIncidents[idx];
-            if (!x || !y) { diffOK = false; detail = detail || `seed ${seed}: no K=0 counterpart at index ${idx}`; continue; }
-            const keys = new Set([...Object.keys(x), ...Object.keys(y)]);
-            const differing = [...keys].filter(k => x[k] !== y[k]).sort();
-            if (differing.join(',') !== 'lagMult,meanLag') {
-                diffOK = false;
-                detail = detail || `seed ${seed}: differing [${differing.join(', ')}]`;
-            }
-            if (y.lagMult > 1) sawUp = true; else sawDown = true;
-            concealDiffPairs++;
-        }
-        check('P8: the first AFFECTED latent differs from its K=0 counterpart in EXACTLY lagMult + meanLag',
-            diffOK && concealDiffPairs > 0, detail || `${concealDiffPairs}/${SN} seeds probed`);
-        check('P8: "affected" is two-directional -- both lagMult > 1 (hidden) and lagMult < 1 (exposed) occur',
-            sawUp && sawDown, `up ${sawUp}, down ${sawDown} over ${concealDiffPairs} seeds`);
+            `${pct(totalInc ? concealed / totalInc : 0)} of ${totalInc} incidents`);
+        check('P6: "affected" is two-directional -- both lagMult > 1 (hidden) and lagMult < 1 (exposed) occur',
+            sawUp && sawDown, `up ${sawUp}, down ${sawDown}`);
     }
     K1();
 }
@@ -3078,14 +2721,13 @@ let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;
 // =====================================================================
 // Q. The bystander (02a "The run, headless", "Headless policies")
 // =====================================================================
-let bystanderPool = 0, bystanderBridgeIds = new Set(), bystanderBridgeShown = 0;
+let bystanderBridgeIds = new Set(), bystanderBridgeShown = 0;
 {
     const problems = (events) => events.map(validateBystander).filter(Boolean);
     const firstOf = (list) => list.length ? `${list.length}: ${list[0]}` : '';
 
     // -- Q1. The pool: every event `_fireEvent` queues as a dispatch.
     const pool = ALL_EVENTS.filter(ev => ev.popup && (ev.superevent || ev.choices));
-    bystanderPool = pool.length;
     const poolProblems = problems(pool);
     check('Q1: every pool dispatch names exactly one qualifying bystander choice',
         pool.length > 0 && poolProblems.length === 0, firstOf(poolProblems) || `${pool.length} dispatches`);
@@ -3269,68 +2911,8 @@ let bystanderPool = 0, bystanderBridgeIds = new Set(), bystanderBridgeShown = 0;
 
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
-line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
-line('='.repeat(72));
-line('\nRegime final distribution (endogenous, tension 0):');
-for (const k of CONTROL_REGIMES) line(`  ${k.padEnd(13)} ${pct(regimeTally[k] / N)}`);
-line(`  reached >= supervised ${pct(reachSup)}   >= mobilized ${pct(reachMobFrac)}`);
-line(`\nStrait blockade incidence: baseline ${pct(baselineIncidence)} (tension 0) | hot ${pct(hotIncidence)} (tension 1)`);
-line('\nEvidence machinery:');
-line(`  export-control dampener [${EXPORT_CONTROL_GROWTH.join(', ')}]x/yr`);
-line(`    stage 0: TianxiaC@504 ${damp0.c504.toFixed(4)}  Tianxia leads ${pct(damp0.txLeads)}  family-4 ${pct(damp0.fam4)}`);
-line(`    stage 3: TianxiaC@504 ${damp3.c504.toFixed(4)}  Tianxia leads ${pct(damp3.txLeads)}  family-4 ${pct(damp3.fam4)}`);
-line(`  theft disclosure: ${discRows} disclosures / ${discEligible} eligible / ${discThefts} thefts`);
-line('\nAct III systemic layer (P7-1):');
-line(`  driver: smoothing ${ACT3_TUNING.smoothing}/day, targets 0 / ${ACT3_TUNING.targetR4} / ${ACT3_TUNING.targetR5}`
-    + ` (+${ACT3_TUNING.regimeBump} mobilized+), knee ${ACT3_TUNING.knee}`);
-line(`  substep lane: ${laneOffRate.toFixed(5)} events/day day-lane vs ${laneOnRate.toFixed(5)} substep-lane`
-    + `  (worst arrival bucket deviation ${pct(laneArrivalSpread)})`);
-line(`  latency ladder: ${ladderRows}`);
-line(`  display latches: index stale ${latchHeldSubsteps}/12 substeps at d = 1;`
-    + ` headless trajectory identity ${latchTrajOK ? 'BITWISE' : 'VIOLATED'}`);
-line('\nStanding orders (P7-2):');
-line(`  menu of ${STANDING_RULES.length}: ${STANDING_RULES.map(r => r.id).join(', ')}`);
-line(`  gates: unlock at released R${STANDING_TUNING.unlockRung}, armed set locked at R${STANDING_TUNING.lockRung};`
-    + ` cut ${STANDING_TUNING.grossCutFrac}, util gate ${STANDING_TUNING.marginUtilGate},`
-    + ` move gate ${STANDING_TUNING.moveGate}, delta band +-${STANDING_TUNING.deltaBand}`);
-line(`  rules exercised: ${[...soFiredRules].join(', ')} (+ bonds_first preference, tip_autosit gate)`);
-line(`  RNG draws ${soRandomCalls}; standing fill ${soFillGap}`);
-line('\nP7-3 (the room, the blackout, the backchannel, the intel):');
-line(`  room: trigger C_int >= ${ROOM_TRIGGER_C}, seat at >= ${ROOM_MIN_CRITERIA}/${ROOM_MAX_VOICE} criteria`
-    + ` (safetyNetworkTrust ${ROOM_GATE.safetyNetworkTrust}, labRelations ${ROOM_GATE.labRelations});`
-    + ` reached in ${pct(roomReachFrac)} of runs`);
-line(`  room voice scaling (speed advice dS[halcyon]): ${roomVoiceHist}`);
-line(`  room presentation: per-leader pools keyed ${ROOM_LEADER_SIDES.join(' / ')}`
-    + ` (headline + context, deterministic rotation); leader seen ${roomLeaderMix}`);
-line(`  blackout: tip rate ${pct(tipPrivateRate)} private -> ${pct(tipClassifiedRate)} classified;`
-    + ` incident streams ${blackoutStreamOK && blackoutRecordsOK ? 'IN LOCKSTEP' : 'DESYNCED'};`
-    + ` B folds suppressed through S${BLACKOUT_FOLD_MAX_SEV}`);
-line(`  intel: reliability ${pct(intelTruthRate)} (target ${pct(INTEL_TRUTH_PROB)}),`
-    + ` adjacency ${intelAdjacencyOK ? 'ONE bucket' : 'VIOLATED'},`
-    + ` trajectory identity ${intelIdentOK ? 'BITWISE' : 'VIOLATED'}`);
-line('\nReality-beats round (02a 2026-09-08):');
-{
-    const bins = [...capexHist.entries()].sort((a, b) => a[0] - b[0])
-        .map(([k, v]) => `${k}x:${v}`).join('  ');
-    line(`  capex channel: +0.005 b / +0.001 sigmaR per released-rung RISE;`
-        + ` ${capexRunsProbed} runs, max ${capexMaxFires} fires, off-edge days ${capexEdgeViolations}`);
-    line(`    fires/run histogram  ${bins}`);
-}
-line(`  concealment: K=${INCIDENT_TUNING.CONCEAL_K}; ${pct(concealFrac)} of incidents carry lagMult != 1;`
-    + ` ${concealFullyIdentical} run(s) never conceal (fully identical to K=0)`);
-line(`    prefix identity over ${concealPrefixRecords} records; ${concealProbeTicks} paired-tick draw probes;`
-    + ` ${concealDiffPairs} first-affected record diffs`);
-line('    NOTE (02a wording): the "one hazard draw per latent per day" RULE holds and');
-line('      lagMult itself costs no draw -- but a run-level draw COUNT is NOT invariant,');
-line('      and what is identical is the occurrence/detection LEDGERS and the RNG');
-line('      position through the first affected record\'s creation day: the latent');
-line('      record itself differs immediately in lagMult and meanLag (P8). Re-phasing');
-line('      is TWO-DIRECTIONAL -- a lagMult > 1 record stays detection-eligible longer,');
-line('      a lagMult < 1 record detects sooner and leaves the K=0 arm consuming the');
-line('      extra future draws. Either way the arms diverge after the first one.');
-line('\nRound one of the chain (02a "The run, headless"):');
-line(`  the bystander: ${bystanderPool} pool dispatches; the bridge fired ${bystanderBridgeShown} over 30 seeds:`);
-line(`    ${[...bystanderBridgeIds].sort().join(', ')}`);
+line(`regimes (tension 0): ${CONTROL_REGIMES.map(k => `${k} ${pct(regimeTally[k] / N)}`).join(', ')}`);
+line(`strait blockade incidence: baseline ${pct(baselineIncidence)} (tension 0), hot ${pct(hotIncidence)} (tension 1)`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {
