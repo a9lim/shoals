@@ -90,6 +90,7 @@ export function createWorldState() {
             halcyonPaused:      false,       // halcyon_pause fired (the voluntary pause that ends)
             proofDisputed:      false,       // wonder_proof_disputed fired (the claimed proof, contested)
             fixedpointIndex:    false,       // halcyon_fixedpoint_index fired (the self-scored index)
+            fixedpointCatalogue: false,      // demo_fixedpoint_catalogue fired (the codename's first public meaning)
         },
     };
 }

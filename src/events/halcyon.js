@@ -29,7 +29,7 @@ export const HALCYON_EVENTS = [
         oneShot: true,
         likelihood: 1.5,
         magnitude: 'minor',
-        when: (sim, world) => world.ai.frontierRung <= 2 && !world.ai.fixedpointPublic,
+        when: (sim, world) => world.ai.frontierRung <= 2 && !world.ai.fixedpointPublic && !world.ai.fixedpointCatalogue,
         headline: 'Page four of the Meridian Brief, between a bond auction recap and the cafeteria schedule: Halcyon’s infra spend came in under guidance, "reflecting efficiencies attributed internally to Project Fixedpoint." No gloss. No follow-up. The Brief’s editor did not ask what the word means, because the Brief’s editor does not know it means anything.',
         params: {},
         impulse: { xi: 0.004 },   // decaying (P4): a flicker of vol nobody can source

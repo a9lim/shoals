@@ -210,6 +210,9 @@ export function stepDemonstrations(race, tr, day, endDay) {
         rows.push({ kind: 'dispute', id, on: d.id, lab: d.lab, rung: d.rung });
     }
     // 4. Publications. The hazard reads C_int against k = the released rung + 1.
+    //    A classified program publishes nothing (a9, 2026-10-27): what is already
+    //    pending above still lands, and no new demonstration is drawn.
+    if (race.controlRegime === 'classified') return rows;
     for (const labId of DEMO_LABS) {
         const lab = race.capability.labs[labId];
         if (!lab.active) continue;

@@ -151,6 +151,9 @@ export const RACE_EVENTS = [
         headline: 'Halcyon posts seven hundred papers overnight, each on a problem somebody had given up on, under a cover note signed by no one and titled Fixedpoint: a catalogue. The model that wrote them isn’t one Halcyon sells; the note calls it “an internal build.” About four in ten come with a proof a machine can check. Mathematicians spend the morning checking the ones in their field and the afternoon not saying much. Consensus barely moves: a theorem isn’t a release. Sharma: “Seven hundred papers is a sentence about the model they haven’t shipped.”',
         params: {},
         impulse: ROUTINE_FRONTIER_IMPULSE,
+        // The codename now means a catalogue, so the Act I hint that nobody knows
+        // what it means stops (the fixedpointPublic pattern).
+        effects: (world) => { world.ai.fixedpointCatalogue = true; },
     },
     {
         id: 'demo_halcyon',
