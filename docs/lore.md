@@ -154,10 +154,18 @@ its fear made into a number.
 - **Halcyon Chat** — consumer. The household word and the revenue floor.
 - **Halcyon Compute** — platform and infrastructure. Quiet, critical.
 - **Project Fixedpoint** — internal: Aleph doing Aleph R&D. x = f(x). A
-  half-sentence on page four of the Brief while the frontier is young;
-  Tan's leak makes it a word the world knows, the way "Manhattan" did;
-  afterward Halcyon publishes a self-graded **Fixedpoint Index** that
-  Consensus declines to list.
+  half-sentence on page four of the Brief while the frontier is young.
+  Its first public meaning is a catalogue: seven hundred papers from an
+  unreleased build, on problems somebody had given up on, about four in
+  ten with a proof a machine can check. Tan's leak makes it a word the
+  world knows, the way "Manhattan" did; afterward Halcyon publishes a
+  self-graded **Fixedpoint Index** that Consensus declines to list.
+- **Demonstrations** — what a lab's unreleased model did, published:
+  catalogues of results, mathematics first, because mathematics certifies
+  fast and loud. Halcyon and Polaris publish them (Polaris more often, and
+  more boldly, before a round). Rivals contest their scope; independent
+  evaluators uphold them, narrow them, or find the lemma that fails and
+  withdraw everything built on it.
 - **The pause** — a voluntary two-week pause "for some work"; the next
   release ships on the cadence it was meant to interrupt.
 

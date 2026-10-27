@@ -213,6 +213,32 @@ sit on results, publication is a choice, and unpublished beats leak.
 Evidence folds into `B`'s alignment sentiment; it has no player-facing
 beat of its own.
 
+## Demonstrations
+
+The capability-side disclosure that isn't a release: a lab publishes
+what its *unreleased* model did. Halcyon and Polaris demonstrate (Tianxia
+ships nearly everything, and the open ecosystem holds nothing back), and
+a demonstration bears on one rung, the next one the lab hasn't released.
+It is evidence about the rung contracts, never their settlement.
+
+Each has a hidden truth, read from the lab's internal capability when it
+is published: *sound* (the model has crossed the rung in house, so the
+release that claims it is likely coming), *over-scoped* (close, but
+short of it) or, independently, *flawed* (a lemma fails). Over-scoped
+work is published less readily than sound work, except by a lab facing a
+funding round, which demonstrates more and stretches more. Then the
+lifecycle: a scope dispute may contest it, a noisy early signal, since
+critics contest sound work too; an independent evaluation weeks later
+upholds it, narrows it short of the rung, or withdraws it, and a
+withdrawal takes everything that cited the withdrawn work. Nothing new is
+published under a classified program.
+
+Demonstrations move nothing in the race. They reach the market only
+through the public record: the reader's full heads read them, and the
+market's crude reading of the headlines doesn't, so the edge on
+information is the player's to take. The constants are in 02a
+"Demonstrations".
+
 ## The theft mechanic
 
 Weight exfiltration is the race's discontinuity — the only event that

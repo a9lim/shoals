@@ -2005,14 +2005,16 @@ publication day and claim, dependents keep their citation edges, and no
 quote before a report's publication day changes because of it.
 
 **Release jitter** (ROADMAP §10). The cooldown after each release is
-drawn per release from U(35, 55) trading days (the mean stays 45), from
+drawn per release from U(30, 60) trading days (the mean stays 45), from
 a new race substream `streams.releaseJitter`, so no other stream's draws
 change. Nothing else moves: a lab's first release keeps its timing, and
 no release history is invented, because `lastReleaseDay` is public. The
 early lockstep is chiefly Tianxia's releases on days 1, 46 and 91, and
 the jitter spreads every release after the first. Gates (`race-mc`): the
 KM medians keep their bands, and the Act I claim excess in days 42–48 of
-the 63-day cycle (65% above average today) falls below 25%. The rule of
+the 63-day cycle (65% above average today) falls below 25%. The ruling
+first drew U(35, 55); that left the Act I excess at +30%, and the round
+widened it to meet the target (+16%, the whole run +4%). The rule of
 thumb's code doesn't change. Its frozen hash is re-derived by running
 HEAD 1343924's `belief.js` on the jittered worlds under the hash's own
 fixed input tape, and the current rule must still match it.
@@ -2059,6 +2061,42 @@ These are tuning targets, not predictions. The late-determination
 ceilings read the full family head, which η doesn't shield, so they bind
 first if demonstrations make worlds legible too early. The levers are
 λ₀, then the evaluation lag.
+
+**Implementation readings** (the round's interpretation calls, kept):
+
+- The cooldown is drawn on whole days, 30 to 60, so its mean is exactly
+  45. The claim excess counts releases that newly cross a rung, binned by
+  day mod 63 into weeks; Act I is a released frontier at R2 or below.
+- A day's hazard is applied as the probability 1 − e^(−λ), as theft and
+  incidents read theirs. A publication on day d is in Polaris's funding
+  window when a scheduled round s has d < s ≤ d + 42.
+- Every dispute, evaluation and withdrawal is a report of its own. A
+  flawed demonstration's evaluation is one withdrawal row naming it, with
+  what it took, and no separate evaluation row.
+- The shells are category `release` (the wire's kicker reads "The race").
+  The catalogue sets `world.ai.fixedpointCatalogue`, which retires the Act
+  I Fixedpoint hint ("the Brief's editor does not know it means
+  anything"). A withdrawal's `{n}` is a count with its noun ("one later
+  result").
+- Under the classified regime nothing new is published; what is pending
+  still lands (a9, 2026-10-27).
+- The cascade is rare by construction. A lab demonstrates rung k + 1 only
+  after releasing k, inside k's evaluation window, so in 2,000 runs 25 of
+  9,805 demonstrations cited one still unevaluated and none cited a
+  flawed one. a9 kept it as built (2026-10-27); a constructed case in
+  `race-mc` covers it.
+- A desk that ends before the world closes the demonstrations before the
+  extrapolation, so the record ends where the run did.
+- On the Race page a demonstration is its lab's mark, hollow, in the
+  lab's lane at its rung: dashed while disputed, a dot once upheld, short
+  of the rung once narrowed, struck through once withdrawn.
+
+Measured (`race-mc`, N = 1000): 4.85 demonstrations a run (Halcyon 1.89
+of R2, 0.44 of R3, 0.40 of R4; Polaris 1.89 of R2, 0.16 of R3); 52%
+over-scoped, 15% flawed, 42% disputed; evaluations uphold 40%, narrow 43%
+and withdraw 15%; 57% of Polaris's fall inside a funding window; Halcyon
+demonstrates R3 before releasing it in 49% of worlds, R4 in 48% and R2
+in 95%.
 
 ## The run, headless
 
@@ -2217,6 +2255,44 @@ What waits for later rounds: the authoring inspector, matched-policy
 gates (§2's second round uses them), the counterfactual (§5) and shared
 seeds (§8). The remaining harnesses that rebuild pieces of `main.js`
 move to the run module when they next change.
+
+**Implementation readings** (the round's interpretation calls, kept):
+
+- A followup chain's id is `id@day#occurrence`, so two firings of one
+  event never share a branch group. A recurring pulse's occurrence 0 is
+  its first scheduling, and occurrence n the nth time it comes due. The
+  election's stream is keyed by its day and kind. A choice followup's
+  delay is keyed by the event's id and occurrence, the choice and the
+  followup's index; a tip's followup takes `'tip'` for the index. A
+  portfolio trigger's firing is an occurrence too.
+- A dispatch's occurrence id is its place in the run's queue order,
+  assigned when it is queued.
+- A pricing setting goes through `_midDayBaseline`, so a mid-day change
+  sets the baseline; before, the close could erase it.
+- A forecast state that fails validation leaves the draft unchanged.
+- A save's endpoint is always between days, and its header carries
+  whether the desk was dealt. It also carries the Markets page's ghost,
+  display state the live page computed, so a resumed run shows the
+  curves it showed. A save that doesn't replay is retired with a notice.
+- The margin call's bystander choice is "Liquidate all positions" (moot:
+  the bystander holds nothing), and game over's single choice is flagged.
+  Four flags are the nearest qualifying choice rather than a neutral one,
+  and wait on a9: export controls ("Fight the controls", which grants the
+  inert Accelerationist conviction), the treaty window ("Counsel
+  against"), the reporting regime ("Let it die in committee", which drops
+  the insider channel's trust below its gate) and enforcement ("Fight
+  it", reached only through scrutiny, which a bystander never draws).
+- **Exactness is per engine.** ECMAScript leaves `Math`'s transcendental
+  functions implementation-approximated, and Node 24 and Chrome round
+  `Math.exp` and `Math.log1p` differently in the last place: `B`'s day-0
+  R5 quote is …1831 in one and …183 in the other. Replay is bit-exact
+  within one engine, and the price path and the book matched exactly.
+  So the fixture is a journal recorded in Chrome with its trail derived
+  in Node, and live equivalence is checked in the page. Bit-identical
+  worlds across engines would need portable math, which shared seeds
+  (§8) will want.
+- A full bystander Dynamic run takes about 0.12 s headless (0.6 s with
+  the digest trail).
 
 ## Resolution
 

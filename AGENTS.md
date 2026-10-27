@@ -40,10 +40,11 @@ node tools/valuation-test.mjs  # [N] [--seed S] [--validation], N=1000/scenario:
 node tools/rounds-test.mjs     # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~28 s)
 node tools/reader-test.mjs     # [N] [--seed S] [--sections A-G], N=2000/scenario: the reader's gates, B's edge and its close (~2 min)
 node tools/opening-test.mjs    # N=400 worlds: the inherited desks, obligations and their netting, the forced sale, the close, reduce-only closes, the skip's stops, the flatten ticket (~4 s)
+node tools/run-test.mjs        # [--seed S] [--rebaseline]: the run headless: no ambient randomness, determinism, isolation, round trip, the fixture, resume, the close's order, coupling, the bystander, Classic inert, timing (~4 s)
 node tools/reader-fit.mjs      # the reader's offline fit; needs NumPy/SciPy (shared venv). Run only under 02a's refit rule
 ```
 
-The eleven harnesses import `src/` directly and exit 1 on any failure. They are the
+The twelve harnesses import `src/` directly and exit 1 on any failure. They are the
 regression gate for anything that touches the Dynamic-mode systems. Run them at the
 default N, because their calibration bands are sized for it and small-N runs miss
 them legitimately. Each harness header lists its sections. The parent build doesn't
@@ -53,13 +54,17 @@ stage `tools/`.
 
 ```
 index.html, styles.css, colors.js  the Brief: masthead, four pages, overlays; styles; data hues on the inks
-main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup queue, all wiring (~4.3k lines)
+main.js            the shell: DOM cache `$`, the clock (rAF loop, step, the skip), the sink, the dispatch's display, save and resume, all wiring (~1.6k lines)
+src/run.js         the run, DOM-free: its transitions (open, substep, close, the race block), the dispatch queue, commands and the journal, the terminal path (~2k lines)
+src/run-desk.js, run-state.js  the run's trade entry points and standing orders; its state object, the sink and shared helpers
+src/run-replay.js, run-worker.js  headless runs, replay to an endpoint, the bystander, the state digest; the module worker for the live-equivalence check
 src/pages.js       the four pages (folios), and a folio's count (the ticket's legs on Markets)
 src/brief.js       masthead, editions and extras, the lead item and "In brief"
 src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard, opened panels and their tables
 src/ticket.js      the ticket: legs, ratios and size, order types, the scenario figure and grid, strategies
 src/surface.js     the volatility surface under the opened Options panel
-src/race-page.js   the race page: public release/claim/certification record, Consensus laws, the forecast editor, epilogue reveal
+src/race-page.js   the race page: public release/claim/certification record, demonstrations, Consensus laws, the forecast editor, epilogue reveal
+src/reports-view.js  the chain's reports under the race page's releases
 src/config.js      named constants and PRESETS
 src/simulation.js  GBM + Merton + Heston stock, Vasicek rate, 16 substeps/day; history-buffer.js ring buffer
 src/pricing.js     CRR binomial American pricing, Heston term/skew vol, VXHCN spot/futures, Vasicek bond
@@ -71,7 +76,7 @@ src/chart.js       the tape: HCN as print candles (zoomed out, a close line over
 src/portfolio-renderer.js  the book on the front page's rail
 src/ui.js, reference.js    the DOM cache and settings, Meridian's panels, the dispatch; info and reference panels
 src/strategy-store.js  built-in and saved (localStorage) strategies
-src/market.js          shared market snapshot, written only by main.js `_syncAll()`
+src/market.js          shared market snapshot, written only by the run's `syncAll()`
 src/events.js          EventEngine: Poisson draw, pulses, one-shots, followups, triggers, impulse dispatch
 src/events/            authored event pools by domain + param-ranges.js; index.js merges and validates
 src/events/race-bridge.js, race-events.js  race ledger → narrative shells
@@ -85,8 +90,9 @@ src/race/              hidden race model and its markets (DOM-free; see below), 
                        record and the reader (reader-constants.js is generated; never edit it)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
 src/audio.js           all music and SFX, synthesized
-tools/*.mjs            the eleven headless harnesses, the reader's fit tool and its data/metrics
-                       modules; tools/reader-optimizer.py (the fit's optimizer)
+tools/*.mjs            the twelve headless harnesses, the reader's fit tool and its data/metrics
+                       modules; tools/reader-optimizer.py (the fit's optimizer); tools/fixtures/
+                       (run-test's browser-recorded journal)
 docs/design/, docs/lore.md, docs/ROADMAP.md
 ```
 
@@ -96,10 +102,11 @@ docs/design/, docs/lore.md, docs/ROADMAP.md
 
 `PRESETS` (`src/config.js`) lists five fixed regimes, collectively "Classic" (Calm
 bull, Sideways, Volatile, Crisis, Rate hike), plus Dynamic, the default at index 5.
-`loadPreset` creates `eventEngine` and `raceState` only for index ≥ 5. In Classic
-both are null, and the race, its markets, belief, Act III and standing orders are all
-inert, so Classic is the pure trading sim. `resetSim` re-rolls the race in place with
-a fresh seed, while a mode change creates or nulls it.
+`newRun` (`src/run.js`) creates the event engine (`run.engine`) and the race
+(`run.race`) only for index ≥ 5. In Classic both are null, and the race, its markets,
+belief, Act III and standing orders are all inert, so Classic is the pure trading sim.
+Every new run (a reset, a mode change, the epilogue's restart) draws a fresh run seed
+with `randomSeed()`, the one ambient draw.
 
 ### The trading day
 
@@ -109,21 +116,23 @@ is a 252-bar `HistoryBuffer` (`.get(day)`, `.last()`, `.minDay`/`.maxDay`), and
 `prepopulate()` backfills it by running with `mu` negated. `beginDay()` pushes
 `sim._partial` by reference and `substep()` mutates it in place.
 
-`frame()` (the playing loop) and `step()` (one substep per press, closing the day
-after the sixteenth) share the same pipeline. `_beginTradingDay()` installs the
-Layer-3 and impulse overlays. `_runSubstep()` runs substep → `_clampRate()` → impact
-decay → `_syncAll()` → market-maker rehedge → pending-order check, then the Act III
-boundary work (deferred manual fills, the substep event lane, a popup drain).
-`_closeTradingDay()` finalizes the bar and removes the overlays LIFO before
-`_onDayComplete()`. That opens with the forecast's snapshot on a lock day (before
-anything else steps, so it is still the lock day's), then handles borrow, dividends,
-expiry, the quarterly review, traits, the race block, the event engine and endings,
-impact and Layer-3 decay, the obligations (`_settleObligations`: payment, the forced
-sale, the notice), the rogue-trading and margin checks, UI and the popup drain. `tick()` in `main.js` has no
-callers.
+The run's transitions live in `src/run.js`; `frame()` (the playing loop) and `step()`
+(one substep per press, closing the day after the sixteenth) in `main.js` only drive
+its clock. `beginDay()` installs the Layer-3 and impulse overlays. `substep()` runs
+substep → `_clampRate()` → impact decay → `syncAll()` → market-maker rehedge →
+pending-order check, then the Act III boundary work (deferred manual fills, processed
+atomically; the substep event lane; a popup drain). `tryClose()` closes a finished day
+unless the barrier holds: `_closeTradingDay()` finalizes the bar and removes the
+overlays LIFO before `_onDayComplete()`. That opens with the forecast's snapshot on a
+lock day (before anything else steps, so it is still the lock day's), then handles
+borrow, dividends, expiry, the quarterly review, traits, the race block, the event
+engine and endings, impact and Layer-3 decay, the obligations (`_settleObligations`:
+payment, the forced sale, the notice), the rogue-trading and margin checks, the sink's
+close notifications and the popup drain.
 
 Race-block order in `_onDayComplete`: `stepCoupling` → `advanceRace(race,
-{straitTension, playerCoupling, exportControlStage})` → `stepControlRegime` →
+{straitTension, playerCoupling, exportControlStage})` (demonstrations step inside it,
+after the day's releases and certifications) → `stepControlRegime` →
 `stepTreaty` → `_syncRaceToWorld()` (the mirrors) → `setBaseRateScale` →
 `_stepAct3()` → standing-order sync → `stepBelief` → Consensus and compute
 settlement → standing day rules → on lock days, quarter scoring (`scoreQuarter`, and the
@@ -132,6 +141,42 @@ reader-copier's), the quarter's close line, `F`, scrutiny and firm conversion �
 `_checkRoom`. After the event engine and the bridge pass, `_stepRaceMarkets` applies
 the valuation gap (and any follow-on dilution) to the closed day, fills resting orders
 at the post-gap price and queues the round offers; `marketsDayClose` snapshots after it.
+
+### The run and its journal
+
+Read 02a "The run, headless" with this. A run is its seed, its journal and its rules
+version (`RULES_VERSION`, `config.js`).
+
+- **Randomness.** Every draw that can change state comes from the run seed through
+  `keyedRng(seed, name, ...keys)` (`race/rng.js`): a fresh stream per semantic slot
+  (the price path by day and substep, the event engine's draws by day or by an event's
+  id and occurrence, tips, lobbying), so a branch that adds an event relabels only the
+  draws keyed on it. The race's named streams are unchanged; presentation keeps
+  streams of its own. `randomSeed()` at a new run is the only `Math.random` left.
+- **The sink.** The run reports to the shell through one object (`setSink`,
+  `run-state.js`): toasts, developments, stops, wire refreshes, a dispatch to show,
+  the close's display data. A headless run passes none.
+- **Commands.** Everything the player does that changes state is a command through
+  `runCommand` (`trade`, `cancel`, `close`, `unwind`, `exercise`, `answer`, `forecast`,
+  `standing`, `lobby`, `setting`), journaled at its position (the day, and the
+  substeps run: 0 between days, 16 for a finished day a dispatch holds open). A
+  command carries what it resolved to, admission is checked inside the run, a
+  dispatch answer names its occurrence, and the forecast editor commits the draft's
+  whole state at a gesture's end. Speed, pause, the skip, pages, theme and sound are
+  not commands.
+- **Save and resume.** The shell writes `shoals-run` (header, journal, endpoint and
+  the Markets page's ghost) at each close and after each command between days, and a
+  page load replays it headless to the endpoint with the sink in replay mode, then
+  opens paused. A save under other rules, or one that fails to replay, is retired
+  with a notice; the last edition clears it.
+- **Headless runs.** `runHeadless` and `drive` (`run-replay.js`) play a policy; the
+  bystander answers each dispatch with its `bystander: true` choice (every dispatch
+  names one, `validateBystander` in `events/index.js`), sends no commands and starts
+  on cash. `digest()` hashes the run's state at each close.
+- **Exactness is per engine.** Replay is bit-exact within one JavaScript engine; Node
+  and Chrome round some `Math` functions differently in the last place, so the fixture's
+  trail is derived in Node and live equivalence is checked in the page
+  (`shoalsReplayCheck()`, a module worker with its own module instances).
 
 ### Pricing, impact, portfolio
 
@@ -161,7 +206,7 @@ at the post-gap price and queues the round offers; `marketsDayClose` snapshots a
   primary input to the cost-of-capital channel). Offers are `rounds` dispatches.
 - Positions carry a signed `qty` (no `side`) and net on `type + strike + expiryDay +
   strategyName`. `portfolio` is a singleton that `resetPortfolio()` mutates in place.
-  `executeWithRollback` (main.js) unwinds every leg of a strategy on partial failure.
+  `executeWithRollback` (`run-desk.js`) unwinds every leg of a strategy on partial failure.
   Strategies are saved as strike/DTE offsets, with built-ins as constants.
 
 ### Events and narrative state
@@ -182,7 +227,7 @@ at the post-gap price and queues the round offers; `marketsDayClose` snapshots a
 - The discretionary draw (`_discretionaryDraw`) is Poisson with cooldown, and
   `eventBaseRateScale` scales it from ×1 at released R1 to ×2.5 at R5. Categories in
   `_PULSE_CATEGORIES` (events.js) never ride it. Those are the pulses (fed, midterm,
-  interjection) and everything fired by the race bridge, the ledger or main.js
+  interjection) and everything fired by the race bridge, the ledger or the run's
   latches (release, incident, certification, strait, regime, dispute, theft, polaris,
   insider, conversion, summit, room, rates). Arc categories (halcyon, china, wonder,
   policy, treaty, ghostwritten) are Poisson-live, gated by `world.ai.frontierRung`.
@@ -192,7 +237,7 @@ at the post-gap price and queues the round offers; `marketsDayClose` snapshots a
   `resetRaceBridge()`, never RNG.
 - `world-state.js` holds congress, geopolitical, fed, investigations, election, media
   and `ai`. `world.ai.controlRegime`, `reportingRegime`, `frontierRung`, `summitLive`,
-  `fundLive` and `geopolitical.taiwanBlockade` are mirrors written by main.js and are
+  `fundLive` and `geopolitical.taiwanBlockade` are mirrors written by the run and are
   absent from `WORLD_STATE_RANGES`, so no event effect can write them. Factions (eight
   standings) live in `faction-standing.js`, attached as `eventEngine.world.factions`.
   Traits (18 permanent convictions, 6 dynamic tags) live in `traits.js`, and the
@@ -209,9 +254,18 @@ them headless.
   ecosystem, and each has internal and released capability on the R1–R5 rung ladder.
   `advanceRace` steps a day and writes `race.lastTransitions` (spawns, releases,
   thefts, crossings, certifications, incident and evidence tracks, strait beats,
-  theft disclosures, regime change). Downstream systems consume that ledger and
-  never diff state. The only capability mutations are `commitRelease` and
-  `commitTheft`.
+  theft disclosures, demonstrations, regime change). Downstream systems consume that
+  ledger and never diff state. The only capability mutations are `commitRelease` and
+  `commitTheft`. A release draws the lab's next cooldown, U(30, 60) days, from
+  `streams.releaseJitter`.
+- Demonstrations (`demonstrations.js`, 02a "Demonstrations"): Halcyon and Polaris
+  publish what their unreleased models did, bearing on the next unreleased rung. Each
+  is sound, over-scoped or flawed by its hidden truth; a scope dispute contests it, an
+  exact independent evaluation upholds, narrows or withdraws it (a withdrawal takes
+  whatever cites it), and nothing new is published under the classified regime. It
+  draws only from `streams.demonstrations` and moves nothing in the race. Polaris's
+  funding window reads `polarisRoundDays` (`rounds.js`), the nominal round schedule.
+  The public rows fold into the record; `chainReports` gives each report's status.
 - RNG: each subsystem draws from a named stream, `createRng(deriveSeed(seed, name))`.
   The race's own streams live in `race.streams`. The nationalization reference,
   closeout, intel, belief noise and act3 presentation keep streams outside it, so race
@@ -268,8 +322,8 @@ key is `shoals-theme`.
 - **Editions.** `brief.js` numbers each live trading day as an edition (day 0 is
   Edition 1) and sets the dateline (day, regime, HCN, VXHCN, rate, book). `markExtra`
   flags an extra edition for a control-regime change, a Taiwan blockade, a superevent
-  or a crisis (`compound`) event; main.js calls it after the day's events fire.
-- **The wire.** Every event-log refresh goes through main.js `_updateWire()`, which
+  or a crisis (`compound`) event; the shell calls it when the run reports an extra.
+- **The wire.** Every event-log refresh goes through the shell's `_updateWire()`, which
   also sets the front page's lead (the newest log entry, split at its first clause
   break by `splitHeadline`; the text is quoted, never rewritten), the wire under it
   (the rest of the log: `MAX_EVENT_LOG` keeps the lead and forty items under it, the
@@ -292,8 +346,9 @@ key is `shoals-theme`.
   working orders and the Greeks. A position's name hands its contract to the ticket
   (`shoals:toTicket`).
 - **Opening.** The desk opens playing on Edition 1 unless the platform asks for reduced
-  motion, which opens paused on a complete frame. In Dynamic, `_dealOpeningHand`
-  (`src/opening.js`) deals one of four inherited desks from the run's seed (its own
+  motion, which opens paused on a complete frame; a saved run resumes paused where it
+  stood ("The run and its journal"). In Dynamic, `_dealOpeningHand` (`src/run.js`,
+  on `src/opening.js`) deals one of four inherited desks from the run's seed (its own
   `'opening'` stream) and takes it over at day 0's marks, cash solved so equity net of
   the obligation is `INITIAL_CAPITAL`. The predecessor's memo leads Edition 1, with two
   archived reports (dated `Archive`, no news day) under it. Classic starts on cash.
@@ -302,12 +357,12 @@ key is `shoals-theme`.
 - **Pacing.** *To the next edition worth reading* (`#skip-btn`, `n`) plays at
   `SKIP_DAYS_PER_SEC` without touching the speed setting and stops on 02a's list: a
   dispatch at once, the rest latched through the day and taken at the close
-  (`pacing.js` `closeStop`). Every development site goes through `_develop(kind)`,
-  which counts it and feeds the latch. A stop pauses and stays paused; answering a
+  (`pacing.js` `closeStop`). Every development site in the run calls `develop(kind)`,
+  which counts it and reaches the shell's `_develop`, which feeds the latch. A stop pauses and stays paused; answering a
   dispatch the skip stopped on does not resume play.
-- **Dispatches and the last edition.** Popups keep their single path
-  (`_queuePopup`/`_processPopupQueue`/`showPopupEvent`); only the markup and styles
-  changed. The epilogue overlay is the last edition, with a "The race, revealed" button
+- **Dispatches and the last edition.** The run's queue decides which dispatch is up
+  (`_queuePopup`/`_processPopupQueue`); the shell shows it (`showPopupEvent`) and a
+  choice sends an `answer` command. The epilogue overlay is the last edition, with a "The race, revealed" button
   that opens the race page; the race page's "The last edition" reopens it.
 - **Markets.** `takeSnapshot` samples six curves from the engines once per day
   (`marketsDayClose`, after the day's events) and prices each tradeable point through
@@ -327,7 +382,8 @@ key is `shoals-theme`.
   stop (triggered on HCN's price, as `checkPendingOrders` does); a named ticket trades
   through `executeWithRollback` or the ladder's `'strategy'` entry, anything else leg
   by leg through `_deferManual`, `executeMarketOrder` and `executeBinaryTrade`, so the
-  latency ladder and spreads apply. Greeks come from `aggregateGreeks` over the legs.
+  latency ladder and spreads apply. A send is a `trade` command carrying its resolved
+  contracts (`sendTicket`, `run-desk.js`). Greeks come from `aggregateGreeks` over the legs.
   The figure and grid revalue every leg at the horizon (until the player sets it, a
   quarter or the nearest option expiry, whichever is sooner) across HCN moves and,
   in Dynamic, how far the race gets (in Classic, volatility). The scenario model is
@@ -347,7 +403,11 @@ key is `shoals-theme`.
 - **Race page.** `recordRaceDay` (after the day's events) appends public records to
   `_pub` (releases with the rung they claim, released-rung claims, certifications, the
   open ecosystem's rung, the Fixedpoint Index's publication day) and the continuous
-  tracks to `_hid`. During play only `_pub`, belief B and the listed contracts are
+  tracks to `_hid`. Demonstrations are read from the public record (`chainReports`):
+  each is its lab's mark, hollow, in the lab's lane at the rung it bears on, dashed
+  while disputed, with a dot once upheld, short of the rung once narrowed and struck
+  through once withdrawn; `reports-view.js` lists them under the releases, one row per
+  demonstration with its trail, marked new since the latest snapshot. During play only `_pub`, belief B and the listed contracts are
   drawn; `_hid` and the internal crossing days are drawn only after `endRacePage()`
   (game over). The Fixedpoint Index has no numeric series in the model, so its strip
   shows publication only. The page is also the posterior's editor: the draft's daily
@@ -355,8 +415,10 @@ key is `shoals-theme`.
   (drag across; up and down for width), the square on the term-end gauge the plateau
   (beside B's tick), with 02a's keys on the focused canvas. A followed rung draws only
   B; ink appears only on carried rungs. Delete or Backspace returns the focused rung to
-  the market, and "Follow the market" returns every rung (`followMarket`). The ladder's
-  Locked column reads `Market` for a rung the latest lock followed.
+  the market, and "Follow the market" returns every rung (`followMarket`). The editor
+  works on a copy during a gesture and commits the draft's whole state as one
+  `forecast` command at its end. The ladder's Locked column reads `Market` for a rung
+  the latest lock followed.
 - **Meridian.** The record shows quarters stated (a carried rung scored) and the
   predecessor's handover (`renderHandover`). The almanac (`almanac-view.js`) sits under
   the columns: summary rows, the latest runs, a reliability canvas and the families
@@ -411,29 +473,32 @@ key is `shoals-theme`.
 - **Bit-identity is a test invariant.** The harnesses assert bit-identical race
   trajectories for no-player runs, stage-0 export controls and substream isolation,
   and they assert that Classic stays inert. A new random draw belongs in its own
-  `deriveSeed` stream. The price path and the event engine use `Math.random`, so
-  presentation randomness (act3) never does, or a display draw would move the
-  market.
+  `deriveSeed` stream, or a `keyedRng` slot keyed by its semantic identity. No state
+  path draws `Math.random`; presentation draws from streams of its own, so a display
+  draw never moves the market. run-test asserts a run completes with `Math.random`
+  throwing.
 - **Orchestrator inputs.** Race steps that need world facts take them as
   `advanceRace` inputs (strait tension, player coupling, export-control stage), and
-  the regime ratchet is called by main.js after `advanceRace`, never inside it.
+  the regime ratchet is called by the run after `advanceRace`, never inside it.
 - **Player channels into the race.** These are HCN positioning (`coupling.js`),
   choice `raceEffects` (S per lab and heat, clamped) and the insider-tip leak verb
   (`raceLeak`). `raceEffects` and the leak share the ledger gate `raceChannelsLive()`,
-  and main.js passes zero coupling once the race has resolved, so nothing the player
+  and the run passes zero coupling once the race has resolved, so nothing the player
   does counts after the resolution latch. The trade and sit verbs on a tip are
   uncoupled by ruling.
 - **Intraday mutation.** `_midDayBaseline(fn)` wraps any sim-param change made while
   a day is open. Without it, `_closeTradingDay`'s overlay restore silently erases the
   change.
-- **The popup queue.** `_queuePopup(event, front)` is the only insertion point, and
-  standing-order tip interception happens there. `_applyPopupChoice` is the only
-  choice applicator. `_popupBarrier()` keeps a day open while any popup is shown,
-  queued or the epilogue is pending, and dismissal closes the waiting day via
-  `_closeCompletedDayIfPending()`.
+- **The popup queue** (`src/run.js`). `_queuePopup(event, front)` is the only
+  insertion point, and standing-order tip interception happens there. A dispatch is
+  answered only by an `answer` command, and `_applyPopupChoice` is the only choice
+  applicator. `barrier()` keeps a day open while a dispatch is up or queued or the
+  epilogue is pending (run state, never the DOM), and an answer closes the waiting day
+  via `_closeCompletedDayIfPending()`.
 - **Machinery vs the player's hand.** The latency ladder and spread multiplier apply
   to every manual entry (the ticket's market legs, binaries, compute futures,
-  strategies) plus position close and strategy unwind, all via `_deferManual`.
+  strategies) plus position close and strategy unwind, all via `_deferManual`
+  (`run-desk.js`).
   Exercise, popup trades, margin liquidation, a forced sale, standing orders and terminal paths
   stay instant. Lag 0 bypasses the queue and `spreadMult === 1`
   short-circuits, because the general formula is not bit-exact at 1.
@@ -447,7 +512,7 @@ key is `shoals-theme`.
   `portfolio.applyBinarySettlementRows` (cash, exactly-once). Credibility is scored
   quarterly by `scoreQuarter`, never at settlement.
   Binary trades go through `executeBinaryTrade`, never `_fillPrice`. Equity decisions
-  use `_portfolioEquity`/`portfolioValue`, which include reserved margin. A frozen leg
+  use `portfolioEquity`/`portfolioValue`, which include reserved margin. A frozen leg
   restricts the book (`portfolio.restricted`) rather than force-filling it.
 - **Listing base rates.** The Consensus listing base rates live only in
   `consensus.js` and equal B's day-0 quote, which is the same in every world. Re-derive
@@ -455,10 +520,12 @@ key is `shoals-theme`.
 - **The rule of thumb is frozen.** The reader's legible heads were fit on the
   heuristic updater's exact trajectory. belief-test hashes it against commit 1343924;
   changing the rule means refitting the reader.
-- **Reset paths.** `_resetCore` resets every module singleton. `resetRaceBridge()`
-  runs unconditionally, because `loadPreset` creates the race after `_resetCore` and
-  stale latches would throttle a fresh run. The epilogue Restart goes through
-  `loadPreset`, since a bare core reset keeps the resolved race.
+- **Reset paths.** One run exists at a time. `newRun` begins with `_resetRun`, which
+  resets every module singleton the run touches; `resetRaceBridge()` runs
+  unconditionally there, because the race is created after it and stale latches would
+  throttle a fresh run. The shell's `_startRun` takes every new run (a reset, a mode
+  change, the epilogue's restart) through `newRun` with a fresh seed, and run-test
+  checks that runs A, B, A reproduce A.
 - **Variance, not vol.** `computeEffectiveSigma`, `computeVXHCNSpot` and
   `computeVXHCNFuturePrice` take Heston variance `v`. `_priceCore` and
   `_pricePairCore` share the `_V` buffer, so a single price after a pair call
