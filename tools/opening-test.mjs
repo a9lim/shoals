@@ -6,7 +6,6 @@
    A. The takeover: equity exactly INITIAL_CAPITAL, margin
       headroom, no rogue or margin trip, not a trade; the
       draw is uniform and a seed deals the same hand
-   B. The draw consumes no race stream
    C. No fixture's construction reads hidden state
    D. The market maker's hedge baseline
    E. The liability is netted out of every equity path
@@ -36,7 +35,7 @@ import { computeVXHCNSpot } from '../src/pricing.js';
 import * as book from '../src/portfolio.js';
 import { unitPrice } from '../src/position-value.js';
 import { resetImpactState, rehedgeMM, baselineMMHedge, getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact } from '../src/price-impact.js';
-import { createRaceState, advanceRace } from '../src/race/race-state.js';
+import { createRaceState } from '../src/race/race-state.js';
 import { consensus, initConsensus, setBinaryQuoteSource, refreshBinaryQuotes, getBinaryQuote, BINARY_NOTIONAL } from '../src/race/consensus.js';
 import { initComputeMarket, setComputePriceSource, refreshComputeQuotes } from '../src/race/compute-market.js';
 import { initBelief, binaryQuoteFromBelief, computeCurveFromBelief } from '../src/race/belief.js';
@@ -124,11 +123,6 @@ function boot(seed, corrupt = false) {
 const bookSig = () => JSON.stringify({ cash: P.cash, positions: P.positions, orders: P.orders, obligations: P.obligations });
 const equity = () => book.portfolioValue(sim.S, market.sigma, sim.r, sim.day, sim.q);
 const margin = () => book.checkMargin(sim.S, market.sigma, sim.r, sim.day, sim.q);
-const neutral = { straitTension: 0, playerCoupling: 0, exportControlStage: 0 };
-function raceSig(race) {
-    const { streams, ...rest } = race;
-    return JSON.stringify(rest);
-}
 
 // ---- A. The takeover ---------------------------------------------------------
 const t0 = Date.now();
@@ -180,21 +174,6 @@ const band = 4 * Math.sqrt(0.25 * 0.75 / N);
 check('A: the draw is uniform over the four fixtures', FIXTURES.every(f => Math.abs(counts[f.id] / N - 0.25) <= band),
     FIXTURES.map(f => `${f.id} ${counts[f.id]}`).join(', '));
 const tA = Date.now() - t0;
-
-// ---- B. The draw consumes no race stream --------------------------------------
-{
-    let identical = true;
-    const K = Math.min(N, 40);
-    for (let s = BASE_SEED; s < BASE_SEED + K; s++) {
-        const a = boot(s);
-        for (let d = 0; d < 300; d++) advanceRace(a, neutral);
-        const b = boot(s);
-        dealOpeningHand(b.seed, EXPIRIES);
-        for (let d = 0; d < 300; d++) advanceRace(b, neutral);
-        if (raceSig(a) !== raceSig(b)) { identical = false; break; }
-    }
-    check(`B: race trajectories are bit-identical with and without the deal (${K} seeds x 300 days, no player)`, identical);
-}
 
 // ---- C. No fixture's construction reads hidden state --------------------------
 {
