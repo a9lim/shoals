@@ -11,6 +11,12 @@ export function fmtDollar(v) {
     return (v < 0 ? '-$' : '$') + _dollarFmt.format(Math.abs(v)) + 'k';
 }
 
+/** The book's money as the dateline and the book set it: whole thousands, a true
+ *  minus. 2500 → $2,500k. */
+export function fmtBook(v) {
+    return (v < 0 ? '−' : '') + '$' + Math.round(Math.abs(v)).toLocaleString('en-US') + 'k';
+}
+
 export function fmtQty(v) {
     return Math.abs(v).toLocaleString() + 'k';
 }

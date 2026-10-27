@@ -6,7 +6,7 @@
    ===================================================== */
 
 import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD, BOND_FACE_VALUE } from './src/config.js';
-import { fmtDollar, fmtSigned } from './src/format-helpers.js';
+import { fmtDollar, fmtSigned, fmtBook } from './src/format-helpers.js';
 import { createSparkHistory, pushSparkSample } from './src/sparkline.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
@@ -18,7 +18,9 @@ import {
     computeNetDelta, computeGrossNotional, portfolioValue,
     executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows, applyCloseoutRows,
     isExpiredForTrading, allocatePrivateStake, allocatePrimaryStock,
+    settleObligation, payObligationsAtCloseout,
 } from './src/portfolio.js';
+import { dealOpeningHand, resetOpening } from './src/opening.js';
 import { ChartRenderer } from './src/chart.js';
 import {
     cacheDOMElements, bindEvents,
@@ -958,6 +960,7 @@ function init() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
+        _dealOpeningHand();
         // Day 0 is a real prompted lock (belief.day === 0). At boot it is queued, not
         // shown: the first edition opens trading, and the dispatch arrives as day 0
         // closes (the popup barrier holds the day for it, so the lock stays on day 0).
@@ -1269,7 +1272,8 @@ function _syncMasthead(force = false) {
 function _updateWire() {
     const log = eventEngine ? eventEngine.eventLog : [];
     renderWire(log, chart.dayOrigin, _tapeSnapshot());
-    chart.setNews(log.map(e => ({ day: e.day, head: splitHeadline(e.headline).head, major: e.magnitude === 'major' })));
+    // Archived items (the predecessor's reports) predate the term: no news day on the tape.
+    chart.setNews(log.filter(e => !e.archive).map(e => ({ day: e.day, head: splitHeadline(e.headline).head, major: e.magnitude === 'major' })));
     dirty = true;
 }
 
@@ -2089,8 +2093,11 @@ function _runTerminalCloseout(resolution, geo) {
         bond: { rate: sim.r, a: market.a, b: market.b, sigmaR: market.sigmaR, day: sim.day, face: BOND_FACE_VALUE },
     });
     applyCloseoutRows(book.rows);   // credit cash + remove positions by id (preserves borrow accrual)
+    // Every unpaid obligation is paid out of the closeout's cash, so terminal equity
+    // (the scorecard's cash) is net of it (02a "The evening").
+    const obligations = payObligationsAtCloseout();
     // All nine cells reach the scorecard: the matrix book + the two finalizer P&L sets.
-    return { rows: book.rows, ctx: book.ctx, totalCash: book.totalCash, totalPnl: book.totalPnl, binary, compute };
+    return { rows: book.rows, ctx: book.ctx, totalCash: book.totalCash, totalPnl: book.totalPnl, binary, compute, obligations };
 }
 
 /**
@@ -2387,6 +2394,50 @@ function _portfolioEquity() {
     // sequester the whole notional), which can spuriously trip rogue-trading /
     // review thresholds -- so always go through portfolioValue.
     return portfolioValue(sim.S, market.sigma, sim.r, sim.day, sim.q);
+}
+
+/** A desk item on the wire (02a "The evening"): minor, category desk. Off the
+ *  front page it also arrives as a toast, as the day's events do. */
+function _postDeskItem(headline) {
+    if (!eventEngine) return;
+    eventEngine._logEvent(sim.day, { headline, category: 'desk' }, {}, 'minor');
+    _updateWire();
+    if (currentPage() !== 'front') _toast(headline, 5000);
+}
+
+const _capFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * The obligations' close (02a "The evening"). An obligation due today is paid from
+ * cash, or, when cash is short, the shortfall is raised by the forced sale (which
+ * costs firmStanding 8) and any remainder goes on the margin loan. Five sessions
+ * ahead, a desk whose cash would not cover it gets a notice and pauses: not a
+ * dispatch, so nothing but the player's play resumes it. A covered obligation
+ * gives no notice.
+ */
+function _settleObligations() {
+    if (!portfolio.obligations.length) return;
+    const rel = _relDay();
+    for (const ob of portfolio.obligations.slice()) {
+        if (ob.dueDay <= rel) {
+            const res = settleObligation(ob, sim, sim.S, market.sigma, sim.r, sim.day, sim.q);
+            if (!res) continue;
+            if (res.forced) {
+                // COUNT: forced sale
+                shiftFaction('firmStanding', -8);
+                _postDeskItem(`Operations sells a slice of the book to meet ${ob.label}; the desk was ${fmtBook(res.shortfall)} short on the day, and the risk committee has noted it.`);
+            } else {
+                _postDeskItem(`${_capFirst(ob.label)} is paid in full; ${fmtBook(ob.amount)} leaves the desk in cash.`);
+            }
+            bookDirty = true;
+        } else if (ob.dueDay - 5 === rel && portfolio.cash < ob.amount) {
+            _postDeskItem(`${_capFirst(ob.label)}, ${fmtBook(ob.amount)}, is due in five sessions; the desk holds ${fmtBook(portfolio.cash)} in cash.`);
+            // COUNT: notice pause
+            playing = false;
+            _resumeAfterDispatch = false;   // a dispatch answered later must not resume past the notice
+            updatePlayBtn($, playing);
+        }
+    }
 }
 
 /**
@@ -2919,6 +2970,13 @@ function _onDayComplete() {
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     bookDirty = true;
 
+    // Obligations (02a "The evening"): one due on day d is settled at the close that
+    // turns day d - 1 into day d -- this close -- after expiry, the race block's
+    // settlements and the terminal check (a close that ended the run returned above,
+    // and its closeout paid what was unpaid), immediately before the rogue-trading
+    // and margin checks. The notice is checked at the same point.
+    _settleObligations();
+
     // Rogue trading check (before margin)
     const equity = _portfolioEquity();
     if (equity < portfolio.initialCapital * ROGUE_TRADING_THRESHOLD) {
@@ -3206,7 +3264,8 @@ function _resetCore(index) {
     _lockPending = false;
     _lockPendingDay = -1;
     sim.reset(index);
-    resetPortfolio();
+    resetPortfolio();   // obligations too: Classic starts on cash; Dynamic boot deals the hand
+    resetOpening();
     resetImpactState();
     sim.prepopulate();
     _syncAll();
@@ -3223,6 +3282,26 @@ function _resetCore(index) {
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateDynamicSections($, index);
+}
+
+/**
+ * The opening hand (02a "The evening"): a Dynamic run starts on an inherited desk,
+ * drawn from the race's seed by the hand's own stream and taken over at day 0's
+ * opening marks. Called at Dynamic boot once belief, valuation, compute and
+ * Consensus are quoting, so every mark exists. The predecessor's two archived
+ * reports go on the wire first and the memo last, so the memo is the newest item
+ * and leads Edition 1; the archived items are dated Archive, not by edition.
+ */
+function _dealOpeningHand() {
+    const fixture = dealOpeningHand(raceState.seed, expiryMgr.update(sim.day).map(e => e.day));
+    // INTERPRETATION: 02a gives the memo and the reports no magnitude; they post as
+    // minor, like the desk's other wire items, and the archived ones mark no news
+    // day on the tape (see _updateWire).
+    for (const r of fixture.reports) {
+        eventEngine._logEvent(sim.day, { headline: r.headline, category: r.category }, {}, 'minor').archive = true;
+    }
+    eventEngine._logEvent(sim.day, { headline: fixture.memo, category: 'desk' }, {}, 'minor');
+    bookDirty = true;
 }
 
 function loadPreset(index) {
@@ -3252,6 +3331,7 @@ function loadPreset(index) {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
+        _dealOpeningHand();
         _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     } else {
         eventEngine = null;
@@ -3303,6 +3383,7 @@ function resetSim() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine ? eventEngine.world.geopolitical : null);
+        _dealOpeningHand();
         _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     }
     _updateWire();

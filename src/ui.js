@@ -49,6 +49,8 @@ export function cacheDOMElements($) {
     $.strategySection   = document.getElementById('book-strategies');
     $.pendingOrders     = document.getElementById('pending-orders');
     $.ordersSection     = document.getElementById('book-orders');
+    $.obligationList    = document.getElementById('obligation-list');   // the unpaid obligations (02a "The evening")
+    $.obligationsSection = document.getElementById('book-obligations');
     $.cashDisplay       = document.getElementById('cash-display');
     $.portfolioValue    = document.getElementById('portfolio-value');
     $.bookChange        = document.getElementById('book-change');

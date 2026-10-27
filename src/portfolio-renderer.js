@@ -12,7 +12,7 @@
 
 import { computePositionPnl, computePositionValue } from './position-value.js';
 import { drawSparkline } from './sparkline.js';
-import { fmtDollar, pnlClass, contractName } from './format-helpers.js';
+import { fmtDollar, fmtBook, pnlClass, contractName } from './format-helpers.js';
 import { lastPolarisRound } from './race/rounds.js';
 import { contractByKey } from './race/consensus.js';
 
@@ -226,7 +226,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     // The figure in ink, rounded as the dateline sets it (the dateline carries the
     // term's change); the line under it compares holding HCN: viridian ahead of
     // it, the accent behind.
-    $.portfolioValue.textContent = (totalValue < 0 ? '−' : '') + '$' + Math.round(Math.abs(totalValue)).toLocaleString('en-US') + 'k';
+    $.portfolioValue.textContent = fmtBook(totalValue);
     const buyHoldValue = (portfolio.initialCapital / 100) * currentPrice;
     const vsBenchmark = totalValue - buyHoldValue;
     const benchCls = vsBenchmark > 0.005 ? 'pnl-up' : vsBenchmark < -0.005 ? 'pnl-down' : '';
@@ -336,6 +336,36 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     // Working orders -- DOM diff
     if ($.ordersSection) $.ordersSection.hidden = portfolio.orders.length === 0;
     _diffOrderRows($.pendingOrders, portfolio.orders, day);
+
+    // Unpaid obligations (02a "The evening"): label, due edition, amount.
+    if ($.obligationsSection) $.obligationsSection.hidden = portfolio.obligations.length === 0;
+    if ($.obligationList) _renderObligations($.obligationList, portfolio.obligations);
+}
+
+/** One row per unpaid obligation, in the book's row idiom. A liability is not a
+ *  loss, so the amount is set in ink. Rebuilt only when the list changes. */
+function _renderObligations(container, obligations) {
+    const sig = obligations.map(o => o.label + '|' + o.dueDay + '|' + o.amount).join(',');
+    if (container._sig === sig) return;
+    container._sig = sig;
+    container.textContent = '';
+    for (const o of obligations) {
+        const row = document.createElement('div');
+        row.className = 'pos-row obligation-row';
+        const label = document.createElement('span');
+        label.className = 'pos-label';
+        label.textContent = o.label.charAt(0).toUpperCase() + o.label.slice(1);
+        const due = document.createElement('span');
+        due.className = 'pos-qty';
+        due.textContent = 'due Ed. ' + (o.dueDay + 1);
+        const amount = document.createElement('span');
+        amount.className = 'pos-pnl';
+        amount.textContent = fmtBook(o.amount);
+        const actions = document.createElement('span');
+        actions.className = 'pos-actions';
+        row.append(label, due, amount, actions);
+        container.appendChild(row);
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -376,12 +406,22 @@ function _diffPositionRows(container, positions, S, vol, rate, day, q) {
     if (hint) hint.remove();
 
     // Add new or update existing
+    // A row belongs to one position object: ids restart at every reset, and a run
+    // now opens on an inherited book, so a new run's id 2 may be another contract
+    // than the last run's (its actions, like an option's exercise, would be stale).
     for (const pos of positions) {
         const posId = String(pos.id);
-        const existing = rowMap.get(posId);
+        let existing = rowMap.get(posId);
+        if (existing && existing._pos !== pos) {
+            if (existing._infoCleanup) existing._infoCleanup();
+            existing.remove();
+            rowMap.delete(posId);
+            existing = null;
+        }
         if (existing) _updatePositionRow(existing, pos, S, vol, rate, day, q);
         else {
             const row = _buildPositionRow(pos, S, vol, rate, day, q);
+            row._pos = pos;
             rowMap.set(posId, row);
             container.appendChild(row);
         }

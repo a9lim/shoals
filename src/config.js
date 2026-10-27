@@ -31,6 +31,11 @@ export const COMPUTE_MAINTENANCE_MARGIN = 0.35;
 export const COMPUTE_SPREAD_VOL = 3.0;
 export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
+// The forced sale that meets an obligation the desk's cash cannot (02a "The
+// evening"): a machinery close at this multiple of the ordinary spread, plus the
+// ordinary impact. Replaces the roadmap's "at the ladder's cost", which is free in
+// Act I, where every fixture's obligation falls.
+export const FORCED_SALE_SPREAD_MULT = 3;
 
 // -- Bid/ask spread model --
 export const STOCKBOND_SPREAD_PCT = 0.001;  // 0.1% of mid price

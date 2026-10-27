@@ -18,6 +18,7 @@ import {
     STOCKBOND_SPREAD_PCT,
     OPTION_SPREAD_PCT,
     MONEYNESS_SPREAD_WEIGHT,
+    FORCED_SALE_SPREAD_MULT,
 } from './config.js';
 
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration, computeVXHCNSpot } from './pricing.js';
@@ -50,6 +51,7 @@ export const portfolio = {
     peakValue:        INITIAL_CAPITAL, // max equity seen
     maxDrawdown:      0, // max (1 - equity/peak) seen
     restricted:       false, // account trading restriction (forced liquidation left un-flattenable legs)
+    obligations:      [], // unpaid { kind, label, amount, dueDay } (02a "The evening"); paid ones are removed
 };
 
 // Auto-increment counters (not exported — internal)
@@ -79,6 +81,7 @@ export function resetPortfolio(capital) {
     portfolio.peakValue        = cap;
     portfolio.maxDrawdown      = 0;
     portfolio.restricted       = false;
+    portfolio.obligations      = [];
     _nextPositionId = 1;
     _nextOrderId    = 1;
 }
@@ -213,6 +216,13 @@ function _fillPrice(sim, type, side, qty, mid, currentPrice, strike, currentVol,
         const fillCost = recordOptionTrade(type, signedQty, currentVol, logSK, dte, strike, expiryDay || 0);
         return Math.max(0.01, spreadFill + fillCost);
     }
+}
+
+/** The vol an instrument's spread model reads: sigmaR for bonds, xi for VXHCN
+ *  futures, the fixed illiquidity vol for compute, the stock's vol otherwise. */
+function _spreadVol(type, currentVol) {
+    return type === 'bond' ? market.sigmaR : type === 'vxhcnfuture' ? market.xi
+        : type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
 }
 
 /**
@@ -385,7 +395,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
 function _postTradeMarginOk(cashDelta, shortMtm, shortMaintenance,
                             currentPrice, currentVol, currentRate, currentDay,
                             skipIdx, q, proposedReserved = 0) {
-    let equity = portfolio.cash + cashDelta;
+    let equity = portfolio.cash + cashDelta - unpaidObligations();
     let required = shortMaintenance;
 
     for (let i = 0; i < portfolio.positions.length; i++) {
@@ -494,9 +504,7 @@ export function executeMarketOrder(
     portfolio.totalTrades++;
 
     const mid  = unitPrice(type, currentPrice, currentVol, currentRate, currentDay, strike, expiryDay, q);
-    const spreadVol = type === 'bond' ? market.sigmaR : type === 'vxhcnfuture' ? market.xi
-        : type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
-    const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, spreadVol, expiryDay || 0, currentDay, spreadMult);
+    const fill = _fillPrice(sim, type, side, qty, mid, currentPrice, strike, _spreadVol(type, currentVol), expiryDay || 0, currentDay, spreadMult);
 
     // Find existing position of same type+strike+expiry+strategy for netting
     const existingIdx = portfolio.positions.findIndex(p =>
@@ -883,8 +891,7 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
 
     const absQty = Math.abs(pos.qty);
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
-    const spreadVol = pos.type === 'bond' ? market.sigmaR : pos.type === 'vxhcnfuture' ? market.xi
-        : pos.type === 'computefuture' ? COMPUTE_SPREAD_VOL : currentVol;
+    const spreadVol = _spreadVol(pos.type, currentVol);
 
     if (pos.qty > 0) {
         const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
@@ -1177,13 +1184,28 @@ export function processExpiry(sim, expiryDay, currentPrice, currentDay, currentV
 // ---------------------------------------------------------------------------
 
 /**
- * Compute total mark-to-market portfolio value (cash + positions).
- * qty > 0 = long, qty < 0 = short.
+ * The unpaid obligations' total (02a "The evening"): a liability from the
+ * takeover. The ONE helper every actual and prospective equity calculation nets
+ * out (portfolioValue, collateralEquity, checkMargin, short-order admission, the
+ * initial-margin debit check through collateralEquity, the private-stake headroom
+ * through checkMargin, and endings' terminal check). Paying one moves cash and
+ * this total together, so equity is unchanged.
+ * @param {object} [book] a portfolio-shaped object; defaults to the singleton.
+ */
+export function unpaidObligations(book = portfolio) {
+    let total = 0;
+    for (const o of (book.obligations || [])) total += o.amount;
+    return total;
+}
+
+/**
+ * Compute total mark-to-market portfolio value (cash + positions), net of the
+ * unpaid obligations. qty > 0 = long, qty < 0 = short.
  *
  * @returns {number} Total portfolio value in dollars.
  */
 export function portfolioValue(currentPrice, currentVol, currentRate, currentDay, q) {
-    let total = portfolio.cash;
+    let total = portfolio.cash - unpaidObligations();
     for (const pos of portfolio.positions) {
         total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
         if (pos._reservedMargin) total += pos._reservedMargin;
@@ -1194,7 +1216,7 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
 /** Equity eligible to collateralize borrowing. Private marks remain in total
  *  NAV, but have zero lending value (02a private-stake contract). */
 export function collateralEquity(currentPrice, currentVol, currentRate, currentDay, q) {
-    let total = portfolio.cash;
+    let total = portfolio.cash - unpaidObligations();
     for (const pos of portfolio.positions) {
         if (pos.type === 'privatestake') continue;
         total += computePositionValue(pos, currentPrice, currentVol, currentRate, currentDay, q);
@@ -1258,7 +1280,7 @@ export function marginRequirement(currentPrice, currentVol, currentRate, current
  * @returns {{ triggered: boolean, equity: number, required: number }}
  */
 export function checkMargin(currentPrice, currentVol, currentRate, currentDay, q) {
-    let equity = portfolio.cash;
+    let equity = portfolio.cash - unpaidObligations();
     let privateValue = 0;
     let required = 0;
 
@@ -1728,4 +1750,177 @@ export function settleComputeFutures(settlements, race) {
         }
     }
     return results;
+}
+
+// ---------------------------------------------------------------------------
+// The opening hand and its obligations (02a "The evening")
+// ---------------------------------------------------------------------------
+//
+// A Dynamic run starts on an inherited book. The takeover seats each position at
+// its mark (seatPosition); its obligation is a liability netted out of every
+// equity calculation (unpaidObligations, above) until it is paid. Payment is in
+// cash (settleObligation); when cash is short, a forced sale raises the shortfall
+// pro rata across every eligible long; the terminal closeout pays whatever is
+// still unpaid (payObligationsAtCloseout).
+
+/**
+ * Seat one inherited position at its takeover mark. The takeover is not a trade:
+ * no spread, impact, fill, trade count or ledger row. The entry is the mark on the
+ * takeover day, so P&L measures from the takeover, never from the predecessor's
+ * entries. A short reserves collateral by the book's own conventions: a binary
+ * its full notional, anything else what `_marginForShort` reserves at that mark.
+ */
+export function seatPosition(type, qty, mark, day, strike, expiryDay) {
+    const pos = { id: _nextPositionId++, type, qty, entryPrice: mark, fillPrice: mark,
+        entryDay: day, strategyName: null };
+    if (strike != null) pos.strike = strike;
+    if (expiryDay != null) pos.expiryDay = expiryDay;
+    if (qty < 0) {
+        pos._reservedMargin = type === 'binary' ? BINARY_NOTIONAL * -qty
+            : _marginForShort(type, -qty, mark, market.S, market.sigma, market.r, day, strike, expiryDay);
+    }
+    portfolio.positions.push(pos);
+    return pos;
+}
+
+/** A long the forced sale may sell: never a short, a private stake, or a frozen,
+ *  pending, disputed or settled contract (or a time-bound one already expired). */
+function _forcedSaleEligible(pos, currentDay) {
+    if (!(pos.qty > 0) || pos.type === 'privatestake') return false;
+    if (pos.type === 'binary') {
+        if (!consensus.active || consensus.frozen) return false;
+        const quote = getBinaryQuote(pos.strike);
+        return !!quote && !quote.settled && !quote.frozen && !quote.pending && !quote.disputed;
+    }
+    if (pos.type === 'computefuture') return isComputeTradeable(pos.strike);
+    return !isExpiredForTrading(pos.type, pos.expiryDay, currentDay);
+}
+
+// The forced sale's stable fill order: bonds, HCN, VXHCN futures, options by
+// expiry then strike, compute, Consensus. Ties break on maturity, then id.
+const _SALE_RANK = { bond: 0, stock: 1, vxhcnfuture: 2, call: 3, put: 3, computefuture: 4, binary: 5 };
+function _saleOrder(a, b) {
+    const opt = a.type === 'call' || a.type === 'put';
+    return (_SALE_RANK[a.type] - _SALE_RANK[b.type])
+        || ((a.expiryDay ?? 0) - (b.expiryDay ?? 0))
+        || (opt ? (a.strike - b.strike) || a.type.localeCompare(b.type) : 0)
+        || (a.id - b.id);
+}
+
+/**
+ * The forced sale's executable per-unit bid for a long position: the
+ * instrument's own spread, the regulation multiplier, FORCED_SALE_SPREAD_MULT and
+ * execution's price floor ($0.01 for chassis instruments, 0 for Consensus),
+ * before this sale's impact. Pure: a slice is sized from these quotes taken
+ * together, since a trial fill would move the impact pools.
+ */
+export function forcedSaleQuote(pos, currentPrice, currentVol, currentRate, currentDay, q) {
+    if (pos.type === 'binary') {
+        const quote = getBinaryQuote(pos.strike);
+        if (!quote) return 0;
+        // INTERPRETATION: binary execution (executeBinaryTrade) applies no regulation
+        // spread multiplier, so the quote that sizes a slice applies none either: an
+        // executable quote is what the fill pays.
+        const px = Math.max(0, Math.min(1, quote.mid - (quote.mid - quote.bid) * FORCED_SALE_SPREAD_MULT));
+        return px * BINARY_NOTIONAL;
+    }
+    const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+    const ba = (pos.type === 'call' || pos.type === 'put')
+        ? computeOptionBidAsk(mid, currentPrice, pos.strike, currentVol)
+        : computeBidAsk(mid, _spreadVol(pos.type, currentVol));
+    const sMult = getRegulationEffect('spreadMult', 1) * FORCED_SALE_SPREAD_MULT;
+    return Math.max(0.01, mid - (mid - ba.bid) * sMult);
+}
+
+/**
+ * Machinery reduce-only close of `n` units of a long: instant, at the forced
+ * sale's spread plus the ordinary impact (binaries carry no impact pool, so their
+ * quote is the fill). It bypasses the account restriction, the short-sale ban and
+ * the binary cash rule, which guard new exposure; eligibility is the caller's.
+ * INTERPRETATION: like every machinery close (closePosition), it counts no trade.
+ * @returns {number} the cash raised.
+ */
+function _forcedClose(sim, pos, n, currentPrice, currentVol, currentRate, currentDay, q) {
+    let fill;
+    if (pos.type === 'binary') {
+        fill = forcedSaleQuote(pos, currentPrice, currentVol, currentRate, currentDay, q);
+    } else {
+        const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+        fill = _fillPrice(sim, pos.type, 'short', n, mid, currentPrice, pos.strike,
+            _spreadVol(pos.type, currentVol), pos.expiryDay || 0, currentDay, FORCED_SALE_SPREAD_MULT);
+    }
+    portfolio.cash += fill * n;
+    pos.qty -= n;
+    pos.fillPrice = fill;
+    if (pos.qty <= 0) {
+        if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;
+        portfolio.positions.splice(portfolio.positions.indexOf(pos), 1);
+    }
+    return fill * n;
+}
+
+/**
+ * Raise `shortfall` by selling the same fraction of every eligible long, the
+ * smallest that covers it at the slice's executable quotes (capped at one). Each
+ * quantity rounds up to a whole unit, capped at the holding, so the slice is pro
+ * rata to within a unit; positions then fill in the stable order, impact
+ * accruing as they go. What impact leaves short is raised by up to two more
+ * slices, sized the same way. If the eligible longs quote zero, nothing is sold.
+ * @returns {{ proceeds: number, sold: Array<{id, type, strike, expiryDay, qty, proceeds}> }}
+ */
+function _forcedSale(sim, shortfall, currentPrice, currentVol, currentRate, currentDay, q) {
+    let proceeds = 0;
+    const sold = new Map();
+    for (let slice = 0; slice < 3 && proceeds < shortfall; slice++) {
+        const book = portfolio.positions.filter(p => _forcedSaleEligible(p, currentDay)).sort(_saleOrder);
+        const quotes = book.map(p => forcedSaleQuote(p, currentPrice, currentVol, currentRate, currentDay, q));
+        let value = 0;
+        for (let i = 0; i < book.length; i++) value += quotes[i] * book[i].qty;
+        if (!(value > 0)) break;
+        const f = Math.min(1, (shortfall - proceeds) / value);
+        const sizes = book.map(p => Math.min(p.qty, Math.ceil(f * p.qty - 1e-9)));
+        for (let i = 0; i < book.length; i++) {
+            if (!(sizes[i] > 0)) continue;
+            const pos = book[i];
+            const raised = _forcedClose(sim, pos, sizes[i], currentPrice, currentVol, currentRate, currentDay, q);
+            proceeds += raised;
+            const row = sold.get(pos.id)
+                || { id: pos.id, type: pos.type, strike: pos.strike, expiryDay: pos.expiryDay, qty: 0, proceeds: 0 };
+            row.qty += sizes[i];
+            row.proceeds += raised;
+            sold.set(pos.id, row);
+        }
+    }
+    return { proceeds, sold: [...sold.values()] };
+}
+
+/**
+ * Settle one obligation at its due close. Met in cash, never on the margin loan:
+ * when cash is short, the shortfall `max(0, amount - cash)` is raised by the
+ * forced sale first, and only what it cannot raise goes on the margin loan. The
+ * obligation and the cash leave together, so the payment itself leaves equity
+ * unchanged (the sale's spread and impact are its cost). main.js runs the
+ * ordinary margin check right after.
+ * @returns {{ amount, shortfall, forced, proceeds, sold, remainder } | null}
+ */
+export function settleObligation(ob, sim, currentPrice, currentVol, currentRate, currentDay, q) {
+    const i = portfolio.obligations.indexOf(ob);
+    if (i < 0) return null;
+    const shortfall = Math.max(0, ob.amount - portfolio.cash);
+    const sale = shortfall > 0
+        ? _forcedSale(sim, shortfall, currentPrice, currentVol, currentRate, currentDay, q)
+        : { proceeds: 0, sold: [] };
+    const remainder = Math.max(0, ob.amount - portfolio.cash);
+    portfolio.cash -= ob.amount;
+    portfolio.obligations.splice(i, 1);
+    return { amount: ob.amount, shortfall, forced: shortfall > 0, proceeds: sale.proceeds, sold: sale.sold, remainder };
+}
+
+/** The terminal closeout pays every unpaid obligation out of its cash, so
+ *  terminal equity is net of it. Returns the amount paid. */
+export function payObligationsAtCloseout() {
+    const paid = unpaidObligations();
+    portfolio.cash -= paid;
+    portfolio.obligations.length = 0;
+    return paid;
 }
