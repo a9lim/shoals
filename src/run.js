@@ -61,6 +61,7 @@ import { applyReportingRegime, forceLeakDetection } from './race/incidents.js';
 import { straitTension } from './race/strait.js';
 import { stepTreaty } from './race/treaty-track.js';
 import { checkResolution, resolveNow, HORIZON } from './race/resolution.js';
+import { closeDemonstrations } from './race/demonstrations.js';
 import {
     consensus, initConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
@@ -948,6 +949,10 @@ function _triggerGameOver(endingId) {
     if (run.race) {
         const geo = run.engine ? run.engine.world.geopolitical : null;
         const deskDay = relDay();                        // the desk's last day: the race clock may already be extrapolated
+        // A desk that ends before the world does closes the demonstrations first, so
+        // the extrapolation draws none (02a "Demonstrations": the record ends where
+        // the run did).
+        closeDemonstrations(run.race);
         resolution = resolveNow(run.race, geo);          // existing record, or extrapolate + latch (freezeLedger first)
         // The outstanding quarter (02a "Scoring"): the unscored lock is scored once,
         // against its original end date and the completed trajectory; the

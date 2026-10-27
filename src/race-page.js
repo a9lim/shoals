@@ -42,6 +42,7 @@ import {
 } from './race/belief.js';
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
+import { renderReports } from './reports-view.js';
 
 export const RUNG_NAME = { 1: 'Reliable agent', 2: 'Autonomous engineer', 3: 'Autonomous researcher', 4: 'Recursion', 5: 'Takeoff threshold' };
 const LABS = [
@@ -799,6 +800,9 @@ function _table() {
         li.append(d, `${L.name}${r.spawn ? ' spins out with ' : ' ships '}${L.model}${r.rung >= 1 ? `, claiming R${r.rung}` : ''}`);
         log.appendChild(li);
     }
+    // The chain's reports (02a "Demonstrations"), marked new since the latest snapshot.
+    const rec = race && belief.active ? belief.record : null;
+    renderReports(rec, rec ? rec.day : 0, rec ? (latestLock()?.day ?? null) : null);
 }
 
 function _key() {
