@@ -855,7 +855,7 @@ export class EventEngine {
             effects,
             popup: true,
             superevent: true,
-            choices: [{ label: 'Acknowledged', desc: 'The markets have spoken.' }],
+            choices: [{ label: 'Acknowledged', bystander: true, desc: 'The markets have spoken.' }],
         };
 
         w.election.midtermComplete = true;

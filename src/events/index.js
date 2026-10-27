@@ -96,3 +96,41 @@ for (const ev of ALL_EVENTS) {
         console.warn(`[events] '${ev.id}' has followupOnly but is never referenced as a followup`);
     }
 }
+
+// -- The bystander (02a "The run, headless", "Headless policies") --
+// A headless run answers every dispatch with its bystander choice, the answer of
+// a desk that takes no position: pass on financing, decline a discretionary
+// intervention, say nothing. Exactly one choice per dispatch carries
+// `bystander: true`, and it carries none of the fields through which
+// `_applyPopupChoice` trades, subscribes, moves the race, leaks, pushes a
+// regime or settles with a regulator. World-side fields (deltas, effects,
+// factionShifts, playerFlag, followups, cashPenalty, complianceTier,
+// resultToast) are allowed.
+const BYSTANDER_FORBIDDEN = [
+    'trades', 'round', 'raceEffects', 'raceLeak', '_applyReportingRegime',
+    '_openDispute', '_ruleDispute', 'regulatoryAction', '_tipAction',
+];
+
+/**
+ * What is wrong with one dispatch's bystander choice, or null when it names
+ * exactly one qualifying choice. The pool is checked below at import; generated
+ * dispatches (round offers, the room, the midterm result, the margin call) are
+ * checked by the harnesses on their generators' output.
+ */
+export function validateBystander(event) {
+    const id = event?.id ?? event?.headline ?? '(unnamed)';
+    const flagged = (Array.isArray(event?.choices) ? event.choices : []).filter(c => c?.bystander === true);
+    if (flagged.length !== 1) return `'${id}' names ${flagged.length} bystander choices, not one`;
+    const carried = BYSTANDER_FORBIDDEN.filter(f => flagged[0][f] != null);
+    return carried.length
+        ? `'${id}' bystander choice '${flagged[0].label}' carries ${carried.join(', ')}`
+        : null;
+}
+
+// Every pool event `_fireEvent` queues as a dispatch (a popup superevent, or a
+// popup with choices) names its bystander.
+for (const ev of ALL_EVENTS) {
+    if (!ev.popup || !(ev.superevent || ev.choices)) continue;
+    const problem = validateBystander(ev);
+    if (problem) console.warn(`[events] ${problem}`);
+}

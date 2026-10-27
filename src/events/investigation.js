@@ -330,6 +330,7 @@ export const INVESTIGATION_EVENTS = [
         choices: [
             {
                 label: 'No comment',
+                bystander: true,
                 desc: 'Decline the interview. The story might run anyway.',
                 factionShifts: [{ faction: 'mediaTrust', value: -5 }],
                 effects: [{ path: 'media.tanCredibility', op: 'add', value: 1 }],
@@ -377,6 +378,7 @@ export const INVESTIGATION_EVENTS = [
             },
             {
                 label: 'Lawyer up',
+                bystander: true,
                 desc: 'Retain outside counsel. Respond only to what\u2019s legally required.',
                 playerFlag: 'lawyered_up',
                 resultToast: 'Outside counsel engaged. The meter is running.',
@@ -417,6 +419,7 @@ export const INVESTIGATION_EVENTS = [
             },
             {
                 label: 'Invoke the Fifth',
+                bystander: true,
                 desc: 'Exercise your constitutional right against self-incrimination.',
                 factionShifts: [
                     { faction: 'regulatoryExposure', value: 5, when: { hasTrait: 'under_scrutiny' }, bonus: 5 },
@@ -480,6 +483,7 @@ export const INVESTIGATION_EVENTS = [
             },
             {
                 label: 'Fight it',
+                bystander: true,
                 desc: 'Contest the charges in court. This will get worse before it gets better.',
                 factionShifts: [
                     { faction: 'regulatoryExposure', value: 5, when: { hasTrait: 'under_scrutiny' }, bonus: 5 },

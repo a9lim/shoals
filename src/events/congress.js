@@ -1436,6 +1436,7 @@ export const CONGRESS_EVENTS = [
             },
             {
                 label: 'Decline politely',
+                bystander: true,
                 desc: 'You trade markets, not favors.',
                 deltas: {},
                 playerFlag: 'declined_fundraiser',
@@ -1490,6 +1491,7 @@ export const CONGRESS_EVENTS = [
             },
             {
                 label: 'Step aside',
+                bystander: true,
                 desc: 'This isn\'t your fight. Watch from the sidelines and reassess after the dust settles.',
                 deltas: { theta: -0.005 },
                 playerFlag: 'flattened_for_election',
@@ -1535,6 +1537,7 @@ export const CONGRESS_EVENTS = [
             },
             {
                 label: 'Wind down gracefully',
+                bystander: true,
                 desc: 'You\'ve played this administration\'s market. Take your chips off the table.',
                 deltas: { theta: -0.005 },
                 playerFlag: 'wound_down_gracefully',
@@ -1587,6 +1590,7 @@ export const CONGRESS_EVENTS = [
             },
             {
                 label: 'Decline everything',
+                bystander: true,
                 desc: 'You trade markets. You don\'t play politics.',
                 factionShifts: [
                     { faction: 'federalistSupport', value: -1 },

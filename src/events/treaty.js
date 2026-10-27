@@ -63,6 +63,7 @@ export const TREATY_EVENTS = [
             },
             {
                 label: 'Stay out of it',
+                bystander: true,
                 desc: 'Registries become caps, caps become allocation, allocation becomes politics. The desk declines to build the machinery of its own constraint.',
                 playerFlag: 'declined_compute_transparency',
                 resultToast: 'The markup slips. The door neither opens nor closes, which is also a policy.',
@@ -110,6 +111,7 @@ export const TREATY_EVENTS = [
             },
             {
                 label: 'Counsel against',
+                bystander: true,
                 desc: 'Verification is unverifiable; a deal you cannot audit is a head start you gift-wrap. Racing is the equilibrium that tells the truth.',
                 playerFlag: 'counseled_no_deal',
                 factionShifts: [{ faction: 'federalistSupport', value: 3 }],
@@ -140,6 +142,7 @@ export const TREATY_EVENTS = [
         choices: [
             {
                 label: 'Reprice everything',
+                bystander: true,
                 desc: 'The premium comes off. The future goes long-dated. The desk learns, slowly, to price a world that intends to continue.',
             },
         ],

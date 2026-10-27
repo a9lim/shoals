@@ -64,6 +64,7 @@ export const CHINA_EVENTS = [
         choices: [
             {
                 label: 'Mark the book',
+                bystander: true,
                 desc: 'The compute positions reprice to the force-majeure schedule. Nothing to decide today; everything to decide about what you believed yesterday.',
             },
         ],
@@ -122,6 +123,7 @@ export const CHINA_EVENTS = [
             },
             {
                 label: 'Fight the controls',
+                bystander: true,
                 desc: 'Side with the constituency. The chips keep flowing, the software stays cheap, and the race stays somebody else’s problem for another quarter.',
                 factionShifts: [{ faction: 'firmStanding', value: 1 }],
                 playerFlag: 'lobbied_deregulation',

@@ -161,6 +161,7 @@ export const ROOM_EVENTS = [
             },
             {
                 label: 'Say nothing',
+                bystander: true,
                 desc: 'You bought the seat. Nothing says you must spend the voice.',
                 _roomVerb: 'silence',
                 // No raceEffects: declining is a real option with a real absence

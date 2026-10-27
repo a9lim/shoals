@@ -89,6 +89,15 @@
       display latches forced on -- plus Classic inertness (no
       RNG drawn at rest) and the reduced-motion split.
 
+   ...and ROUND ONE OF THE CHAIN (02a "The run, headless", 2026-10-27):
+
+   Q. The bystander: every pool dispatch and every generator's
+      dispatch (round offers, the room with its gate open and
+      shut, the midterm result, the bridge's finalized shells
+      over a seed sweep) names exactly one bystander choice,
+      and it carries no trade, subscription, race effect, leak,
+      regime push or regulatory settlement.
+
    All numeric bands are DESIGN bands; the tuning is RATIFIED in
    02a's "Control regime and content plumbing"
    and "Evidence machinery (pre-P7 ratifications, 2026-07-24)"
@@ -173,7 +182,8 @@ import {
 import { market, syncMarket } from '../src/market.js';
 import { eventBaseRateScale, BASE_RATE_MAX_MULT, EventEngine } from '../src/events.js';
 import { runRaceBridge, resetRaceBridge } from '../src/events/race-bridge.js';
-import { getEventById } from '../src/events/index.js';
+import { getEventById, ALL_EVENTS, validateBystander } from '../src/events/index.js';
+import { roundDispatch } from '../src/events/rounds.js';
 import { NON_FED_POISSON_RATE, PRESETS } from '../src/config.js';
 import { createWorldState, applyStructuredEffects } from '../src/world-state.js';
 
@@ -3060,6 +3070,113 @@ let concealLagEarly = 0, concealLagLate = 0, concealDiffPairs = 0;
     K1();
 }
 
+// =====================================================================
+// Q. The bystander (02a "The run, headless", "Headless policies")
+// =====================================================================
+let bystanderPool = 0, bystanderBridgeIds = new Set(), bystanderBridgeShown = 0;
+{
+    const problems = (events) => events.map(validateBystander).filter(Boolean);
+    const firstOf = (list) => list.length ? `${list.length}: ${list[0]}` : '';
+
+    // -- Q1. The pool: every event `_fireEvent` queues as a dispatch.
+    const pool = ALL_EVENTS.filter(ev => ev.popup && (ev.superevent || ev.choices));
+    bystanderPool = pool.length;
+    const poolProblems = problems(pool);
+    check('Q1: every pool dispatch names exactly one qualifying bystander choice',
+        pool.length > 0 && poolProblems.length === 0, firstOf(poolProblems) || `${pool.length} dispatches`);
+    // Non-vacuous: the validator rejects each forbidden field, and a dispatch
+    // naming no bystander or two.
+    const forbidden = ['trades', 'round', 'raceEffects', 'raceLeak', '_applyReportingRegime',
+        '_openDispute', '_ruleDispute', 'regulatoryAction', '_tipAction'];
+    const rejects = forbidden.every(f => validateBystander({ id: 'probe', choices: [{ label: 'x', bystander: true, [f]: 0 }] }))
+        && validateBystander({ id: 'probe', choices: [{ label: 'x' }] })
+        && validateBystander({ id: 'probe', choices: [{ label: 'x', bystander: true }, { label: 'y', bystander: true }] })
+        && !validateBystander({ id: 'probe', choices: [{ label: 'x', bystander: true, deltas: { mu: 0.01 }, playerFlag: 'p' }] });
+    check('Q1: the validator rejects every forbidden field and a dispatch naming zero or two bystanders', !!rejects);
+    const autosit = (getEventById('insider_tip')?.choices || []).find(c => c.playerFlag === 'sat_on_insider_tip');
+    check('Q1: the insider tip\'s bystander is the choice the auto-sit standing order applies',
+        !!autosit && autosit.bystander === true);
+
+    // -- Q2. Round offers: Halcyon's follow-on and every Polaris round shape, at
+    //        an offered amount and at none. Pass is the bystander and subscribes nothing.
+    const rounds = [
+        { kind: 'halcyon', id: 'halcyon_followon_300_0', day: 300, price: 97 },
+        { kind: 'polaris', id: 'polaris_a', founding: true, price: 1, letter: 'A', ratio: 1 },
+        { kind: 'polaris', id: 'polaris_b', price: 2.4, letter: 'B', ratio: 2.4, rungGain: 1, claimedRung: 3 },
+        { kind: 'polaris', id: 'polaris_c', price: 2.6, letter: 'C', ratio: 1.08, rungGain: 0 },
+        { kind: 'polaris', id: 'polaris_d', price: 2.6, letter: 'D', ratio: 1 },
+        { kind: 'polaris', id: 'polaris_e', price: 1.9, letter: 'E', ratio: 0.73 },
+    ];
+    const offers = rounds.flatMap(r => [roundDispatch(r, 250), roundDispatch(r, 0)]);
+    const offerProblems = problems(offers);
+    const takesOK = offers.every((ev, k) => {
+        const r = rounds[k >> 1], [full, half, pass] = ev.choices;
+        return ev.choices.length === 3 && pass.bystander && pass.round === undefined
+            && full.round?.take === 1 && half.round?.take === 0.5
+            && full.round.id === r.id && half.round.kind === r.kind;
+    });
+    check('Q2: every round offer names Pass as its bystander, and Pass carries no subscription',
+        offerProblems.length === 0 && takesOK, firstOf(offerProblems) || `${offers.length} offers`);
+
+    // -- Q3. The room, with its gate open (every invited voice, summit live and
+    //        not) and shut (no seat: no dispatch at all).
+    const roomBase = getEventById(ROOM_EVENT_ID);
+    const roomOpen = [], roomShut = [];
+    for (let voice = 0; voice <= ROOM_MAX_VOICE; voice++) {
+        for (const summit of [false, true]) {
+            const choices = roomChoices(voice, summit);
+            if (roomInvited(voice)) roomOpen.push({ ...roomBase, choices });
+            else roomShut.push(choices.length);
+        }
+    }
+    const roomProblems = problems(roomOpen);
+    const sayNothing = roomOpen.every(ev => ev.choices.find(c => c.bystander)?.playerFlag === ROOM_FLAGS.declined);
+    check('Q3: the room with its gate open names "Say nothing" as its bystander at every voice',
+        roomOpen.length > 0 && roomProblems.length === 0 && sayNothing, firstOf(roomProblems) || `${roomOpen.length} rooms`);
+    check('Q3: the room with its gate shut offers no choices (no dispatch to answer)',
+        roomShut.length > 0 && roomShut.every(n => n === 0));
+
+    // -- Q4. The midterm result, generated by the event engine.
+    const midterms = [];
+    for (const approval of [10, 50, 90]) {
+        const eng = new EventEngine();
+        eng.world.election.barronApproval = approval;
+        const sim = { mu: 0.05, theta: 0.04, lambda: 0.5, _recomputeRhoDerived() {} };
+        for (const r of eng._onMidterm(sim, 500, 0)) if (r?.queued) midterms.push(r.event);
+    }
+    const midtermProblems = problems(midterms);
+    check('Q4: the midterm result names its bystander',
+        midterms.length === 3 && midtermProblems.length === 0, firstOf(midtermProblems) || midterms.map(e => e.id).join(', '));
+
+    // -- Q5. The bridge's finalized shells (token substitution, deep clone, the
+    //        tip's stamp) over a seed sweep, the insider channel's gate held open.
+    const bridgeProblems = [];
+    for (let seed = 1; seed <= 30; seed++) {
+        resetRaceBridge();
+        const race = createRaceState(seed);
+        const engine = new EventEngine();
+        engine.world.factions = { safetyNetworkTrust: 50 };
+        const sim = { b: 0.03, sigmaR: 0.01, _recomputeRhoDerived() {} };
+        initConsensus(race); initBelief(race);
+        for (let d = 0; d < HORIZON && !race.resolution; d++) {
+            advanceRace(race);
+            stepControlRegime(race);
+            stepTreaty(race, { treatyStage: engine.world.ai.treatyStage });
+            for (const ev of runRaceBridge(engine, race, sim, race.day, 0).popups) {
+                bystanderBridgeShown++;
+                bystanderBridgeIds.add(ev.id);
+                const problem = validateBystander(ev);
+                if (problem) bridgeProblems.push(problem);
+            }
+            checkResolution(race, null);
+        }
+    }
+    deactivateBelief(); deactivateConsensus(); resetRaceBridge();
+    check('Q5: every dispatch the bridge fires over 30 seeds names its bystander',
+        bystanderBridgeShown > 0 && bridgeProblems.length === 0,
+        firstOf(bridgeProblems) || `${bystanderBridgeShown} dispatches, ${bystanderBridgeIds.size} kinds`);
+}
+
 // ---- Report --------------------------------------------------------------
 line(`plumbing-test: N=${N}, horizon=${HORIZON}d`);
 line(`control tuning: supP=${CONTROL_TUNING.supPressure} mobP=${CONTROL_TUNING.mobPressure} natP=${CONTROL_TUNING.natPressure} natHeat=${CONTROL_TUNING.natHeat}`);
@@ -3121,6 +3238,9 @@ line('      record itself differs immediately in lagMult and meanLag (P8). Re-ph
 line('      is TWO-DIRECTIONAL -- a lagMult > 1 record stays detection-eligible longer,');
 line('      a lagMult < 1 record detects sooner and leaves the K=0 arm consuming the');
 line('      extra future draws. Either way the arms diverge after the first one.');
+line('\nRound one of the chain (02a "The run, headless"):');
+line(`  the bystander: ${bystanderPool} pool dispatches; the bridge fired ${bystanderBridgeShown} over 30 seeds:`);
+line(`    ${[...bystanderBridgeIds].sort().join(', ')}`);
 line('='.repeat(72));
 line('\nChecks:');
 for (const r of results) {

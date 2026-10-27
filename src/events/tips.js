@@ -187,6 +187,7 @@ export const TIP_EVENTS = [
         choices: [
             {
                 label: 'Don\'t respond',
+                bystander: true,
                 desc: 'Whatever this is, you don\'t want any part of it.',
                 playerFlag: 'declined_insider_tip',
                 resultToast: 'You leave the text on read. Smart.',
@@ -220,6 +221,7 @@ export const TIP_EVENTS = [
         choices: [
             {
                 label: 'Politely decline',
+                bystander: true,
                 desc: 'The line between mosaic theory and material non-public information is thin.',
                 playerFlag: 'passed_channel_check',
                 resultToast: 'You rely on your own analysis. The analyst sounds annoyed.',

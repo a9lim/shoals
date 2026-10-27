@@ -201,6 +201,7 @@ export const MEDIA_EVENTS = [
             },
             {
                 label: 'Decline politely',
+                bystander: true,
                 desc: 'Stay anonymous. The best traders are the ones nobody\'s heard of.',
                 factionShifts: [{ faction: 'mediaTrust', value: -2 }],
                 deltas: {},
@@ -225,6 +226,7 @@ export const MEDIA_EVENTS = [
         choices: [
             {
                 label: 'Stay in the shadows',
+                bystander: true,
                 desc: 'The work is the brand. Let the returns compound.',
                 factionShifts: [{ faction: 'mediaTrust', value: -1 }],
                 deltas: {},
@@ -277,6 +279,7 @@ export const MEDIA_EVENTS = [
             },
             {
                 label: 'Hold the position',
+                bystander: true,
                 desc: 'You have a fiduciary duty to your investors. The position is legal and well-reasoned.',
                 factionShifts: [
                     { faction: 'regulatoryExposure', value: 3, when: { hasTrait: 'under_scrutiny' }, bonus: 3 },
