@@ -314,6 +314,7 @@ function _fireSubstepArrival() {
     run.sink.fired(fired, true);
     if (fired.length > 0 || popups.length > 0) {
         run.sink.world();
+        run.sink.wire();
         run.sink.book();
     }
 }
@@ -468,7 +469,9 @@ function _onSubstepTick() {
  */
 function _queuePopup(event, front) {
     if (_interceptByStandingOrder(event)) { countDispatch(_dispatchCategory(event), 'intercepted'); return false; }
-    event._occ = ++run.dispatchSeq;   // the occurrence id an answer names
+    // INTERPRETATION: a dispatch's occurrence id is its place in the run's queue
+    // order (assigned here, when it joins the queue); an answer names it.
+    event._occ = ++run.dispatchSeq;
     if (front) run.queue.unshift(event); else run.queue.push(event);
     countDispatch(_dispatchCategory(event), 'queued');
     return true;
@@ -1247,7 +1250,8 @@ function _marginCallDispatch(margin) {
                 label: 'Liquidate all positions',
                 desc: 'Dump everything at market. Stop the bleeding.',
                 playerFlag: 'margin_liquidated',
-                // The bystander's answer: the forced liquidation (02a "Headless policies").
+                // INTERPRETATION: the bystander's answer is the full forced
+                // liquidation (02a "Headless policies": a specified forced-liquidation response).
                 bystander: true,
                 // No static resultToast -- the _marginAction handler reports the
                 // TRUE outcome (n closed, m frozen) via _applyRestriction.

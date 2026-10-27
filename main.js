@@ -1399,6 +1399,9 @@ function _drawDesk() {
     _updateWire();
     _refreshWorld();
     updateUI();
+    _updateTraitDisplay();
+    _updateRegulationDisplay();
+    _updateLobbyPills();
     _repositionCamera();
     renderTicket();
     if (currentPage() === 'meridian') renderHandover(dealtFixture());

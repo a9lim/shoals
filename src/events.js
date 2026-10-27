@@ -173,8 +173,9 @@ export class EventEngine {
         this._triggerPool = ALL_EVENTS.filter(e => typeof e.trigger === 'function');
         this._triggerCooldowns = {};
 
-        // Pulse schedule. `n` counts a recurring pulse's occurrences: its slot key
-        // (0 is the first scheduling, n the nth firing's rescheduling and pick).
+        // Pulse schedule. `n` counts a recurring pulse's occurrences: its slot key.
+        // INTERPRETATION: occurrence 0 is the first scheduling; occurrence n is the
+        // nth time the pulse comes due, its rescheduling jitter and then its pick.
         this._pulses = [
             { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, n: 0, poolKey: 'fed' },
             { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, n: 0, poolKey: 'filibuster' },
@@ -399,6 +400,7 @@ export class EventEngine {
         if (w.media.tanCredibility >= 8) score -= 3;
 
         // Noise: +-5
+        // INTERPRETATION: the election stream is keyed by day and which election.
         score += (keyedRng(this.seed, 'events.election', day, 'presidential').next() - 0.5) * 10;
 
         let presidentialResult;
@@ -516,7 +518,9 @@ export class EventEngine {
     }
 
     /** A firing's followups. The chain's id is the parent's id, day and
-     *  occurrence (02a "The run, headless"); each followup's delay is its own slot. */
+     *  occurrence (02a "The run, headless"); each followup's delay is its own slot.
+     *  INTERPRETATION: the id is `${id}@${day}#${occurrence}`, so two firings of one
+     *  event no longer share a chain (they did when the id alone named it). */
     _scheduleFollowups(event, day, depth, occ) {
         if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
         const parent = event.id || 'chain';
