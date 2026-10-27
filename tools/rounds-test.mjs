@@ -40,6 +40,7 @@ import { PRESETS } from '../src/config.js';
 import { computeVXHCNSpot } from '../src/pricing.js';
 import { roundDispatch } from '../src/events/rounds.js';
 import { fmtDollar } from '../src/format-helpers.js';
+import * as counters from '../src/counters.js';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
 
@@ -368,6 +369,7 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
         halcyonOfferPrice, recordPrimaryAllocation, applyRaceEffects, raceChannelsLive,
         consensus: { active: false }, computeMarket: { active: false },
         showToast: message => messages.push(message), fmtDollar,
+        ...counters,
     });
     runInContext(main + `
         updateUI = () => {};
@@ -377,8 +379,7 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
             open(value) { dayInProgress = value; },
             gap: _stepRaceMarkets, choice: _applyPopupChoice,
             restrict: _applyRestriction, stuck: _hasStuckLegs,
-            hold(value) { _lockPending = value; },
-            playing() { return playing; }, isOpen() { return dayInProgress; },
+            playing() { return playing; }, isOpen() { return dayInProgress; }, barrier: _popupBarrier,
             play: togglePlay, step,
         };
     `, context, { filename: 'main.js (headless helpers)' });
@@ -465,14 +466,11 @@ check('B: rounds on/off full trajectories and RNG states bit-identical', identit
     check('H: a private subscription is capped at collateral headroom (never leaves the book under-margined)',
         !before.triggered && !after.triggered && (!stake || stake.allocated <= before.collateralEquity - before.required + 1e-9),
         `headroom ${(before.collateralEquity - before.required).toFixed(1)}, allocated ${stake ? stake.allocated.toFixed(1) : 0}`);
-    // 3. "Adjust first" holds the quarter: neither play nor step opens a day.
-    api.open(false); api.hold(true);
-    api.play();
-    const playBlocked = !api.playing();
-    api.step();
-    check('H: the adjust-first hold blocks play and step until the curves are locked',
-        playBlocked && !api.isOpen(), `playing ${api.playing()}, open ${api.isOpen()}`);
-    api.hold(false);
+    // 3. Nothing holds a day for the forecast (02a "The standing policy"): the desk
+    //    snapshots it without asking, so with no dispatch queued or shown the popup
+    //    barrier is down and a finished day closes.
+    api.queue.length = 0;
+    check('H: nothing holds a day for the forecast (no barrier without a dispatch)', !api.barrier());
 }
 
 console.log(`\nRounds gate: N=${N}, base seed=${BASE_SEED}, ${((Date.now() - t0) / 1000).toFixed(2)}s`);

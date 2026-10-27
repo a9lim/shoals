@@ -39,7 +39,9 @@ import {
     invalidateTicket, tradeTicket, ticketLegCount,
 } from './src/ticket.js';
 import { initSurface } from './src/surface.js';
-import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace, setForecastPending } from './src/race-page.js';
+import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace } from './src/race-page.js';
+import { resetCounts, countDispatch, countChoice, countDevelopment, counts } from './src/counters.js';
+import { buildAlmanacRecord, appendAlmanac } from './src/almanac.js';
 import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
 import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
@@ -101,7 +103,7 @@ import { roundDispatch } from './src/events/rounds.js';
 import { applyReportingRegime, forceLeakDetection } from './src/race/incidents.js';
 import { straitTension } from './src/race/strait.js';
 import { stepTreaty } from './src/race/treaty-track.js';
-import { checkResolution, resolveNow } from './src/race/resolution.js';
+import { checkResolution, resolveNow, HORIZON } from './src/race/resolution.js';
 import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
@@ -121,10 +123,9 @@ import {
 import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief, binaryProb,
     binaryQuoteFromBelief, computeCurveFromBelief,
-    isLockDay, lockForecast, scoreQuarter, scoreOutstandingQuarter, draftCurves, presetCurves, curvesEqual, openRungs,
-    curveMedian, impliedTimeline,
-    forecastRecord,
-    playerPilled, stepFirmBelief, scrutinyGap, hasEverLocked, credibility,
+    isLockDay, snapshotForecast, scoreQuarter, scoreCopierQuarter, scoreOutstandingQuarter, scoreCopierOutstanding,
+    forecastRecord, copierRecord,
+    playerPilled, stepFirmBelief, scrutinyGap, hasStatedForecast, credibility,
     canSendMemos, canActAsFund, firmBelief, foldPlayerLeak,
 } from './src/race/belief.js';
 import {
@@ -164,9 +165,8 @@ let portfolioHistory = null; // sparkline ring buffer for the book's value
 let benchHistory = null;     // ... and for holding HCN with the same capital (the ghost under it)
 let _savedOverlays = {};
 let _savedImpulse = {};   // event-impulse overlay saved originals (restored at day-complete)
-let _lastForecastLockDay = -1;   // race-day of the last forecast-lock prompt (avoids double-firing)
-let _lockPending = false;        // "Adjust first": the lock day is held until the Race page's Lock is pressed
-let _lockPendingDay = -1;        // the race day that lock belongs to
+let _lastForecastLockDay = -1;   // race-day of the last lock-day block (scoring, F, scrutiny; avoids double-firing)
+let _almanacRecord = null;       // the run's almanac record, built at game over, appended when the last edition shows
 let _fundLive = false;    // P7-3 fund-as-actor latch (monotone; mirrored to world.ai.fundLive)
 let _roomFired = false;   // P7-3: the room is a once-per-run branch point, gate open or shut
 let _capFront = null;
@@ -303,6 +303,7 @@ function _applyBinaryRows(rows) {
     if (!rows || rows.length === 0) return [];
     const { fresh, cashResults } = applyBinarySettlementRows(rows);   // cash, exactly-once
     for (const r of cashResults) {
+        countDevelopment('settlement');
         _toast('Consensus: ' + r.label + ' settled ' + r.outcome + ' — P&L ' + fmtDollar(r.pnl), 4500);
     }
     for (const r of fresh) {
@@ -527,6 +528,7 @@ function _executeDeferred(entry) {
             p.strike, p.expiryDay, undefined, sim.q, mult
         );
         if (pos) {
+            countDevelopment('fill');
             const label = p.side === 'short' ? 'Shorted' : 'Bought';
             _toast(label + ' ' + p.qty + 'k ' + p.type + ' at $' + pos.fillPrice.toFixed(2), 3000);
             _haptic('success');
@@ -544,6 +546,7 @@ function _executeDeferred(entry) {
             p.key, p.key, undefined, sim.q, mult
         );
         if (pos) {
+            countDevelopment('fill');
             _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k Compute Q@' + p.key, 2500);
             _haptic('success');
         } else {
@@ -553,6 +556,7 @@ function _executeDeferred(entry) {
     } else if (entry.kind === 'binary') {
         const pos = executeBinaryTrade(p.key, p.side, p.qty, mult);
         if (pos) {
+            countDevelopment('fill');
             _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k Yes', 2500);
             _haptic('success');
         } else {
@@ -560,17 +564,17 @@ function _executeDeferred(entry) {
             _haptic('error');
         }
     } else if (entry.kind === 'strategy') {
-        executeWithRollback(p.legs, p.name, p.mult, mult);
+        if (executeWithRollback(p.legs, p.name, p.mult, mult)) countDevelopment('fill');
     } else if (entry.kind === 'close') {
         // The position may have expired / settled / been flattened by machinery
         // while the close was working -- report it, never fabricate a fill.
         if (!_closePositionAction(p.id, mult)) {
             _toast('Working close expired — the position closed without you.', 4000);
-        }
+        } else countDevelopment('fill');
     } else if (entry.kind === 'unwind') {
         if (_unwindStrategyAction(p.name, mult) === 0) {
             _toast('Working unwind expired — no legs left in "' + p.name + '".', 4000);
-        }
+        } else countDevelopment('fill');
     }
 }
 
@@ -958,10 +962,6 @@ function init() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
-        // Day 0 is a real prompted lock (belief.day === 0). At boot it is queued, not
-        // shown: the first edition opens trading, and the dispatch arrives as day 0
-        // closes (the popup barrier holds the day for it, so the lock stays on day 0).
-        _promptDay0Lock(false);
     } else {
         deactivateConsensus();
         deactivateComputeMarket();
@@ -1073,7 +1073,6 @@ function init() {
     initSurface();
     marketsDayClose(null);
     initRacePage({ race: () => raceState, world: () => (eventEngine ? eventEngine.world : null) }, {
-        onLock: () => _lockFromEditor(),
         onEdit: () => redrawMarkets(),
     });
     resetRacePage();
@@ -1087,7 +1086,9 @@ function init() {
         _forms.bindSlider(_vol, document.getElementById('volume-val'), v => setVolume(v / 100), v => Math.round(v) + '%');
     }
 
-    // 19. Debug console API — use window._debug in the browser console
+    // 19. Debug console API — use window._debug in the browser console. The
+    //     interruption counters (02a "Interruption counters") read as shoalsCounts().
+    window.shoalsCounts = () => counts();
     window._debug = {
         sim, portfolio, market, factions,
         get eventEngine() { return eventEngine; },
@@ -1325,12 +1326,11 @@ function _closeTradingDay() {
  * Two halves, both required: an event already SHOWN has been shifted OFF the queue
  * (so the overlay is the only evidence), and an event still QUEUED is waiting its
  * turn behind the one on screen. A pending terminal epilogue bars the close
- * outright -- nothing ticks after the latch. So does a lock the player chose to
- * adjust first (02a, the posterior's locks): the quarter waits on the Race page's
- * Lock, with no dispatch on screen.
+ * outright -- nothing ticks after the latch. Nothing holds a day for the
+ * forecast (02a "The standing policy").
  */
 function _popupBarrier() {
-    if (_popupQueue.length > 0 || _pendingEpilogue || _lockPending) return true;
+    if (_popupQueue.length > 0 || _pendingEpilogue) return true;
     const ov = $.popupOverlay;
     return !!(ov && !ov.classList.contains('hidden'));
 }
@@ -1377,7 +1377,7 @@ function _abortPartialDay() {
 }
 
 function frame(now) {
-    if (playing && !_lockPending) {
+    if (playing) {
         const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
         const substepInterval = tickInterval / INTRADAY_STEPS;
 
@@ -1452,6 +1452,7 @@ function frame(now) {
 function _fillPendingOrders() {
     const filledOrders = checkPendingOrders(sim, sim.S, market.sigma, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
+        countDevelopment('fill');
         const side = pos.qty > 0 ? 'Bought' : 'Sold';
         _toast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         bookDirty = true;
@@ -1548,9 +1549,15 @@ function _updateLobbyPills() {
  * @returns {boolean} true when the event was actually queued.
  */
 function _queuePopup(event, front) {
-    if (_interceptByStandingOrder(event)) return false;
+    if (_interceptByStandingOrder(event)) { countDispatch(_dispatchCategory(event), 'intercepted'); return false; }
     if (front) _popupQueue.unshift(event); else _popupQueue.push(event);
+    countDispatch(_dispatchCategory(event), 'queued');
     return true;
+}
+
+/** A dispatch's category, as the popup frame reads it. */
+function _dispatchCategory(event) {
+    return event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
 }
 
 /**
@@ -1598,12 +1605,15 @@ function _processPopupQueue() {
             const pages = _pendingEpilogue;
             _pendingEpilogue = null;
             _showEpilogue(pages, true);   // terminal: no "keep playing"
+            // The almanac (02a "The evening"): the last edition of a Dynamic run,
+            // natural resolution and ejection alike, appends its record once.
+            if (_almanacRecord) { appendAlmanac(_almanacRecord); _almanacRecord = null; }
         }
         return;
     }
 
     const event = _popupQueue.shift();
-    if (event._forecastLock) _composeLockDispatch(event);   // the draft may have moved since it was queued
+    countDispatch(_dispatchCategory(event), 'shown');
     if (event._roundOffer) {
         // Allocation caps and all prose tokens are public show-time values. The
         // offer price is fixed at announcement; another dispatch may move cash.
@@ -1620,7 +1630,7 @@ function _processPopupQueue() {
         ? event.context(sim, eventEngine?.world, portfolio)
         : event.context || '';
 
-    const popupCat = event.category || (event.id && event.id.startsWith('desk_') ? 'desk' : '');
+    const popupCat = _dispatchCategory(event);
     playStinger('alert');
 
     const isSuperevent = !!event.superevent;
@@ -1640,6 +1650,9 @@ function _processPopupQueue() {
     if (_dd) _dd.textContent = `Edition ${Math.max(1, _relDay() + 1)} · day ${Math.max(0, _relDay())}`;
     showPopupEvent($, event.headline, contextText, event.choices, (idx) => {
         if (isSuperevent) stopMusic(2000);
+        // INTERPRETATION: a repeat is counted on the player's own answers only (an
+        // intercepted tip is the standing order's), keyed by event id and choice label.
+        countChoice(event.id || event.headline, event.choices[idx]?.label ?? idx);
         _applyPopupChoice(event, event.choices[idx]);
         dirty = true;
         // Drain the next queued popup (the overlay was hidden before this callback ran).
@@ -1919,14 +1932,6 @@ function _applyPopupChoice(event, choice) {
     if (event._gameOverAction) {
         _triggerGameOver(event._gameOverEnding || 'forced_resignation');
     }
-    // The quarterly lock (02a, the posterior's locks): record the chosen curves on
-    // the scheduled day -- immutable, on-grid, current day only -- or, for "Adjust
-    // first", hold the day for the Race page's Lock.
-    if (event._forecastLock && choice._lockMode) {
-        if (choice._lockMode === 'adjust') _beginLockAdjust(event._lockDay);
-        else if (choice._lockMode === 'market') _recordLock(event._lockDay, null, 'market');
-        else _recordLock(event._lockDay, choice._lockMode === 'drawn' ? draftCurves() : presetCurves(choice._lockMode));
-    }
     // Reporting-regime lever (phase 5a): a policy choice enacts the mandatory
     // incident-reporting regime (retroactive-once). Mirror the flag into
     // world-state so guards see it, and report the disclosure wave.
@@ -2003,8 +2008,6 @@ function _triggerGameOver(endingId) {
     _gameOver = true;
     playing = false;
     _resumeAfterDispatch = false;
-    _lockPending = false;            // nothing locks after the latch
-    setForecastPending(false);
     updatePlayBtn($, playing);
     // 0b. Partial-day abort (02a "Act III"): a terminal reached MID-DAY -- an
     //     intraday compliance choice, a rogue latch off a substep-lane popup --
@@ -2041,12 +2044,23 @@ function _triggerGameOver(endingId) {
         const geo = eventEngine ? eventEngine.world.geopolitical : null;
         resolution = resolveNow(raceState, geo);          // existing record, or extrapolate + latch (freezeLedger first)
         // The outstanding quarter (02a "Scoring"): the unscored lock is scored once,
-        // against its original end date and the completed trajectory.
+        // against its original end date and the completed trajectory; the
+        // reader-copier's beside it (02a "The almanac").
         scoreOutstandingQuarter(raceState);
+        scoreCopierOutstanding(raceState);
         closeout = _runTerminalCloseout(resolution, geo);
         const _dP = resolution && resolution.axes ? Math.abs(resolution.axes.dP || 0) : 0;
         // Personal overlay (surface the mapping; the epilogue picks slots, not tone).
         overlay = determineOverlay(endingId, ledgerTotals(), _dP, _firmVerdictFired);
+        // MERGE (pass B): the drawn opening fixture's id, from src/opening.js's getter; null until it lands.
+        const fixture = null;
+        // INTERPRETATION: the record's terminal day and cause are the resolution's
+        // (day, terminalCause); the desk's own ending (natural or an ejection) rides
+        // beside them as `ending`.
+        _almanacRecord = buildAlmanacRecord({
+            race: raceState, resolution, overlay, ending: endingId, fixture,
+            player: forecastRecord(), copier: copierRecord(),
+        });
     }
 
     // 4. Epilogue (structure + numbers here; sentences are coordinator slots). DEFERRED
@@ -2192,10 +2206,11 @@ function _checkRoom() {
 
 function _runScrutiny() {
     if (!raceState) return;
-    if (!hasEverLocked()) return;                  // no stated posterior -> no belief gap to scrutinize
-    const pilled = playerPilled();                 // player's locked posterior on the recursion rungs
-    const gap = scrutinyGap(raceState, pilled);    // player - F
-    if (Math.abs(gap) <= 20) return;               // not divergent -> no scrutiny
+    // A followed R4 states nothing (02a "What follows states nothing"): no stated
+    // posterior on the recursion rung, no belief gap to scrutinize this quarter.
+    const pilled = playerPilled();                 // null, or the locked posterior on R4
+    const gap = scrutinyGap(raceState, pilled);    // player - F, null when pilled is
+    if (gap == null || Math.abs(gap) <= 20) return;   // not stated, or not divergent -> no scrutiny
     const lastRev = quarterlyReviews[quarterlyReviews.length - 1];
     const vs = lastRev ? lastRev.vsBenchmark : 0;
     // Two-sided by rule (02a "Belief, η, and the firm"): the committee grudgingly respects P&L --
@@ -2214,110 +2229,19 @@ function _runScrutiny() {
     }
 }
 
-/** Prompt the day-0 forecast lock at game start (a REAL lock, belief.day === 0):
- *  shown immediately, pausing the game, so the player sets their initial thesis
- *  before the first day advances. Never a manufactured market-prior forecast. */
-function _promptDay0Lock(drainNow = true) {
-    if (!raceState || !belief.active) return;
-    _lastForecastLockDay = 0;
-    _promptForecastLock();
-    if (drainNow) _processPopupQueue();
-}
-
-/**
- * The quarterly lock dispatch (02a, the posterior's locks): it holds the day
- * until a lock is recorded. Queued here; its context and choices are composed
- * again when it is shown (`_composeLockDispatch`), because day 0's is queued at
- * boot and the draft may change before day 0 closes.
- */
-function _promptForecastLock() {
-    if (!raceState || !belief.active) return;
-    const ev = { category: 'desk', magnitude: 'moderate', headline: 'Quarterly forecast lock', _forecastLock: true, _lockDay: raceState.day };
-    _composeLockDispatch(ev);
-    _queuePopup(ev);
-}
-
-/** The lock dispatch's context and choices, from the draft, `B` and the record. */
-function _composeLockDispatch(ev) {
-    const draft = draftCurves(), mkt = presetCurves('market'), open = openRungs();
-    let ctx = 'The desk logs your timeline for the record — no retroactive edits — and scores it '
-        + 'against the market’s at every quarter’s close: the rungs that certify, and the quiet quarters that don’t.';
-    const shown = [3, 4, 5].filter(R => open.includes(R));
-    // Both sides as conditional medians given nothing yet (null: not this term),
-    // never the curve's m, which is the median given the rung ever certifies.
-    const today = raceState.day, implied = impliedTimeline();
-    const round = d => d == null ? null : Math.round(d);
-    // A rung still on the market's projection is the market's call, whatever
-    // the projection's fitting error says about its median.
-    const same = R => curvesEqual(draft, mkt, R);
-    const days = R => [same(R) ? round(implied[R]) : round(curveMedian(draft[R], today, R)), round(implied[R])];
-    const by = (d, first) => d == null ? 'not this term' : `by ${first ? 'day ' : ''}${d}`;
-    if (shown.length && shown.every(R => days(R)[0] === days(R)[1])) {
-        // One sentence when the draft is the market's: a list, not a chorus.
-        ctx += ' Your curves match Consensus: ' + shown.map((R, i) => `R${R} ${by(days(R)[1], !i)}`).join(', ') + '.';
-    } else {
-        for (const R of shown) {
-            const [dm, mm] = days(R);
-            if (dm === mm) {
-                ctx += mm == null
-                    ? ` Consensus doesn’t see R${R} this term, and neither do you.`
-                    : ` Consensus has R${R} by day ${mm}, and so do you.`;
-            } else if (mm == null) {
-                ctx += ` Consensus doesn’t see R${R} this term; your curve has it by day ${dm}.`;
-            } else if (dm == null) {
-                ctx += ` Consensus has R${R} by day ${mm}; your curve doesn’t see it this term.`;
-            } else {
-                ctx += ` Consensus has R${R} by day ${mm}; your curve has it by day ${dm}.`;
-            }
-        }
-    }
+/** A quarter's close is one line in the Brief (02a "The standing policy"): when
+ *  the quarter just scored had a carried rung, the lock day's edition carries one
+ *  desk item on the wire with the quarter's increment and the record. A quarter
+ *  whose every rung was followed scored exactly 0 and prints nothing. */
+function _quarterCloseLine(scored) {
+    if (!scored || !eventEngine || !scored.rungs.some(r => r.cls === 'carried')) return;
+    // INTERPRETATION: n counts every quarter scored, the followed ones (which
+    // scored exactly 0) included, as forecastRecord().quarters does.
     const rec = forecastRecord();
-    if (rec && rec.quarters > 0) {
-        ctx += ` Your record: ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'} scored, ${fmtSigned(rec.S)} nats against the market.`;
-    }
-    const choices = [];
-    if (!open.every(R => curvesEqual(draft, mkt, R))) {
-        choices.push({ label: 'Lock as drawn', desc: 'Your forecast, as it stands on the Race page.', _lockMode: 'drawn' });
-    }
-    choices.push(
-        { label: 'Lock the market’s curves', desc: 'No call this quarter. You score exactly what Consensus scores.', _lockMode: 'market' },
-        { label: 'Earlier than the market', desc: 'Every open rung half a width sooner. The recursion is closer than the tape thinks.', _lockMode: 'earlier' },
-        { label: 'Later than the market', desc: 'Every open rung half a width later. The wall is real, or at least slow.', _lockMode: 'later' },
-        { label: 'Adjust first', desc: 'Open your forecast on the Race page. The quarter waits until you lock.', _lockMode: 'adjust' },
-    );
-    ev.context = ctx;
-    ev.choices = choices;
-}
-
-/** Record a lock on `day` and report it ('market': a market-policy lock, 02a).
- *  Returns the record, or null. */
-function _recordLock(day, curves, policy = 'own') {
-    const rec = lockForecast(day, curves, policy);
-    _toast(rec ? 'Locked for the quarter.' : 'The lock window has passed — no forecast recorded this quarter.', 4000);
-    redrawMarkets();
-    if (currentPage() === 'race') setRaceVisible(true);   // the ladder's "Locked" column
-    return rec;
-}
-
-/** "Adjust first": the dispatch is gone, the day stays held (`_lockPending`), and
- *  the Race page opens with the forecast editor focused and its Lock shown. */
-function _beginLockAdjust(day) {
-    _lockPending = true;
-    _lockPendingDay = day;
-    showPage('race');
-    setForecastPending(true, true);
-}
-
-/** The Race page's Lock: record the draft, release the held day, and resume a
- *  desk the dispatch paused. */
-function _lockFromEditor() {
-    if (!_lockPending) return;
-    _recordLock(_lockPendingDay, draftCurves());
-    _lockPending = false;
-    _lockPendingDay = -1;
-    setForecastPending(false);
-    _closeCompletedDayIfPending();
-    _resumeAfterDispatches();
+    const headline = `The desk’s forecast closes the quarter ${fmtSigned(scored.delta, 2)} nats against Consensus; `
+        + `${fmtSigned(rec.S, 2)} over ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'} scored.`;
+    eventEngine._logEvent(sim.day, { headline, category: 'desk' }, {}, 'minor');
+    _updateWire();
 }
 
 function _updateTraitDisplay() {
@@ -2466,6 +2390,17 @@ function _recordImpact(day, direction, magnitude, context) {
 function _onDayComplete() {
     if (_gameOver) return;   // P6-3: the desk is closed; no further day processing after the terminal closeout
 
+    // The quarterly snapshot (02a "Locks"): at the start of the close that ends a
+    // lock day's edition, before any other close bookkeeping and before the race
+    // steps, while race.day and belief.day still equal the lock day. The desk
+    // snapshots the standing policy without asking, and the reader-copier beside
+    // it. Day 0's is the close of Edition 1; none is ever taken on day 1008, and a
+    // run that ended mid-edition never reaches here (the game-over guard above).
+    if (raceState && belief.active && !raceState.resolution && raceState.day < HORIZON
+        && isLockDay(raceState.day) && belief.day === raceState.day) {
+        snapshotForecast(raceState.day);
+    }
+
     const vol = market.sigma;
 
     chargeBorrowInterest(sim.S, vol, sim.r, sim.borrowSpread, sim.day);
@@ -2511,7 +2446,10 @@ function _onDayComplete() {
         _toast(text, rating === 'poor' ? 8000 : 5000);
     }
 
-    const { unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
+    const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
+    // INTERPRETATION: a chassis expiry (an option, bond or VXHCN future reaching its
+    // date) counts as its own kind beside Consensus and compute settlements.
+    for (let i = 0; i < expired.length; i++) countDevelopment('expiry');
     if (unwound.length > 0) {
         const names = [...new Set(unwound.map(p => p.strategyName))];
         for (const name of names) {
@@ -2550,7 +2488,7 @@ function _onDayComplete() {
         // everLocked false, so agi_pilled/doomer stay dormant.
         beliefPilled: raceState ? playerPilled() : 0,
         credibility: raceState ? credibility() : 0,
-        everLocked: raceState ? hasEverLocked() : false,
+        everLocked: raceState ? hasStatedForecast() : false,
     };
     const newTraits = evaluateTraits(_traitCtx);
     for (const id of newTraits) {
@@ -2669,6 +2607,7 @@ function _onDayComplete() {
         if (cSettlements.length) {
             const cSettled = settleComputeFutures(cSettlements, raceState);
             for (const r of cSettled) {
+                countDevelopment('settlement');
                 _toast('Compute Q@' + r.key + ' ' + r.kind.toLowerCase().replace('_', ' ')
                     + ' — P&L ' + fmtDollar(r.pnl), 4500);
             }
@@ -2682,29 +2621,32 @@ function _onDayComplete() {
         // sees the book. Machinery-instant; one fire per trigger episode.
         _runStandingDayRules();
 
-        // Forecast locking + firm belief F + the belief-gap scrutiny loop
+        // The quarter's close + firm belief F + the belief-gap scrutiny loop
         // (overhaul phase 4). Lock days are the fixed quarterly grid 0/63/126...
-        // (race clock). Day zero was prompted during initialization.
+        // (race clock). The lock itself is the snapshot at the top of the NEXT
+        // close (02a "Locks"), so F, scrutiny and the conversion read the closing
+        // quarter's lock here.
         if (isLockDay(raceState.day) && raceState.day !== _lastForecastLockDay) {
-            _lastForecastLockDay = raceState.day;   // race.day >= 1 here; day 0 is prompted at init
+            _lastForecastLockDay = raceState.day;   // race.day >= 1 here
             // Score the quarter that just closed under the lock that opened it (02a
-            // "Scoring"), BEFORE today's lock is recorded and before F reads
-            // credibility -- so the firm, the memo gate and the dispatch's record all
-            // see this quarter's result.
-            scoreQuarter(raceState.day);
+            // "Scoring"), the reader-copier's beside it, before F reads credibility
+            // -- so the firm, the memo gate and the close line all see this
+            // quarter's result.
+            const _scored = scoreQuarter(raceState.day);
+            scoreCopierQuarter(raceState.day);
             updateStandings($, eventEngine.world, factions, getFactionDescriptor);   // the Desk's record
             stepFirmBelief(raceState);   // F wakes toward B; converts on the player's track record
             // P6-2 F-channel ledger (advice line): stepFirmBelief exposes the applied
             // movement's decomposition -- ledger ONLY the PLAYER conversion term
             // (race.lastFConvert), never the autonomous B-wake (02a "Player influence and the ledger": the
             // ledger charges the player for persuasion, not for the world waking on its
-            // own). Gated on the player ever having locked (the advice channel is silent
-            // otherwise); zero-dropped like every channel. F is 0-100; /100 keeps the
-            // epilogue's channel totals commensurable in margin-unit-ish fractions.
-            if (hasEverLocked()) appendLedger(sim.day, 'F', 'advice_line', (raceState.lastFConvert || 0) / 100, 'firm belief (F) conversion');
+            // own). Gated on the player having stated a forecast (the advice channel is
+            // silent otherwise); zero-dropped like every channel. F is 0-100; /100 keeps
+            // the epilogue's channel totals commensurable in margin-unit-ish fractions.
+            if (hasStatedForecast()) appendLedger(sim.day, 'F', 'advice_line', (raceState.lastFConvert || 0) / 100, 'firm belief (F) conversion');
             _runScrutiny();              // risk committee heats on the player's belief-gap vs F
             _checkFirmConversion();      // the CIO throughline: memo, then verdict (once each)
-            _promptForecastLock();
+            _quarterCloseLine(_scored);  // one desk item on the wire when a carried rung scored
         }
 
         // Terminal resolution (P6): the precedence ladder, checked LAST -- after this
@@ -3077,9 +3019,6 @@ function togglePlay() {
     // day marked closed with its partial bar standing in history and the sim clock
     // deliberately un-advanced. Resuming would open a SECOND bar on that same day.
     if (_gameOver) return;
-    // "Adjust first" holds the quarter until the curves are locked: no new day
-    // opens behind the hold, by play or by step.
-    if (_lockPending && !playing) { _toast('Lock your forecast on the Race page to open the next day.'); return; }
     _resumeAfterDispatch = false;
     playing = !playing;
     if (playing) {
@@ -3109,7 +3048,6 @@ function _resumeClockOrigin() {
 function step() {
     if (playing) return;
     if (_gameOver) return;   // same reason as togglePlay: never reopen an aborted day
-    if (_lockPending) { _toast('Lock your forecast on the Race page to open the next day.'); return; }
 
     // Start a new day if none in progress (installs overlays via the shared helper).
     if (!dayInProgress) {
@@ -3203,8 +3141,8 @@ function _resetCore(index) {
     _roomFired = false;   // P7-3: the room is a once-per-RUN branch point
     resetEventImpulses();          // clear the decaying race-event impulse overlay (phase 4)
     _lastForecastLockDay = -1;
-    _lockPending = false;
-    _lockPendingDay = -1;
+    _almanacRecord = null;
+    resetCounts();                 // the interruption counters are run-scoped
     sim.reset(index);
     resetPortfolio();
     resetImpactState();
@@ -3219,7 +3157,6 @@ function _resetCore(index) {
     bookDirty = true;
     playing = false;
     _resumeAfterDispatch = false;
-    setForecastPending(false);
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateDynamicSections($, index);
@@ -3252,7 +3189,6 @@ function loadPreset(index) {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
-        _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     } else {
         eventEngine = null;
         raceState = null;
@@ -3303,7 +3239,6 @@ function resetSim() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine ? eventEngine.world.geopolitical : null);
-        _promptDay0Lock();   // day 0 is a real prompted lock (belief.day === 0)
     }
     _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);

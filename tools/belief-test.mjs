@@ -26,11 +26,23 @@
       crossingProb with q against the naive survival ratio; the
       plateau handle in closed form; monotone m and q over
       R2-R4, R5 unordered; locks store clamped pairs; a call's
-      score from the stored pairs; the market-policy copier
-      scores exactly 0; lock guards; once per quarter; no
-      manufactured forecast; lockedClaim and playerPilled of a
-      market-policy lock; sigma0 (against the naive formula, 0 for
-      the market-policy copier; reported, read by no gate).
+      score from the stored pairs; the market copier scores
+      exactly 0; lock guards; once per quarter; no manufactured
+      forecast; a followed rung's claim and the null pilledness
+      of a followed R4; a carried curve equal to the projection
+      is followed; sigma0 (against the naive formula, 0 for the
+      market copier; reported, read by no gate).
+   Q. The standing policy (02a "The standing policy", its gates):
+      an edit carries (the activation clamp); follow the market;
+      mixed policies (a followed rung's moves never move a
+      carried one, a certification moves none, a followed /
+      carried crossing validates); snapshot fidelity; a revision
+      reaches only later snapshots; a player who never draws
+      (every lock followed, S_P and sigma0 exactly 0, no scrutiny,
+      no belief-keyed conviction, no F advice row) on main.js's
+      close order; no lock after the end or on day 1008; a run
+      that ends mid-edition takes no snapshot; the trait
+      evaluation later in the same close sees the new lock.
    D. Lock-day schedule.
    E. Listing quotes two-sided with the real quoter (the base
       rates themselves are consensus-test's gate).
@@ -47,7 +59,7 @@
    P. The outstanding quarter at the terminal (02a "Scoring").
    F. Impulse-overlay decay (no permanent param drift).
    G. eta monotone in the released frontier.
-   H/H2. F bounded, the gates, the never-lock scrutiny guard.
+   H/H2. F bounded, the gates, the never-draw scrutiny skip.
    I. A quiet record decays the quote toward NO: by the deadline's eve
       it sits at least 0.3 below its day-0 listing and is still falling.
    J/K. Followup impulses; the day-lifecycle overlay order.
@@ -74,12 +86,15 @@ import {
     impliedTimeline, beliefLaw, familyHeads, coherenceStats, certDay, isCertified,
     marketEfficiency, beliefCauses,
     isLockDay, LOCK_INTERVAL, POSTERIOR, lockForecast, lockedClaim, scoreQuarter, scoreOutstandingQuarter, scoreVariance,
+    snapshotForecast, scoreCopierQuarter, scoreCopierOutstanding, copierRecord,
     crossingProb, quarterProb, plateauHeight, logScoreDelta,
-    presetCurves, marketCurves, normalizeCurves, draftCurves, setDraft, setDraftMedian, setDraftPlateau, curvesEqual, openRungs, curveMedian,
+    presetCurves, marketCurves, normalizeCurves, draftCurves, draftPolicy, setDraft, followMarket,
+    setDraftMedian, setDraftWidth, setDraftPlateau, curvesEqual, openRungs, curveMedian,
     forecastRecord, forecastTuning, latestLock,
     credibility, canSendMemos, canActAsFund, playerPilled, marketPilled,
-    firmBelief, stepFirmBelief, scrutinyGap, hasEverLocked,
+    firmBelief, stepFirmBelief, scrutinyGap, hasStatedForecast,
 } from '../src/race/belief.js';
+import { getTrait } from '../src/traits.js';
 import { ruleSummary } from '../src/race/public-record.js';
 import { checkResolution } from '../src/race/resolution.js';
 import { inputSchedule, runReaderWorld } from './reader-data.mjs';
@@ -347,9 +362,11 @@ let projectionIsMarketOK = false, lateCapOK = false, latePlateauOK = false, late
     assert(probOK, 'crossingProb/quarterProb with q disagree with the naive survival ratio');
 
     // The plateau handle: setDraftPlateau(R, h) lands plateauHeight on h exactly when
-    // reachable, pushes neighbours' q to keep R2-R4 ordered, and leaves R5 alone.
+    // reachable, pushes carried neighbours' q to keep R2-R4 ordered, and leaves R5
+    // alone. Every rung carries here, so the neighbours are pushed.
     const raceP = createRaceState((BASE_SEED + 230) >>> 0);
     initBelief(raceP);
+    setDraft(marketCurves());
     const d0 = draftCurves();
     setDraftPlateau(3, 0.4);
     const d1 = draftCurves();
@@ -369,27 +386,31 @@ let projectionIsMarketOK = false, lateCapOK = false, latePlateauOK = false, late
     orderOK &&= draftCurves()[5].m === 50;
     assert(orderOK, 'normalizeCurves / setDraftMedian ladder order wrong (R5 must be unordered)');
 
-    // A lock stores clamped pairs: pP from the player's law, pM from B at the lock.
+    // A lock stores clamped pairs: pP from the player's carried law, pM from B at
+    // the lock; a carried rung still bit-equal to the projection is followed.
     const race2 = createRaceState((BASE_SEED + 223) >>> 0);
     initBelief(race2);
     const mk = marketCurves();
     const mine = normalizeCurves({ ...mk, 2: { m: 40, w: 30, q: 0.1 } });
-    const lk = lockForecast(0, mine);
-    pairsOK = !!lk && lk.policy === 'own'
-        && [2, 3, 4].every(R => !!lk.pairs[R] && Math.abs(lk.pairs[R].pP - clampP(naiveP(mine[R].m, mine[R].w, mine[R].q, 0, 63))) < 1e-12
-            && lk.pairs[R].pM === clampP(binaryProb(R, 63)));
+    setDraft(mine);
+    const lk = lockForecast(0);
+    pairsOK = !!lk && lk.classes[2] === 'carried'
+        && [2, 3, 4].every(R => !!lk.pairs[R] && lk.pairs[R].pM === clampP(binaryProb(R, 63)) && (curvesEqual(mine, mk, R)
+            ? lk.classes[R] === 'followed' && lk.pairs[R].pP === lk.pairs[R].pM
+            : lk.classes[R] === 'carried' && Math.abs(lk.pairs[R].pP - clampP(naiveP(mine[R].m, mine[R].w, mine[R].q, 0, 63))) < 1e-12));
     assert(pairsOK, 'lock pairs are not the clamped player / B quarter probabilities');
     // The call's score reads the stored pairs (B moves meanwhile; the pairs don't).
     quietTo(race2, 63, { 63: certifyOn(2) });
     const q2 = scoreQuarter(63);
     const want = [2, 3, 4].reduce((acc, R) => acc + naiveD(lk.pairs[R].pP, lk.pairs[R].pM, R === 2 ? 1 : 0), 0);
-    deltaOK = !!q2 && Math.abs(q2.delta - want) < 1e-12 && q2.rungs.find(r => r.R === 2).o === 1
+    deltaOK = !!q2 && Math.abs(q2.delta - want) < 1e-12 && q2.rungs.find(r => r.R === 2).o === 1 && q2.rungs.find(r => r.R === 2).cls === 'carried'
         && Math.abs(credibility() - Math.tanh(want / forecastTuning.K_CRED)) < 1e-12 && logScoreDelta(0.5, 0.5, 1) === 0;
     assert(deltaOK, `scored delta ${q2 && q2.delta} != stored-pair hand value ${want}`);
     // sigma0 (02a): sigma0^2 = sum p_M(1 - p_M)(ln(p_P/p_M) - ln((1 - p_P)/(1 - p_M)))^2.
     const naiveV = (pP, pM) => pM * (1 - pM) * (Math.log(pP / pM) - Math.log((1 - pP) / (1 - pM))) ** 2;
     const v1 = [2, 3, 4].reduce((a, R) => a + naiveV(lk.pairs[R].pP, lk.pairs[R].pM), 0);
-    const lk2 = lockForecast(63, normalizeCurves({ ...marketCurves(), 3: { m: 100, w: 40, q: 0.2 } }));
+    setDraft(normalizeCurves({ ...marketCurves(), 3: { m: 100, w: 40, q: 0.2 } }));
+    const lk2 = lockForecast(63);
     quietTo(race2, 126);
     const q3 = scoreQuarter(126);
     const v2 = v1 + Object.values(lk2.pairs).reduce((a, pr) => a + naiveV(pr.pP, pr.pM), 0);
@@ -399,45 +420,56 @@ let projectionIsMarketOK = false, lateCapOK = false, latePlateauOK = false, late
         && scoreVariance(0.37, 0.37) === 0;
     assert(sigmaOK, `sigma0^2 ${q3 && q3.var0} != naive ${v2}`);
 
-    // A market-policy copier: pP === pM in every pair -> exactly 0, every quarter.
+    // A market copier, following every rung: pP === pM in every pair -> exactly 0,
+    // every quarter.
     const race = createRaceState((BASE_SEED + 222) >>> 0);
     initBelief(race);
-    const c0 = lockForecast(0, null, 'market');
+    followMarket();
+    const c0 = lockForecast(0);
     quietTo(race, 63, { 40: certifyOn(2) });
     const s1 = scoreQuarter(63);
-    lockForecast(63, null, 'market');
+    followMarket();
+    lockForecast(63);
     quietTo(race, 126);
     const s2 = scoreQuarter(126);
     sigmaCopierOK = !!s1 && s1.var0 === 0 && !!s2 && s2.var0 === 0 && forecastRecord().sigma0 === 0 && s2.rungs.every(r => r.v === 0);
     assert(sigmaCopierOK, 'a market-policy record has nonzero sigma0');
-    copierZeroOK = !!c0 && c0.policy === 'market' && [2, 3, 4].every(R => c0.pairs[R].pP === c0.pairs[R].pM)
+    copierZeroOK = !!c0 && [2, 3, 4, 5].every(R => c0.classes[R] === 'followed') && [2, 3, 4].every(R => c0.pairs[R].pP === c0.pairs[R].pM)
         && curvesEqual(c0.curves, c0.market, 3) && !!s1 && s1.delta === 0 && !!s2 && s2.delta === 0
-        && s2.rungs.length === 2 && credibility() === 0 && forecastRecord().quarters === 2;
+        && s2.rungs.length === 2 && s2.rungs.every(r => r.cls === 'followed') && credibility() === 0 && forecastRecord().quarters === 2
+        && !hasStatedForecast();
     assert(copierZeroOK, `market-policy copier scored ${s1 && s1.delta}/${s2 && s2.delta} (want exactly 0)`);
 
-    // Lock semantics: a full valid set; on-grid + current day; immutable (exact replay).
+    // Lock semantics: a valid policy; on-grid + current day, never day 1008;
+    // immutable (exact replay only).
     const race3 = createRaceState((BASE_SEED + 224) >>> 0);
     initBelief(race3);
-    const base = presetCurves('market');
-    const partial = lockForecast(0, { 2: base[2], 3: base[3] });
-    const noQ = lockForecast(0, { ...base, 4: { m: base[4].m, w: base[4].w } });
-    const outOfRange = lockForecast(0, { ...base, 5: { m: 2017, w: 100, q: 0 } });
-    const qHigh = lockForecast(0, { ...base, 5: { ...base[5], q: 0.96 } });
-    const tooNarrow = lockForecast(0, { ...base, 3: { ...base[3], w: 10 } });
-    const crossedM = lockForecast(0, { ...base, 3: { ...base[3], m: base[2].m - 1 } });
-    const crossedQ = lockForecast(0, { ...base, 4: { ...base[4], q: base[3].q - 0.01 } });
-    const offGrid = lockForecast(7, base);
-    const wrongDay = lockForecast(63, base);
-    const badPolicy = lockForecast(0, base, 'copy');
-    const own = presetCurves('later');                    // an own call (the projection itself is market policy)
-    const good = lockForecast(0, own);
-    const replay = lockForecast(0, presetCurves('later'));
-    const asMarket = lockForecast(0, null, 'market');
-    const mutate = lockForecast(0, presetCurves('earlier'));
-    lockGuardOK = [partial, noQ, outOfRange, qHigh, tooNarrow, offGrid, wrongDay, badPolicy, mutate, asMarket].every(x => x === null)
-        && (base[3].q > 0.01 ? crossedQ === null : true) && crossedM === null
-        && good !== null && replay === good && Object.isFrozen(good) && Object.isFrozen(good.curves[2]) && Object.isFrozen(good.pairs);
-    assert(lockGuardOK, 'lock semantics wrong (valid-set / on-grid+current-day / immutable / policy)');
+    const base = presetCurves('later');
+    const tryBroken = (R, patch) => {
+        setDraft(base);
+        Object.assign(belief.player.carried[R], patch);
+        const r = lockForecast(0);
+        setDraft(base);
+        return r;
+    };
+    const crossedM = tryBroken(3, { m: base[2].m - 1 });
+    const crossedQ = base[3].q > 0.01 ? tryBroken(4, { q: base[3].q - 0.01 }) : null;
+    const outOfRange = tryBroken(5, { m: 2017 });
+    const qHigh = tryBroken(5, { q: 0.96 });
+    const tooNarrow = tryBroken(3, { w: 10 });
+    const notFinite = tryBroken(2, { q: NaN });
+    const offGrid = lockForecast(7);
+    const wrongDay = lockForecast(63);
+    const good = lockForecast(0);
+    const replay = lockForecast(0);
+    setDraftWidth(3, base[3].w * 1.2);
+    const mutate = lockForecast(0);
+    followMarket();
+    const asMarket = lockForecast(0);
+    lockGuardOK = [crossedM, crossedQ, outOfRange, qHigh, tooNarrow, notFinite, offGrid, wrongDay, mutate, asMarket].every(x => x === null)
+        && good !== null && replay === good && Object.isFrozen(good) && Object.isFrozen(good.curves[2]) && Object.isFrozen(good.pairs)
+        && Object.isFrozen(good.classes) && belief.player.locks.length === 1;
+    assert(lockGuardOK, 'lock semantics wrong (valid policy / on-grid+current-day / immutable)');
 
     // Scoring guards: no lock at L_q -> nothing scored; once per quarter; current day.
     const race4 = createRaceState((BASE_SEED + 225) >>> 0);
@@ -446,42 +478,49 @@ let projectionIsMarketOK = false, lateCapOK = false, latePlateauOK = false, late
     const noLock = scoreQuarter(63);
     const race4b = createRaceState((BASE_SEED + 225) >>> 0);
     initBelief(race4b);
-    lockForecast(0, presetCurves('later'));
+    setDraft(presetCurves('later'));
+    lockForecast(0);
     quietTo(race4b, 63);
     const first = scoreQuarter(63), again = scoreQuarter(63);
     scoreGuardOK = noLock === null && !!first && again === first && forecastRecord().quarters === 1
         && forecastRecord().S === first.S && scoreQuarter(64) === null && scoreQuarter(126) === null;
     assert(scoreGuardOK, 'scoreQuarter guards wrong (needs the opening lock; once per quarter; current day only)');
 
-    // No manufactured day-0 forecast: no locks, credibility 0, no claim; the draft
-    // is B's projection.
+    // No manufactured forecast: no locks, credibility 0, no claim, no pilledness;
+    // every rung follows, so the effective curves are B's projection.
     const race5 = createRaceState((BASE_SEED + 226) >>> 0);
     initBelief(race5);
-    const dd = draftCurves(), m0 = marketCurves();
-    noManufacturedOK = belief.player.locks.length === 0 && credibility() === 0 && lockedClaim(2) === null
-        && [2, 3, 4, 5].every(R => curvesEqual(dd, m0, R));
-    assert(noManufacturedOK, 'initBelief manufactured a forecast, or the day-0 draft is not the projection');
+    const dd = draftCurves(), m0 = marketCurves(), pol0 = draftPolicy();
+    noManufacturedOK = belief.player.locks.length === 0 && credibility() === 0 && lockedClaim(2) === null && playerPilled() === null
+        && !hasStatedForecast() && [2, 3, 4, 5].every(R => curvesEqual(dd, m0, R) && pol0[R] === 'follow');
+    assert(noManufacturedOK, 'initBelief manufactured a forecast, or the day-0 policy does not follow the market');
 
-    // A market-policy lock: lockedClaim is B's quote at the lock; playerPilled is
-    // marketPilled live, days later too.
-    lockForecast(0, null, 'market');
+    // A followed rung's claim is B's quote at the lock; a followed R4 states
+    // nothing, so playerPilled is null (02a "What follows states nothing"), days
+    // later too.
+    lockForecast(0);
     const claims0 = [2, 3, 4, 5].map(R => binaryProb(R, DEADLINE[R]));
     quietTo(race5, 30);
-    marketPolicyReadsOK = [2, 3, 4, 5].every((R, i) => lockedClaim(R) === claims0[i]) && playerPilled() === marketPilled();
-    assert(marketPolicyReadsOK, 'a market-policy lock does not read B (lockedClaim at the lock, playerPilled live)');
+    marketPolicyReadsOK = [2, 3, 4, 5].every((R, i) => lockedClaim(R) === claims0[i]) && playerPilled() === null
+        && scrutinyGap(race5, playerPilled()) === null;
+    assert(marketPolicyReadsOK, 'a followed rung does not read B at the lock, or a followed R4 is not null pilledness');
 
-    // An own lock of curves still equal to today's projection on every open rung is a
-    // market-policy lock (02a), whichever path records it; one moved rung makes it own.
+    // A carried curve still bit-equal to today's projection is the market's call
+    // (02a), rung by rung; one moved rung carries, and a followed R4 stays null.
     const raceM = createRaceState((BASE_SEED + 227) >>> 0);
     initBelief(raceM);
-    const lp = lockForecast(0, draftCurves());                       // the untouched draft
-    const replayM = lockForecast(0, null, 'market');
+    setDraft(draftCurves());                                         // the untouched projection, carried
+    const lp = lockForecast(0);
+    followMarket();
+    const replayM = lockForecast(0);                                 // the same classes and curves: a replay
     quietTo(raceM, 63);
     const moved = draftCurves(); moved[3] = { ...moved[3], w: moved[3].w * 1.5 };
-    const lo = lockForecast(63, normalizeCurves(moved));
-    projectionIsMarketOK = !!lp && lp.policy === 'market' && [2, 3, 4].every(R => lp.pairs[R].pP === lp.pairs[R].pM)
-        && replayM === lp && !!lo && lo.policy === 'own' && playerPilled() !== null;
-    assert(projectionIsMarketOK, 'an own lock of the untouched projection was not recorded as a market-policy lock');
+    setDraft(normalizeCurves(moved));
+    const lo = lockForecast(63);
+    projectionIsMarketOK = !!lp && [2, 3, 4, 5].every(R => lp.classes[R] === 'followed') && [2, 3, 4].every(R => lp.pairs[R].pP === lp.pairs[R].pM)
+        && replayM === lp && !!lo && lo.classes[3] === 'carried' && [2, 4, 5].every(R => lo.classes[R] === 'followed')
+        && hasStatedForecast() && playerPilled() === null;
+    assert(projectionIsMarketOK, 'a carried curve equal to the projection was not classified as followed');
 
     // Late in the term (Codex's repros, day 945).
     const raceL = createRaceState((BASE_SEED + 228) >>> 0);
@@ -489,7 +528,8 @@ let projectionIsMarketOK = false, lateCapOK = false, latePlateauOK = false, late
     quietTo(raceL, 945);
     if (openRungs().includes(4)) {
         const late = normalizeCurves({ ...marketCurves(), 2: { m: 1000, w: 25, q: 0 }, 3: { m: 1050, w: 25, q: 0 }, 4: { m: 1100, w: 25, q: 0 } });
-        lockForecast(945, late);
+        setDraft(late);
+        lockForecast(945);
         const inTerm = 100 * crossingProb(1100, 25, 0, 945, 1008);
         // playerPilled reads the same event B's law does: R4 within 252 days AND by day 1008.
         lateCapOK = Math.abs(playerPilled() - inTerm) < 1e-9 && inTerm < 5
@@ -644,10 +684,12 @@ let outstandingOK = false, outstandingNaturalOK = false, noDoubleOK = false;
     // world certifies R3 on day 110 -> o = 1 against the original end date.
     const race = createRaceState((BASE_SEED + 240) >>> 0);
     initBelief(race);
-    lockForecast(0, presetCurves('earlier'));
+    setDraft(presetCurves('earlier'));
+    lockForecast(0);
     quietTo(race, 63);
     const sc0Var = scoreQuarter(63).var0;
-    const L63 = lockForecast(63, presetCurves('earlier'));
+    setDraft(presetCurves('earlier'));
+    const L63 = lockForecast(63);
     quietTo(race, 100);
     const locks0 = belief.player.locks.length, S0 = forecastRecord().S;
     race.capability.labs.tianxia.rungCertified[2] = 110; race.capability.labs.tianxia.rungCertified[3] = 110;
@@ -661,7 +703,8 @@ let outstandingOK = false, outstandingNaturalOK = false, noDoubleOK = false;
     // A certification after the original end date does not count.
     const raceN = createRaceState((BASE_SEED + 241) >>> 0);
     initBelief(raceN);
-    const L0 = lockForecast(0, presetCurves('later'));
+    setDraft(presetCurves('later'));
+    const L0 = lockForecast(0);
     quietTo(raceN, 40);
     raceN.capability.labs.halcyon.rungCertified[2] = 64;
     const oN = scoreOutstandingQuarter(raceN);
@@ -670,7 +713,8 @@ let outstandingOK = false, outstandingNaturalOK = false, noDoubleOK = false;
     // A quarter already scored is never scored again at the terminal.
     const raceS = createRaceState((BASE_SEED + 242) >>> 0);
     initBelief(raceS);
-    lockForecast(0, presetCurves('earlier'));
+    setDraft(presetCurves('earlier'));
+    lockForecast(0);
     quietTo(raceS, 63);
     const sc = scoreQuarter(63);
     noDoubleOK &&= scoreOutstandingQuarter(raceS) === sc && forecastRecord().quarters === 1;
@@ -678,6 +722,169 @@ let outstandingOK = false, outstandingNaturalOK = false, noDoubleOK = false;
     assert(outstandingNaturalOK, 'a certification after the quarter end counted');
     assert(noDoubleOK, 'a quarter was scored twice');
 }
+// ==========================================================================
+// Q. The standing policy (02a "The standing policy", its gates)
+// ==========================================================================
+
+/** One close of the game's day pipeline, in main.js's order: the snapshot at its
+ *  top while race.day and belief.day are still the lock day (02a "Locks"), the
+ *  trait evaluation, the race block, the lock-day block (the closing quarter's
+ *  score, F, the F advice row's gate, scrutiny), then the terminal check.
+ *  `hooks.traits(race)` and `hooks.lockDay(race, scored)` observe; returns the
+ *  resolution or null. */
+function deskClose(race, hooks = {}) {
+    if (!race.resolution && race.day < HORIZON && isLockDay(race.day) && belief.day === race.day) snapshotForecast(race.day);
+    if (hooks.traits) hooks.traits(race);
+    advanceRace(race); stepControlRegime(race); stepTreaty(race, {}); stepBelief(race);
+    if (isLockDay(race.day)) {
+        const scored = scoreQuarter(race.day);
+        scoreCopierQuarter(race.day);
+        stepFirmBelief(race);
+        if (hooks.lockDay) hooks.lockDay(race, scored);
+    }
+    return checkResolution(race, null);
+}
+/** The belief-keyed convictions (agi_pilled, doomer, and accelerationist's belief
+ *  arm), with every positioning flag they read set, so belief is the only gate. */
+const BELIEF_TRAITS = ['agi_pilled', 'doomer', 'accelerationist'];
+const traitCtx = () => ({
+    everLocked: hasStatedForecast(), beliefPilled: playerPilled(), credibility: credibility(),
+    playerChoices: { bought_takeoff_binary: true, long_vol_hedge: true, doom_short: true, long_frontier: true, lobbied_export_controls: true },
+});
+const beliefTraitFires = () => BELIEF_TRAITS.some(id => getTrait(id).condition(traitCtx()));
+
+let editCarriesOK = false, followOK = false, mixedValidOK = false, fidelityOK = false, revisionOK = false;
+let followedMovesNoneOK = false, certMovesNoneOK = false, neverDrawOK = true, neverDrawDetail = '', noLock1008OK = false;
+let midEditionOK = false, traitSeesLockOK = false;
+{
+    const clampW = (w) => Math.min(POSTERIOR.W_MAX, Math.max(POSTERIOR.W_MIN, w));
+    // An edit carries: a width key on a followed rung whose projection crosses a
+    // carried neighbour copies the projection, clamps its median and plateau to
+    // the neighbour's and moves no neighbour; the result validates.
+    const ra = createRaceState((BASE_SEED + 700) >>> 0);
+    initBelief(ra);
+    const P0 = marketCurves();
+    setDraftMedian(2, 900);
+    const c2 = { ...belief.player.carried[2] };
+    setDraftWidth(3, P0[3].w * 1.1);
+    const c = belief.player.carried, pol = draftPolicy(), eff = draftCurves();
+    editCarriesOK = P0[3].m < 900 && pol[2] === 'carry' && pol[3] === 'carry' && pol[4] === 'follow' && pol[5] === 'follow'
+        && c[2].m === 900 && c[2].q === c2.q && c[2].w === c2.w
+        && c[3].m === 900 && c[3].q === Math.max(P0[3].q, c2.q) && c[3].w === clampW(P0[3].w * 1.1)
+        && curvesEqual(eff, P0, 4) && curvesEqual(eff, P0, 5) && lockForecast(0) !== null;
+    assert(editCarriesOK, 'an edit on a followed rung did not carry with the activation clamp, or it moved a neighbour');
+    // Follow the market, one rung and then every rung.
+    followMarket(3);
+    const f1 = draftPolicy(), e1 = draftCurves();
+    followMarket();
+    const f2 = draftPolicy(), e2 = draftCurves();
+    followOK = f1[3] === 'follow' && belief.player.carried[3] === null && f1[2] === 'carry' && curvesEqual(e1, P0, 3) && e1[2].m === 900
+        && [2, 3, 4, 5].every(R => f2[R] === 'follow' && curvesEqual(e2, P0, R));
+    assert(followOK, 'followMarket did not set the rung(s) back to the projection');
+
+    // Mixed policies on one run. Day 0: R3 carried early, R2 followed above it.
+    const rb = createRaceState((BASE_SEED + 701) >>> 0);
+    initBelief(rb);
+    setDraftMedian(3, 10);
+    const lock0 = lockForecast(0);
+    const e0 = draftCurves(), mk0 = marketCurves();
+    mixedValidOK = !!lock0 && lock0.classes[2] === 'followed' && lock0.classes[3] === 'carried' && curvesEqual(e0, mk0, 2) && e0[2].m > e0[3].m;
+    assert(mixedValidOK, 'validation rejected a crossing between a followed and a carried rung, or a followed rung was pushed');
+    // Snapshot fidelity: a followed rung stores pP === pM and B's deadline quote; a
+    // carried rung its carried curve bit-for-bit.
+    const k3 = belief.player.carried[3];
+    fidelityOK = !!lock0 && [2, 4].every(R => lock0.pairs[R].pP === lock0.pairs[R].pM && lock0.claims[R] === binaryProb(R, DEADLINE[R]))
+        && lock0.classes[5] === 'followed' && lock0.claims[5] === binaryProb(5, DEADLINE[5]) && curvesEqual(lock0.curves, mk0, 5)
+        && curvesEqual(lock0.curves, belief.player.carried, 3) && !(3 in lock0.claims)
+        && lock0.pairs[3].pP === clampP(crossingProb(k3.m, k3.w, k3.q, 0, 63)) && lock0.pairs[3].pM === clampP(binaryProb(3, 63));
+    assert(fidelityOK, 'a snapshot does not match its declared policy (followed pP === pM; carried curve bit-for-bit)');
+    // A revision after the snapshot leaves it unchanged and reaches only the next.
+    const j0 = JSON.stringify(lock0);
+    setDraftMedian(4, 600);
+    revisionOK = JSON.stringify(lock0) === j0 && latestLock() === lock0 && lock0.classes[4] === 'followed';
+    // A followed rung's moves never move a carried one; a certification moves none.
+    const snap = () => JSON.stringify([belief.player.carried[3], belief.player.carried[4]]);
+    const k0 = snap(), b0 = marketCurves();
+    quietTo(rb, 63, { 40: certifyOn(2) });
+    const b63 = marketCurves();
+    followedMovesNoneOK = snap() === k0 && !curvesEqual(b0, b63, 5) && curvesEqual(draftCurves(), b63, 5)
+        && draftCurves()[2].m === 40 && curvesEqual(draftCurves(), belief.player.carried, 3) && curvesEqual(draftCurves(), belief.player.carried, 4);
+    const s63 = scoreQuarter(63), r4 = s63 && s63.rungs.find(r => r.R === 4);
+    const lock63 = lockForecast(63);
+    revisionOK &&= !!r4 && r4.cls === 'followed' && r4.pP === r4.pM && r4.delta === 0
+        && !!lock63 && lock63.classes[4] === 'carried' && curvesEqual(lock63.curves, belief.player.carried, 4);
+    assert(revisionOK, 'a draft change after a snapshot moved the stored lock, or did not reach the next one');
+    quietTo(rb, 126, { 100: certifyOn(3) });
+    certMovesNoneOK = snap() === k0 && draftCurves()[3].m === 100 && draftCurves()[3].q === 0
+        && curvesEqual(draftCurves(), belief.player.carried, 4) && followedMovesNoneOK;
+    assert(followedMovesNoneOK, 'a followed rung\'s moves moved a carried rung');
+    assert(certMovesNoneOK, 'a certification moved a carried rung');
+
+    // No lock after the end or on day 1008.
+    const rc = createRaceState((BASE_SEED + 702) >>> 0);
+    initBelief(rc);
+    quietTo(rc, 1008);
+    const s1008 = snapshotForecast(1008);
+    noLock1008OK = s1008.lock === null && s1008.copier === null && belief.player.locks.length === 0;
+    assert(noLock1008OK, 'a lock was taken on day 1008');
+
+    // A player who never draws, on main.js's close order, several worlds: every
+    // lock follows on every rung, S_P and sigma0 are exactly 0 for the whole run,
+    // there is no scrutiny trigger, belief-keyed conviction or F advice row, and
+    // the locks are exactly the lock days the run reached before it ended.
+    for (let i = 0; i < 12; i++) {
+        const race = createRaceState((BASE_SEED + 710 + i) >>> 0);
+        initConsensus(race); initBelief(race);
+        let lastTop = 0, bad = '';
+        const hooks = {
+            traits: () => { if (beliefTraitFires()) bad ||= `conviction on day ${race.day}`; },
+            lockDay: (r, scored) => {
+                if (hasStatedForecast()) bad ||= `F advice row on day ${r.day}`;
+                const gap = scrutinyGap(r, playerPilled());
+                if (gap != null) bad ||= `scrutiny gap ${gap} on day ${r.day}`;
+                if (scored && (scored.delta !== 0 || scored.var0 !== 0)) bad ||= `quarter to ${scored.to} scored ${scored.delta}`;
+            },
+        };
+        for (;;) { lastTop = race.day; if (deskClose(race, hooks)) break; }
+        scoreOutstandingQuarter(race);
+        const P = belief.player;
+        const want = [];
+        for (let L = 0; L <= lastTop && L < HORIZON; L += LOCK_INTERVAL) want.push(L);
+        if (!bad && JSON.stringify(P.locks.map(l => l.day)) !== JSON.stringify(want)) bad = `locks ${P.locks.map(l => l.day)} vs ${want}`;
+        if (!bad && !P.locks.every(l => [2, 3, 4, 5].every(R => l.classes[R] === 'followed'))) bad = 'a lock carried a rung';
+        if (!bad && (P.S !== 0 || P.var0 !== 0 || P.scores.some(q => q.delta !== 0))) bad = `S_P ${P.S}, var0 ${P.var0}`;
+        if (bad) { neverDrawOK = false; neverDrawDetail ||= `seed ${BASE_SEED + 710 + i}: ${bad}`; }
+    }
+    assert(neverDrawOK, `never-draw player: ${neverDrawDetail}`);
+
+    // A run that ends mid-edition takes no snapshot: the desk ejects during the
+    // lock day 126's edition, after its quarter scored and before its close.
+    const rd = createRaceState((BASE_SEED + 703) >>> 0);
+    initConsensus(rd); initBelief(rd);
+    while (rd.day < 126 && !deskClose(rd)) { /* closes */ }
+    const scoredBefore = belief.player.scores.length;
+    const out = scoreOutstandingQuarter(rd), outC = scoreCopierOutstanding(rd);
+    midEditionOK = rd.day === 126 && !rd.resolution && latestLock().day === 63 && belief.player.locks.length === 2
+        && !!out && out.from === 63 && out.to === 126 && !out.terminal && belief.player.scores.length === scoredBefore
+        && !!outC && outC.from === 63 && !outC.terminal && copierRecord().locks === 2;
+    assert(midEditionOK, 'a run that ended mid-edition took a snapshot or opened a quarter');
+
+    // The trait evaluation later in the same close sees the new lock, and the
+    // snapshot reads the lock day's state: the player first states R4 during day
+    // 63's edition, and the close's traits see it.
+    const re = createRaceState((BASE_SEED + 704) >>> 0);
+    initConsensus(re); initBelief(re);
+    while (re.day < 63 && !deskClose(re)) { /* closes */ }
+    setDraft(normalizeCurves({ 2: { m: 30, w: 25 }, 3: { m: 40, w: 25 }, 4: { m: 50, w: 25 }, 5: { m: 60, w: 25 } }));
+    const before = beliefTraitFires() || hasStatedForecast();
+    const pM4 = clampP(binaryProb(4, 63 + LOCK_INTERVAL));
+    let sawIt = false;
+    deskClose(re, { traits: () => { sawIt = hasStatedForecast() && playerPilled() > 62 && getTrait('agi_pilled').condition(traitCtx()); } });
+    const l63 = belief.player.locks.find(l => l.day === 63);
+    traitSeesLockOK = !before && sawIt && !!l63 && l63.classes[4] === 'carried' && l63.pairs[4].pM === pM4;
+    assert(traitSeesLockOK, 'the close\'s trait evaluation did not see the new lock, or the snapshot did not read the lock day');
+}
+
 // ==========================================================================
 // F. Impulse-overlay decay -- no permanent param drift
 // ==========================================================================
@@ -791,29 +998,34 @@ let fBoundedOK = true, fWakesOK = false, gatesOK = false;
 
 let neverLockNoScrutinyOK = false, guardNotVacuousOK = false;
 {
-    // A never-lock player over a FULL run: the fixed _runScrutiny early-returns
-    // on !hasEverLocked(), so the scrutiny trigger stays at zero and firmStanding
-    // is never touched by the scrutiny path -- no false ±3 from a manufactured
-    // player-vs-market gap.
+    // A player who never draws, snapshotted every quarter over a FULL run: every
+    // lock follows R4, so playerPilled is null, scrutinyGap is null and
+    // _runScrutiny skips every quarter -- no false ±3 from copying the market,
+    // whose gap against a slow-waking F reached 42 on seed 1 (02a "What follows
+    // states nothing").
     const race = createRaceState((BASE_SEED + 600) >>> 0);
     initConsensus(race); initBelief(race);
     let triggers = 0;
+    lockForecast(0);
     for (let d = 0; d < HORIZON; d++) {
         raceDay(race);
-        if (d % LOCK_INTERVAL === 0) {
+        if (isLockDay(race.day)) {
             stepFirmBelief(race);
-            // Exactly the fixed _runScrutiny guard + trigger condition.
-            if (hasEverLocked() && Math.abs(scrutinyGap(race, playerPilled())) > 20) triggers++;
+            // Exactly _runScrutiny's guard + trigger condition.
+            const gap = scrutinyGap(race, playerPilled());
+            if (gap != null && Math.abs(gap) > 20) triggers++;
+            if (race.day < HORIZON) lockForecast(race.day);
         }
     }
-    neverLockNoScrutinyOK = !hasEverLocked() && triggers === 0;
-    assert(neverLockNoScrutinyOK, `never-lock player produced ${triggers} scrutiny triggers (want 0)`);
+    neverLockNoScrutinyOK = !hasStatedForecast() && playerPilled() === null && triggers === 0 && belief.player.locks.length === HORIZON / LOCK_INTERVAL;
+    assert(neverLockNoScrutinyOK, `never-draw player produced ${triggers} scrutiny triggers (want 0)`);
 
-    // The guard is not vacuous: a divergent LOCKED posterior CAN still trigger.
+    // The guard is not vacuous: a divergent CARRIED R4 can still trigger.
     const race2 = createRaceState((BASE_SEED + 601) >>> 0);
     initConsensus(race2); initBelief(race2);
-    lockForecast(0, normalizeCurves({ 2: { m: 30, w: 25 }, 3: { m: 40, w: 25 }, 4: { m: 50, w: 25 }, 5: { m: 60, w: 25 } }));   // maximally pilled at day 0 vs F=15
-    guardNotVacuousOK = hasEverLocked() && Math.abs(scrutinyGap(race2, playerPilled())) > 20;
+    setDraft(normalizeCurves({ 2: { m: 30, w: 25 }, 3: { m: 40, w: 25 }, 4: { m: 50, w: 25 }, 5: { m: 60, w: 25 } }));   // maximally pilled at day 0 vs F=15
+    lockForecast(0);
+    guardNotVacuousOK = hasStatedForecast() && Math.abs(scrutinyGap(race2, playerPilled())) > 20;
     assert(guardNotVacuousOK, 'scrutiny guard is vacuous (a divergent locked posterior cannot trigger)');
 }
 
@@ -928,12 +1140,12 @@ line(`  plateau handle (closed form, bounds, ladder push):  ${ok(plateauOK)}`);
 line(`  m and q monotone over R2-R4, R5 unordered:          ${ok(orderOK)}`);
 line(`  locks store the clamped {pP, pM} pairs:             ${ok(pairsOK)}`);
 line(`  a call's score == stored-pair hand value:           ${ok(deltaOK)}`);
-line(`  market-policy copier scores exactly 0:              ${ok(copierZeroOK)}`);
-line(`  lock semantics (valid set/on-grid/immutable/policy): ${ok(lockGuardOK)}`);
+line(`  market copier (every rung followed) scores 0:       ${ok(copierZeroOK)}`);
+line(`  lock semantics (valid policy/on-grid/immutable):    ${ok(lockGuardOK)}`);
 line(`  scoring needs the opening lock; once per quarter:   ${ok(scoreGuardOK)}`);
-line(`  no manufactured forecast; day-0 draft = projection: ${ok(noManufacturedOK)}`);
-line(`  market-policy lockedClaim / playerPilled read B:    ${ok(marketPolicyReadsOK)}`);
-line(`  an untouched projection locks as market policy:     ${ok(projectionIsMarketOK)}`);
+line(`  no manufactured forecast; every rung follows:      ${ok(noManufacturedOK)}`);
+line(`  followed claim reads B; followed R4 pilled is null:  ${ok(marketPolicyReadsOK)}`);
+line(`  a carried curve == projection is followed:         ${ok(projectionIsMarketOK)}`);
 line(`  day 945: playerPilled capped at R4's support:       ${ok(lateCapOK)}`);
 line(`  day 945: plateau inverse exact (saturated logistic): ${ok(latePlateauOK)}`);
 line(`  day 945: curveMedian 962.33, daily mass adds up:     ${ok(lateMedianOK)}`);
@@ -960,6 +1172,18 @@ line('\nP. The outstanding quarter at the terminal');
 line(`  scored once from its pairs vs the completed world:  ${ok(outstandingOK)}`);
 line(`  a certification after the quarter's end: o = 0:     ${ok(outstandingNaturalOK)}`);
 line(`  no quarter scored twice, no terminal lock:          ${ok(noDoubleOK)}`);
+line('\nQ. The standing policy');
+line(`  an edit carries (activation clamp, no neighbour):   ${ok(editCarriesOK)}`);
+line(`  follow the market (one rung, every rung):          ${ok(followOK)}`);
+line(`  followed/carried crossing validates, not pushed:    ${ok(mixedValidOK)}`);
+line(`  snapshot matches its declared policy:               ${ok(fidelityOK)}`);
+line(`  a revision reaches only later snapshots:            ${ok(revisionOK)}`);
+line(`  a followed rung's moves move no carried rung:       ${ok(followedMovesNoneOK)}`);
+line(`  a certification moves no carried rung:              ${ok(certMovesNoneOK)}`);
+line(`  never-draw: all followed, S_P = sigma0 = 0, no scrutiny/conviction/F row: ${ok(neverDrawOK)}${neverDrawDetail ? '  (' + neverDrawDetail + ')' : ''}`);
+line(`  no lock on day 1008:                                ${ok(noLock1008OK)}`);
+line(`  a mid-edition end takes no snapshot:                ${ok(midEditionOK)}`);
+line(`  the close's traits see the new lock:               ${ok(traitSeesLockOK)}`);
 line('\nF. Impulse-overlay decay (no permanent param drift)');
 line(`  overlay shifts a param while live:                  ${ok(overlayLiveOK)}`);
 line(`  param restored to baseline each day:                ${ok(restoreOK)}`);
@@ -973,9 +1197,9 @@ line(`  reads ONLY releasedFrontierRung:                    ${ok(etaReadsOnlyRel
 line('\nH. Firm belief F + gates');
 line(`  F stays in [0,100] over a run:                      ${ok(fBoundedOK)}`);
 line(`  memo / fund-as-actor gate thresholds:               ${ok(gatesOK)}`);
-line('\nH2. Never-lock scrutiny guard (P1)');
-line(`  never-lock player -> zero scrutiny triggers:        ${ok(neverLockNoScrutinyOK)}`);
-line(`  guard not vacuous (divergent lock can still fire):  ${ok(guardNotVacuousOK)}`);
+line('\nH2. Never-draw scrutiny skip (02a "What follows states nothing")');
+line(`  never-draw player -> zero scrutiny triggers:        ${ok(neverLockNoScrutinyOK)}`);
+line(`  not vacuous (a divergent carried R4 can fire):      ${ok(guardNotVacuousOK)}`);
 line('\nI. A quiet record (R2 quote by day)');
 line(`  ${decayPath.map(([t, q]) => `${t}:${q.toFixed(3)}`).join('  ')}  monotone (diagnostic): ${decayMonotone ? 'yes' : 'no'}`);
 line(`  eve quote >= 0.3 below the listing, still falling:  ${ok(decayReachesFloorOK)}`);

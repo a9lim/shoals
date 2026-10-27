@@ -167,7 +167,7 @@ import {
     resetImpactState, getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact,
 } from '../src/price-impact.js';
 import {
-    belief, initBelief, deactivateBelief, lockForecast, presetCurves, credibility,
+    belief, initBelief, deactivateBelief, lockForecast, setDraft, presetCurves, credibility,
     stepBelief, foldPlayerLeak, beliefCauses, beliefProcessed, BLACKOUT_FOLD_MAX_SEV,
 } from '../src/race/belief.js';
 import { market, syncMarket } from '../src/market.js';
@@ -470,7 +470,7 @@ check('gray-zone fires at tension 1', grayAtTension1 > 0, `${grayAtTension1} tot
         const race = createRaceState(301);
         initConsensus(race); initBelief(race);
         const c = consensus.contracts.find(x => x.predicate.rung === 2);
-        lockForecast(0, presetCurves('earlier'));
+        setDraft(presetCurves('earlier')); lockForecast(0);
         const before = credibility();
         openDispute(c.key, 10, 'private');
         const row = ruleDispute(c.key, 'YES', 12, 'private');

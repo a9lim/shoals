@@ -14,14 +14,17 @@
    conditioned on today). The self-graded Fixedpoint Index
    sits apart, unlisted.
 
-   Your forecast (02a, the posterior) is drawn over
-   Consensus in ink and edited here: on each open rung,
-   the bead is your median (drag along the rung; up and
-   down to tighten or loosen), and the square on the
-   term's-end gauge is the chance the rung lands this
-   term at all. The keys follow 02a. Consensus's spindle
-   and yours share one scale per rung, so a narrower or
-   less likely forecast reads as one.
+   Your forecast (02a, the posterior and its standing
+   policy) is edited here and drawn over Consensus in ink,
+   on the rungs it carries; a rung that follows the market
+   shows only Consensus. On each open rung the bead is your
+   median (drag along the rung; up and down to tighten or
+   loosen), and the square on the term's-end gauge is the
+   chance the rung lands this term at all. An edit carries
+   a followed rung; Delete follows the market again. The
+   keys follow 02a. Consensus's spindle and yours share one
+   scale per rung, so a narrower or less likely forecast
+   reads as one. The desk snapshots the policy each quarter.
 
    THE INTEGRITY RULE (09 "Information hygiene", as in
    race/consensus.js): during play this page reads only
@@ -34,8 +37,8 @@
 
 import {
     belief, latestLock, beliefLaw, isCertified, crossingProb, curveMedian,
-    draftCurves, openRungs, setDraftMedian, setDraftWidth, setDraftPlateau, plateauHeight,
-    curvesEqual, marketCurves, impliedTimeline, setDraft,
+    draftCurves, draftPolicy, openRungs, setDraftMedian, setDraftWidth, setDraftPlateau, plateauHeight,
+    impliedTimeline, followMarket,
 } from './race/belief.js';
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
@@ -53,8 +56,8 @@ let _pub = null, _hid = null;
 const _st = {
     ctx: null, visible: false, revealed: false, ended: false, reveal0: -1e9, raf: 0, w: 0, h: 0, dpr: 1, cap: null, canvas: null, c: null, reduced: false,
     // The forecast editor: the selected rung, a drag, the handles drawn last frame,
-    // a lock held open by "Adjust first", and main.js's hooks.
-    sel: 2, drag: null, handles: [], hover: null, pending: false, hooks: {},
+    // and main.js's hooks.
+    sel: 2, drag: null, handles: [], hover: null, hooks: {},
 };
 
 // Editor steps (UNRATIFIED feel numbers, 02a gives only the keys): ←/→ move a
@@ -71,7 +74,7 @@ function _fresh() {
 
 /**
  * @param {object} ctx    { race(), world() }
- * @param {object} hooks  { onLock(), onEdit() }: the held lock's button; a draft change
+ * @param {object} hooks  { onEdit() }: a change to the standing policy
  */
 export function initRacePage(ctx, hooks = {}) {
     _st.ctx = ctx;
@@ -84,10 +87,14 @@ export function initRacePage(ctx, hooks = {}) {
     new ResizeObserver(() => { if (_size()) drawRace(); }).observe(_st.canvas.parentElement);
     const btn = document.getElementById('race-reveal');
     btn.addEventListener('click', () => revealRace(!_st.revealed));
-    document.getElementById('race-lock').addEventListener('click', () => { if (_st.pending && _st.hooks.onLock) _st.hooks.onLock(); });
-    document.getElementById('race-match').addEventListener('click', () => {
+    // The desk snapshots the standing policy each quarter (02a "The standing
+    // policy"): nothing is locked by hand, so the old Lock control stays hidden.
+    const lock = document.getElementById('race-lock');
+    if (lock) lock.hidden = true;
+    // Follow the market on every rung.
+    document.getElementById('race-match')?.addEventListener('click', () => {
         if (!_editable()) return;
-        setDraft(marketCurves());
+        followMarket();
         _edited(true);
     });
     _wireEditor();
@@ -343,9 +350,8 @@ export function drawRace() {
     const deadlines = {};
     for (const ct of consensus.contracts) deadlines[ct.predicate.rung] = ct;
     const editing = _editable();
-    const draft = editing ? draftCurves() : null;
+    const draft = editing ? draftCurves() : null, pol = draft ? draftPolicy() : null;
     const focused = document.activeElement === _st.canvas;
-    const mkt = draft ? marketCurves() : null;
     _st.handles = [];
     _st.geom = { L0, R0 };
     if (belief.active && !_st.revealed) {
@@ -353,7 +359,9 @@ export function drawRace() {
         for (const R of [2, 3, 4, 5]) {
             const law = _law(R, today);
             if (!law) continue;
-            const mine = draft && draft[R] ? _law(R, today, draft[R]) : null;
+            // Ink only where the player has stated something (02a "The standing
+            // policy"): a followed rung's effective curve is B's, so it shows only B.
+            const mine = draft && draft[R] && pol[R] === 'carry' ? _law(R, today, draft[R]) : null;
             const y = Y(R), amp = narrow ? 10 : 15;
             let mx = 0;
             for (let d = today; d <= HORIZON; d += 4) mx = Math.max(mx, law.dens(d), mine ? mine.dens(d) : 0);
@@ -376,18 +384,34 @@ export function drawRace() {
                 const p = Math.round(q.mid * 100);
                 c.fillText(narrow ? `${p}%` : `${p}% by day ${ct.deadline}`, R0 + 6, y + 4);
             }
-            if (!mine) continue;
+            if (!draft || !draft[R]) continue;
+            const d = draft[R];
+            const sel = R === _st.sel && (focused || (_st.drag && _st.drag.R === R));
+            const xm = X(Math.max(today, Math.min(HORIZON, d.m)));
+            // The gauge: 0 at the rung, 1 a little under the rung above.
+            const G = Math.max(18, Math.min(rowGap * 0.5, 44)), gx = Math.round(R0) + 0.5;
+            const h = plateauHeight(d.m, d.w, d.q || 0, today);
+            if (!mine) {
+                // A followed rung: its handles sit, undrawn, where the bead and the
+                // square will appear once an edit carries it (the cursor shows them),
+                // and the focus ring marks the selected rung for the keys.
+                // INTERPRETATION: the hidden handles take the projection's median,
+                // where the carried copy's bead lands, not B's conditional median tick.
+                _st.handles.push({ R, sx: xm, sy: y }, { R, plateau: true, sx: gx, sy: y - G * h, G, y0: y });
+                if (sel && focused) {
+                    c.strokeStyle = pal.accent; c.lineWidth = 1;
+                    c.strokeRect(Math.round(xm) - 7.5, Math.round(y) - 7.5, 15, 15);
+                }
+                continue;
+            }
 
             // Yours, in ink: the outline, the median bead, and the term's-end gauge.
-            const d = draft[R];
             c.beginPath();
             for (let x = today; x <= HORIZON; x += 3) c.lineTo(X(x), y - amp * mine.dens(x) / mx);
             for (let x = HORIZON; x >= today; x -= 3) c.lineTo(X(x), y + amp * mine.dens(x) / mx);
             c.closePath();
             c.strokeStyle = text; c.lineWidth = 1.3; c.stroke();
-            const sel = R === _st.sel && (focused || (_st.drag && _st.drag.R === R));
             const hov = _st.hover && _st.hover.R === R;
-            const xm = X(Math.max(today, Math.min(HORIZON, d.m)));
             const off = d.m < today ? -1 : d.m > HORIZON ? 1 : 0;
             c.beginPath(); c.arc(xm, y, sel ? 4.8 : hov && !_st.hover.plateau ? 4.4 : 3.8, 0, Math.PI * 2);
             c.fillStyle = sel ? text : pal.canvas; c.fill();
@@ -403,17 +427,14 @@ export function drawRace() {
                 c.strokeRect(Math.round(xm) - 7.5, Math.round(y) - 7.5, 15, 15);
             }
             // Its median as the market's is read: conditional on today (null: not
-            // this term). A rung still on the market's projection reads the market's.
-            const dMed = curvesEqual(draft, mkt, R) ? law.median : mine.median;
+            // this term).
+            const dMed = mine.median;
             if (!narrow) {
                 c.font = font(12, true); c.fillStyle = sel ? text : pal.textSecondary; c.textAlign = 'center';
                 c.fillText(dMed == null ? 'yours: not this term' : `yours day ${Math.round(dMed)}`, Math.max(L0 + 40, Math.min(R0 - 40, xm)), y + amp + 15);
             }
-            // The gauge: 0 at the rung, 1 a little under the rung above. The market's
-            // chance this term is its tick; yours is the square.
-            const G = Math.max(18, Math.min(rowGap * 0.5, 44)), gx = Math.round(R0) + 0.5;
+            // The market's chance this term is the gauge's tick; yours is the square.
             const bLaw = beliefLaw(R), pm = bLaw ? bLaw.cdf(HORIZON) : 0;
-            const h = plateauHeight(d.m, d.w, d.q || 0, today);
             c.strokeStyle = _r(text, 0.35); c.lineWidth = 1;
             c.beginPath(); c.moveTo(gx, y); c.lineTo(gx, y - G); c.moveTo(gx - 2.5, Math.round(y - G) + 0.5); c.lineTo(gx + 2.5, Math.round(y - G) + 0.5); c.stroke();
             c.strokeStyle = ind; c.lineWidth = 1.5;
@@ -578,18 +599,6 @@ function _editable() {
     return !!(belief.active && _st.ctx && _st.ctx.race() && !_st.ended && !_st.revealed && draftCurves());
 }
 
-/**
- * "Adjust first" holds the quarter's lock until the Race page's Lock is pressed:
- * show it (and focus the editor, for the dispatch's hand-off), or clear it.
- */
-export function setForecastPending(pending, focus = false) {
-    _st.pending = !!pending;
-    const lock = document.getElementById('race-lock');
-    if (lock) lock.hidden = !_st.pending;
-    if (focus && _st.canvas) { _selectOpen(0); _st.canvas.focus(); }
-    if (_st.visible) drawRace();
-}
-
 /** Keep the selected rung on an open one: step `dir` through the open rungs
  *  (0 = stay if still open, else the first). Returns false past either end. */
 function _selectOpen(dir) {
@@ -666,7 +675,9 @@ function _wireEditor() {
 /**
  * The editor's keys (02a): ←/→ move the selected median 5 days (Shift: 21),
  * ↑ tightens and ↓ loosens its width, Page Up/Down raise and lower the chance it
- * lands this term (Shift: finer). Tab and Shift+Tab step through the open rungs
+ * lands this term (Shift: finer); any of them carries a followed rung, and Delete
+ * or Backspace sets it back to follow the market (02a "The standing policy").
+ * Tab and Shift+Tab step through the open rungs
  * like the thumbs of a multi-thumb slider, letting focus leave past either end;
  * Home and End choose the first and last.
  */
@@ -682,7 +693,8 @@ function _editKey(e) {
     else if (e.key === 'PageUp' || e.key === 'PageDown') {
         const h = plateauHeight(d[R].m, d[R].w, d[R].q, belief.day);
         setDraftPlateau(R, h + (e.key === 'PageUp' ? 1 : -1) * (e.shiftKey ? EDIT_H_STEP_FINE : EDIT_H_STEP));
-    } else if (e.key === 'Tab') { if (!_selectOpen(e.shiftKey ? -1 : 1)) return; }
+    } else if (e.key === 'Delete' || e.key === 'Backspace') followMarket(R);
+    else if (e.key === 'Tab') { if (!_selectOpen(e.shiftKey ? -1 : 1)) return; }
     else if (e.key === 'Home') _st.sel = open[0];
     else if (e.key === 'End') _st.sel = open[open.length - 1];
     else return;
@@ -697,7 +709,7 @@ function _announce() {
     const d = draftCurves();
     if (!live || !d || !d[_st.sel]) return;
     const R = _st.sel, bMed = impliedTimeline()[R], t = belief.day;
-    const dMed = curvesEqual(d, marketCurves(), R) ? bMed : curveMedian(d[R], t, R);
+    const dMed = draftPolicy()[R] === 'carry' ? curveMedian(d[R], t, R) : bMed;
     const h = plateauHeight(d[R].m, d[R].w, d[R].q || 0, t);
     const by = (x) => x == null ? 'not this term' : `by day ${Math.round(x)}`;
     live.textContent = `R${R}: yours ${by(dMed)}, width ${Math.round(d[R].w)} days, ${Math.round(100 * h)}% this term. Consensus ${by(bMed)}.`;
@@ -717,15 +729,15 @@ function _table() {
         const claim = _pub.claims.find(cl => cl.rung === R), cert = _pub.certs.find(ce => ce.rung === R);
         const t0 = race ? (_st.ended ? _pub.lastDay : Math.min(race.day, HORIZON)) : 0;
         const law = race && belief.active ? _law(R, t0) : null;
-        // Yours: the latest lock's median, conditioned on today like the market's
-        // beside it. A market-policy lock reads the market's own law (02a).
-        const lock = race && belief.active ? latestLock() : null;
-        const locked = lock ? (lock.policy === 'market' ? law : _law(R, t0, lock.curves[R])) : null;
-        // The draft as the canvas reads it: on the market's projection, the market's day.
-        const draft = race && belief.active && !_st.ended ? draftCurves() : null;
-        const drawn = draft && law ? (curvesEqual(draft, marketCurves(), R) ? law : _law(R, t0, draft[R])) : null;
         const med = (l) => l ? (l.median != null ? String(Math.round(l.median)) : 'not this term') : cert ? 'certified' : '—';
-        const cells = [`R${R}`, claim ? String(claim.day) : '—', cert ? String(cert.day) : '—', med(law), draft ? med(drawn) : '—', lock ? med(locked) : '—'];
+        // Locked: the latest lock per rung, conditioned on today like the market's
+        // beside it. A rung the lock read as followed is the market's (02a).
+        const lock = race && belief.active ? latestLock() : null;
+        const locked = !lock ? '—' : lock.classes[R] === 'followed' && !cert ? 'Market' /* PROSE */ : med(_law(R, t0, lock.curves[R]));
+        // The standing policy as the canvas reads it: a followed rung, the market's day.
+        const draft = race && belief.active && !_st.ended ? draftCurves() : null;
+        const drawn = draft && law ? (draftPolicy()[R] === 'carry' ? _law(R, t0, draft[R]) : law) : null;
+        const cells = [`R${R}`, claim ? String(claim.day) : '—', cert ? String(cert.day) : '—', med(law), draft ? med(drawn) : '—', locked];
         cells.forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (!i) td.className = 'l'; tr.appendChild(td); });
         tb.appendChild(tr);
     }

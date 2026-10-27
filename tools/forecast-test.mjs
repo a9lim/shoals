@@ -14,15 +14,21 @@
    bit-identically and runs every synthetic player through the
    REAL API: on each lock day the player's store is installed as
    `belief.player`, the closing quarter is scored (scoreQuarter),
-   and, unless the world resolved that day, the new lock is
-   recorded (lockForecast). At the terminal the outstanding
-   quarter is scored (scoreOutstandingQuarter).
+   and, unless the world resolved that day, the player sets its
+   standing policy (followMarket, or setDraft to carry its curves)
+   and the snapshot is taken (lockForecast), the module's
+   reader-copier beside it (copierLock). At the terminal the
+   outstanding quarters are scored (scoreOutstandingQuarter,
+   scoreCopierOutstanding).
 
    Players:
-     market      a market-policy lock every quarter (pP === pM)
+     market      follows the market on every rung, every quarter
+                 (pP === pM)
      reader      the full reader's quarter probabilities, scored
                  against the pM B stores at each lock (outside the
-                 player store: no curve in the family carries them)
+                 player store: no curve in the family carries them);
+                 computed here, and checked against the module's
+                 own reader-copier record (02a "The almanac")
      oracle      m_R = the true certification day (2016 if none), w 30, q 0
      informed    halfway between B's projection and the truth
                  (w = 0.7*w_B; q halfway to the truth's plateau): diagnostic
@@ -31,9 +37,14 @@
      projection  B's projection, locked as drawn every quarter
 
    Checks:
-   A. Market-policy copier: every increment exactly 0; its
-      playerPilled is marketPilled on every lock day; every
-      synthetic lock is valid.
+   A. The market copier: every increment exactly 0; its
+      playerPilled is null and it has stated nothing on every
+      lock day (02a "What follows states nothing"); every
+      synthetic lock is valid and matches its declared policy
+      (a followed rung stores pP === pM and B's deadline quote, a
+      carried rung its carried curve bit-for-bit); the module's
+      reader-copier record equals this harness's reader-copier,
+      quarter by quarter, bit for bit.
    B. Properness (02a) with the plateau: analytic per quarter and
       Monte Carlo over a full term with common random numbers.
    C. Calibration targets at the module's K_CRED (02a):
@@ -48,6 +59,12 @@
       sigma0 is reported for every player; no gate reads it.
    D. The real predicates (canSendMemos, canActAsFund with F stubbed
       at 100) agree with the recorded paths on every lock day.
+   E. The almanac (src/almanac.js): records built from these worlds,
+      the summary's arithmetic against an independent recount
+      (runs, cumulative S_P and the reader-copier's, the
+      reliability deciles over carried rung-quarters, families
+      beside the neutral-input baseline), and storage: the latest
+      200 kept, a version mismatch or broken storage reads empty.
 
    Usage:  node tools/forecast-test.mjs [N] [--seed S] [--calibrate]
            N defaults to 500 per scenario; base seed 1.
@@ -62,9 +79,11 @@ import { initConsensus } from '../src/race/consensus.js';
 import {
     belief, initBelief, stepBelief, binaryProb, certDay, isLockDay, LOCK_INTERVAL, POSTERIOR,
     lockForecast, scoreQuarter, scoreOutstandingQuarter, quarterProb, crossingProb, logScoreDelta,
-    presetCurves, marketCurves, normalizeCurves, forecastRecord, forecastTuning,
-    credibility, canSendMemos, canActAsFund, playerPilled, marketPilled, latestLock, scoreVariance,
+    copierLock, scoreCopierQuarter, scoreCopierOutstanding, copierRecord,
+    presetCurves, marketCurves, normalizeCurves, setDraft, followMarket, curvesEqual, forecastRecord, forecastTuning,
+    credibility, canSendMemos, canActAsFund, playerPilled, hasStatedForecast, scoreVariance,
 } from '../src/race/belief.js';
+import { buildAlmanacRecord, appendAlmanac, readAlmanac, summarizeAlmanac, ALMANAC_KEY, ALMANAC_KEEP, NEUTRAL_BASELINE } from '../src/almanac.js';
 import { ruleSummary } from '../src/race/public-record.js';
 import { readerLaw, lawQuarter } from '../src/race/reader.js';
 import { createRng } from '../src/race/rng.js';
@@ -112,7 +131,7 @@ const mean = (a) => (a.length ? a.reduce((x, y) => x + y, 0) / a.length : NaN);
 // ---- The players ---------------------------------------------------------
 
 const truthOf = (truth, R) => (truth[R] != null ? truth[R] : NONE);
-// Locking players: curves (own policy) or 'market' (market policy).
+// Players: curves (carried on every rung) or 'market' (every rung follows).
 const PLAYERS = {
     market: () => 'market',
     oracle: (truth) => normalizeCurves(Object.fromEntries([2, 3, 4, 5].map(R => [R, { m: truthOf(truth, R), w: 30, q: 0 }]))),
@@ -133,7 +152,8 @@ const ALL = ['reader', ...NAMES];
 const gateAt = (p, gate, K) => Math.tanh(p.S / K) > gate;
 
 /** A blank player store, shaped like belief.js's own (_freshPlayer). */
-const freshStore = () => ({ draft: marketCurves(), locks: [], scores: [], S: 0, var0: 0, credibility: 0, lastLockDay: null });
+const freshStore = () => ({ policy: { 2: 'follow', 3: 'follow', 4: 'follow', 5: 'follow' }, carried: { 2: null, 3: null, 4: null, 5: null },
+    locks: [], scores: [], S: 0, var0: 0, credibility: 0 });
 
 // ---- The worlds ----------------------------------------------------------
 
@@ -161,6 +181,28 @@ function truthOfWorld(seed, scenario) {
 const worlds = [];
 let copierExactOK = true, copierPilledOK = true, lockRejected = 0;
 let copierDetail = '', pilledDetail = '', predicateOK = true, predicateDetail = '';
+let fidelityOK = true, fidelityDetail = '', readerRecordOK = true, readerRecordDetail = '';
+const almanacRecords = [];
+/** A snapshot matches its declared policy (02a gates): a followed rung stores
+ *  pP === pM and B's deadline quote; a carried, uncertified rung its carried
+ *  curve bit-for-bit and pP from it. */
+function fidelity(lk, store, day) {
+    for (const R of [2, 3, 4, 5]) {
+        const pr = lk.pairs[R], open = certDay(R) == null;
+        if (lk.classes[R] === 'followed') {
+            if (!(store.policy[R] === 'follow' || curvesEqual(store.carried, lk.market, R))) return `R${R} followed against its policy`;
+            if (pr && pr.pP !== pr.pM) return `R${R} followed with pP != pM`;
+            if (open && lk.claims[R] !== binaryProb(R, { 2: 420, 3: 756, 4: 880, 5: 1000 }[R])) return `R${R} claim is not B's quote`;
+        } else {
+            if (lk.classes[R] !== 'carried' || store.policy[R] !== 'carry') return `R${R} class ${lk.classes[R]}`;
+            if (!open) continue;
+            if (!curvesEqual(lk.curves, store.carried, R)) return `R${R} curve is not the carried curve`;
+            const c = store.carried[R];
+            if (pr && pr.pP !== quarterProb(c.m, c.w, c.q, day, day + LOCK_INTERVAL)) return `R${R} pP is not the carried law's`;
+        }
+    }
+    return '';
+}
 for (const scenario of SCENARIOS) for (let i = 0; i < N; i++) {
     const seed = (BASE_SEED + i) >>> 0;
     const truth = truthOfWorld(seed, scenario);
@@ -200,18 +242,25 @@ for (const scenario of SCENARIOS) for (let i = 0; i < N; i++) {
             }
         }
         readerScore(day, certDay);
+        scoreCopierQuarter(day);
         record('reader', day, reader.S, reader.var0);
     };
     const lockDay = (day) => {
         for (const n of NAMES) {
             belief.player = stores[n];
             const c = PLAYERS[n](truth);
-            if (!(c === 'market' ? lockForecast(day, null, 'market') : lockForecast(day, c))) lockRejected++;
-            if (n === 'market' && playerPilled() !== marketPilled()) {
-                if (copierPilledOK) pilledDetail = `seed ${seed} day ${day}: ${playerPilled()} vs ${marketPilled()}`;
+            if (c === 'market') followMarket(); else setDraft(c);
+            const lk = lockForecast(day);
+            if (!lk) { lockRejected++; continue; }
+            const bad = fidelity(lk, stores[n], day);
+            if (bad && fidelityOK) { fidelityOK = false; fidelityDetail = `${n} seed ${seed} day ${day}: ${bad}`; }
+            // A followed R4 states nothing (02a): null pilledness, no stated forecast.
+            if (n === 'market' && (playerPilled() !== null || hasStatedForecast())) {
+                if (copierPilledOK) pilledDetail = `seed ${seed} day ${day}: ${playerPilled()}`;
                 copierPilledOK = false;
             }
         }
+        copierLock(day);
         // The reader-copier's pairs: the full reader's quarter probability, B's stored pM.
         const rule = ruleSummary(belief.rungs, day), pairs = {};
         for (const R of [2, 3, 4]) {
@@ -237,11 +286,26 @@ for (const scenario of SCENARIOS) for (let i = 0; i < N; i++) {
     if (!race.resolution) checkResolution(race, inputs?.geo);
     // The outstanding quarter at the terminal (scores, but unlocks nothing).
     for (const n of NAMES) { belief.player = stores[n]; scoreOutstandingQuarter(race); }
+    scoreCopierOutstanding(race);
     readerScore(reader.lock ? reader.lock.day + LOCK_INTERVAL : 0, (R) => {
         let m = null;
         for (const id of ['halcyon', 'tianxia', 'polaris']) { const c = race.capability.labs[id].rungCertified[R]; if (c != null && (m == null || c < m)) m = c; }
         return m;
     });
+    // The module's reader-copier record against this harness's, quarter by quarter
+    // (a quarter with no open rung is an entry here and none there).
+    {
+        const mine = reader.scores.filter(q => q.rungs.length), theirs = copierRecord().history;
+        const same = (a, b) => a.from === b.from && a.to === b.to && a.delta === b.delta && a.rungs.length === b.rungs.length
+            && a.rungs.every((r, k) => r.R === b.rungs[k].R && r.o === b.rungs[k].o && r.delta === b.rungs[k].delta && r.v === b.rungs[k].v);
+        const ok = mine.length === theirs.length && mine.every((q, k) => same(q, theirs[k])) && copierRecord().S === reader.S;
+        if (!ok && readerRecordOK) { readerRecordOK = false; readerRecordDetail = `seed ${seed} ${scenario}: ${mine.length} vs ${theirs.length} quarters, S ${reader.S} vs ${copierRecord().S}`; }
+    }
+    // The almanac's record of this world: the early caller on even seeds, the market
+    // copier on odd, so the summary sees carried and followed rung-quarters both.
+    belief.player = stores[seed % 2 ? 'market' : 'earlier'];
+    almanacRecords.push(buildAlmanacRecord({ race, resolution: race.resolution, overlay: 'bystander', ending: 'natural', fixture: null,
+        player: forecastRecord(), copier: copierRecord() }));
     for (const q of stores.market.scores) {
         if (q.delta !== 0 || q.rungs.some(r => r.delta !== 0)) {
             if (copierExactOK) copierDetail = `seed ${seed} quarter to ${q.to}: ${q.delta}`;
@@ -299,9 +363,11 @@ if (CALIBRATE) {
 
 // ---- A. Market-policy copier -------------------------------------------------
 
-check('A: market-policy copier scores exactly 0 every quarter, every world', copierExactOK, copierDetail || `${worlds.length} worlds`);
-check('A: market-policy playerPilled === marketPilled on every lock day', copierPilledOK, pilledDetail || `${worlds.length} worlds`);
-check('A: every synthetic lock is a valid curve set (none rejected)', lockRejected === 0, `${lockRejected} rejected`);
+check('A: market copier scores exactly 0 every quarter, every world', copierExactOK, copierDetail || `${worlds.length} worlds`);
+check('A: market copier: playerPilled null, nothing stated, on every lock day', copierPilledOK, pilledDetail || `${worlds.length} worlds`);
+check('A: every synthetic lock is a valid policy (none rejected)', lockRejected === 0, `${lockRejected} rejected`);
+check('A: every snapshot matches its declared policy (followed pP === pM; carried curve bit-for-bit)', fidelityOK, fidelityDetail || `${worlds.length} worlds x ${NAMES.length} players`);
+check('A: the module\'s reader-copier record == this harness\'s reader-copier, bit for bit', readerRecordOK, readerRecordDetail || `${worlds.length} worlds`);
 
 // ---- B. Properness -------------------------------------------------------
 
@@ -387,6 +453,72 @@ diag('early caller: quiet quarters cost, crossing quarters pay', mean(quietCost)
     `quiet ${f3(mean(quietCost))} nats/rung (n ${quietCost.length}), crossing ${f3(mean(hitGain))} (n ${hitGain.length})`);
 const terminal = worlds.reduce((a, w) => a + w.scores.oracle.filter(q => q.terminal).length, 0);
 diag('outstanding quarters scored at the terminal (oracle)', true, `${terminal} of ${worlds.length} worlds`);
+
+// ---- E. The almanac ------------------------------------------------------------
+
+{
+    // The summary against an independent recount over the same records.
+    const sum = summarizeAlmanac(almanacRecords);
+    let sp = 0, sc = 0;
+    const carried = [];
+    const fam = new Map();
+    for (const r of almanacRecords) {
+        sp += r.player.S; sc += r.copier.S;
+        for (const q of r.player.quarters) for (const x of q.rungs) if (x.cls === 'carried') carried.push(x);
+        fam.set(r.family, (fam.get(r.family) || 0) + 1);
+    }
+    let decilesOK = sum.reliability.length === 10, counted = 0;
+    sum.reliability.forEach((row, k) => {
+        const lo = k / 10, hi = (k + 1) / 10;
+        const inBin = carried.filter(x => x.pP >= lo && (k === 9 ? x.pP <= hi : x.pP < hi));
+        counted += row.n;
+        const mP = inBin.length ? inBin.reduce((a, x) => a + x.pP, 0) / inBin.length : null;
+        const fr = inBin.length ? inBin.reduce((a, x) => a + x.o, 0) / inBin.length : null;
+        decilesOK &&= row.n === inBin.length && (mP == null ? row.meanP === null : Math.abs(row.meanP - mP) < 1e-12)
+            && (fr == null ? row.freq === null : Math.abs(row.freq - fr) < 1e-12);
+    });
+    const famOK = sum.families.length === 6 && sum.families.every(f => f.n === (fam.get(f.family) || 0)
+        && Math.abs(f.share - f.n / almanacRecords.length) < 1e-12 && f.baseline === NEUTRAL_BASELINE[f.family] / 100)
+        && Math.abs(sum.families.reduce((a, f) => a + f.baseline, 0) - 1) < 1e-12
+        && sum.families.reduce((a, f) => a + f.n, 0) === almanacRecords.length;
+    // The records carry what the copier and the player scored, classification included.
+    const recordsOK = almanacRecords.length === worlds.length && almanacRecords.every((r, i) => r.seed === worlds[i].seed
+        && Math.abs(r.copier.S - worlds[i].finalS.reader) < 1e-12 && r.player.quarters.every(q => q.rungs.every(x => x.cls === 'carried' || x.cls === 'followed'))
+        && typeof r.draws.tau === 'number' && r.family >= 1 && r.family <= 6);
+    check('E: almanac summary == an independent recount (runs, S_P and the reader-copier\'s, deciles, families)',
+        sum.runs === almanacRecords.length && Math.abs(sum.S.player - sp) < 1e-9 && Math.abs(sum.S.copier - sc) < 1e-9
+            && decilesOK && counted === carried.length && carried.length > 0 && famOK && recordsOK,
+        `${sum.runs} runs, ${carried.length} carried rung-quarters, S_P ${f3(sum.S.player)} / reader ${f3(sum.S.copier)}`);
+    // A synthetic set with known answers: two runs, three carried rung-quarters.
+    const q = (rungs) => ({ from: 0, to: 63, terminal: false, rungs });
+    const synth = [
+        { family: 2, player: { S: 0.5, quarters: [q([{ R: 2, o: 1, pP: 0.25, pM: 0.2, cls: 'carried' }, { R: 3, o: 0, pP: 0.02, pM: 0.02, cls: 'followed' }])] }, copier: { S: 0.25, quarters: [] } },
+        { family: 6, player: { S: -0.125, quarters: [q([{ R: 2, o: 0, pP: 0.29, pM: 0.2, cls: 'carried' }, { R: 4, o: 1, pP: 0.98, pM: 0.5, cls: 'carried' }])] }, copier: { S: 0.5, quarters: [] } },
+    ];
+    const ss = summarizeAlmanac(synth);
+    const r2 = ss.reliability[2], r9 = ss.reliability[9];
+    check('E: almanac summary on a synthetic set (known answers)',
+        ss.runs === 2 && ss.S.player === 0.375 && ss.S.copier === 0.75 && r2.n === 2 && Math.abs(r2.meanP - 0.27) < 1e-12 && r2.freq === 0.5
+            && r9.n === 1 && r9.meanP === 0.98 && r9.freq === 1 && ss.reliability[0].n === 0 && ss.reliability[0].meanP === null
+            && ss.families[1].n === 1 && ss.families[5].n === 1 && ss.families[1].share === 0.5 && ss.families[0].share === 0
+            && summarizeAlmanac([]).families[0].share === null && summarizeAlmanac([]).runs === 0);
+    // Storage: versioned, the latest 200, and empty (never throwing) without it.
+    const mem = new Map(), store = { getItem: (k) => (mem.has(k) ? mem.get(k) : null), setItem: (k, v) => { mem.set(k, String(v)); } };
+    let wrote = 0;
+    for (const r of almanacRecords.slice(0, ALMANAC_KEEP + 25)) wrote += +appendAlmanac(r, store);
+    const back = readAlmanac(store), want = almanacRecords.slice(0, ALMANAC_KEEP + 25).slice(-ALMANAC_KEEP);
+    const keptOK = wrote === Math.min(ALMANAC_KEEP + 25, almanacRecords.length) && back.length === want.length
+        && JSON.stringify(back[back.length - 1]) === JSON.stringify(want[want.length - 1]) && back[0].seed === want[0].seed;
+    mem.set(ALMANAC_KEY, JSON.stringify({ version: 999, records: want }));
+    const mismatch = readAlmanac(store);
+    mem.set(ALMANAC_KEY, '{not json');
+    const garbled = readAlmanac(store);
+    const broken = { getItem: () => { throw new Error('denied'); }, setItem: () => { throw new Error('denied'); } };
+    check('E: almanac storage keeps the latest 200, reads a version mismatch / garbage / no storage as empty',
+        keptOK && mismatch.length === 0 && garbled.length === 0 && readAlmanac(broken).length === 0 && appendAlmanac(want[0], broken) === false
+            && readAlmanac(null).length === 0 && appendAlmanac(want[0], null) === false,
+        `${back.length} kept of ${wrote} written`);
+}
 
 // ---- Report --------------------------------------------------------------
 
