@@ -78,6 +78,7 @@ import {
     getRegulationEffect, resetRegulations, getRegulationPipeline,
 } from './src/regulations.js';
 import { TIP_REAL_PROBABILITY } from './src/config.js';
+import { randomSeed, keyedRng } from './src/race/rng.js';
 import {
     initAudio, setAmbientMood, playStinger, playMusic, stopMusic, setVolume, getVolume, resetAudio,
     setMachineIntensity, glitchAudio, silenceDesk,
@@ -167,6 +168,7 @@ let bookDirty = true;     // the book changed: the markets tables and the ticket
 let lastTickTime = 0;
 let dayInProgress = false; // true between beginDay() and finalizeDay()
 let mouseX = -1, mouseY = -1;
+let runSeed = 0;         // the run seed (02a "The run, headless"): the race's in Dynamic, drawn at each new run
 let eventEngine = null;  // EventEngine instance (null when not in Dynamic mode)
 let raceState = null;    // hidden AI-race state machine (null when not in Dynamic mode; nothing reads it yet)
 let _gameOver = false;   // P6-3 DURABLE terminal latch: desk locked, book closed out, epilogue shown. Never auto-releases (unlike portfolio.restricted); cleared only by _resetCore.
@@ -1133,7 +1135,10 @@ function init() {
     );
     bindReferenceTriggers(openReference);
 
-    // 13. Pre-populate full history buffer (prices scaled so final close = $100)
+    // 13. Pre-populate full history buffer (prices scaled so final close = $100).
+    //     The run's seed is the one ambient draw.
+    runSeed = randomSeed();
+    sim.reset(DEFAULT_PRESET, runSeed);
     sim.prepopulate();
     _syncAll();
     _initPortfolioHistory();
@@ -1149,11 +1154,11 @@ function init() {
 
     // 14b. Initialize event engine for dynamic presets
     if (_isDynamicPreset(DEFAULT_PRESET)) {
-        eventEngine = new EventEngine();
+        eventEngine = new EventEngine(runSeed);
         // Faction state lives in faction-standing.js; attach by reference so events can read it
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
-        raceState = createRaceState();
+        raceState = createRaceState(runSeed);
         // Attach the race by reference for the non-popup raceEffects chokepoint (P6-2).
         eventEngine.race = raceState;
         // Player cost-of-capital coupling + complicity ledger (P6-2): activate.
@@ -1197,7 +1202,7 @@ function init() {
             if (!btn || btn.disabled) return;
             const actionId = btn.dataset.lobby;
             const day = sim.history.maxDay;
-            const result = executeLobbyAction(actionId, day, eventEngine.world);
+            const result = executeLobbyAction(actionId, day, eventEngine.world, keyedRng(runSeed, 'lobby', actionId, day));
             if (result) {
                 portfolio.cash -= result.cost;
                 if (result.playerFlag) playerChoices[result.playerFlag] = day;
@@ -2004,9 +2009,11 @@ function _applyPopupChoice(event, choice) {
     } else if (choice.regulatoryAction === 'cooperate') {
         cooperateRegulatory();
     }
+    // A choice's draws are keyed by the event's id and occurrence and the choice.
+    const _choiceKey = [event.id || '', event._fireOcc ?? 0, (event.choices || []).indexOf(choice)];
     if (choice.followups && eventEngine) {
-        for (const fu of choice.followups) {
-            eventEngine.scheduleFollowup(fu, sim.day);
+        for (let i = 0; i < choice.followups.length; i++) {
+            eventEngine.scheduleFollowup(choice.followups[i], sim.day, [..._choiceKey, i]);
         }
     }
     if (choice.resultToast) {
@@ -2088,11 +2095,15 @@ function _applyPopupChoice(event, choice) {
     }
     // -- Insider tip scheduling --
     if (choice._tipAction && eventEngine) {
-        const tip = pickTip();
-        const isReal = Math.random() < TIP_REAL_PROBABILITY;
+        // The tip's slot: the incident it carries, or the event's id and occurrence.
+        const tipRng = event._tipIncidentId != null
+            ? keyedRng(runSeed, 'tips', event._tipIncidentId)
+            : keyedRng(runSeed, 'tips', event.id || '', event._fireOcc ?? 0);
+        const tip = pickTip(tipRng);
+        const isReal = tipRng.next() < TIP_REAL_PROBABILITY;
         const eventId = isReal ? tip.realEvent : tip.fakeEvent;
         _toast(`"Word is ${tip.hint}."`, 6000);
-        eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day);
+        eventEngine.scheduleFollowup({ id: eventId, mtth: 14 }, sim.day, [..._choiceKey, 'tip']);
         if (isReal) {
             shiftFaction('firmStanding', -5);
         }
@@ -3093,7 +3104,7 @@ function _onDayComplete() {
     if (eventEngine && !_gameOver) {
         const endingId = checkEndings(sim, portfolio, eventEngine.world, playerChoices);
         if (endingId) {
-            if (endingId === 'term_ends') eventEngine.computeElectionOutcome(sim);
+            if (endingId === 'term_ends') eventEngine.computeElectionOutcome(sim, sim.day);
             _triggerGameOver(endingId);
             return;
         }
@@ -3436,7 +3447,8 @@ function _resetCore(index) {
     _lastForecastLockDay = -1;
     _almanacRecord = null;
     resetCounts();                 // the interruption counters are run-scoped
-    sim.reset(index);
+    runSeed = randomSeed();        // a new run: the one ambient draw
+    sim.reset(index, runSeed);
     resetPortfolio();   // obligations too: Classic starts on cash; Dynamic boot deals the hand
     resetOpening();
     resetImpactState();
@@ -3483,11 +3495,11 @@ function loadPreset(index) {
     _resetCore(index);
 
     if (_isDynamicPreset(index)) {
-        eventEngine = new EventEngine();
+        eventEngine = new EventEngine(runSeed);
         // Attach faction reference (faction-standing.js is the source of truth)
         eventEngine.world.factions = factions;
         // Hidden AI-race state machine (overhaul phase 1): wired but invisible.
-        raceState = createRaceState();
+        raceState = createRaceState(runSeed);
         // Attach the race by reference for the non-popup raceEffects chokepoint (P6-2).
         eventEngine.race = raceState;
         // Player cost-of-capital coupling + complicity ledger (P6-2): activate.
@@ -3534,12 +3546,12 @@ function resetSim() {
     const index = $.presetSelect.selectedIndex;
     _resetCore(index);
 
-    if (eventEngine) eventEngine.reset();
+    if (eventEngine) eventEngine.reset(runSeed);
     // Reset the hidden AI-race state in place with a fresh per-run seed (a new
     // world each reset). Same-preset reset only; mode changes create/null it in
     // loadPreset -- so no discarded-seed draws. Null in Classic, untouched.
     if (raceState) {
-        resetRaceState(raceState);
+        resetRaceState(raceState, runSeed);
         // Player cost-of-capital coupling + complicity ledger (P6-2): clear the EMA +
         // entries for the fresh run. raceState is mutated in place (singleton), so the
         // eventEngine.race reference stays valid -- no re-attach needed.

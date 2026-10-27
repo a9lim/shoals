@@ -14,18 +14,24 @@ import {
     HISTORY_CAPACITY,
 } from './config.js';
 import { HistoryBuffer } from './history-buffer.js';
+import { keyedRng } from './race/rng.js';
 
 export class Simulation {
     constructor() {
-        this.reset(DEFAULT_PRESET);
+        this.reset(DEFAULT_PRESET, 0);
     }
 
     /* -----------------------------------------------
-       reset(presetIndex)
+       reset(presetIndex, seed)
        Load preset parameters and initialise state.
+       `seed` is the run seed: every substep draws from
+       its own keyed slot (02a "The run, headless").
     ----------------------------------------------- */
-    reset(presetIndex = DEFAULT_PRESET) {
+    reset(presetIndex = DEFAULT_PRESET, seed = 0) {
         const p = PRESETS[presetIndex];
+        this.seed = seed >>> 0;
+        this._stream = 'price';   // 'backfill' while prepopulate() runs
+        this._rng = null;
 
         // Model parameters (Heston + Merton jumps + Vasicek)
         this.mu     = p.mu;
@@ -101,6 +107,12 @@ export class Simulation {
 
         const dt = this._dt;
         const k  = this._k;
+
+        // This substep's own slot: keyed by day and substep (the backfill by bar
+        // and substep), so no draw, and no spare normal, crosses from one slot
+        // into the next (02a "The run, headless").
+        this._rng = keyedRng(this.seed, this._stream, this.day, this._substepIndex);
+        this._spareValid = false;
 
         // 1. Correlated Brownian increments
         const z1 = this._randn();
@@ -195,7 +207,11 @@ export class Simulation {
         this.mu = -this.mu;
         const savedLambda = this.lambda;
         this.lambda = 0;
+        // The backfill's slots are keyed by bar (the day counter runs 0..count-1
+        // here, from reset) and substep.
+        this._stream = 'backfill';
         for (let i = 0; i < count; i++) this.tick();
+        this._stream = 'price';
         this.lambda = savedLambda;
         this.mu = -this.mu;
 
@@ -218,8 +234,8 @@ export class Simulation {
             this._spareValid = false;
             return this._spare;
         }
-        const u1 = 1 - Math.random();
-        const angle = 2 * Math.PI * Math.random();
+        const u1 = 1 - this._rng.next();
+        const angle = 2 * Math.PI * this._rng.next();
         const mag = Math.sqrt(-2 * Math.log(u1));
         this._spare = mag * Math.sin(angle);
         this._spareValid = true;
@@ -234,7 +250,7 @@ export class Simulation {
         const L = this._poissonL;
         if (L >= 1) return 0;
         let k = 0, p = 1;
-        do { k++; p *= Math.random(); } while (p > L);
+        do { k++; p *= this._rng.next(); } while (p > L);
         return k - 1;
     }
 }

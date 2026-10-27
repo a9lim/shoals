@@ -13,6 +13,7 @@ import {
 } from './config.js';
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma } from './pricing.js';
 import { market } from './market.js';
+import { keyedRng } from './race/rng.js';
 
 /* ── Layer 3: parameter shifts from large exposure ── */
 const _playerParamShifts = { mu: 0, theta: 0, xi: 0, kappa: 0, sigmaR: 0 };
@@ -411,7 +412,9 @@ export function selectImpactToast(grossRatio, instrument, day) {
         else return null;
     }
     _lastToastDay = day;
-    return pool[Math.floor(Math.random() * pool.length)];
+    // A presentation stream (02a "The run, headless"): the line's pick is keyed
+    // by day alone and feeds nothing but the toast.
+    return pool[keyedRng(0, 'present.impactToast', day).int(pool.length)];
 }
 
 /* ── Accessors ── */

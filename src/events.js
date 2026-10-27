@@ -21,6 +21,7 @@ import { firmCooldownMult, shiftFaction } from './faction-standing.js';
 import { addEventImpulse } from './race/impulse.js';
 import { applyRaceEffects } from './race/ledger.js';
 import { intelRead } from './race/intel.js';
+import { keyedRng } from './race/rng.js';
 
 // -- Re-export for backwards compat -------------------------------------
 export { PARAM_RANGES } from './events/index.js';
@@ -115,7 +116,11 @@ function _hashId(s) {
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
-    constructor() {
+    /** @param {number} seed  the run seed: every draw is a keyed slot of it
+     *  (02a "The run, headless"). */
+    constructor(seed = 0) {
+        this.seed = seed >>> 0;
+        this._occ = {};                 // event id -> times fired this run (the draws' occurrence key)
         this.eventLog = [];             // { day, headline, magnitude, params }
         this._pendingFollowups = [];    // { event, chainId, targetDay, weight, depth }
 
@@ -168,12 +173,13 @@ export class EventEngine {
         this._triggerPool = ALL_EVENTS.filter(e => typeof e.trigger === 'function');
         this._triggerCooldowns = {};
 
-        // Pulse schedule
+        // Pulse schedule. `n` counts a recurring pulse's occurrences: its slot key
+        // (0 is the first scheduling, n the nth firing's rescheduling and pick).
         this._pulses = [
-            { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, poolKey: 'fed' },
-            { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, poolKey: 'filibuster' },
-            { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, poolKey: 'media' },
-            { type: 'recurring', id: 'interjection',     interval: 50, jitter: 15, nextDay: -1, poolKey: 'interjection' },
+            { type: 'recurring', id: 'fomc',           interval: FED_MEETING_INTERVAL,    jitter: FED_MEETING_JITTER,    nextDay: -1, n: 0, poolKey: 'fed' },
+            { type: 'recurring', id: 'filibuster_check', interval: 7,  jitter: 2, nextDay: -1, n: 0, poolKey: 'filibuster' },
+            { type: 'recurring', id: 'media_cycle',      interval: 21, jitter: 5, nextDay: -1, n: 0, poolKey: 'media' },
+            { type: 'recurring', id: 'interjection',     interval: 50, jitter: 15, nextDay: -1, n: 0, poolKey: 'interjection' },
             { type: 'fixed',     id: 'campaign_season', day: CAMPAIGN_START_DAY, fired: false, handler: '_onCampaignSeason' },
             { type: 'fixed',     id: 'midterm',         day: MIDTERM_DAY,        fired: false, handler: '_onMidterm' },
         ];
@@ -221,17 +227,20 @@ export class EventEngine {
             if (pulse.type === 'recurring') {
                 // Initialize nextDay on first call
                 if (pulse.nextDay < 0) {
-                    pulse.nextDay = day + pulse.interval + this._jitterRoll(pulse.jitter);
+                    pulse.nextDay = day + pulse.interval
+                        + this._jitterRoll(pulse.jitter, keyedRng(this.seed, 'events.pulse', pulse.id, 0));
                 }
                 if (day >= pulse.nextDay) {
-                    // Reschedule regardless of whether we find an event
-                    pulse.nextDay = day + pulse.interval + this._jitterRoll(pulse.jitter);
+                    // Reschedule regardless of whether we find an event. One slot per
+                    // occurrence: its jitter, then its pick.
+                    const rng = keyedRng(this.seed, 'events.pulse', pulse.id, ++pulse.n);
+                    pulse.nextDay = day + pulse.interval + this._jitterRoll(pulse.jitter, rng);
                     // Flavor pulses run nothing rather than a rerun; the Fed and
                     // filibuster pulses carry mechanics, so they fall back to the full pool.
                     const strict = pulse.poolKey === 'media' || pulse.poolKey === 'interjection';
                     const eligible = this._fresh(this._filterEligible(this._pools[pulse.poolKey], sim), strict);
                     if (eligible.length > 0) {
-                        const event = this._weightedPick(eligible, sim);
+                        const event = this._weightedPick(eligible, sim, rng);
                         return _partition([this._fireEvent(event, sim, day, 0, netDelta)]);
                     }
                     // No eligible event -- skip, already rescheduled
@@ -262,7 +271,7 @@ export class EventEngine {
         if (this._substepLane) {
             this._substepArrival = {
                 event, day,
-                substep: Math.floor(Math.random() * INTRADAY_STEPS),
+                substep: keyedRng(this.seed, 'events.lane', day).int(INTRADAY_STEPS),
             };
             return empty;
         }
@@ -285,15 +294,16 @@ export class EventEngine {
             return null;
         }
 
+        const day = this._currentDay;
         const scale = this._baseRateScale || 1;
-        if (Math.random() >= Math.min(0.95, NON_FED_POISSON_RATE * scale)) return null;
+        if (keyedRng(this.seed, 'events.accept', day).next() >= Math.min(0.95, NON_FED_POISSON_RATE * scale)) return null;
 
-        const event = this._drawRandom(sim);
+        const event = this._drawRandom(sim, keyedRng(this.seed, 'events.pick', day));
         if (!event) return null;
 
         // Set cooldown after successful random draw (compressed by the base-rate scale)
         const cd = NON_FED_COOLDOWN_MIN +
-            Math.floor(Math.random() * (NON_FED_COOLDOWN_MAX - NON_FED_COOLDOWN_MIN + 1));
+            keyedRng(this.seed, 'events.cooldown', day).int(NON_FED_COOLDOWN_MAX - NON_FED_COOLDOWN_MIN + 1);
         this._randomCooldown = Math.max(1, Math.round(cd / scale));
 
         return event;
@@ -366,8 +376,8 @@ export class EventEngine {
         if (params.rho !== undefined) sim._recomputeRhoDerived();
     }
 
-    /** Compute the final election outcome. Sets _epilogueFired. */
-    computeElectionOutcome(sim) {
+    /** Compute the final election outcome on `day`. Sets _epilogueFired. */
+    computeElectionOutcome(sim, day) {
         const w = this.world;
         let score = w.election.barronApproval;
 
@@ -389,7 +399,7 @@ export class EventEngine {
         if (w.media.tanCredibility >= 8) score -= 3;
 
         // Noise: +-5
-        score += (Math.random() - 0.5) * 10;
+        score += (keyedRng(this.seed, 'events.election', day, 'presidential').next() - 0.5) * 10;
 
         let presidentialResult;
         if (w.investigations.impeachmentStage >= 3) {
@@ -414,11 +424,13 @@ export class EventEngine {
         return { score, presidentialResult };
     }
 
-    /** Clear all state. */
-    reset() {
+    /** Clear all state for a new run on `seed`. */
+    reset(seed) {
+        this.seed = seed >>> 0;
         this.world = createWorldState();
         this.eventLog = [];
         this._pendingFollowups = [];
+        this._occ = {};
         this._randomCooldown = 0;
         this._consecutiveMinor = 0;
         this._epilogueFired = false;
@@ -434,6 +446,7 @@ export class EventEngine {
         for (const pulse of this._pulses) {
             if (pulse.type === 'recurring') {
                 pulse.nextDay = -1;
+                pulse.n = 0;
             } else if (pulse.type === 'fixed') {
                 pulse.fired = false;
             }
@@ -502,11 +515,15 @@ export class EventEngine {
         return entry;
     }
 
-    _scheduleFollowups(event, day, depth, chainIdSuffix) {
+    /** A firing's followups. The chain's id is the parent's id, day and
+     *  occurrence (02a "The run, headless"); each followup's delay is its own slot. */
+    _scheduleFollowups(event, day, depth, occ) {
         if (!event.followups || depth >= MAX_CHAIN_DEPTH) return;
-        const chainId = event.id || ('chain_' + day + (chainIdSuffix || ''));
-        for (const fu of event.followups) {
-            const delay = this._followupDelay(fu.mtth);
+        const parent = event.id || 'chain';
+        const chainId = `${parent}@${day}#${occ}`;
+        for (let i = 0; i < event.followups.length; i++) {
+            const fu = event.followups[i];
+            const delay = this._followupDelay(fu.mtth, keyedRng(this.seed, 'events.delay', parent, occ, i));
             this._pendingFollowups.push({
                 event: getEventById(fu.id) || fu,
                 chainId,
@@ -519,6 +536,9 @@ export class EventEngine {
 
     _fireEvent(event, sim, day, depth, netDelta = 0) {
         if (event.id) this._lastFired[event.id] = day;
+        // The occurrence keys this firing's draws (its followups' delays, its
+        // choices' followups, a tip) and its followup chain's id.
+        const occ = this._occ[event.id || ''] = (this._occ[event.id || ''] || 0) + 1;
         // P7-3 chinaTrue INTEL read: a shell declaring `intel: true` carries
         // `headlinesByRead` (behind / matched / faster) instead of a headline pool.
         // Resolve ONE read here -- the canonical fire path, so a Poisson draw, a
@@ -586,14 +606,14 @@ export class EventEngine {
             validateCongress(this.world);
 
             this._logEvent(day, event, event.params || {}, event.magnitude || 'major');
-            this._scheduleFollowups(event, day, depth);
+            this._scheduleFollowups(event, day, depth, occ);
 
-            return { queued: true, event: { ...event } };
+            return { queued: true, event: { ...event, _fireOcc: occ } };
         }
 
         if (event.popup && event.choices) {
             const coupling = this._computeCoupling(netDelta, event.params);
-            const queuedEvent = { ...event };
+            const queuedEvent = { ...event, _fireOcc: occ };
             if (coupling !== 1.0) {
                 queuedEvent.choices = event.choices.map(c => ({
                     ...c,
@@ -645,7 +665,7 @@ export class EventEngine {
         const logEntry = this._logEvent(day, event, event.params || {});
         logEntry.interjection = event.interjection || false;
 
-        this._scheduleFollowups(event, day, depth, '_' + Math.random().toString(36).slice(2, 8));
+        this._scheduleFollowups(event, day, depth, occ);
 
         return logEntry;
     }
@@ -672,9 +692,9 @@ export class EventEngine {
         // Pick one from each chain via weighted selection, then fire
         const congress = congressHelpers(this.world);
         const fired = [];
-        for (const [, group] of chains) {
+        for (const [key, group] of chains) {
             const totalWeight = group.reduce((sum, pf) => sum + (pf.weight ?? 1), 0);
-            let roll = Math.random() * totalWeight;
+            let roll = keyedRng(this.seed, 'events.followup', key, day).next() * totalWeight;
             let picked = group[group.length - 1];
             for (const pf of group) {
                 roll -= (pf.weight ?? 1);
@@ -712,7 +732,7 @@ export class EventEngine {
         return w;
     }
 
-    _weightedPick(events, sim) {
+    _weightedPick(events, sim, rng) {
         const congress = congressHelpers(this.world);
         const boredomImmune = getTraitEffect('boredomImmune', false);
         const boostNonMinor = !boredomImmune && this._consecutiveMinor >= BOREDOM_THRESHOLD;
@@ -726,7 +746,7 @@ export class EventEngine {
             totalWeight += w;
         }
 
-        let roll = Math.random() * totalWeight;
+        let roll = rng.next() * totalWeight;
         for (let i = 0; i < events.length; i++) {
             roll -= weights[i];
             if (roll <= 0) return events[i];
@@ -750,13 +770,13 @@ export class EventEngine {
         });
     }
 
-    _drawRandom(sim) {
+    _drawRandom(sim, rng) {
         const pool = this._pools.random.filter(ev =>
             !(ev.oneShot && this._firedOneShot.has(ev.id))
         );
         const eligible = this._filterEligible(pool, sim);
         if (eligible.length === 0) return null;
-        return this._weightedPick(this._fresh(eligible), sim);
+        return this._weightedPick(this._fresh(eligible), sim, rng);
     }
 
     /** The eligible events that have not fired within RECENCY_DAYS. When none
@@ -800,7 +820,7 @@ export class EventEngine {
         score += ((factions.federalistSupport || 30) - (factions.farmerLaborSupport || 30)) * 0.15;
 
         // Noise: +-5 (reduced from +-10 to preserve player agency)
-        score += (Math.random() - 0.5) * 10;
+        score += (keyedRng(this.seed, 'events.election', day, 'midterm').next() - 0.5) * 10;
 
         let result, headline, params, effects;
 
@@ -875,10 +895,13 @@ export class EventEngine {
 
     // -- Public followup scheduling ---------------------------------------
 
-    scheduleFollowup(followup, fromDay) {
+    /** A choice's followup. `keys` name the slot of its delay: the event's id
+     *  and occurrence, the choice, the followup's index (02a "The run, headless"). */
+    scheduleFollowup(followup, fromDay, keys) {
         const id = typeof followup === 'string' ? followup : followup.id;
         const mtth = typeof followup === 'object' ? (followup.mtth ?? 20) : 20;
-        const delay = Math.max(1, Math.round(mtth + (Math.random() - 0.5) * mtth * 0.3));
+        const u = keyedRng(this.seed, 'events.choiceDelay', ...keys).next();
+        const delay = Math.max(1, Math.round(mtth + (u - 0.5) * mtth * 0.3));
         const event = getEventById(id);
         if (!event) return;
         this._pendingFollowups.push({
@@ -892,22 +915,22 @@ export class EventEngine {
 
     // -- Timing helpers ---------------------------------------------------
 
-    _jitterRoll(jitter) {
+    _jitterRoll(jitter, rng) {
         if (!jitter || jitter <= 0) return 0;
-        return Math.floor((Math.random() - 0.5) * 2 * jitter);
+        return Math.floor((rng.next() - 0.5) * 2 * jitter);
     }
 
-    _followupDelay(mtth) {
+    _followupDelay(mtth, rng) {
         if (!mtth || mtth <= 0) return 1;
         const sigma = mtth * 0.3;
-        const raw = mtth + this._gaussianSample() * sigma;
+        const raw = mtth + this._gaussianSample(rng) * sigma;
         return Math.max(Math.round(mtth * 0.4), Math.min(Math.round(mtth * 2.0), Math.round(raw)));
     }
 
-    _gaussianSample() {
+    _gaussianSample(rng) {
         // Box-Muller transform
-        const u1 = Math.random();
-        const u2 = Math.random();
+        const u1 = rng.next();
+        const u2 = rng.next();
         return Math.sqrt(-2 * Math.log(u1 || 1e-10)) * Math.cos(2 * Math.PI * u2);
     }
 }
