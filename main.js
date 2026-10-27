@@ -24,7 +24,7 @@ import {
 } from './src/ui.js';
 import { initPages, showPage, cyclePage, currentPage, setFolioCount } from './src/pages.js';
 import { initBrief, resetBrief, updateMasthead, renderWire, markExtra, splitHeadline } from './src/brief.js';
-import { initMarkets, setMarketsVisible, marketsDayClose, resetMarkets, redrawMarkets, marketsSubstep, smileExpiryDay } from './src/markets.js';
+import { initMarkets, setMarketsVisible, marketsDayClose, resetMarkets, redrawMarkets, marketsSubstep, smileExpiryDay, marketsGhost, restoreMarkets } from './src/markets.js';
 import {
     initTicket, pickPoint, addToTicket, legState, renderTicket, resetTicket, refreshTicketQuotes, redrawTicket,
     invalidateTicket, tradeTicket, ticketLegCount, loadFlatten,
@@ -92,7 +92,6 @@ let benchHistory = null;     // ... and for holding HCN with the same capital (t
 let _capFront = null;          // the tape's live caption setter (shared/colophon.js caption())
 let _epilogueReopen = null;    // reopens the last edition after a visit to the race page
 let _replaying = false;        // a save is replaying: the sink rebuilds display history and nothing else
-let _replayLead = null;        // the last replayed close's lead, for the markets' snapshot once the replay ends
 let _runEnded = false;         // the last edition has shown: the save is cleared and stays cleared
 const SAVE_KEY = 'shoals-run'; // the run's save in browser storage (02a "Save and resume")
 
@@ -134,7 +133,7 @@ const SINK = {
     notice() { if (!_replaying) _onNotice(); },
     extra() { markExtra(relDay()); if (!_replaying) _worthReading('extra'); },
     raceDay() { recordRaceDay(run.race, run.engine.world); },
-    marketsClose(headline) { if (_replaying) _replayLead = headline; else _marketsClose(headline); },
+    marketsClose(headline) { if (!_replaying) _marketsClose(headline); },
     closed(margin) { _onClosed(margin); },
     skipClose() { if (!_replaying) _skipClose(); },
     afterClose() { _save(); },
@@ -1072,14 +1071,16 @@ function _onLastEdition(pages, record) {
 // ---------------------------------------------------------------------------
 
 /** Write the save between days (each close, after its dispatches; each command
- *  made between days): the header, the journal and the endpoint. A day in
- *  progress is not saved, and nothing is saved while a save replays. */
+ *  made between days): the header, the journal, the endpoint and the Markets
+ *  page's ghost. A day in progress is not saved, and nothing is saved while a
+ *  save replays. */
 function _save() {
     if (_replaying || _runEnded || run.dayOpen) return;
     const p = position();
     const data = {
         v: RULES_VERSION, seed: run.seed, preset: run.preset, journal: run.journal,
         endpoint: { day: p.day, phase: 'between', substeps: p.substeps, commands: run.journal.length },
+        ghost: marketsGhost(),   // display state: the Markets page's curves before the latest news
     };
     try { localStorage.setItem(SAVE_KEY, JSON.stringify(data)); } catch { /* storage unavailable or full */ }
 }
@@ -1110,7 +1111,6 @@ function _readSave() {
  */
 function _resume(data) {
     _replaying = true;
-    _replayLead = null;
     try {
         newRun({ preset: data.preset, seed: data.seed, hand: isDynamicPreset(data.preset) });
         _onNewRun();
@@ -1123,7 +1123,9 @@ function _resume(data) {
         return false;
     }
     _replaying = false;
-    _marketsClose(_replayLead);
+    chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
+    restoreMarkets(data.ghost);
+    invalidateTicket();
     return true;
 }
 

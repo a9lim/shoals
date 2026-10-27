@@ -362,6 +362,20 @@ export function marketsDayClose(newsHead) {
     if (_st.visible) { _drawAll(); _renderTable(); _kick(); if (_st.open === 'smile') drawSurface(); }
 }
 
+/** The ghost on show (the snapshot from the close before the latest news), for
+ *  the save: display state the live page computed, carried so a resumed run
+ *  shows the curves it showed (02a "Save and resume"). */
+export function marketsGhost() { return _st.ghost; }
+
+/** A resumed run's curves: today's snapshot, the saved ghost beside it, at rest. */
+export function restoreMarkets(ghost) {
+    resetMarkets();
+    marketsDayClose(null);
+    _st.ghost = ghost || null;
+    _st.t0 = -1e9;
+    if (_st.visible) { _drawAll(); _renderTable(); }
+}
+
 /** Clear ghosts and snapshots (reset / regime change). */
 export function resetMarkets() {
     _st.cur = _st.prev = _st.ghost = null;
