@@ -3,6 +3,12 @@
    for the Shoals trading simulator.
    =================================================== */
 
+// -- The rules a journal replays under (02a "The run, headless") --
+// Bump on any change that alters what a journal replays to: a saved run under
+// another version is retired, never replayed, and run-test's fixture trail is
+// re-derived (`node tools/run-test.mjs --rebaseline`).
+export const RULES_VERSION = 1;
+
 // -- Simulation timing --
 export const TRADING_DAYS_PER_YEAR = 252;
 export const INTRADAY_STEPS = 16;

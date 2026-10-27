@@ -37,8 +37,8 @@
 
 import {
     belief, latestLock, beliefLaw, isCertified, crossingProb, curveMedian,
-    draftCurves, draftPolicy, openRungs, setDraftMedian, setDraftWidth, setDraftPlateau, plateauHeight,
-    impliedTimeline, followMarket,
+    draftCurves, draftPolicy, openRungs, plateauHeight, impliedTimeline,
+    draftState, editDraftState, draftStateView,
 } from './race/belief.js';
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
@@ -55,10 +55,22 @@ const LAB = Object.fromEntries(LABS.map(l => [l.id, l]));
 let _pub = null, _hid = null;
 const _st = {
     ctx: null, visible: false, revealed: false, ended: false, reveal0: -1e9, raf: 0, w: 0, h: 0, dpr: 1, cap: null, canvas: null, c: null, reduced: false,
-    // The forecast editor: the selected rung, a drag, the handles drawn last frame,
-    // and main.js's hooks.
-    sel: 2, drag: null, handles: [], hover: null, hooks: {},
+    // The forecast editor: the selected rung, a drag, the draft's copy the drag
+    // edits (02a "The run, headless": committed on release), the handles drawn
+    // last frame, and main.js's hooks.
+    sel: 2, drag: null, edit: null, handles: [], hover: null, hooks: {},
 };
+
+/** The draft the editor shows: the drag's copy while a gesture runs, else the run's. */
+function _curves() { return _st.edit ? draftStateView(_st.edit).curves : draftCurves(); }
+function _policy() { return _st.edit ? draftStateView(_st.edit).policy : draftPolicy(); }
+
+/** Commit a state as the run's draft (main.js sends it as the forecast command);
+ *  a state equal to the draft changes nothing and sends nothing. */
+function _commit(state) {
+    if (!state || !_st.hooks.onCommit || JSON.stringify(state) === JSON.stringify(draftState())) return;
+    _st.hooks.onCommit(state);
+}
 
 // Editor steps (UNRATIFIED feel numbers, 02a gives only the keys): ←/→ move a
 // median 5 days, Shift 21 (ratified); ↑/↓ scale the width by 10%; a vertical drag
@@ -74,7 +86,8 @@ function _fresh() {
 
 /**
  * @param {object} ctx    { race(), world() }
- * @param {object} hooks  { onEdit() }: a change to the standing policy
+ * @param {object} hooks  { onCommit(state) }: the editor's edit, committed as the
+ *                        draft's whole state; { onEdit() }: a change to the standing policy
  */
 export function initRacePage(ctx, hooks = {}) {
     _st.ctx = ctx;
@@ -94,7 +107,7 @@ export function initRacePage(ctx, hooks = {}) {
     // Follow the market on every rung.
     document.getElementById('race-match')?.addEventListener('click', () => {
         if (!_editable()) return;
-        followMarket();
+        _commit(editDraftState(draftState(), { op: 'follow', R: null }));
         _edited(true);
     });
     _wireEditor();
@@ -350,7 +363,7 @@ export function drawRace() {
     const deadlines = {};
     for (const ct of consensus.contracts) deadlines[ct.predicate.rung] = ct;
     const editing = _editable();
-    const draft = editing ? draftCurves() : null, pol = draft ? draftPolicy() : null;
+    const draft = editing ? _curves() : null, pol = draft ? _policy() : null;
     const focused = document.activeElement === _st.canvas;
     _st.handles = [];
     _st.geom = { L0, R0 };
@@ -634,6 +647,7 @@ function _wireEditor() {
         const [x, y] = local(e), h = near(x, y), d = draftCurves();
         if (!h || !d) return;
         _st.sel = h.R;
+        _st.edit = draftState();   // the gesture edits a copy, committed on release
         _st.drag = { R: h.R, plateau: !!h.plateau, x, y, m0: d[h.R].m, w0: d[h.R].w, G: h.G, y0: h.y0 };
         cv.setPointerCapture(e.pointerId);
         cv.style.cursor = 'grabbing';
@@ -644,7 +658,7 @@ function _wireEditor() {
         if (!_editable()) return;
         const [x, y] = local(e), dr = _st.drag;
         if (dr) {
-            if (dr.plateau) setDraftPlateau(dr.R, (dr.y0 - y) / dr.G);
+            if (dr.plateau) _st.edit = editDraftState(_st.edit, { op: 'plateau', R: dr.R, v: (dr.y0 - y) / dr.G });
             else {
                 // The first move carries a followed rung (its copy clamped between its
                 // carried neighbours), and the drag runs from that copy. Across moves the
@@ -652,15 +666,15 @@ function _wireEditor() {
                 // that way: a width drag moves no neighbour (02a "The standing policy").
                 if (!dr.carried) {
                     dr.carried = true;
-                    _carryFirst(dr.R);
-                    const c = draftCurves()[dr.R];
+                    _st.edit = _carryFirst(_st.edit, dr.R);
+                    const c = _curves()[dr.R];
                     dr.m0 = c.m; dr.w0 = c.w;
                 }
                 dr.across = dr.across || x !== dr.x;
                 dr.along = dr.along || y !== dr.y;
                 const perPx = HORIZON / Math.max(1, _st.geom.R0 - _st.geom.L0);
-                if (dr.across) setDraftMedian(dr.R, dr.m0 + (x - dr.x) * perPx);
-                if (dr.along) setDraftWidth(dr.R, dr.w0 * Math.exp((y - dr.y) / EDIT_W_PX));
+                if (dr.across) _st.edit = editDraftState(_st.edit, { op: 'median', R: dr.R, v: dr.m0 + (x - dr.x) * perPx });
+                if (dr.along) _st.edit = editDraftState(_st.edit, { op: 'width', R: dr.R, v: dr.w0 * Math.exp((y - dr.y) / EDIT_W_PX) });
             }
             drawRace();
             return;
@@ -671,8 +685,11 @@ function _wireEditor() {
     });
     const end = () => {
         if (!_st.drag) return;
+        const edited = _st.edit;
         _st.drag = null;
+        _st.edit = null;
         cv.style.cursor = 'grab';
+        _commit(edited);   // the gesture's end commits it: a lock never sees a half-finished drag
         _edited(true);
     };
     cv.addEventListener('pointerup', end);
@@ -695,27 +712,30 @@ function _wireEditor() {
 const _EDIT_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown']);
 
 /** Carry a followed rung without changing it: a width edit to its own width
- *  copies and clamps the projection and moves no neighbour. */
-function _carryFirst(R) {
-    if (draftPolicy()[R] !== 'carry') setDraftWidth(R, draftCurves()[R].w);
+ *  copies and clamps the projection and moves no neighbour. Pure: returns the state. */
+function _carryFirst(state, R) {
+    if (state.policy[R] === 'carry') return state;
+    return editDraftState(state, { op: 'width', R, v: draftStateView(state).curves[R].w });
 }
 
 function _editKey(e) {
     if (!_editable()) return;
     const R = _st.sel, open = openRungs();
     if (!draftCurves() || !draftCurves()[R]) return;
-    // An edit key on a followed rung carries it first, so the step runs from the
-    // clamped copy rather than the projection.
-    if (_EDIT_KEYS.has(e.key)) _carryFirst(R);
-    const d = draftCurves();
+    // Each key is an edit to a copy of the draft, committed at once. An edit key on
+    // a followed rung carries it first, so the step runs from the clamped copy
+    // rather than the projection.
+    let st = draftState();
+    if (_EDIT_KEYS.has(e.key)) st = _carryFirst(st, R);
+    const d = draftStateView(st).curves;
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-        setDraftMedian(R, d[R].m + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? EDIT_STEP_BIG : EDIT_STEP));
-    } else if (e.key === 'ArrowUp') setDraftWidth(R, d[R].w / EDIT_W_STEP);
-    else if (e.key === 'ArrowDown') setDraftWidth(R, d[R].w * EDIT_W_STEP);
+        _commit(editDraftState(st, { op: 'median', R, v: d[R].m + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? EDIT_STEP_BIG : EDIT_STEP) }));
+    } else if (e.key === 'ArrowUp') _commit(editDraftState(st, { op: 'width', R, v: d[R].w / EDIT_W_STEP }));
+    else if (e.key === 'ArrowDown') _commit(editDraftState(st, { op: 'width', R, v: d[R].w * EDIT_W_STEP }));
     else if (e.key === 'PageUp' || e.key === 'PageDown') {
         const h = plateauHeight(d[R].m, d[R].w, d[R].q, belief.day);
-        setDraftPlateau(R, h + (e.key === 'PageUp' ? 1 : -1) * (e.shiftKey ? EDIT_H_STEP_FINE : EDIT_H_STEP));
-    } else if (e.key === 'Delete' || e.key === 'Backspace') followMarket(R);
+        _commit(editDraftState(st, { op: 'plateau', R, v: h + (e.key === 'PageUp' ? 1 : -1) * (e.shiftKey ? EDIT_H_STEP_FINE : EDIT_H_STEP) }));
+    } else if (e.key === 'Delete' || e.key === 'Backspace') _commit(editDraftState(st, { op: 'follow', R }));
     else if (e.key === 'Tab') { if (!_selectOpen(e.shiftKey ? -1 : 1)) return; }
     else if (e.key === 'Home') _st.sel = open[0];
     else if (e.key === 'End') _st.sel = open[open.length - 1];
@@ -728,10 +748,10 @@ function _editKey(e) {
 /** Speak the selected rung's draft beside the market's (screen readers). */
 function _announce() {
     const live = document.getElementById('race-live');
-    const d = draftCurves();
+    const d = _curves();
     if (!live || !d || !d[_st.sel]) return;
     const R = _st.sel, bMed = impliedTimeline()[R], t = belief.day;
-    const dMed = draftPolicy()[R] === 'carry' ? curveMedian(d[R], t, R) : bMed;
+    const dMed = _policy()[R] === 'carry' ? curveMedian(d[R], t, R) : bMed;
     const h = plateauHeight(d[R].m, d[R].w, d[R].q || 0, t);
     const by = (x) => x == null ? 'not this term' : `by day ${Math.round(x)}`;
     live.textContent = `R${R}: yours ${by(dMed)}, width ${Math.round(d[R].w)} days, ${Math.round(100 * h)}% this term. Consensus ${by(bMed)}.`;
@@ -757,8 +777,8 @@ function _table() {
         const lock = race && belief.active ? latestLock() : null;
         const locked = !lock ? '—' : lock.classes[R] === 'followed' && !cert ? 'Market' : med(_law(R, t0, lock.curves[R]));
         // The standing policy as the canvas reads it: a followed rung, the market's day.
-        const draft = race && belief.active && !_st.ended ? draftCurves() : null;
-        const drawn = draft && law ? (draftPolicy()[R] === 'carry' ? _law(R, t0, draft[R]) : law) : null;
+        const draft = race && belief.active && !_st.ended ? _curves() : null;
+        const drawn = draft && law ? (_policy()[R] === 'carry' ? _law(R, t0, draft[R]) : law) : null;
         const cells = [`R${R}`, claim ? String(claim.day) : '—', cert ? String(cert.day) : '—', med(law), draft ? med(drawn) : '—', locked];
         cells.forEach((t, i) => { const td = document.createElement('td'); td.textContent = t; if (!i) td.className = 'l'; tr.appendChild(td); });
         tb.appendChild(tr);

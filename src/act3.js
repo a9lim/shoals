@@ -212,6 +212,9 @@ export function dueOrders() {
 /** Number of orders still working. */
 export function workingOrderCount() { return _deferred.length; }
 
+/** The working orders, read-only (the run's digest, 02a "The run, headless"). */
+export function workingOrders() { return _deferred; }
+
 /** Drop every working order (desk lock: terminal latch, restriction, reset). */
 export function clearDeferredOrders() {
     const n = _deferred.length;
