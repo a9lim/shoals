@@ -82,7 +82,6 @@
       record's creation day, the record's own immediate
       lagMult/meanLag difference (P8), and per-tick occurrence
       + draw-count purity.
-
    L. Presentation degradation: hold arithmetic, and the
       invariant that every headless number (portfolio value,
       marks, the VXHCN index) is BITWISE unchanged with the
@@ -97,6 +96,12 @@
       over a seed sweep) names exactly one bystander choice,
       and it carries no trade, subscription, race effect, leak,
       regime push or regulatory settlement.
+   R. Demonstrations through the bridge (02a "Demonstrations"):
+      the seven shells (category release, Poisson-excluded),
+      their impulses (the routine frontier release's, reversed
+      for a withdrawal, none for rulings), one shell per chain
+      row with every token filled, the Fixedpoint catalogue's
+      condition, deterministic rotation, and the {n} variant.
 
    All numeric bands are DESIGN bands; the tuning is RATIFIED in
    02a's "Control regime and content plumbing"
@@ -3175,6 +3180,91 @@ let bystanderPool = 0, bystanderBridgeIds = new Set(), bystanderBridgeShown = 0;
     check('Q5: every dispatch the bridge fires over 30 seeds names its bystander',
         bystanderBridgeShown > 0 && bridgeProblems.length === 0,
         firstOf(bridgeProblems) || `${bystanderBridgeShown} dispatches, ${bystanderBridgeIds.size} kinds`);
+}
+
+// =====================================================================
+// R. Demonstrations through the bridge (02a "Demonstrations")
+// =====================================================================
+// R1 the seven shells exist under 'release' and never ride the Poisson pool.
+// R2 a demonstration carries release_routine_frontier's impulse, a withdrawal
+//    the same reversed; disputes and evaluations carry no impulse key.
+// R3 off real worlds, every chain row fires exactly one shell of its kind with
+//    every token substituted and {lab} the row's lab; the Fixedpoint catalogue
+//    is Halcyon's first publication while the codename isn't public, never
+//    otherwise; rotation is deterministic (same seed, same headlines).
+// R4 a withdrawal with dependents takes the {n} variant, spelled out.
+{
+    const DEMO_SHELLS = ['demo_fixedpoint_catalogue', 'demo_halcyon', 'demo_polaris', 'demo_dispute', 'demo_upheld', 'demo_narrowed', 'demo_withdrawn'];
+    const randomPool = new EventEngine()._pools.random;
+    check('R1: the demonstration shells exist, category release, Poisson-excluded',
+        DEMO_SHELLS.every(id => getEventById(id)?.category === 'release') && !randomPool.some(e => e.id.startsWith('demo_')));
+    const routine = JSON.stringify(getEventById('release_routine_frontier').impulse);
+    const neg = JSON.stringify(Object.fromEntries(Object.entries(getEventById('release_routine_frontier').impulse).map(([k, v]) => [k, -v])));
+    check('R2: demonstrations carry the routine frontier impulse, a withdrawal it reversed, rulings none',
+        ['demo_fixedpoint_catalogue', 'demo_halcyon', 'demo_polaris'].every(id => JSON.stringify(getEventById(id).impulse) === routine)
+        && JSON.stringify(getEventById('demo_withdrawn').impulse) === neg
+        && ['demo_dispute', 'demo_upheld', 'demo_narrowed'].every(id => !('impulse' in getEventById(id))));
+
+    const KIND_SHELL = { dispute: ['demo_dispute'], evaluation: ['demo_upheld', 'demo_narrowed'], withdrawal: ['demo_withdrawn'],
+        publication: ['demo_fixedpoint_catalogue', 'demo_halcyon', 'demo_polaris'] };
+    const runOne = (seed, fixedpointPublic) => {
+        const fired = [], rows = [];
+        const engine = { world: { factions: {}, geopolitical: {}, ai: { fixedpointPublic } },
+            _fireEvent(ev) { if (ev.id.startsWith('demo_')) fired.push(ev); return { id: ev.id }; } };
+        const race = createRaceState(seed);
+        resetRaceBridge();
+        for (let d = 0; d < HORIZON; d++) {
+            advanceRace(race);
+            if (!race.lastTransitions.demonstrations.length) continue;
+            rows.push(...race.lastTransitions.demonstrations);
+            runRaceBridge(engine, race, { day: race.day }, race.day, 0);
+        }
+        return { fired, rows };
+    };
+    let oneEach = true, kindOK = true, tokensClean = true, labOK = true, catalogueOK = true, scaleOK = true, rowsSeen = 0, catalogues = 0;
+    let rotationOK = true;
+    for (let i = 0; i < Math.min(N, 300); i++) {
+        const seed = (BASE_SEED + i) >>> 0;
+        const { fired, rows } = runOne(seed, false);
+        rowsSeen += rows.length;
+        if (fired.length !== rows.length) { oneEach = false; continue; }
+        rows.forEach((row, j) => {
+            const ev = fired[j];
+            if (!KIND_SHELL[row.kind].includes(ev.id)) kindOK = false;
+            if (/\{[a-zA-Z]+\}/.test(ev.headline)) tokensClean = false;
+            if (ev.raceMeta.lab !== row.lab || ev.raceMeta.rung !== row.rung) labOK = false;
+            const wantCatalogue = row.kind === 'publication' && row.lab === 'halcyon' && row.ordinal === 1;
+            if ((ev.id === 'demo_fixedpoint_catalogue') !== wantCatalogue) catalogueOK = false;
+            if (ev.id === 'demo_fixedpoint_catalogue') catalogues++;
+            if (ev.impulse && typeof ev._impulseScale !== 'number') scaleOK = false;
+        });
+        if (i < 40) {
+            const again = runOne(seed, false), pub = runOne(seed, true);
+            if (JSON.stringify(again.fired.map(e => e.headline)) !== JSON.stringify(fired.map(e => e.headline))) rotationOK = false;
+            if (pub.fired.some(e => e.id === 'demo_fixedpoint_catalogue')) catalogueOK = false;
+        }
+    }
+    check('R3: one shell per chain row, of its kind, tokens substituted, {lab}/{rung} the row\'s',
+        oneEach && kindOK && tokensClean && labOK && scaleOK && rowsSeen > 0, `${rowsSeen} rows`);
+    check('R3: the Fixedpoint catalogue is Halcyon\'s first publication while the codename isn\'t public, never otherwise',
+        catalogueOK && catalogues > 0, `${catalogues} catalogues`);
+    check('R3: variant rotation is deterministic per seed (no RNG)', rotationOK);
+
+    // R4: a constructed withdrawal row, alone and with two dependents.
+    const fired = [];
+    const engine = { world: { factions: {}, geopolitical: {}, ai: {} }, _fireEvent(ev) { fired.push(ev); return { id: ev.id }; } };
+    const race = createRaceState(1);
+    resetRaceBridge();
+    race.lastTransitions = freshTransitions();
+    race.lastTransitions.demonstrations = [
+        { kind: 'withdrawal', id: 'W9', on: 'D1', lab: 'polaris', rung: 3, took: [] },
+        { kind: 'withdrawal', id: 'W10', on: 'D4', lab: 'halcyon', rung: 2, took: ['D6', 'D7'] },
+    ];
+    runRaceBridge(engine, race, { day: 0 }, 0, 0);
+    const w = fired.filter(e => e.id === 'demo_withdrawn');
+    check('R4: a withdrawal alone takes the plain item; with dependents the {n} variant, spelled out',
+        w.length === 2 && w[0].headline.startsWith('Polaris withdraws') && w[1].headline.includes('takes two later results'),
+        w.map(e => e.headline.slice(0, 60)).join(' | '));
 }
 
 // ---- Report --------------------------------------------------------------

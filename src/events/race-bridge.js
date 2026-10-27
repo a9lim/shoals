@@ -27,6 +27,8 @@
                       victim -> superevent, otherwise the ordinary shell
      capex         -> ONE rates_capex_wave per RISE of the public released-
                       frontier rung (a public-state latch, not a ledger row)
+     demonstrations-> one item per chain row (02a "Demonstrations"): publication,
+                      scope dispute, evaluation, withdrawal
      evidence      -> NOT bridged this slice (generated + laddered in the race
                       state; surfaced through belief / the insider channel later)
 
@@ -82,6 +84,8 @@ const RUNG_NAME = {
     1: 'reliable agency', 2: 'autonomous engineering', 3: 'autonomous research',
     4: 'recursive self-improvement', 5: 'takeoff',
 };
+// {n}: a count the Brief spells out (house style: "seven hundred papers").
+const NUMBER_WORD = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
 
 /** Canonical entity id from a raceMeta: incidents carry `source`, releases
  *  `entity`, certifications `lab`. These never overlap on one meta. */
@@ -131,6 +135,10 @@ export function substituteTokens(str, meta, shellId) {
     if (out.includes('{rungName}')) {
         const v = meta ? RUNG_NAME[meta.rung] : null;
         if (v != null) out = out.replaceAll('{rungName}', v); else warnToken(shellId, '{rungName}');
+    }
+    if (out.includes('{n}')) {
+        const n = meta ? meta.n : null;
+        if (n != null) out = out.replaceAll('{n}', NUMBER_WORD[n] ?? String(n)); else warnToken(shellId, '{n}');
     }
     if (out.includes('{lag}')) {
         const l = meta ? meta.lag : null;
@@ -287,6 +295,31 @@ function bridgeCertifications(tr, emit) {
     }
     for (const [lab, rung] of byLab) {
         emit(shell('certification_settled', {}, { lab, rung }));
+    }
+}
+
+// ---- Demonstrations (02a "Demonstrations") --------------------------------
+// One wire item per public row of the chain, in the step's order (withdrawals,
+// evaluations, disputes, publications). The rows carry no truth; the bridge reads
+// nothing else of the chain. Halcyon's first publication, while the Fixedpoint
+// codename is not yet public, is the Fixedpoint catalogue (world.ai is public
+// narrative state). A withdrawal that took dependents swaps in the {n} variant.
+
+function bridgeDemonstrations(tr, emit, world) {
+    for (const row of tr.demonstrations) {
+        const meta = { lab: row.lab, rung: row.rung, reportId: row.id, on: row.on ?? null };
+        if (row.kind === 'publication') {
+            const catalogue = row.lab === 'halcyon' && row.ordinal === 1 && !(world && world.ai && world.ai.fixedpointPublic);
+            emit(shell(catalogue ? 'demo_fixedpoint_catalogue' : row.lab === 'polaris' ? 'demo_polaris' : 'demo_halcyon', {}, meta));
+        } else if (row.kind === 'dispute') {
+            emit(shell('demo_dispute', {}, meta));
+        } else if (row.kind === 'evaluation') {
+            emit(shell(row.outcome === 'narrowed' ? 'demo_narrowed' : 'demo_upheld', {}, meta));
+        } else {
+            meta.n = row.took.length;
+            const base = getEventById('demo_withdrawn');
+            emit(shell('demo_withdrawn', meta.n && base ? { headline: base.headlineDependents } : {}, meta));
+        }
     }
 }
 
@@ -498,6 +531,7 @@ export function runRaceBridge(engine, race, sim, day, netDelta = 0, liveRung = n
     bridgeReleases(tr, emit);
     bridgeCapex(emit, race, liveRung);
     bridgeCertifications(tr, emit);
+    bridgeDemonstrations(tr, emit, engine.world);
     bridgeIncidents(tr, emit, race);
     bridgeStrait(tr, emit);
     bridgeRegime(tr, emit);

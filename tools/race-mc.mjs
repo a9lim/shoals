@@ -16,11 +16,24 @@
    unconditional quantile is the p-quantile of the full
    N-sample with non-crossers placed at +infinity.
 
+   02a "Demonstrations" adds the release jitter's gates (the
+   race core at zero jitter width against HEAD 43d677c's
+   fingerprint, the claim excess in days 42-48 of the
+   63-day cycle) and Polaris's nominal round schedule
+   (rounds open on exactly the days the old clock opened
+   them).
+
    Usage:  node tools/race-mc.mjs [N] [--seed S]
            N defaults to 1000; base seed defaults to 1.
    =================================================== */
 
-import { createRaceState, advanceRace, heatValue, RACE_TUNING } from '../src/race/race-state.js';
+import { createHash } from 'node:crypto';
+import { createRaceState, advanceRace, heatValue, RACE_TUNING, freshTransitions } from '../src/race/race-state.js';
+import { createPublicRecord, stepPublicRecord, publicRecordRow, foldPublicRecordRow, createRecordFromSnapshot, chainReports } from '../src/race/public-record.js';
+import { stepDemonstrations, closeDemonstrations, freshDemonstrationState } from '../src/race/demonstrations.js';
+import { buildPublicView } from '../src/race/consensus.js';
+import { initRounds, stepRounds, polarisRoundDays, ROUNDS_TUNING } from '../src/race/rounds.js';
+import { createRng, deriveSeed } from '../src/race/rng.js';
 
 // ---- CLI -----------------------------------------------------------------
 
@@ -110,13 +123,65 @@ let nonImmediate = 0, tipCount = 0;    // insider-tip rate over non-immediate oc
 
 const T_CAP = RACE_TUNING.prolifCap / RACE_TUNING.prolifInc;   // releases needed to hit the cap
 
+// ---- Release jitter: claims by week of the 63-day cycle (02a) -------------
+// A claim is a released rung newly crossed by a release (R1 included: the early
+// lockstep is chiefly Tianxia's R1 claims on days 1, 46 and 91). Bins are the
+// nine 7-day weeks of day mod 63; the excess is a week's count over the weekly
+// mean, minus one. The gate reads the whole run; the Act I slice (released
+// frontier at or below R2 before the claim) is reported beside it.
+const claimWeeks = new Array(9).fill(0), claimWeeksAct1 = new Array(9).fill(0), releaseWeeks = new Array(9).fill(0);
+
+// ---- Polaris's nominal schedule vs the old clock ----------------------------
+// HEAD 43d677c's stepRounds, called every day: the founding round 21 days after
+// the spawn, then each next one 126 + int(43) - 21 days after the day a round
+// opened, drawn from the `rounds` substream as rounds executed.
+function legacyRoundDays(seed, spawnDay, untilDay) {
+    const rng = createRng(deriveSeed(seed, 'rounds'));
+    const out = [];
+    let next = spawnDay + 21;
+    for (let day = spawnDay; day <= untilDay; day++) {
+        if (day >= next) { out.push(day); next = day + 126 + rng.int(43) - 21; }
+    }
+    return out;
+}
+let roundsChecked = 0, roundsMismatch = 0, roundsTotal = 0;
+
+// ---- Demonstrations (02a "Demonstrations") ---------------------------------
+// The gate: of Halcyon's internal Rk crossings whose release falls within the
+// horizon, the share with a first publication of Rk before that release
+// (withdrawn ones included), in [0.35, 0.65] for R3 and R4; R2 is reported.
+const demoBefore = { halcyon: { 2: [0, 0], 3: [0, 0], 4: [0, 0] }, polaris: { 2: [0, 0], 3: [0, 0], 4: [0, 0] } };
+const demoCount = { halcyon: { 2: 0, 3: 0, 4: 0 }, polaris: { 2: 0, 3: 0, 4: 0 } };
+const demoPerRun = [], disputesPerRun = [];
+let demoTotal = 0, demoOverScoped = 0, demoFlawed = 0, demoDisputed = 0;
+const demoOutcome = { upheld: 0, narrowed: 0, withdrawnFlawed: 0, withdrawnDependent: 0, pending: 0 };
+let withdrawals = 0, withdrawalsWithDeps = 0, depsTaken = 0, depsMax = 0;
+let polarisDemos = 0, polarisInWindow = 0, polarisDemoRuns = 0;
+
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
     const race = createRaceState((BASE_SEED + i) >>> 0);
+    initRounds(race);
+    const roundDays = [];
+    let spawnDay = null;
     let leaderC888 = null;
     let eOcc = 0, lOcc = 0, tOcc = 0, s4 = 0;   // per-run occurrence tallies
     for (let d = 0; d < HORIZON; d++) {
+        const frontierBefore = buildPublicView(race).releasedFrontierRung;
         advanceRace(race);
+        for (const round of stepRounds(race, 0)) roundDays.push(round.day);
+        if (race.lastTransitions.spawned.includes('polaris')) spawnDay = race.day;
+        for (const row of race.lastTransitions.demonstrations) {
+            if (row.kind !== 'withdrawal') continue;
+            withdrawals++; depsTaken += row.took.length; depsMax = Math.max(depsMax, row.took.length);
+            if (row.took.length) withdrawalsWithDeps++;
+        }
+        for (const rel of race.lastTransitions.releases) {
+            const week = Math.floor((race.day % 63) / 7);
+            releaseWeeks[week]++;
+            claimWeeks[week] += rel.releasedCrossings.length;
+            if (frontierBefore <= 2) claimWeeksAct1[week] += rel.releasedCrossings.length;
+        }
         if (race.day === 350) sAt[350].push(leaderSafety(race));
         if (race.day === 700) sAt[700].push(leaderSafety(race));
         if (race.day === 888) leaderC888 = leaderInternal(race).C;
@@ -128,6 +193,44 @@ for (let i = 0; i < N; i++) {
         for (const o of occ) if (o.severity >= 4) s4++;
     }
     const cap = race.capability;
+
+    // Rounds open on the nominal schedule, which is the old clock's days.
+    if (spawnDay != null) {
+        roundsChecked++; roundsTotal += roundDays.length;
+        const legacy = legacyRoundDays(race.seed, spawnDay, HORIZON);
+        const nominal = polarisRoundDays(race.seed, spawnDay, HORIZON).filter(d => d <= HORIZON);
+        if (JSON.stringify(roundDays) !== JSON.stringify(legacy) || JSON.stringify(roundDays) !== JSON.stringify(nominal)) roundsMismatch++;
+    }
+
+    // Demonstrations: the hidden list, read only here (the harness is the reveal).
+    const demos = race.demonstrations.list;
+    demoPerRun.push(demos.length);
+    disputesPerRun.push(demos.filter(d => d.disputeId).length);
+    for (const d of demos) {
+        demoTotal++; demoCount[d.lab][d.rung]++;
+        if (d.truth.reach === 'overScoped') demoOverScoped++;
+        if (d.truth.flawed) demoFlawed++;
+        if (d.disputeId) demoDisputed++;
+        if (d.status === 'withdrawn') demoOutcome[d.root === d.id ? 'withdrawnFlawed' : 'withdrawnDependent']++;
+        else if (d.status === 'upheld' || d.status === 'narrowed') demoOutcome[d.status]++;
+        else demoOutcome.pending++;
+        if (d.lab === 'polaris') {
+            polarisDemos++;
+            if ((race.demonstrations.polarisRounds || []).some(s => s > d.day && s <= d.day + 42)) polarisInWindow++;
+        }
+    }
+    if (demos.some(d => d.lab === 'polaris')) polarisDemoRuns++;
+    for (const id of ['halcyon', 'polaris']) {
+        const lab = cap.labs[id];
+        for (const k of [2, 3, 4]) {
+            const tRel = lab.rungReleased[k];
+            if (lab.rungInternal[k] == null || tRel == null || tRel > HORIZON) continue;
+            if (id === 'polaris' && lab.rungInternal[k] === lab.rungReleased[k]) continue;   // crossed at spawn
+            demoBefore[id][k][1]++;
+            const first = demos.find(d => d.lab === id && d.rung === k);
+            if (first && first.day < tRel) demoBefore[id][k][0]++;
+        }
+    }
 
     // Incident occurrence / detection / evidence per-run summaries.
     incTotal.push(tOcc); incEarly.push(eOcc); incLate.push(lOcc); s4PerRun.push(s4);
@@ -227,6 +330,164 @@ function isolationOK(nSeeds) {
 const ISO_SEEDS = Math.min(N, 50);
 const isolationPass = isolationOK(ISO_SEEDS);
 
+// ---- The jitter's own stream (02a "Demonstrations") ------------------------
+// At zero width every cooldown is 45 days, the pre-jitter constant, while the
+// jitter stream is still drawn once per release. The race core must then match
+// HEAD 43d677c bit for bit (seeds 1-50): drawing the cooldown perturbs no other
+// stream. Fingerprint derived on HEAD 43d677c with this exact function.
+const PRE_JITTER_CORE_SHA256 = '45769e9b8c21a364fff50d0972fe6c7c588054169c2a4f830583884a0f745340';
+function coreFingerprint(seeds, setup = () => {}) {
+    const h = createHash('sha256');
+    for (let seed = 1; seed <= seeds; seed++) {
+        const race = createRaceState(seed);
+        setup(race);
+        for (let d = 0; d < 1008; d++) {
+            const tr = advanceRace(race);
+            const cap = race.capability;
+            const labs = ['halcyon', 'tianxia', 'polaris'].map(id => {
+                const l = cap.labs[id];
+                return [l.active, l.C_internal, l.C_released, l.releaseCount, Number.isFinite(l.lastReleaseDay) ? l.lastReleaseDay : null];
+            });
+            h.update(JSON.stringify([seed, race.day, labs, cap.open.C, race.safety, race.heat, race.theftCount,
+                tr.releases.length, tr.certifications.length, tr.incidents.occurred.length, tr.incidents.detected.length,
+                tr.theftDisclosures.length]) + '\n');
+        }
+    }
+    return h.digest('hex');
+}
+let jitterIsolationPass;
+{
+    const saved = { lo: RACE_TUNING.releaseCooldownMin, hi: RACE_TUNING.releaseCooldownMax };
+    RACE_TUNING.releaseCooldownMin = RACE_TUNING.releaseCooldownMax = 45;
+    jitterIsolationPass = coreFingerprint(50) === PRE_JITTER_CORE_SHA256;
+    RACE_TUNING.releaseCooldownMin = saved.lo; RACE_TUNING.releaseCooldownMax = saved.hi;
+}
+
+// ---- Demonstrations on vs off (02a "Demonstrations") -----------------------
+// Under identical (neutral) inputs the race core is bit-identical with the chain
+// on or off, and every other stream sits at the same draw afterwards: the chain
+// consumes streams.demonstrations alone.
+const demoCoreOn = coreFingerprint(ISO_SEEDS), demoCoreOff = coreFingerprint(ISO_SEEDS, r => { r.demonstrationsEnabled = false; });
+let demoStreamsPass = true;
+for (let s = 1; s <= ISO_SEEDS; s++) {
+    const on = createRaceState(s), off = createRaceState(s);
+    off.demonstrationsEnabled = false;
+    for (let d = 0; d < HORIZON; d++) { advanceRace(on); advanceRace(off); }
+    for (const name of Object.keys(on.streams)) {
+        if (name !== 'demonstrations' && on.streams[name].next() !== off.streams[name].next()) demoStreamsPass = false;
+    }
+    if (off.demonstrations.list.length !== 0) demoStreamsPass = false;
+}
+const demoIsolationPass = demoCoreOn === demoCoreOff && demoStreamsPass;
+
+// ---- The chain's reports (02a "Demonstrations": gates) ---------------------
+// R1 replaying the fixed public rows (JSON) reproduces every report, at every
+//    day; reports as of an earlier day equal the reports that day.
+// R2 corrupting the hidden truth and schedule after publication changes neither
+//    that day's row nor any report as of that day (later rows may differ).
+// R3 every report keeps its publication's day, rung and citation edge, the
+//    withdrawn and narrowed included.
+const REPORT_SEEDS = Math.min(N, 100);
+let replayReportsPass = true, corruptReportsPass = true, keepClaimPass = true, keptChecked = 0, corruptDiverged = 0;
+function corruptDemonstrations(race) {
+    for (const d of race.demonstrations.list) {
+        d.truth = { reach: d.truth.reach === 'sound' ? 'overScoped' : 'sound', flawed: !d.truth.flawed, C: 99 };
+        if (d.evalDay != null) d.evalDay += 5;
+        if (d.disputeDay != null) d.disputeDay += 3; else if (d.status === 'standing') d.disputeDay = race.day + 2;
+    }
+}
+for (let s = 1; s <= REPORT_SEEDS; s++) {
+    const a = createRaceState(s), b = createRaceState(s);
+    const recA = createPublicRecord(a), recB = createPublicRecord(b);
+    const rows = [], asOf = new Map();
+    const D = 300 + 7 * s;   // the corruption day
+    for (let d = 0; d < HORIZON; d++) {
+        advanceRace(a); advanceRace(b);
+        const row = JSON.stringify(publicRecordRow(a));
+        if (b.day === D) {
+            corruptDemonstrations(b);
+            if (JSON.stringify(publicRecordRow(b)) !== row) corruptReportsPass = false;
+        }
+        stepPublicRecord(recA, a); stepPublicRecord(recB, b);
+        rows.push(row);
+        if (a.day % 21 === 0) asOf.set(a.day, JSON.stringify(chainReports(recA)));
+    }
+    const replay = createRecordFromSnapshot(JSON.parse(JSON.stringify(recA.initial)));
+    for (const row of rows) {
+        foldPublicRecordRow(replay, JSON.parse(row));
+        if (replay.day % 21 === 0 && JSON.stringify(chainReports(replay)) !== asOf.get(replay.day)) replayReportsPass = false;
+    }
+    for (const [day, json] of asOf) if (JSON.stringify(chainReports(recA, day)) !== json) replayReportsPass = false;
+    if (JSON.stringify(chainReports(recB, D)) !== asOf.get(D) && asOf.has(D)) corruptReportsPass = false;
+    if (JSON.stringify(chainReports(recB, D)) !== JSON.stringify(chainReports(recA, D))) corruptReportsPass = false;
+    if (JSON.stringify(recB.demonstrations.filter(r => r.day <= D)) !== JSON.stringify(recA.demonstrations.filter(r => r.day <= D))) corruptReportsPass = false;
+    if (JSON.stringify(recB.demonstrations) !== JSON.stringify(recA.demonstrations)) corruptDiverged++;   // later rows may differ
+    const pubs = new Map(recA.demonstrations.filter(r => r.kind === 'publication').map(r => [r.id, r]));
+    for (const rep of chainReports(recA)) {
+        if (rep.kind !== 'demonstration') continue;
+        const p = pubs.get(rep.id);
+        if (rep.day !== p.day || rep.rung !== p.rung || rep.cites !== p.cites || rep.lab !== p.lab) keepClaimPass = false;
+        if (rep.status === 'withdrawn' || rep.status === 'narrowed') keptChecked++;
+    }
+}
+
+// R4 the cascade, constructed (MC worlds almost never cite a demonstration still
+// awaiting its evaluation, so the withdrawal's reach is checked on a fixed chain).
+let cascadePass = true;
+const cascadeNotes = [];
+{
+    const race = createRaceState(1);
+    race.capability.labs.halcyon.active = false;   // no new publications in the fixture
+    race.demonstrations = freshDemonstrationState();
+    const st = race.demonstrations;
+    const fixture = [];
+    const add = (lab, rung, day, cites, flawed, reach, evalDay, disputeDay) => {
+        const seq = fixture.length + 1;
+        fixture.push({ id: 'D' + seq, seq, lab, rung, day, cites, ordinal: seq, truth: { reach, flawed, C: rung }, evalDay, disputeDay,
+            status: 'standing', disputeId: null, evaluationId: null, withdrawnBy: null, root: null });
+    };
+    add('halcyon', 2, 11, null, true, 'overScoped', 50, 55);    // D1 flawed root; its dispute falls after it is withdrawn
+    add('halcyon', 3, 20, 'D1', false, 'sound', 40, null);      // D2 upheld on day 40, then taken
+    add('halcyon', 4, 30, 'D2', false, 'overScoped', 50, null); // D3 due the root's day: taken first, never evaluated
+    add('halcyon', 4, 35, null, false, 'sound', 50, 52);        // D4 unrelated, upheld on 50; its dispute cancelled
+    add('polaris', 2, 36, null, true, 'sound', 80, 45);         // D5 disputed on 45, untouched
+    st.nextId = fixture.length + 1;
+    race.day = 10;
+    const rec = createPublicRecord(race);
+    for (let day = 10; day < 60; day++) {
+        race.day = day + 1;
+        const tr = freshTransitions();
+        tr.demonstrations = stepDemonstrations(race, tr, day, day + 1);
+        // The fixture's publications enter at their close, last, as the step's do.
+        for (const d of fixture.filter(x => x.day === day + 1)) {
+            st.list.push(d);
+            tr.demonstrations.push({ kind: 'publication', id: d.id, lab: d.lab, rung: d.rung, cites: d.cites, ordinal: d.ordinal });
+        }
+        race.lastTransitions = tr;
+        foldPublicRecordRow(rec, publicRecordRow(race));
+    }
+    const reps = new Map(chainReports(rec).map(r => [r.id, r]));
+    const kinds = rec.demonstrations.filter(r => r.kind !== 'publication').map(r => `${r.day}:${r.kind}:${r.on}${r.took ? '>' + r.took.join('+') : ''}${r.outcome ? '=' + r.outcome : ''}`).join(' ');
+    const want = '40:evaluation:D2=upheld 45:dispute:D5 50:withdrawal:D1>D2+D3 50:evaluation:D4=upheld';
+    const expect = (ok, note) => { if (!ok) { cascadePass = false; cascadeNotes.push(note); } };
+    expect(kinds === want, `rows ${kinds}`);
+    expect(['D1', 'D2', 'D3'].every(id => reps.get(id).status === 'withdrawn' && reps.get(id).root === 'D1'), 'root and status');
+    expect(JSON.stringify(reps.get('D3').ancestry) === '["D2","D1"]' && reps.get('D3').cites === 'D2', 'ancestry and edge');
+    expect(reps.get('D4').status === 'upheld' && reps.get('D5').status === 'disputed', 'bystanders');
+    // The world resolves: everything pending is cancelled and no row is written.
+    race.resolution = { family: 6 };
+    const after = stepDemonstrations(race, freshTransitions(), 60, 61);
+    expect(after.length === 0 && st.closed && st.list.every(d => d.evalDay == null && d.disputeDay == null), 'close');
+    closeDemonstrations(race);   // idempotent
+}
+
+/** Week-of-cycle excess: each bin over the weekly mean, minus one. */
+function weekExcess(bins) {
+    const m = bins.reduce((a, b) => a + b, 0) / bins.length;
+    return bins.map(x => m > 0 ? x / m - 1 : 0);
+}
+const claimExcess = weekExcess(claimWeeks), claimExcessAct1 = weekExcess(claimWeeksAct1), releaseExcess = weekExcess(releaseWeeks);
+
 /** Leader = per-run argmax C_internal across active labs + open (no hardcoded Halcyon). */
 function leaderInternal(race) {
     const cap = race.capability;
@@ -254,7 +515,7 @@ function frontierCrossed(cap, r) {
 
 const line = (s = '') => console.log(s);
 line(`race-mc: N=${N}, base seed=${BASE_SEED}, horizon=${HORIZON}d, ${elapsed}s`);
-line(`tuned proliferation triple (RACE_TUNING): releaseCooldown=${RACE_TUNING.releaseCooldown}d, `
+line(`tuned proliferation triple (RACE_TUNING): releaseCooldown=U(${RACE_TUNING.releaseCooldownMin}, ${RACE_TUNING.releaseCooldownMax})d, `
     + `prolifInc=${RACE_TUNING.prolifInc}, prolifCap=${RACE_TUNING.prolifCap} `
     + `(cap needs ${T_CAP.toFixed(1)} Tianxia releases)`);
 line('='.repeat(70));
@@ -341,6 +602,40 @@ line(`  published/run mean ${f2(mean(evPublished))}   (02a ratified cadence ~40 
 line('\nSubstream isolation (incidents ON vs OFF, ' + ISO_SEEDS + ' seeds)');
 line(`  capability + theft trajectories bit-identical: ${isolationPass ? 'PASS' : 'FAIL'}`);
 
+const pctSigned = x => (x >= 0 ? '+' : '') + (100 * x).toFixed(0) + '%';
+line('\nRelease jitter (02a "Demonstrations"): week of the 63-day cycle, excess over the weekly mean');
+line(`  releases          ${releaseExcess.map(pctSigned).join(' ')}`);
+line(`  claims            ${claimExcess.map(pctSigned).join(' ')}   (n=${claimWeeks.reduce((a, b) => a + b, 0)})`);
+line(`  claims, Act I     ${claimExcessAct1.map(pctSigned).join(' ')}   (released frontier <= R2 before the claim; diagnostic)`);
+line(`  days 42-48: claims ${pctSigned(claimExcess[6])}, Act I slice ${pctSigned(claimExcessAct1[6])} (HEAD 43d677c: +58% and +128% at N=1000)`);
+line(`  zero width reproduces HEAD 43d677c's race core (seeds 1-50): ${jitterIsolationPass ? 'PASS' : 'FAIL'}`);
+
+line('\nPolaris rounds: the nominal schedule vs the old clock');
+line(`  ${roundsChecked} spawned worlds, ${roundsTotal} rounds, ${roundsMismatch} world(s) whose rounds moved`);
+
+const share = ([a, b]) => b ? `${pct(a / b)} (${a}/${b})` : '--';
+line('\nDemonstrations (02a "Demonstrations"; hidden truth read by the harness only)');
+line(`  per run   mean ${f2(mean(demoPerRun))}   p10 ${d0(quantile(demoPerRun, 0.10))}   p50 ${d0(quantile(demoPerRun, 0.50))}   p90 ${d0(quantile(demoPerRun, 0.90))}`);
+for (const id of ['halcyon', 'polaris']) {
+    line(`  ${id.padEnd(8)} per run by rung   R2 ${f3(demoCount[id][2] / N)}   R3 ${f3(demoCount[id][3] / N)}   R4 ${f3(demoCount[id][4] / N)}`);
+}
+line(`  over-scoped ${pct(demoOverScoped / Math.max(1, demoTotal))}   flawed ${pct(demoFlawed / Math.max(1, demoTotal))}   disputed ${pct(demoDisputed / Math.max(1, demoTotal))}   (n=${demoTotal})`);
+line(`  disputes per run   mean ${f2(mean(disputesPerRun))}   p90 ${d0(quantile(disputesPerRun, 0.90))}`);
+line(`  outcomes   upheld ${pct(demoOutcome.upheld / Math.max(1, demoTotal))}   narrowed ${pct(demoOutcome.narrowed / Math.max(1, demoTotal))}   `
+    + `withdrawn flawed ${pct(demoOutcome.withdrawnFlawed / Math.max(1, demoTotal))}   withdrawn as dependents ${pct(demoOutcome.withdrawnDependent / Math.max(1, demoTotal))}   `
+    + `unevaluated at 1008 ${pct(demoOutcome.pending / Math.max(1, demoTotal))}`);
+line(`  withdrawals ${withdrawals} (${f3(withdrawals / N)}/run), with dependents ${withdrawalsWithDeps}; dependents taken ${depsTaken}, most in one ${depsMax}`);
+line(`  Polaris: ${polarisDemos} demonstrations in ${polarisDemoRuns} runs; in a funding window (42 days before a nominal round) ${pct(polarisInWindow / Math.max(1, polarisDemos))}`);
+line('  demonstrated before the lab released the rung (crossings released within the horizon):');
+for (const id of ['halcyon', 'polaris']) {
+    line(`    ${id.padEnd(8)} R2 ${share(demoBefore[id][2])}   R3 ${share(demoBefore[id][3])}   R4 ${share(demoBefore[id][4])}`);
+}
+line(`  race core bit-identical with demonstrations on/off, other streams undrawn (${ISO_SEEDS} seeds): ${demoIsolationPass ? 'PASS' : 'FAIL'}`);
+line(`  reports (${REPORT_SEEDS} seeds): replay from fixed rows ${replayReportsPass ? 'PASS' : 'FAIL'};  `
+    + `hidden truth corrupted after publication ${corruptReportsPass ? 'PASS' : 'FAIL'} (later rows diverged in ${corruptDiverged});  `
+    + `day, claim and citation kept ${keepClaimPass ? 'PASS' : 'FAIL'} (${keptChecked} withdrawn or narrowed);  `
+    + `cascade fixture ${cascadePass ? 'PASS' : 'FAIL ' + cascadeNotes.join('; ')}`);
+
 // ---- Calibration PASS/MISS against 02a targets ---------------------------
 
 line('\n' + '='.repeat(70));
@@ -390,6 +685,33 @@ checkVal('incident early cadence (d)', eIA, '~13d', OCC_EARLY_TARGET * 0.65, OCC
 // Substream isolation is a hard invariant.
 line(`  ${'substream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(isolationPass ? 'yes' : 'no').padStart(6)}    ${isolationPass ? 'PASS' : 'MISS'}`);
 if (!isolationPass) allPass = false;
+// Release jitter (02a "Demonstrations"): the claim excess in days 42-48 falls
+// below 25%, and the jitter's draw perturbs no other stream.
+{
+    const pass = claimExcess[6] < 0.25;
+    if (!pass) allPass = false;
+    line(`  ${'claim excess, days 42-48'.padEnd(28)} ${'<25%'.padStart(6)}   ${pctSigned(claimExcess[6]).padStart(6)}    ${pass ? 'PASS' : 'MISS'}`);
+}
+line(`  ${'jitter stream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(jitterIsolationPass ? 'yes' : 'no').padStart(6)}    ${jitterIsolationPass ? 'PASS' : 'MISS'}`);
+if (!jitterIsolationPass) allPass = false;
+// Demonstrations (02a): Halcyon's R3 and R4 crossings demonstrated before their
+// release in [35%, 65%] each, and the chain isolated from the race core.
+for (const k of [3, 4]) {
+    const [a, b] = demoBefore.halcyon[k];
+    checkBand(`Halcyon R${k} shown pre-release`, b ? a / b : NaN, '35-65%', 0.35, 0.65);
+}
+line(`  ${'demonstrations isolated'.padEnd(28)} ${'ident.'.padStart(6)}   ${(demoIsolationPass ? 'yes' : 'no').padStart(6)}    ${demoIsolationPass ? 'PASS' : 'MISS'}`);
+if (!demoIsolationPass) allPass = false;
+{
+    const pass = replayReportsPass && corruptReportsPass && keepClaimPass && cascadePass;
+    if (!pass) allPass = false;
+    line(`  ${'chain reports'.padEnd(28)} ${'4 gates'.padStart(6)}   ${(pass ? 'held' : 'broke').padStart(6)}    ${pass ? 'PASS' : 'MISS'}   (replay, corruption, kept claims, cascade)`);
+}
+{
+    const pass = roundsMismatch === 0 && roundsChecked > 0;
+    if (!pass) allPass = false;
+    line(`  ${'Polaris rounds unmoved'.padEnd(28)} ${'0 moved'.padStart(6)}   ${String(roundsMismatch).padStart(6)}    ${pass ? 'PASS' : 'MISS'}   (of ${roundsChecked} worlds, ${roundsTotal} rounds)`);
+}
 
 line('='.repeat(70));
 line(allPass ? 'ALL CALIBRATION TARGETS PASS' : 'ONE OR MORE TARGETS MISS -- see above');

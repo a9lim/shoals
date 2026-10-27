@@ -284,13 +284,19 @@ let totalCauses = 0;
 // A2. The rule of thumb is HEAD's, bit for bit
 // ==========================================================================
 
-// Derived once (2026-10-25) by running this exact loop with HEAD 1343924's
-// src/race/belief.js (`git show 1343924:src/race/belief.js`, imports pointed at
-// the unchanged src/race/rng.js and compute-market.js) in place of the working
-// tree's: seeds 1-32, odd seeds on the assumed input schedule's Markov scenario,
-// even seeds neutral; one line `${seed}:${day}:${JSON [m, w, crossed, certDay]
-// for R2-R5}` per completed day after stepBelief, before checkResolution.
-const RULE_TRAJECTORY_SHA256 = '1d36daa9e785992accd0462109746f855f3c4efa640482bb1438ec924f734811';
+// Derived by running this exact loop with HEAD 1343924's src/race/belief.js
+// (`git show 1343924:src/race/belief.js`, imports pointed at the unchanged
+// src/race/rng.js and compute-market.js) in place of the working tree's: seeds
+// 1-32, odd seeds on the assumed input schedule's Markov scenario (this hash's
+// fixed input tape), even seeds neutral; one line `${seed}:${day}:${JSON [m, w,
+// crossed, certDay] for R2-R5}` per completed day after stepBelief, before
+// checkResolution. First derived 2026-10-25 (1d36daa9...). Re-derived
+// 2026-10-27 on the release jitter's worlds (02a "Demonstrations"): the same
+// procedure, the race of this tree, 28718 days; the old rule on the new worlds
+// and the current rule agree. A procedure check on HEAD 43d677c's worlds
+// reproduced 1d36daa9... first. Demonstrations move no world and the rule
+// doesn't read them, so they leave it unchanged.
+const RULE_TRAJECTORY_SHA256 = 'dcb1044be84f135755097121b711a9f2bb24bcfcdaaf470a5654dc7e6fd57887';
 let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
 {
     const state = () => JSON.stringify([2, 3, 4, 5].map(R => [belief.rungs[R].m, belief.rungs[R].w, belief.rungs[R].crossed, belief.rungs[R].certDay]));

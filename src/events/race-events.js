@@ -29,6 +29,9 @@
      {rungName} autonomous engineering / autonomous research /
                 recursive self-improvement / takeoff
      {lag}      days the incident stayed latent
+     {n}        a withdrawal's dependents, as a number word
+   The demonstration shells (02a "Demonstrations") ride the
+   'release' category; their prose is a draft awaiting a9.
    High-frequency shells use `headlines: [...]` variant pools
    (bridge rotates deterministically); scalar `headline`
    remains valid for single-text shells.
@@ -58,6 +61,12 @@
 // capability AND proliferation (open-weights ratchet). All toast-weight: the
 // release ladder is frequent by design; incidents carry the popup/superevent load.
 
+// The frontier labs' ordinary release impulse. A demonstration carries it, and a
+// withdrawal carries it with its sign reversed (02a "Demonstrations": a headline
+// is a headline). Disputes and evaluations carry none.
+const ROUTINE_FRONTIER_IMPULSE = Object.freeze({ mu: 0.01 });
+const reversed = impulse => Object.freeze(Object.fromEntries(Object.entries(impulse).map(([k, v]) => [k, -v])));
+
 export const RACE_EVENTS = [
     {
         id: 'release_routine_frontier',
@@ -72,7 +81,7 @@ export const RACE_EVENTS = [
             'Routine {model} release day. The API changelog is mostly deprecations; the interesting work, as usual, is whatever the release notes are silent about. HCN drifts on volume best described as contractual.',
         ],
         params: {},                    // no permanent delta (03 incident-coupling rule)
-        impulse: { mu: 0.01 },         // decaying market impulse (P4); a good print, a hair of drift
+        impulse: ROUTINE_FRONTIER_IMPULSE,   // decaying market impulse (P4); a good print, a hair of drift
     },
     {
         id: 'release_routine_tianxia',
@@ -123,6 +132,97 @@ export const RACE_EVENTS = [
         ],
         params: {},                            // no permanent delta (03 incident-coupling rule)
         impulse: { mu: 0.005, xi: -0.005 },    // decaying (P4): certainty lands -- small drift up, vol bleeds
+    },
+
+    // ---- Demonstrations (02a "Demonstrations": the chain's wire items) ---------
+    // One shell per public row of the chain: a publication, a scope dispute, an
+    // evaluation (upheld or narrowed), a withdrawal. Category 'release' keeps them
+    // pulse-only (bridge-fired, never Poisson) under the race's kicker. The wire
+    // prints each report as it happens and never rewrites it; status lives on the
+    // Race page. Tokens: {lab} {model} {rung} {rungName}, and {n} (the dependents
+    // a withdrawal took with it).
+    {
+        // Halcyon's first demonstration while the Fixedpoint codename is not yet
+        // public: the codename's first public meaning (the bridge selects it).
+        id: 'demo_fixedpoint_catalogue',
+        category: 'release',
+        magnitude: 'major',
+        /* PROSE: draft, awaiting a9 */
+        headline: 'Halcyon posts seven hundred papers overnight, each on a problem somebody had given up on, under a cover note signed by no one and titled Fixedpoint: a catalogue. The model that wrote them isn’t one Halcyon sells; the note calls it “an internal build.” About four in ten come with a proof a machine can check. Mathematicians spend the morning checking the ones in their field and the afternoon not saying much. Consensus barely moves: a theorem isn’t a release. Sharma: “Seven hundred papers is a sentence about the model they haven’t shipped.”',
+        params: {},
+        impulse: ROUTINE_FRONTIER_IMPULSE,
+    },
+    {
+        id: 'demo_halcyon',
+        category: 'release',
+        magnitude: 'moderate',
+        /* PROSE: draft, awaiting a9 */
+        headlines: [
+            '{lab} publishes another catalogue from the build it hasn’t shipped, and this one says what it is: work at the level the {rung} contract describes, {rungName}, by a model nobody outside can run. Referees have the proofs; everyone else has the abstract. Sharma: “A demonstration is a release you can’t buy.”',
+            'Another {lab} catalogue, quieter than the first: fewer papers, harder problems, and a cover note that says {rungName} once and then stops, as if it had said too much. The model isn’t {model}; it’s whatever comes after. The Brief: “They’re showing us the next release without selling it to us.”',
+        ],
+        params: {},
+        impulse: ROUTINE_FRONTIER_IMPULSE,
+    },
+    {
+        id: 'demo_polaris',
+        category: 'release',
+        magnitude: 'moderate',
+        /* PROSE: draft, awaiting a9 */
+        headlines: [
+            'Polaris publishes what Holt’s next build can do before anyone can use it: a catalogue of results it calls {rungName}, with Gottlieb’s name on the cover note and a paragraph on safety in every section. Boulder doesn’t do launch events. It does preprints, and investors read them.',
+            'A Polaris catalogue lands on a Sunday: Holt’s unreleased build, results claimed at the level of the {rung} contract, every proof attached and half of them checkable by machine. The Brief: “Polaris can’t outspend Halcyon. It can out-publish it.”',
+        ],
+        params: {},
+        impulse: ROUTINE_FRONTIER_IMPULSE,
+    },
+    {
+        // The scope dispute: opened by an event, closed by the evaluation. It
+        // halts and settles no Consensus contract, and carries no impulse.
+        id: 'demo_dispute',
+        category: 'release',
+        magnitude: 'minor',
+        /* PROSE: draft, awaiting a9 */
+        headlines: [
+            'A referee’s note on {lab}’s catalogue travels faster than the catalogue did: the headline result, it says, proves a narrower statement than the abstract claims, and the machine-checked version is narrower still. {lab} says the scope is as stated. Nobody can settle it by Friday, which is the only deadline the tape knows.',
+            'Two groups say {lab}’s demonstration solved an easier problem than the one it names: the checker proved what it was given, and what it was given was smaller. {lab}’s reply runs three pages and concedes nothing. The evaluation, when it lands, will be the first word from someone without a stake.',
+        ],
+        params: {},
+    },
+    {
+        id: 'demo_upheld',
+        category: 'release',
+        magnitude: 'minor',
+        /* PROSE: draft, awaiting a9 */
+        headlines: [
+            'The independent evaluation of {lab}’s catalogue is in, and it is short: the results hold, at the scope claimed. The model that produced them still isn’t for sale. Sharma: “So now we know what they have. We still don’t know when they’ll sell it.”',
+            'Evaluators sign off on {lab}’s demonstration, every lemma and every scope. The dispute ends in a footnote. {rungName} is now something {lab}’s unreleased model has demonstrably done, which is not the same as something the {rung} contract pays on.',
+        ],
+        params: {},
+    },
+    {
+        id: 'demo_narrowed',
+        category: 'release',
+        magnitude: 'minor',
+        /* PROSE: draft, awaiting a9 */
+        headlines: [
+            'The evaluation of {lab}’s catalogue upholds the proofs and narrows the claim: the work is real, and the problems were smaller than the abstract said. Close, the evaluators write, but not {rungName}. {lab} calls this a confirmation. The Brief calls it a measurement.',
+            '{lab}’s demonstration comes back narrowed. Every theorem stands; the headline doesn’t. What the unreleased model did is now on the record at its true size, a little short of the rung the cover note implied.',
+        ],
+        params: {},
+    },
+    {
+        // One item per withdrawal: alone, or (the bridge swaps in
+        // `headlineDependents`) with the {n} later results that cited it.
+        id: 'demo_withdrawn',
+        category: 'release',
+        magnitude: 'moderate',
+        /* PROSE: draft, awaiting a9 */
+        headline: '{lab} withdraws its catalogue’s central result: a lemma on page eleven fails, and the proofs that leaned on it fall with it. The retraction notice is two sentences long. Sharma: “One bad lemma is a typo. A citation graph is a margin call.”',
+        /* PROSE: draft, awaiting a9 */
+        headlineDependents: 'A flawed lemma in an earlier {lab} catalogue takes {n} later results down with it; each cited the one before. The withdrawal is careful, complete and public, which is more than most retractions manage, and it still leaves the market not knowing what the model can actually do.',
+        params: {},
+        impulse: reversed(ROUTINE_FRONTIER_IMPULSE),
     },
 
     // ---- Incident ladder (two-track: fired on DETECTION, never occurrence) -----

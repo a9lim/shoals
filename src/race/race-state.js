@@ -45,6 +45,7 @@ import {
 } from './capability.js';
 import { freezeConsensus, isFreezeRegime } from './consensus.js';
 import { freezeComputeMarket } from './compute-market.js';
+import { freshDemonstrationState, stepDemonstrations } from './demonstrations.js';
 
 // Re-export the control-regime enum so existing importers of race-state.js
 // (main.js, harnesses) keep working after the definition moved to
@@ -84,7 +85,11 @@ const F0 = 15;   // firm belief F in [0,100] starts 15 (02a)
  * the 35-55% acceptance band. The object is mutable so the harness can sweep it.
  */
 export const RACE_TUNING = {
-    releaseCooldown: 45,   // trading days a lab must wait between releases (~9 weeks minimum cadence)
+    // Trading days a lab waits after a release, drawn per release from
+    // U(35, 55) whole days (mean 45, ~9 weeks) on streams.releaseJitter (02a
+    // "Demonstrations", release jitter): the jitter breaks the early lockstep.
+    releaseCooldownMin: 35,
+    releaseCooldownMax: 55,
     prolifInc: 0.016,      // proliferation floor increment per Tianxia release
     prolifCap: 0.30,       // proliferation floor cap (binds in ~47% of runs)
 };
@@ -245,6 +250,9 @@ export function freshTransitions() {
         // track; occurrence stays in `thefts` and stays silent). Rows carry the
         // SAMPLED public attribution, never the record's true one.
         theftDisclosures: [],
+        // 02a "Demonstrations": the chain's public rows this tick, in phase
+        // order (withdrawal, evaluation, dispute, publication). No hidden truth.
+        demonstrations: [],
         regimeChange: null,   // { from, to } on a forward controlRegime move this tick
         // P6-2: this tick's player-attributable dC to Halcyon (the coupling's
         // Halcyon-C contribution). main.js ledgers it under the C channel; 0 headless.
@@ -293,6 +301,11 @@ export function resetRaceState(race, seed) {
         // substream (convention 5) -- so adding it perturbs no existing
         // trajectory for the same seed (race C/S/heat stay bit-identical).
         theftDisclosure: createRng(deriveSeed(seed, 'theftDisclosure')),
+        // 02a "Demonstrations": the per-release cooldown draw and the
+        // demonstration chain each get their own stream, so neither perturbs
+        // another stream's draws.
+        releaseJitter: createRng(deriveSeed(seed, 'releaseJitter')),
+        demonstrations: createRng(deriveSeed(seed, 'demonstrations')),
     };
 
     race.capability = createCapabilityState(hidden);
@@ -329,6 +342,10 @@ export function resetRaceState(race, seed) {
     // ---- Evidence machinery round: theft disclosure track ----------------
     race.latentThefts = freshTheftQueue();      // two-track theft queue (commit -> disclose | rumor forever)
     race.theftDisclosureEnabled = true;         // MC toggle for the on/off bit-identity arm; always true in-game
+
+    // ---- 02a "Demonstrations": the chain's hidden list (truth stays here) --
+    race.demonstrations = freshDemonstrationState();
+    race.demonstrationsEnabled = true;          // MC toggle for the on/off bit-identity arm; always true in-game
     // Orchestrator-passed export-control stage (world.ai.exportControlStage 0..3),
     // STORED so the plateau detector and the extrapolation path read the same value
     // the kinematics did (the playerCoupling precedent -- one drift, one stage).
@@ -390,17 +407,27 @@ export function resetRaceState(race, seed) {
  * updates the proliferation heat floor, and returns the ledger record (or null
  * if the cooldown blocks it or there is no gap). The baseline policy and any
  * phase-2 policy call this rather than moving C_released directly.
+ *
+ * Release jitter (02a "Demonstrations"): each release draws the cooldown that
+ * follows it, a whole number of days uniform on [35, 55], from
+ * streams.releaseJitter. A lab's first release has no prior one to wait on
+ * (`lastReleaseDay` is -Infinity), so it keeps its timing and no release
+ * history is invented.
  */
 export function commitRelease(race, labId, endDay) {
     const cap = race.capability;
     const lab = cap.labs[labId];
-    if (endDay - lab.lastReleaseDay < RACE_TUNING.releaseCooldown) return null;   // cooldown gate
+    if (endDay - lab.lastReleaseDay < lab.releaseCooldown) return null;   // cooldown gate
     const gap = lab.C_internal - lab.C_released;
     if (gap <= 0) return null;
 
     lab.C_released = clamp(lab.C_released + RELEASE_PULL * gap, C_MIN, C_MAX);
     lab.releaseCount++;
     lab.lastReleaseDay = endDay;
+    // INTERPRETATION: U(35, 55) is drawn on whole trading days (the integers
+    // 35..55), so the mean is exactly 45 under the day-difference gate above.
+    const T = RACE_TUNING;
+    lab.releaseCooldown = T.releaseCooldownMin + race.streams.releaseJitter.int(T.releaseCooldownMax - T.releaseCooldownMin + 1);
     const releasedCrossings = recordRungs(lab.rungReleased, lab.C_released, endDay);
 
     const openCrossings = [];
@@ -619,6 +646,13 @@ export function advanceRace(race, inputs = {}) {
     // 4. Certification settlement (nested; Consensus consumes rungCertified phase 3).
     const certRes = stepCertification(cap, endDay);
     tr.certifications.push(...certRes.certifications);
+
+    // 4b. Demonstrations (02a "Demonstrations"), at the close after the day's
+    //     releases and certifications. Draw ONLY from streams.demonstrations and
+    //     read C_int, the released rungs and Polaris's nominal round days; they
+    //     move no capability, heat, S, schedule or hazard, so the race core is
+    //     bit-identical with them on or off (race-mc).
+    if (race.demonstrationsEnabled !== false) tr.demonstrations = stepDemonstrations(race, tr, day, endDay);
 
     // 5. Heat floor recompute (idempotent; the commit ops already updated it).
     race.heat.floor = computeFloor(race);
