@@ -9,8 +9,7 @@ import { createPublicRecord, createRecordFromSnapshot, foldPublicRecordRow, step
 import { engineInputs } from './engine-worlds.mjs';
 
 /** 02a "Demonstrations" (The refit): the worlds' input scenarios. The assumed
- *  Markov schedule is retired (its tape survives only in belief-test's frozen
- *  rule-of-thumb hash). */
+ *  Markov schedule is retired. */
 export const WORLD_SCENARIOS = Object.freeze({
     scenarios: ['neutral', 'engine'],
     training: '4000 neutral + 4000 engine, alternating by world index; validation and test report each separately',
@@ -80,10 +79,9 @@ export function worldSampler(seed, scenario) {
 const capTargets = (targets, T5) => [...targets, T5 <= 1260 ? T5 : Infinity].map((v, i) => v <= (i === 3 ? 1260 : 1008) ? v : Infinity);
 
 /** One world on the reader's loop: the race on the world's inputs, the rule of
- *  thumb beside it, sampled by `worldSampler`. `source` replaces the scenario's
- *  inputs (belief-test's frozen tape). */
-export function runReaderWorld(seed, scenario = 'neutral', hook = null, source = null) {
-    const race = createRaceState(seed), rec = createPublicRecord(race), inputsOf = source || worldInputs(seed, scenario);
+ *  thumb beside it, sampled by `worldSampler`. */
+export function runReaderWorld(seed, scenario = 'neutral', hook = null) {
+    const race = createRaceState(seed), rec = createPublicRecord(race), inputsOf = worldInputs(seed, scenario);
     // 02a reader fit consumes the heuristic only. The public initializer's
     // capability-free form seeds that rule without phase-B pricing/player
     // projection; the complete race is still passed to stepBelief below.
