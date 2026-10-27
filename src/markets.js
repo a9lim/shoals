@@ -197,7 +197,8 @@ function _points(snap, ctx, full) {
 }
 
 // ---------------------------------------------------------------------------
-// The six panels: one drawing routine, six specs
+// The six panels: one drawing routine, six specs (`sub` and `what` are spoken
+// only, in each canvas's aria-label; on screen a panel is its title)
 // ---------------------------------------------------------------------------
 
 const pct = (v) => v.toFixed(v < 10 ? 2 : 1) + '%';
@@ -228,14 +229,14 @@ export const PANELS = [
       series: (s) => s.compute && s.compute.curve.length ? [{ pts: s.compute.curve }] : [], yfmt: (v) => v.toFixed(0),
       xr: (s) => s.compute && s.compute.curve.length ? [s.compute.curve[0][0], s.compute.curve[s.compute.curve.length - 1][0]] : [0, 1],
       xticks: (s) => s.compute && s.compute.curve.length ? [[s.compute.curve[0][0], 'now', 'left'], ...s.compute.contracts.map((c, i, a) => [c.settleDay, 'day ' + c.settleDay, i === a.length - 1 ? 'right' : 'center']).filter((_, i, a) => i === a.length - 1 || i % 2 === 1)] : [],
-      empty: (s) => !s.compute ? 'Listed in the Dynamic regimes only.' : s.compute.frozen ? 'Frozen by the control regime: held at the last valid marks.' : '',
+      empty: (s) => !s.compute ? 'Dynamic only' : s.compute.frozen ? 'Frozen' : '',
       read: (s) => s.compute && s.compute.curve.length ? `spot ${s.compute.curve[0][1].toFixed(1)}` : '' },
     { key: 'cons', title: 'Consensus', sub: 'crossing curves', what: 'The chance each rung is certified by each day: a timeline priced as odds. Yours, set on the Race page, in ink.',
       series: (s) => s.consensus ? [2, 3, 4, 5].map(R => ({ pts: s.consensus.curves[R].pts, R, crossed: s.consensus.curves[R].crossed })) : [],
       yfmt: (v) => Math.round(v * 100) + '%', fixed: [0, 1],
       xr: (s) => s.consensus ? [s.consensus.raceDay, HORIZON] : [0, HORIZON],
       xticks: (s) => s.consensus ? [[s.consensus.raceDay, 'today', 'left'], [HORIZON, 'day ' + HORIZON, 'right']] : [],
-      empty: (s) => !s.consensus ? 'Listed in the Dynamic regimes only.' : '',
+      empty: (s) => !s.consensus ? 'Dynamic only' : '',
       read: (s) => { if (!s.consensus) return ''; const R = [2, 3, 4, 5].find(r => !s.consensus.curves[r].crossed); return R ? `R${R} by day ${HORIZON}: ${Math.round(s.consensus.curves[R].pts[44][1] * 100)}%` : 'R4 certified'; } },
 ];
 
@@ -244,7 +245,7 @@ export const PANELS = [
 // ---------------------------------------------------------------------------
 
 const _st = {
-    ctx: null, onPick: null, legState: () => 0, cur: null, ghost: null, ghostHead: '', prev: null,
+    ctx: null, onPick: null, legState: () => 0, cur: null, ghost: null, prev: null,
     t0: -1e9, dur: 1100, smileIdx: -1, panels: [], visible: false, raf: 0, reduced: false, cap: null,
     open: null, grid: null, onOpen: null,
 };
@@ -272,11 +273,11 @@ export function initMarkets(ctx, hooks) {
         const fig = document.createElement('figure');
         fig.className = 'mk-panel';
         fig.dataset.key = spec.key;
-        fig.innerHTML = `<figcaption class="mk-h"><button type="button" class="mk-t" aria-expanded="false" title="Open with its table">${spec.title}</button> <span class="mk-sub">· ${spec.sub}</span>`
+        fig.innerHTML = `<figcaption class="mk-h"><button type="button" class="mk-t" aria-expanded="false" title="Open with its table">${spec.title}</button>`
             + '<span class="mk-exp">'
             + (spec.key === 'smile' ? '<button class="hbtn" type="button" data-exp="-1" aria-label="Earlier expiry">‹</button><button class="hbtn" type="button" data-exp="1" aria-label="Later expiry">›</button>' : '')
             + `<button class="hbtn mk-open" type="button" aria-label="Open ${spec.title} with its table">Open</button></span>`
-            + `</figcaption><p class="mk-what">${spec.what}</p>`
+            + '</figcaption>'
             + '<div class="mk-body"><div class="mk-fig"><div class="mk-box"><canvas tabindex="0" role="img"></canvas></div>'
             + (spec.key === 'smile' ? '<div class="mk-surface"><canvas id="surface-canvas" role="img" aria-label="The pricing volatility surface: vol by strike and expiry, rising toward low strikes. Drag to turn it."></canvas></div>' : '')
             + '</div><div class="mk-table" hidden></div></div>';
@@ -354,7 +355,6 @@ export function marketsDayClose(newsHead) {
     const next = takeSnapshot(_st.ctx, _st.smileIdx, _st.open === 'smile');
     if (newsHead && _st.prev) {
         _st.ghost = _st.prev;
-        _st.ghostHead = newsHead;
         _st.t0 = _st.reduced ? -1e9 : performance.now();
     }
     _st.prev = next;
@@ -365,7 +365,6 @@ export function marketsDayClose(newsHead) {
 /** Clear ghosts and snapshots (reset / regime change). */
 export function resetMarkets() {
     _st.cur = _st.prev = _st.ghost = null;
-    _st.ghostHead = '';
     _st.smileIdx = -1;
 }
 
@@ -414,16 +413,9 @@ function _drawAll() {
 }
 
 function _caption() {
-    const s = _st.cur;
-    if (!s || !_st.cap) return;
-    const parts = [`HCN ${s.S.toFixed(2)}`, `10-year ${pct(s.rates[s.rates.length - 1][1])}`, `VXHCN ${s.vxSpot.toFixed(1)}`];
-    if (s.compute && s.compute.curve.length) parts.push(`compute spot ${s.compute.curve[0][1].toFixed(1)}`);
-    if (s.consensus) {
-        const R = [2, 3, 4, 5].find(r => !s.consensus.curves[r].crossed);
-        if (R) parts.push(`R${R} by day ${HORIZON} at ${Math.round(s.consensus.curves[R].pts[44][1] * 100)}%`);
-    }
-    _st.cap((_st.ghost ? `After “${_st.ghostHead}”: the dashed lines are the curves before it. ` : 'Edition ' + (s.rel + 1) + '. ')
-        + parts.join(' · ') + '.');
+    // The name, and the edition the dashed ghosts show; each panel reads its own value.
+    if (!_st.cur || !_st.cap) return;
+    _st.cap(_st.ghost ? `The curves · dashed, Edition ${_st.ghost.rel + 1}` : 'The curves');
 }
 
 // ---------------------------------------------------------------------------
@@ -606,10 +598,8 @@ function _draw(p) {
     c.fillText(spec.read(s), g.l, 11);
     const lab = p.hover || (p.focus >= 0 && document.activeElement === p.canvas ? pts[p.focus] : null);
     if (lab) {
-        const side = _st.legState(lab);
-        const act = lab.disabled ? 'not trading' : side > 0 ? 'click: go short' : side < 0 ? 'click: remove' : 'click: add long';
         c.font = font(12, true);
-        let t = `${lab.desc} · ${_priceLabel(lab)} · ${act}`;
+        let t = `${lab.desc} · ${_priceLabel(lab)}${lab.disabled ? ' · not trading' : ''}`;
         if (c.measureText(t).width > W - 10) t = `${lab.desc} · ${_priceLabel(lab)}`;
         if (c.measureText(t).width > W - 10) t = _priceLabel(lab);
         const tw = c.measureText(t).width;
@@ -794,9 +784,8 @@ function _renderTable() {
             // By day, not index: the skeleton can roll an expiry off under a snapshot.
             const priced = e && _st.ctx.chain ? _st.ctx.chain(e.day) : null;
             if (e && !priced && !_st.resnapped) { _st.resnapped = true; refreshMarkets(true); _st.resnapped = false; return; }
-            if (!priced || !priced.options || !priced.options.length) { html = '<tbody><tr><td class="l">No options at this expiry.</td></tr></tbody>'; break; }
-            html = `<caption>${fmtSpan(e.dte)} · day ${e.day - s.origin} · the published chain</caption>`
-                + head([['Held'], ['Call'], ['Strike'], ['Put'], ['Held']]) + '<tbody>';
+            if (!priced || !priced.options || !priced.options.length) { html = '<tbody><tr><td class="l">—</td></tr></tbody>'; break; }
+            html = head([['Held'], ['Call'], ['Strike'], ['Put'], ['Held']]) + '<tbody>';
             const atm = priced.options.reduce((b, o) => Math.abs(o.strike - S) < Math.abs(b.strike - S) ? o : b, priced.options[0]).strike;
             // The published chain may be a held snapshot of bids and asks alone
             // (act3.js), so the cell shows their mid, as the chain always has.
@@ -815,7 +804,7 @@ function _renderTable() {
             break;
         }
         case 'cmp': {
-            if (!s.compute) { html = '<tbody><tr><td class="l">Listed in the Dynamic regimes only.</td></tr></tbody>'; break; }
+            if (!s.compute) { html = '<tbody><tr><td class="l">Dynamic only</td></tr></tbody>'; break; }
             html = head([['Delivery', 1], ['Bid'], ['Ask'], ['Held'], ['Days']]) + '<tbody>';
             for (const c of computeMarket.contracts) {
                 const q = computeMarket.quotes[c.key] || {}, settled = computeMarket.settled[c.key];
@@ -829,7 +818,7 @@ function _renderTable() {
             break;
         }
         case 'cons': {
-            if (!s.consensus) { html = '<tbody><tr><td class="l">Listed in the Dynamic regimes only.</td></tr></tbody>'; break; }
+            if (!s.consensus) { html = '<tbody><tr><td class="l">Dynamic only</td></tr></tbody>'; break; }
             html = head([['Milestone', 1], ['Bid'], ['Ask'], ['Held'], ['Days']]) + '<tbody>';
             for (const c of consensus.contracts) {
                 const q = consensus.quotes[c.key] || {}, st = consensus.settled[c.key];
@@ -856,7 +845,6 @@ function _renderTable() {
     const same = old && old.rows.length === neu.rows.length
         && [...old.rows].every((r, i) => r.cells.length === neu.rows[i].cells.length);
     if (!same) { p.table.textContent = ''; p.table.appendChild(neu); return; }
-    if (old.caption && neu.caption && old.caption.textContent !== neu.caption.textContent) old.caption.textContent = neu.caption.textContent;
     [...neu.rows].forEach((r, i) => {
         const o = old.rows[i];
         if (o.className !== r.className) o.className = r.className;

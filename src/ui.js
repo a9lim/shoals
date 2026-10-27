@@ -80,7 +80,6 @@ export function cacheDOMElements($) {
     $.popupContext   = document.getElementById('popup-event-context');
     $.popupChoices   = document.getElementById('popup-event-choices');
     $.dynamicOnly    = document.querySelectorAll('[data-dynamic]');
-    $.meridianClassic    = document.getElementById('mer-classic');
     $.senateSeats        = document.getElementById('senate-seats');
     $.houseSeats         = document.getElementById('house-seats');
     $.senateKey          = document.getElementById('senate-key');
@@ -92,7 +91,7 @@ export function cacheDOMElements($) {
     $.standingsFactions  = document.getElementById('standings-factions');
     $.standingOrdersSection = document.getElementById('standing-orders-section');
     $.standingOrdersList    = document.getElementById('standing-orders-list');
-    $.standingOrdersHint    = document.getElementById('standing-orders-hint');
+    $.standingOrdersState   = document.getElementById('standing-orders-state');
     $.convictionsSection = document.getElementById('convictions-section');
     $.convictionsList    = document.getElementById('convictions-list');
 }
@@ -216,17 +215,14 @@ export function wireInfoTips() {
         borrowSpread: { title: 'Borrow spread (k)', body: 'Volatility-scaled borrow cost factor. Daily charge = notional $\\times$ (max($r$,0) + $k \\sigma$) / 252. Events like short squeezes spike this.' },
         q:            { title: 'Dividend yield (q)', body: 'Continuous dividend yield. Reduces stock drift and option cost of carry ($b = r - q$). Cash dividends paid quarterly.' },
         // --- The book ---
-        margin:       { title: 'Margin', body: 'Your collateral against what the book requires. Low means you are near the maintenance threshold; a margin call means equity is below it, and the desk will trim the book.' },
-        cash:         { title: 'Cash', body: 'Available cash. Changes with trades, dividends, borrow costs, and exercises. Can go negative (buying on margin).' },
         portfolioValue: { title: 'The book', body: 'Total equity: cash plus every position marked to market at mid-price. Set against holding HCN with the same starting capital, the dashed line under it.' },
-        borrowCost:   { title: 'Borrow cost', body: 'Cumulative interest on short positions and margin debit. Charged daily using the borrow spread formula.' },
-        dividends:    { title: 'Dividends', body: 'Net cumulative dividends. Long stock receives cash quarterly; short stock pays. Amount = $S \\times q/4$ per share.' },
         greeks:       { title: 'Greeks', body: '$\\Delta$: change in value per point of HCN. $\\Gamma$: change in $\\Delta$. $\\Theta$: decay per trading day. $\\nu$: change per point of volatility. $\\rho$: change per point of rates.' },
         // --- The ticket ---
-        ticket:       { title: 'The ticket', body: 'Every trade starts here. Pick points on the curves, or rows of an opened curve’s table. Each leg has a side and a ratio; the size scales them all. You buy at the ask and sell at the bid, and spreads widen with volatility and distance from the money.' },
-        orderTypes:   { title: 'Order types', body: 'Market fills now. Limit and stop rest until HCN reaches the trigger: a limit buys on the way down, a stop on the way up (and the reverse to sell). One leg, or a named strategy, can rest.' },
+        ticket:       { title: 'The ticket', body: 'Pick a point on a curve, or a cell of its table: once long, twice short, a third time off. The size scales every ratio; you buy at the ask and sell at the bid. A limit or stop rests until HCN reaches the trigger, and a named ticket trades as one strategy, every leg or none.' },
         horizon:      { title: 'The horizon', body: 'How far out the figure and the grid value the legs. Options are repriced on the tree at that day; one that expires before it is worth what it pays.' },
         // --- Meridian ---
+        record:       { title: 'Your record', body: 'Each quarter your locked forecast is scored against the market’s by log-likelihood, in nats: the rungs that certified and the quarters that passed quietly. Credibility is the edge you have shown.' },
+        standingOrders: { title: 'Standing orders', body: 'Armed rules execute without you. Editable until the frontier reaches R5; then the set is final.' },
         regime:       { title: 'Market regime', body: 'Five fixed regimes (Calm bull to Rate hike) for the trading sim alone, or Dynamic: the race, its markets and the wire. Changing regime resets the run.' },
         gbm:          { title: 'Pricing models', body: 'GBM + Merton jumps + Heston stochastic vol + Vasicek rates. American options priced via 128-step CRR binomial tree.' },
     };
@@ -240,7 +236,6 @@ export function wireInfoTips() {
 export function updateDynamicSections($, presetIndex) {
     const isDynamic = presetIndex >= 5;
     for (const el of $.dynamicOnly || []) el.hidden = !isDynamic;
-    if ($.meridianClassic) $.meridianClassic.hidden = isDynamic;
     // Standing orders (P7-2) are Dynamic-only AND rung-gated: the mode switch can
     // only ever HIDE the panel here; `updateStandingOrdersPanel` owns showing it
     // (released frontier rung >= 3).
@@ -260,7 +255,7 @@ let _standingBound = false;
  * rule with an arm/disarm toggle and its FIXED parameter shown underneath (v1
  * parameters are not editable -- arming is the choice). Hidden until the
  * released frontier rung unlocks it; after R5 every toggle is disabled and the
- * hint says so.
+ * heading reads "locked".
  *
  * @param {object} $        DOM cache
  * @param {object|null} view  standingOrdersView(), or null (Classic / no race)
@@ -314,10 +309,7 @@ export function updateStandingOrdersPanel($, view, onToggle) {
         list.appendChild(row);
     }
 
-    // Lock state, plainly.
-    $.standingOrdersHint.textContent = view.locked
-        ? 'Locked. The rules run as written until the run ends.'
-        : 'Armed rules execute without you. Editable until the frontier reaches R5 — then the set is final.';
+    $.standingOrdersState.textContent = view.locked ? '· locked' : '';
 }
 
 // ---------------------------------------------------------------------------
@@ -347,7 +339,7 @@ function _renderRecord(container) {
     _renderRows(container, [
         ['Against the market', rec.quarters
             ? `${fmtSigned(rec.S)} nats over ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'}`
-            : 'No quarter scored yet'],
+            : '—'],
         ['Credibility', (pct < 0 ? '−' : '') + Math.abs(pct) + '%'],
         ['Forecasts locked', String(rec.locks)],
     ]);

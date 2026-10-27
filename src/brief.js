@@ -200,7 +200,7 @@ export function renderWire(log, origin, tape) {
     if (!rest.length) {
         const li = document.createElement('li');
         li.className = 'b-empty';
-        li.textContent = 'Nothing else on the wire yet.';
+        li.textContent = '—';
         ol.appendChild(li);
         return;
     }

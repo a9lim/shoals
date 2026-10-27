@@ -99,6 +99,7 @@ export function resetRacePage() {
     _fresh();
     _st.revealed = false;
     _st.ended = false;
+    _key();
     const btn = document.getElementById('race-reveal');
     if (btn) { btn.hidden = true; btn.setAttribute('aria-pressed', 'false'); btn.textContent = 'Show the hidden tracks'; }
     const back = document.getElementById('race-epilogue');
@@ -177,6 +178,7 @@ export function revealRace(on) {
     const btn = document.getElementById('race-reveal');
     btn.setAttribute('aria-pressed', String(on));
     btn.textContent = on ? 'Hide the hidden tracks' : 'Show the hidden tracks';
+    _key();
     _animate();
 }
 
@@ -264,8 +266,8 @@ export function drawRace() {
     c.clearRect(0, 0, W, H);
     if (!race) {
         c.font = font(14, true); c.fillStyle = muted; c.textAlign = 'center';
-        c.fillText('The race runs in the Dynamic regime. Choose it in Meridian’s settings.', W / 2, H / 2);
-        _st.cap('No race in a Classic regime.');
+        c.fillText('Dynamic only', W / 2, H / 2);
+        _st.cap('The race');
         return;
     }
     const narrow = W < 560;
@@ -532,7 +534,7 @@ export function drawRace() {
         c.textBaseline = 'alphabetic';
     }
     c.font = font(12.5, true); c.fillStyle = muted; c.textAlign = 'left';
-    c.fillText(narrow ? 'Fixedpoint Index · unlisted' : 'Halcyon’s tasks, graded by Halcyon · unlisted: Consensus will not list it', L0 + 2, sT + 15);
+    c.fillText(narrow ? 'Fixedpoint Index · unlisted' : 'self-graded · unlisted', L0 + 2, sT + 15);
     const fp = _pub.fixedpoint;
     if (_st.revealed && _hid.tracks.halcyon.length > 1) {
         const tr = _hid.tracks.halcyon, FY = (v) => sB - 4 - (sB - sT - 22) * Math.max(0, Math.min(1, (v - 1) / 4.5));
@@ -549,29 +551,22 @@ export function drawRace() {
         c.fillText('Not published.', L0 + 2, sB - 6);
     }
 
-    _caption(today, best);
+    _caption(best);
 }
 
-function _caption(today, frontier) {
+function _caption(frontier) {
     if (_st.revealed) {
+        // Halcyon's own crossings, against the day each was claimed.
         const bits = [];
         for (const R of [3, 4, 5]) {
             const d = _hiddenCross('halcyon', R);
             const claim = _pub.claims.find(cl => cl.rung === R);
-            if (d != null) bits.push(`R${R} in house on day ${d}` + (claim ? `, claimed on day ${claim.day}` : d > _pub.lastDay ? ', after the desk closed' : ', never claimed'));
+            if (d != null) bits.push(`Halcyon R${R} in house day ${d}, ` + (claim ? `claimed day ${claim.day}` : d > _pub.lastDay ? 'after the close' : 'unclaimed'));
         }
-        _st.cap('The hidden tracks: solid is what each lab had in house, dashed what it shipped, and each release slides to its true value. Halcyon reached '
-            + (bits.length ? bits.join('; ') : 'no rung past R2 in house') + '.');
+        _st.cap(['The hidden tracks', ...(bits.length ? bits : ['Halcyon in house ≤ R2'])].join(' · '));
         return;
     }
-    const next = belief.active ? [2, 3, 4, 5].find(R => !isCertified(R)) : null;
-    let tail = '';
-    if (next) {
-        const law = _law(next, today);
-        tail = law && law.median != null ? ` Consensus’s median for R${next} is day ${Math.round(law.median)}.` : '';
-    }
-    const ink = _editable() ? ' Your forecast is in ink over it: drag a bead along its rung, up or down to tighten it; the square sets the chance it lands this term.' : '';
-    _st.cap(`Day ${today}. The released frontier claims R${frontier || 1}.${tail}${ink} Hollow diamonds are unadjudicated claims; the thick rule to a filled one is the certification lag.`);
+    _st.cap(`The race · released frontier R${frontier || 1}`);
 }
 
 // ---------------------------------------------------------------------------
@@ -589,9 +584,8 @@ function _editable() {
  */
 export function setForecastPending(pending, focus = false) {
     _st.pending = !!pending;
-    const lock = document.getElementById('race-lock'), note = document.getElementById('race-lock-note');
+    const lock = document.getElementById('race-lock');
     if (lock) lock.hidden = !_st.pending;
-    if (note) note.hidden = !_st.pending;
     if (focus && _st.canvas) { _selectOpen(0); _st.canvas.focus(); }
     if (_st.visible) drawRace();
 }
@@ -740,7 +734,7 @@ function _table() {
     if (!rel.length) {
         const li = document.createElement('li');
         li.className = 'b-empty';
-        li.textContent = race ? 'No release yet this term.' : 'The race runs in the Dynamic regimes.';
+        li.textContent = '—';
         log.appendChild(li);
     }
     for (const r of rel) {
@@ -761,6 +755,8 @@ function _key() {
         ['hatch', 'var(--ink-umber)', 'open weights'], ['claim', 'var(--text)', 'claim'], ['cert', 'var(--text)', 'certified'],
         ['ridge', 'var(--ink-indigo)', 'Consensus'],
     ];
+    // The hidden tracks, once shown: solid in house, dashed shipped.
+    if (_st.revealed) items.push(['solid', 'var(--text)', 'in house'], ['dashed', 'var(--text)', 'shipped']);
     const svg = (s, col) => {
         const sh = {
             circle: `<circle cx="7" cy="7" r="4.3" fill="${col}"/>`,
@@ -770,6 +766,8 @@ function _key() {
             claim: `<path d="M7 1.8 12.2 7 7 12.2 1.8 7Z" fill="none" stroke="${col}" stroke-width="1.3"/>`,
             cert: `<path d="M7 1.8 12.2 7 7 12.2 1.8 7Z" fill="${col}"/>`,
             ridge: `<path d="M1 7C4 7 5 3 7 3S10 7 13 7C10 7 9 11 7 11S4 7 1 7Z" fill="${col}" fill-opacity=".3" stroke="${col}" stroke-width=".8"/>`,
+            solid: `<path d="M1 7H13" stroke="${col}" stroke-width="1.5"/>`,
+            dashed: `<path d="M1 7H13" stroke="${col}" stroke-width="1" stroke-dasharray="3 2"/>`,
         }[s];
         return `<svg width="14" height="14" viewBox="0 0 14 14" aria-hidden="true">${sh}</svg>`;
     };

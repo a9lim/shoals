@@ -223,20 +223,18 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     // by the margin system (cash + all position mark-to-market values). Fall back to cash
     // only when marginInfo is not provided (e.g. called before first margin check).
     const totalValue = (marginInfo && marginInfo.equity != null) ? marginInfo.equity : portfolio.cash;
-    // The figure in ink, rounded as the dateline sets it; the line under it carries
-    // the comparison with holding HCN: viridian ahead of it, the accent behind.
+    // The figure in ink, rounded as the dateline sets it (the dateline carries the
+    // term's change); the line under it compares holding HCN: viridian ahead of
+    // it, the accent behind.
     $.portfolioValue.textContent = (totalValue < 0 ? '−' : '') + '$' + Math.round(Math.abs(totalValue)).toLocaleString('en-US') + 'k';
     const buyHoldValue = (portfolio.initialCapital / 100) * currentPrice;
     const vsBenchmark = totalValue - buyHoldValue;
     const benchCls = vsBenchmark > 0.005 ? 'pnl-up' : vsBenchmark < -0.005 ? 'pnl-down' : '';
     if ($.bookChange) {
-        const term = (totalValue / portfolio.initialCapital - 1) * 100;
-        const t = (term < 0 ? '−' : '+') + Math.abs(term).toFixed(1) + '%';
         const b = (vsBenchmark < 0 ? '−' : '+') + fmtDollar(Math.abs(vsBenchmark));
-        const key = t + '|' + b;
-        if ($.bookChange._key !== key) {
-            $.bookChange._key = key;
-            $.bookChange.innerHTML = `<span class="${pnlClass(term)}">${t}</span> on the term · <span class="${benchCls}">${b}</span> against holding HCN`;
+        if ($.bookChange._key !== b) {
+            $.bookChange._key = b;
+            $.bookChange.innerHTML = `vs holding HCN <span class="${benchCls}">${b}</span>`;
         }
     }
 
@@ -277,7 +275,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 
     // Single positions, every instrument (binaries included: the book is their one list).
     const defaultPos = portfolio.positions.filter(p => !p.strategyName);
-    _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, 'Nothing held. Trade from the ticket on the Markets page.', q);
+    _diffPositionRows($.defaultPositions, defaultPos, currentPrice, vol, rate, day, q);
 
     // Strategy positions -- grouped by name, one row per strategy and its legs under it.
     const strategyNames = [...new Set(
@@ -344,7 +342,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
 // DOM diffing helpers
 // ---------------------------------------------------------------------------
 
-function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q) {
+function _diffPositionRows(container, positions, S, vol, rate, day, q) {
     if (!container._rowMap) container._rowMap = new Map();
     const rowMap = container._rowMap;
 
@@ -367,7 +365,7 @@ function _diffPositionRows(container, positions, S, vol, rate, day, emptyHint, q
             rowMap.clear();
             const hint = document.createElement('p');
             hint.className = 'panel-hint';
-            hint.textContent = emptyHint;
+            hint.textContent = '—';
             container.appendChild(hint);
         }
         return;

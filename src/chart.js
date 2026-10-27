@@ -53,9 +53,6 @@ export class ChartRenderer {
         // News days for the tape (setNews): [{ day, head, major }]
         this._news = [];
 
-        // 'candle' or 'line': what the last draw used (the caption reads it).
-        this.mode = 'candle';
-
         // Axis gutter sizes (CSS px) — from config.js
         this.Y_AXIS_W  = CHART_Y_AXIS_W;
         this.Y_LABEL_W = CHART_Y_LABEL_W;
@@ -353,7 +350,6 @@ export class ChartRenderer {
         // ── Candles, or the line and band when a body would be too narrow ──
         const slot = cam ? cam.zoom : 8;
         const candles = slot >= CANDLE_MIN_PX;
-        this.mode = candles ? 'candle' : 'line';
         if (!candles) {
             const half = Math.max(0.5, Math.min(6, slot * 0.36));
             ctx.beginPath();

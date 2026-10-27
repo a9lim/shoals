@@ -1256,12 +1256,8 @@ function _syncMasthead(force = false) {
     if (!_capFront) _capFront = _colophon.caption(document.getElementById('cap-front'), 400);
     const bar = sim.history.last();
     if (bar) {
-        const ch = t.prevClose > 0 ? (t.S / t.prevClose - 1) * 100 : 0;
-        const mv = Math.abs(ch) < 0.05 ? 'flat on the session' : `${ch > 0 ? 'up' : 'down'} ${Math.abs(ch).toFixed(1)}% on the session`;
-        _capFront(`HCN at ${t.S.toFixed(2)}, ${mv}; today's range ${bar.low.toFixed(2)} to ${bar.high.toFixed(2)}. `
-            + (chart.mode === 'line'
-                ? 'Zoomed out, the line is each day\u2019s close over a band of its range; ticks mark news days.'
-                : 'A hollow candle closed up, a solid red one down; the wick is the day\u2019s range, and ticks mark news days.'), force);
+        // The dateline carries the price and the session's change.
+        _capFront(`HCN · range ${bar.low.toFixed(2)}–${bar.high.toFixed(2)}`, force);
     }
     updateMasthead({
         rel: _relDay(), regime: _regimeLabel(), S: t.S, prevClose: t.prevClose,
@@ -1510,7 +1506,7 @@ function _publishVxhcn() {
 }
 
 /** Government affairs on the Meridian page: one row per available action, its
- *  cost beside it, its description under it. */
+ *  cost beside it, its description on hover. */
 function _updateLobbyPills() {
     if (!$.lobbyBar || !$.lobbyActions) return;
     const day = sim.history.maxDay;
@@ -1523,6 +1519,7 @@ function _updateLobbyPills() {
     for (const action of actions) {
         const row = document.createElement('div');
         row.className = 'lobby-row';
+        row.dataset.tooltip = action.desc;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'link-btn lobby-pill';
@@ -1532,10 +1529,7 @@ function _updateLobbyPills() {
         const cost = document.createElement('span');
         cost.className = 'lobby-cost';
         cost.textContent = (action.cost > 0 ? `$${action.cost}k` : 'free') + (action.cooldownReady ? '' : ', cooling off');
-        const desc = document.createElement('p');
-        desc.className = 'lobby-desc';
-        desc.textContent = action.desc;
-        row.append(btn, cost, desc);
+        row.append(btn, cost);
         $.lobbyActions.appendChild(row);
     }
 }
@@ -2362,7 +2356,7 @@ function _updateRegulationDisplay() {
     if (pipeline.length === 0) {
         const p = document.createElement('p');
         p.className = 'panel-hint';
-        p.textContent = 'Nothing on the books or in committee.';
+        p.textContent = '—';
         list.appendChild(p);
         return;
     }

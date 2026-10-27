@@ -56,7 +56,7 @@ main.js            orchestrator: DOM cache `$`, rAF loop, day pipeline, popup qu
 src/pages.js       the four pages (folios), and a folio's count (the ticket's legs on Markets)
 src/brief.js       masthead, editions and extras, the lead item and "In brief"
 src/markets.js     the markets page: six curves sampled into daily snapshots, ghosts, pointer/keyboard, opened panels and their tables
-src/ticket.js      the ticket: legs, ratios and size, order types, the scenario figure and grid, the reading, strategies
+src/ticket.js      the ticket: legs, ratios and size, order types, the scenario figure and grid, strategies
 src/surface.js     the volatility surface under the opened Options panel
 src/race-page.js   the race page: public release/claim/certification record, Consensus laws, the forecast editor, epilogue reveal
 src/config.js      named constants and PRESETS
@@ -272,7 +272,7 @@ key is `shoals-theme`.
   up, solid in the accent on a day that closed down, a hairline wick that never
   crosses the body. The forming day's wick is a water mark of the eased close, so it
   ratchets out and holds. Below `CANDLE_MIN_PX` a day it draws the close as a line
-  over a band of the range, and `chart.mode` tells the caption which.
+  over a band of the range.
 - **The book.** The front page's rail (`portfolio-renderer.js`): the value in ink with
   a line comparing it to holding HCN (the sparkline's dashed ghost), the account,
   positions (binaries included) as contract, quantity and P&L, strategy groups,
@@ -441,6 +441,13 @@ key is `shoals-theme`.
   `--font-text`/`_FONT.text`. The canvas redraws once `_loadTextFonts()` resolves. Live
   captions use `_colophon.caption()`; the tape's first write is forced, because the
   helper skips a write that falls within its interval of time zero.
+- **Show, don't tell** (root `AGENTS.md`). A caption is the view's name and the live
+  values nothing else shows: the dateline carries HCN, VXHCN, the rate and the book,
+  and each market panel reads its own value, so Fig. 1 is the day's range, Fig. 2 the
+  edition the dashed ghosts show, Fig. 3 the released frontier. Empty states are a
+  muted em dash. What a mark means or how a control works lives in `about.md` and in
+  one info tip per section heading, never in ledes, hints or panel subtitles; the
+  diegetic copy (wire, lead, dispatches, epilogue) is content and keeps its voice.
 - **Labels.** UI labels, presets, built-in strategies, traits and epilogue labels are
   sentence case in source. Contracts are named once, by `contractName`
   (format-helpers.js), for the ticket, the tables and the book. An opened panel's

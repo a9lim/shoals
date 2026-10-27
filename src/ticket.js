@@ -17,8 +17,7 @@
    The figure prices the book at a horizon over HCN
    moves, one line per scenario row: how far the race
    gets (in Classic, where there is no race, how
-   volatility goes). The grid is its table, and one
-   sentence says what the book bets on. "Include my
+   volatility goes). The grid is its table. "Include my
    book" folds the live positions in, marked from today.
 
    The scenario model is the display's, not the engine's:
@@ -207,9 +206,9 @@ function _say(msg) {
 // Init and wiring
 // ---------------------------------------------------------------------------
 
-const IDS = ['tk-sub', 'tk-legs', 'tk-empty', 'tk-size', 'tk-size-val', 'tk-order', 'tk-trigger-row', 'tk-trigger',
-    'tk-trigger-val', 'tk-trigger-lbl', 'tk-cost', 'tk-greeks', 'tk-note', 'tk-clear', 'tk-trade', 'tk-fig-h', 'tk-canvas',
-    'tk-horizon', 'tk-horizon-val', 'tk-mine', 'tk-scen', 'tk-read', 'tk-load', 'tk-name', 'tk-save', 'tk-delete', 'tk-live'];
+const IDS = ['tk-legs', 'tk-empty', 'tk-size', 'tk-size-val', 'tk-order', 'tk-trigger-row', 'tk-trigger',
+    'tk-trigger-val', 'tk-trigger-lbl', 'tk-cost', 'tk-greeks', 'tk-clear', 'tk-trade', 'tk-fig-sub', 'tk-canvas',
+    'tk-horizon', 'tk-horizon-val', 'tk-mine', 'tk-scen', 'tk-load', 'tk-name', 'tk-save', 'tk-delete', 'tk-live'];
 
 /**
  * @param {object} ctx    { sim, race(), geo(), positions(), expiries(), expiryDay(), vxVariance() }
@@ -447,9 +446,6 @@ function _renderLegs() {
         tb.dataset.sig = sig;
     }
     el['tk-empty'].hidden = _st.legs.length > 0;
-    el['tk-sub'].textContent = _st.legs.length
-        ? `· ${_st.name.trim() ? _st.name.trim() + ', ' : ''}${_st.legs.length} leg${_st.legs.length > 1 ? 's' : ''}`
-        : '· pick a point on any curve';
 }
 
 function _renderControls() {
@@ -477,7 +473,7 @@ function _renderControls() {
         const strat = !!_st.name.trim() && _strategyable();
         const long = strat || _st.legs[0].ratio > 0;
         const below = (_st.order === 'limit') === long;
-        el['tk-trigger-lbl'].textContent = `Fills when HCN is ${below ? 'at or below' : 'at or above'}`;
+        el['tk-trigger-lbl'].textContent = below ? 'HCN ≤' : 'HCN ≥';
     }
     const named = !!_st.name.trim();
     el['tk-trade'].disabled = !_st.legs.length;
@@ -489,11 +485,6 @@ function _renderControls() {
     el['tk-name'].placeholder = nextAutoName();
     el['tk-save'].disabled = !_strategyable();
     el['tk-delete'].hidden = !_st.stratId;
-    let note = '';
-    if (_st.legs.length > 1 && !named && _strategyable()) note = 'Name the ticket to trade it as one strategy: every leg or none, grouped in the book, and able to rest as a limit or stop.';
-    else if (_st.legs.some(l => MARKET_ONLY.has(l.type))) note = 'Consensus and compute trade at market, leg by leg.';
-    el['tk-note'].textContent = note;
-    el['tk-note'].hidden = !note;
 }
 
 function _renderCost() {
@@ -501,8 +492,7 @@ function _renderCost() {
     if (!_st.legs.length) { el['tk-cost'].textContent = ''; el['tk-greeks'].textContent = ''; return; }
     let net = 0;
     for (const L of _st.legs) net += Math.sign(L.ratio) * Math.abs(L.ratio) * _st.size * _quote(L).fill;
-    el['tk-cost'].innerHTML = Math.abs(net) < 0.005 ? 'Costs nothing up front'
-        : `Net ${net > 0 ? 'debit' : 'credit'} <b>$${Math.abs(net).toFixed(2)}k</b> at today’s quotes`;
+    el['tk-cost'].innerHTML = `${Math.abs(net) < 0.005 ? 'Net' : net > 0 ? 'Debit' : 'Credit'} <b>$${Math.abs(net).toFixed(2)}k</b>`;
     const s = _st.ctx.sim;
     const pos = _st.legs.filter(l => STRATEGY_TYPES.has(l.type)).map(l => ({ type: l.type, qty: l.ratio * _st.size, strike: l.strike, expiryDay: l.expiryDay }));
     if (!pos.length) { el['tk-greeks'].textContent = ''; return; }
@@ -628,8 +618,7 @@ function _renderScenarios() {
     const el = _st.el;
     if (!_st.calc) _st.calc = _compute();
     const { rows, vals, n, raced, dayH } = _st.calc;
-    const atExpiry = _st.legs.some(L => (L.type === 'call' || L.type === 'put') && L.expiryDay - _st.ctx.sim.day === _st.horizon);
-    el['tk-fig-h'].innerHTML = `Profit and loss ${atExpiry ? 'at expiry' : fmtSpan(_st.horizon) + ' out'} <span class="sub">· day ${dayH}, $ thousands</span>`;
+    el['tk-fig-sub'].textContent = `· day ${dayH}, $k`;
     const cells = vals.map(r => COLS.map(j => r[j]));
     const maxAbs = Math.max(1, ...cells.flat().map(Math.abs));
     const pal = _themePalette();
@@ -647,7 +636,6 @@ function _renderScenarios() {
         html += '</tr>';
     });
     el['tk-scen'].innerHTML = html + '</tbody>';
-    el['tk-read'].textContent = _reading(cells, rows, maxAbs, n, raced);
     _drawFig();
 }
 
@@ -656,29 +644,6 @@ function _mix(h1, h2, t) {
     return 'rgb(' + a.map((x, i) => Math.round((x + (b[i] - x) * t) * 255)).join(',') + ')';
 }
 
-function _reading(cells, rows, maxAbs, n, raced) {
-    if (!n) return 'Pick a point on any curve to add a leg; pick it again to go short, a third time to remove it. Open a curve by its title for every contract on it.';
-    const mean = (a) => a.reduce((p, q) => p + q, 0) / a.length;
-    const col = (j) => mean(cells.map(r => r[j]));
-    const thr = 0.15 * maxAbs;
-    const last = cells.length - 1;
-    const race = mean(cells[last]) - mean(cells[0]);
-    const hcn = col(6) - col(0), lowEdge = col(0) - col(3), highEdge = col(6) - col(3);
-    const parts = [];
-    // In Classic the rows run as now, falling, rising: the race term compares rising to as-now.
-    if (Math.abs(race) > thr) parts.push(raced ? (race > 0 ? 'the race runs ahead of the market' : 'the race stalls') : (race > 0 ? 'volatility rises' : 'volatility stays low'));
-    if (Math.abs(hcn) > thr) parts.push(hcn > 0 ? 'HCN rises' : 'HCN falls');
-    let first = parts.length ? `This book makes money if ${parts.join(' and ')}.` : 'This book is close to flat in direction.';
-    if (lowEdge > thr && highEdge > thr) first += ' It also gains from a big move either way.';
-    else if (lowEdge < -thr && highEdge < -thr) first += ' It wants a quiet stretch.';
-    let worst = Infinity, wi = 0, wj = 0;
-    cells.forEach((r, i) => r.forEach((v, j) => { if (v < worst) { worst = v; wi = i; wj = j; } }));
-    const m = MOVES[COLS[wj]];
-    const cl = m === 0 ? 'flat' : `${m > 0 ? 'up' : 'down'} ${Math.round(Math.abs(m * 100))}%`;
-    return worst < -0.05
-        ? `${first} The worst case here is ${rows[wi].label.toLowerCase()} with HCN ${cl}: a loss of $${_k(-worst)}k.`
-        : `${first} No scenario here loses money.`;
-}
 
 // ---------------------------------------------------------------------------
 // The figure: P&L at the horizon against HCN, one line per scenario row
@@ -739,11 +704,7 @@ function _drawFig() {
     const xs = Math.round(X(20)) + 0.5;
     c.strokeStyle = _r(text, 0.28); c.setLineDash([1.5, 3]); c.beginPath(); c.moveTo(xs, g.t); c.lineTo(xs, g.b); c.stroke(); c.setLineDash([]);
 
-    if (!n) {
-        c.font = font(12.5, true); c.fillStyle = muted; c.textAlign = 'center';
-        c.fillText('The payoff of the legs appears here.', (g.l + g.r) / 2, g.t + (g.b - g.t) * 0.3);
-        return;
-    }
+    if (!n) return;
 
     // The first row's gains and losses: viridian above the rule, the accent below.
     const line = (r) => { c.beginPath(); r.forEach((v, i) => (i ? c.lineTo(X(i), Y(v)) : c.moveTo(X(i), Y(v)))); };

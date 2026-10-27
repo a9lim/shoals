@@ -315,7 +315,7 @@
                     <canvas id="chart-canvas" role="img" aria-label="HCN as print candles: hollow on a day it closed up, solid red on a day it closed down, the wick its range; news days are ticked. Drag to pan; scroll or use = and - to zoom."></canvas>
                 </div>
                 <div class="fig-foot">
-                    <figcaption class="caption"><span class="caption-n">Fig. 1</span><span id="cap-front">HCN.</span></figcaption>
+                    <figcaption class="caption"><span class="caption-n">Fig. 1</span><span id="cap-front">HCN</span></figcaption>
                     <div id="zoom-controls" class="zoom" role="group" aria-label="Zoom">
                         <button class="hbtn" id="zoom-out-btn" type="button" aria-label="Zoom out">−</button>
                         <span id="zoom-level" class="zoom-level">100%</span>
@@ -331,13 +331,13 @@
                 <p class="book-change" id="book-change"></p>
                 <canvas class="sparkline" id="portfolio-sparkline" role="img" aria-label="The book's value over the last year, with holding HCN dashed under it"></canvas>
                 <div class="book-acct">
-                    <div class="stat-row"><span class="stat-label">Cash <button class="info-trigger" type="button" data-info="cash" aria-label="Info: Cash">?</button></span><span class="stat-value" id="cash-display">$10,000.00k</span></div>
-                    <div class="stat-row"><span class="stat-label">Margin <button class="info-trigger" type="button" data-info="margin" aria-label="Info: Margin">?</button></span><span class="stat-value margin-ok" id="margin-status">Clear</span></div>
-                    <div class="stat-row"><span class="stat-label">Borrow cost <button class="info-trigger" type="button" data-info="borrowCost" aria-label="Info: Borrow cost">?</button></span><span class="stat-value" id="borrow-cost">$0.00k</span></div>
-                    <div class="stat-row"><span class="stat-label">Dividends <button class="info-trigger" type="button" data-info="dividends" aria-label="Info: Dividends">?</button></span><span class="stat-value" id="dividend-income">$0.00k</span></div>
+                    <div class="stat-row"><span class="stat-label">Cash</span><span class="stat-value" id="cash-display">$10,000.00k</span></div>
+                    <div class="stat-row"><span class="stat-label">Margin</span><span class="stat-value margin-ok" id="margin-status">Clear</span></div>
+                    <div class="stat-row"><span class="stat-label">Borrow cost</span><span class="stat-value" id="borrow-cost">$0.00k</span></div>
+                    <div class="stat-row"><span class="stat-label">Dividends</span><span class="stat-value" id="dividend-income">$0.00k</span></div>
                 </div>
                 <h3 class="col-h">Positions</h3>
-                <div id="default-positions" class="pos-list"><p class="panel-hint">Nothing held. Trade from the ticket on the Markets page.</p></div>
+                <div id="default-positions" class="pos-list"><p class="panel-hint">—</p></div>
                 <section id="book-strategies" hidden>
                     <h3 class="col-h">Strategies</h3>
                     <div id="strategy-positions" class="pos-list"></div>
@@ -360,56 +360,50 @@
         <!-- Markets: every market is a curve, and the ticket -->
         <section class="page page-markets" id="page-markets" role="tabpanel" aria-labelledby="folio-markets" hidden>
             <div class="mk-main">
-                <header class="page-head">
-                    <h2 class="page-h">Every market is a curve</h2>
-                    <p class="page-dek" id="mk-dek">Six prices on one world, drawn the same way. Pick a point to put it on the ticket; open a curve by its title for every contract on it. The dashed line is each curve the day before the latest news.</p>
-                </header>
                 <div class="mk-grid" id="mk-grid"></div>
                 <p class="caption"><span class="caption-n">Fig. 2</span><span id="cap-markets"></span></p>
             </div>
             <section class="ticket" id="ticket" aria-labelledby="tk-h">
-                <h2 class="ticket-h" id="tk-h">The ticket <span class="sub" id="tk-sub">· pick a point on any curve</span> <button class="info-trigger" type="button" data-info="ticket" aria-label="Info: The ticket">?</button></h2>
+                <h2 class="ticket-h" id="tk-h">The ticket <button class="info-trigger" type="button" data-info="ticket" aria-label="Info: The ticket">?</button></h2>
                 <table class="agate tk-legs" aria-label="Legs on the ticket">
                     <thead><tr><th class="l">Contract</th><th>Side</th><th>Ratio</th><th>Mid</th><th><span class="vh">Remove</span></th></tr></thead>
                     <tbody id="tk-legs"></tbody>
                 </table>
-                <p class="panel-hint" id="tk-empty">No legs yet. Pick a point on a curve: once to go long, twice for short, a third time to take it off. A right-click goes short at once.</p>
+                <p class="panel-hint" id="tk-empty">—</p>
                 <div class="tk-row">
                     <label class="tk-lbl" for="tk-size">Size</label>
                     <input type="range" id="tk-size" min="1" max="100" step="1" value="1">
                     <span class="slider-value" id="tk-size-val">1k</span>
                 </div>
                 <div class="tk-row">
-                    <span class="tk-lbl">Order <button class="info-trigger" type="button" data-info="orderTypes" aria-label="Info: Order types">?</button></span>
+                    <span class="tk-lbl">Order</span>
                     <div class="seg" id="tk-order" role="group" aria-label="Order type">
                         <button class="mode-btn active" type="button" data-order="market" aria-pressed="true">Market</button>
                         <button class="mode-btn" type="button" data-order="limit" aria-pressed="false">Limit</button>
                         <button class="mode-btn" type="button" data-order="stop" aria-pressed="false">Stop</button>
                     </div>
                 </div>
-                <div class="tk-row tk-trigger" id="tk-trigger-row" hidden>
-                    <label class="tk-lbl" for="tk-trigger" id="tk-trigger-lbl">Fills when HCN is at or below</label>
+                <div class="tk-row" id="tk-trigger-row" hidden>
+                    <label class="tk-lbl" for="tk-trigger" id="tk-trigger-lbl">HCN ≤</label>
                     <input type="range" id="tk-trigger" min="50" max="150" step="1" value="100">
                     <span class="slider-value" id="tk-trigger-val">100</span>
                 </div>
                 <p class="tk-cost" id="tk-cost"></p>
                 <p class="greeks-line" id="tk-greeks"></p>
-                <p class="panel-hint" id="tk-note" hidden></p>
                 <div class="tk-actions">
                     <button class="ghost-btn" id="tk-clear" type="button">Clear</button>
                     <button class="ghost-btn primary" id="tk-trade" type="button" disabled>Trade</button>
                 </div>
 
-                <h3 class="col-h" id="tk-fig-h">Profit and loss</h3>
+                <h3 class="col-h"><span id="tk-fig-h">Profit and loss <span class="sub" id="tk-fig-sub"></span></span> <button class="info-trigger" type="button" data-info="horizon" aria-label="Info: The horizon">?</button></h3>
                 <div class="tk-fig"><canvas id="tk-canvas" role="img" aria-label="Profit and loss of the ticket at the horizon against HCN's move, one line per scenario: solid for the first row of the grid below, dashed and dotted for the next two."></canvas></div>
                 <div class="tk-row">
-                    <label class="tk-lbl" for="tk-horizon">Horizon <button class="info-trigger" type="button" data-info="horizon" aria-label="Info: The horizon">?</button></label>
+                    <label class="tk-lbl" for="tk-horizon">Horizon</label>
                     <input type="range" id="tk-horizon" min="1" max="252" step="1" value="63">
                     <span class="slider-value" id="tk-horizon-val">3 months</span>
                 </div>
                 <div class="sb-scen-wrap"><table class="sb-scen" id="tk-scen" aria-labelledby="tk-fig-h"></table></div>
                 <label class="chk" for="tk-mine"><input type="checkbox" id="tk-mine"> <span>Include my book</span></label>
-                <p class="tk-read" id="tk-read" aria-live="polite"></p>
 
                 <h3 class="col-h">Strategies</h3>
                 <select id="tk-load" class="sim-select" aria-label="Load a strategy"></select>
@@ -418,7 +412,6 @@
                     <button class="ghost-btn" id="tk-save" type="button" disabled>Save</button>
                     <button class="ghost-btn" id="tk-delete" type="button" hidden>Delete</button>
                 </div>
-                <p class="panel-hint">A strategy loads at the Options panel’s expiry, around today’s price. Named, the ticket trades as one strategy.</p>
                 <p class="vh" id="tk-live" aria-live="assertive"></p>
             </section>
         </section>
@@ -426,18 +419,12 @@
         <!-- Race: the rung ladder, after Epoch's Capabilities Index, and your forecast -->
         <section class="page page-race" id="page-race" role="tabpanel" aria-labelledby="folio-race" hidden>
             <figure class="race-fig">
-                <header class="page-head">
-                    <h2 class="page-h">The race, as the market can see it</h2>
-                    <p class="page-dek" id="race-dek">Every public release placed on the rung it claims, by date. Ahead of today, Consensus prices when each rung is crossed, and your forecast is drawn over it in ink.</p>
-                </header>
                 <div class="figure-box race-box"><canvas id="race-canvas" tabindex="0" role="img" aria-label="The capability ladder from R1 to R5 over the four-year term: releases by lab, certifications, claims, the released frontier, Consensus's distributions for when each rung ahead is crossed, and your forecast over them. Focus it to edit your forecast: left and right move the selected rung's median, with Shift for larger steps; up and down tighten or loosen it; Page Up and Page Down raise or lower the chance it lands this term; Tab moves between rungs."></canvas></div>
                 <p class="caption"><span class="caption-n">Fig. 3</span><span id="cap-race"></span></p>
             </figure>
             <aside class="race-notes" aria-label="Your forecast and the ladder">
                 <section data-dynamic>
                 <h3 class="col-h">Your forecast</h3>
-                <p class="race-how">Drag a bead along its rung to move your median, up or down to tighten or loosen it. The square at the term’s end is the chance the rung lands this term at all; the blue tick is the market’s. Each quarter the desk locks what you have drawn and scores it against the market.</p>
-                <p class="race-lock-note" id="race-lock-note" hidden>The quarter waits until you lock.</p>
                 <div class="race-actions">
                     <button class="ghost-btn primary" id="race-lock" type="button" hidden>Lock this forecast</button>
                     <button class="ghost-btn" id="race-match" type="button">Match the market</button>
@@ -461,34 +448,26 @@
 
         <!-- Meridian: your record, the firm, the town it answers to, the settings -->
         <section class="page page-meridian" id="page-meridian" role="tabpanel" aria-labelledby="folio-meridian" hidden>
-            <header class="page-head">
-                <h2 class="page-h">Meridian Capital</h2>
-                <p class="page-dek">The firm you trade for, the record it keeps on you, and the town it answers to.</p>
-            </header>
-            <p class="panel-hint mer-classic" id="mer-classic" hidden>Your record, the firm and Washington run in the Dynamic regime; choose it under Settings.</p>
             <div class="mer-cols">
                 <section class="mer-col" data-dynamic aria-label="Your record">
-                    <h3 class="col-h">Your record</h3>
+                    <h3 class="col-h">Your record <button class="info-trigger" type="button" data-info="record" aria-label="Info: Your record">?</button></h3>
                     <div id="standings-record"></div>
                     <table class="agate record-tbl" id="record-quarters" aria-label="Quarters scored against the market" hidden>
                         <thead><tr><th class="l">Quarter</th><th>Rungs</th><th>Nats</th></tr></thead>
                         <tbody></tbody>
                     </table>
-                    <p class="panel-hint">Each quarter the desk scores your locked forecast against the market’s by log-likelihood: the rungs that certified, and the quarters that passed quietly. Credibility is the edge you have shown.</p>
                 </section>
                 <section class="mer-col" data-dynamic aria-label="Your standing, standing orders and convictions">
                     <h3 class="col-h">Your standing</h3>
                     <div id="standings-factions"></div>
                     <section id="standing-orders-section" hidden>
-                        <h3 class="col-h">Standing orders</h3>
+                        <h3 class="col-h">Standing orders <span class="sub" id="standing-orders-state"></span> <button class="info-trigger" type="button" data-info="standingOrders" aria-label="Info: Standing orders">?</button></h3>
                         <div id="standing-orders-list" class="so-list"></div>
-                        <p class="panel-hint" id="standing-orders-hint"></p>
                     </section>
                     <section id="convictions-section" class="hidden">
                         <h3 class="col-h">Convictions</h3>
                         <div id="convictions-list" class="convictions-list"></div>
                     </section>
-                    <p class="panel-hint mer-later">Standing orders open once a lab ships R3. Convictions form from what you do and say.</p>
                 </section>
                 <section class="mer-col" data-dynamic aria-label="Washington">
                     <h3 class="col-h">Washington</h3>
@@ -527,8 +506,7 @@
                             </select>
                         </label>
                         <label class="ctrl-row" for="volume-slider"><span class="stat-label">Sound</span><input type="range" id="volume-slider" min="0" max="100" step="1" value="50"><span class="slider-value" id="volume-val">50%</span></label>
-                        <button id="advanced-toggle" class="ghost-btn advanced-toggle-btn" type="button" aria-expanded="false" aria-controls="advanced-section">Pricing parameters</button>
-                        <p class="panel-hint">The models under the prices. Changing one moves this run’s market; the regime resets them. <button class="info-trigger" type="button" data-info="gbm" aria-label="Info: Pricing models">?</button></p>
+                        <div class="adv-row"><button id="advanced-toggle" class="ghost-btn advanced-toggle-btn" type="button" aria-expanded="false" aria-controls="advanced-section">Pricing parameters</button> <button class="info-trigger" type="button" data-info="gbm" aria-label="Info: Pricing models">?</button></div>
                     </div>
                     <div id="advanced-section" class="advanced-section hidden">
                         <div class="ctrl-row"><label class="stat-label" for="slider-mu">Drift μ <button class="info-trigger" type="button" data-info="mu" aria-label="Info: Drift">?</button></label><input type="range" id="slider-mu" min="-0.50" max="0.80" step="0.02" value="0.08"><span class="slider-value" id="slider-mu-val">0.08</span></div>
