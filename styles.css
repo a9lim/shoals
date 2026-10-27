@@ -512,6 +512,12 @@ body.rail-off .page-front .rail { display: none; }
 .race-log .b-day { font-style: italic; color: var(--text-muted); margin-right: 0.4em; }
 .race-log .b-empty { font-style: italic; color: var(--text-muted); }
 .race-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px; }
+.race-reports .rep-claim { color: var(--text); }
+.race-reports .rep-st { font-style: italic; color: var(--text-muted); }
+.race-reports .rep-sub { display: block; font-size: var(--font-sm); font-style: italic; color: var(--text-muted); }
+.race-reports .rep[data-status="withdrawn"] .rep-claim { text-decoration: line-through; text-decoration-thickness: 1px; color: var(--text-muted); }
+.race-reports .rep[data-status="upheld"] .rep-st { font-style: normal; color: var(--text-secondary); }
+.race-reports .rep-new .b-day::before { content: '\2022'; color: var(--text); margin-right: 0.3em; font-style: normal; }
 
 /* --- Meridian: your record, the firm, Washington | settings --- */
 .page-meridian { overflow-y: auto; padding: 12px var(--gutter) 28px; scrollbar-width: thin; }
