@@ -147,6 +147,8 @@ input[type="checkbox"] { accent-color: var(--text); width: 14px; height: 14px; m
     display: flex; align-items: baseline; gap: 4px; flex-wrap: wrap;
 }
 .col-h .sub { font-weight: 400; font-style: italic; color: var(--text-muted); }
+.col-h-act { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; }
+.col-h-act .link-btn { font-weight: 400; font-size: var(--font-sm); }
 .col-h:first-child { margin-top: 0; }
 
 /* --- Colophon sits in the masthead's top-left corner (shared/colophon.js) --- */

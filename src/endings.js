@@ -22,6 +22,7 @@
    =================================================== */
 
 import { computePositionValue } from './position-value.js';
+import { unpaidObligations } from './portfolio.js';
 import { INITIAL_CAPITAL, HISTORY_CAPACITY, TERM_END_DAY } from './config.js';
 import { getFactionState, getFaction } from './faction-standing.js';
 import { getActiveTraitIds, getTrait } from './traits.js';
@@ -57,7 +58,7 @@ function _num(n, d = 3) { return (Number.isFinite(n) ? n : 0).toFixed(d); }
 // -- Equity helper ------------------------------------------------------------
 
 function _computeEquity(portfolio, sim) {
-    let equity = portfolio.cash;
+    let equity = portfolio.cash - unpaidObligations(portfolio);   // net of what the desk owes (02a "The evening")
     for (const pos of portfolio.positions) {
         equity += computePositionValue(pos, sim.S, Math.sqrt(sim.v), sim.r, sim.day, sim.q);
         if (pos._reservedMargin) equity += pos._reservedMargin;
@@ -95,7 +96,7 @@ export function checkEndings(sim, portfolio, world, playerChoices = {}) {
 // Family + personal-overlay metadata
 // =============================================================================
 
-const FAMILY_NAMES = {
+export const FAMILY_NAMES = {
     1: 'Won with margin', 2: 'The knife-edge', 3: 'Misaligned takeoff',
     4: 'China first', 5: 'The deal', 6: 'The fizzle',
 };
@@ -472,8 +473,9 @@ function _pageLedger(family, overlay, ctx, factionState, traitIds) {
 
 function _financialScorecard(sim, portfolio, closeout) {
     if (!sim || !portfolio) return '';
-    // Post-closeout equity is cash (closeout converted every valued position); fall
-    // back to the mark-to-market equity when the closeout is absent (pre-integration).
+    // Post-closeout equity is cash: the closeout converted every valued position and
+    // paid every unpaid obligation out of it (02a "The evening"). Fall back to the
+    // mark-to-market equity, net of obligations, when the closeout is absent (Classic).
     const equity = closeout ? portfolio.cash : _computeEquity(portfolio, sim);
     const totalPnl = equity - INITIAL_CAPITAL;
     const pnlPct = totalPnl / INITIAL_CAPITAL;

@@ -49,6 +49,8 @@ export function cacheDOMElements($) {
     $.strategySection   = document.getElementById('book-strategies');
     $.pendingOrders     = document.getElementById('pending-orders');
     $.ordersSection     = document.getElementById('book-orders');
+    $.obligationList    = document.getElementById('obligation-list');   // the unpaid obligations (02a "The evening")
+    $.obligationsSection = document.getElementById('book-obligations');
     $.cashDisplay       = document.getElementById('cash-display');
     $.portfolioValue    = document.getElementById('portfolio-value');
     $.bookChange        = document.getElementById('book-change');
@@ -343,7 +345,7 @@ function _renderRecord(container) {
             ? `${fmtSigned(rec.S)} nats over ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'}`
             : '—'],
         ['Credibility', (pct < 0 ? '−' : '') + Math.abs(pct) + '%'],
-        ['Forecasts locked', String(rec.locks)],
+        ['Quarters stated', String(rec.history.filter(q => q.rungs.some(r => r.cls === 'carried')).length)],
     ]);
     // The quarters scored, newest first.
     const tbl = document.getElementById('record-quarters');
@@ -353,8 +355,19 @@ function _renderRecord(container) {
     if (tbl._sig === sig) return;
     tbl._sig = sig;
     tbl.tBodies[0].innerHTML = rec.history.slice(-12).reverse().map(q =>
-        `<tr><td class="l">Days ${q.from}–${q.to}${q.terminal ? ', at the end' : ''}</td><td>${q.rungs.length}</td>`
+        `<tr><td class="l">Days ${q.from}–${q.to}${q.terminal ? ', at the end' : ''}</td><td>${q.rungs.filter(r => r.cls === 'carried').length}</td>`
         + `<td class="${q.delta > 0.005 ? 'pnl-up' : q.delta < -0.005 ? 'pnl-down' : ''}">${fmtSigned(q.delta, 2)}</td></tr>`).join('');
+}
+
+/** The handover (02a "The evening"): the predecessor's memo, kept on the
+ *  Meridian page for the run, and where they went. Hidden without a hand. */
+export function renderHandover(fixture) {
+    const sec = document.getElementById('handover-section');
+    if (!sec) return;
+    sec.hidden = !fixture;
+    if (!fixture) return;
+    document.getElementById('handover-memo').textContent = fixture.memo;
+    document.getElementById('handover-left').textContent = `${fixture.predecessor.name} ${fixture.predecessor.left}.`;
 }
 
 function _renderRows(container, entries) {

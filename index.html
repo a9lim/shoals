@@ -288,6 +288,7 @@
                 <button class="folio" id="folio-meridian" data-page="meridian" role="tab" aria-selected="false" aria-controls="page-meridian" tabindex="-1">Meridian</button>
             </div>
             <div class="folio-tools">
+                <button id="skip-btn" class="hbtn" type="button" title="To the next edition worth reading (N)">Next edition</button>
                 <button id="speed-btn" class="hbtn" type="button" aria-label="Simulation speed" title="Speed (. faster, , slower)">1×</button>
                 <button id="reset-btn" class="hbtn" type="button" title="Reset (R)">Reset</button>
             </div>
@@ -336,7 +337,11 @@
                     <div class="stat-row"><span class="stat-label">Borrow cost</span><span class="stat-value" id="borrow-cost">$0.00k</span></div>
                     <div class="stat-row"><span class="stat-label">Dividends</span><span class="stat-value" id="dividend-income">$0.00k</span></div>
                 </div>
-                <h3 class="col-h">Positions</h3>
+                <section id="book-obligations" hidden>
+                    <h3 class="col-h">Obligations</h3>
+                    <div id="obligation-list" class="pos-list"></div>
+                </section>
+                <h3 class="col-h col-h-act">Positions <button class="link-btn" id="book-flatten" type="button" title="Load the flatten into the ticket (X)">Flatten</button></h3>
                 <div id="default-positions" class="pos-list"><p class="panel-hint">—</p></div>
                 <section id="book-strategies" hidden>
                     <h3 class="col-h">Strategies</h3>
@@ -452,7 +457,7 @@
                     <h3 class="col-h">Your record <button class="info-trigger" type="button" data-info="record" aria-label="Info: Your record">?</button></h3>
                     <div id="standings-record"></div>
                     <table class="agate record-tbl" id="record-quarters" aria-label="Quarters scored against the market" hidden>
-                        <thead><tr><th class="l">Quarter</th><th>Rungs</th><th>Nats</th></tr></thead>
+                        <thead><tr><th class="l">Quarter</th><th>Stated</th><th>Nats</th></tr></thead>
                         <tbody></tbody>
                     </table>
                     <section id="handover-section" hidden>

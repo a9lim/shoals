@@ -15,6 +15,8 @@
    DOM only; reads what main.js hands it.
    ===================================================== */
 
+import { fmtBook } from './format-helpers.js';
+
 // Kickers for the wire, by event category (the dispatch uses the same labels).
 export const CATEGORY_LABEL = {
     fed: 'Federal Reserve', investigation: 'Investigation', congressional: 'Congress',
@@ -99,7 +101,7 @@ export function updateMasthead(d) {
     _text('dl-vx', `VXHCN ${d.vx.toFixed(1)}`);
     _text('dl-rate', `Rate ${(d.rate * 100).toFixed(2)}%`);
     const pnl = d.equity - d.initial;
-    _mixed('dl-book', `Book ${d.equity < 0 ? '−' : ''}$${Math.round(Math.abs(d.equity)).toLocaleString('en-US')}k `, (pnl < 0 ? '−' : '+') + Math.abs(pnl / d.initial * 100).toFixed(1) + '%', pnl < 0 ? 'dn' : '');
+    _mixed('dl-book', `Book ${fmtBook(d.equity)} `, (pnl < 0 ? '−' : '+') + Math.abs(pnl / d.initial * 100).toFixed(1) + '%', pnl < 0 ? 'dn' : '');
 }
 
 const _last = {};
@@ -167,7 +169,7 @@ function _swapLead(kick, head, body, src) {
 /**
  * Set the lead and the wire under it from the engine's event log (oldest
  * first). With no news yet, the lead is the tape itself.
- * @param {object[]} log   eventLog entries { day, headline, magnitude, category }
+ * @param {object[]} log   eventLog entries { day, headline, magnitude, category, archive? }
  * @param {number} origin  sim day of edition 1
  * @param {object} tape    { S, prevClose, vx, rate } for a quiet day's lead
  */
@@ -179,7 +181,7 @@ export function renderWire(log, origin, tape) {
     if (key !== _leadKey) {
         if (lead) {
             const { head, body } = splitHeadline(lead.headline);
-            _swapLead(categoryLabel(lead.category), head, body, `Edition ${editionOf(lead.day - origin)}`);
+            _swapLead(categoryLabel(lead.category), head, body, lead.archive ? 'Archive' : `Edition ${editionOf(lead.day - origin)}`);
         } else if (tape) {
             const ch = tape.prevClose > 0 ? (tape.S / tape.prevClose - 1) * 100 : 0;
             const rel = Math.max(0, tape.rel || 0);
@@ -209,7 +211,8 @@ export function renderWire(log, origin, tape) {
         if (e.magnitude === 'major') li.className = 'major';
         const d = document.createElement('span');
         d.className = 'b-day';
-        d.textContent = 'Ed. ' + editionOf(e.day - origin);
+        // The predecessor's archived reports predate the term (02a "The evening").
+        d.textContent = e.archive ? 'Archive' : 'Ed. ' + editionOf(e.day - origin);
         const k = document.createElement('span');
         k.className = 'b-kick';
         k.textContent = categoryLabel(e.category) + '. ';

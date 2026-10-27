@@ -6,7 +6,7 @@
    ===================================================== */
 
 import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD, BOND_FACE_VALUE } from './src/config.js';
-import { fmtDollar, fmtSigned } from './src/format-helpers.js';
+import { fmtDollar, fmtSigned, fmtBook } from './src/format-helpers.js';
 import { createSparkHistory, pushSparkSample } from './src/sparkline.js';
 import { Simulation } from './src/simulation.js';
 import { buildChainSkeleton, priceChainExpiry, ExpiryManager } from './src/chain.js';
@@ -18,7 +18,9 @@ import {
     computeNetDelta, computeGrossNotional, portfolioValue,
     executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows, applyCloseoutRows,
     isExpiredForTrading, allocatePrivateStake, allocatePrimaryStock,
+    settleObligation, payObligationsAtCloseout,
 } from './src/portfolio.js';
+import { dealOpeningHand, resetOpening, dealtFixture } from './src/opening.js';
 import { ChartRenderer } from './src/chart.js';
 import {
     cacheDOMElements, bindEvents,
@@ -26,7 +28,7 @@ import {
     syncSettingsUI,
     updatePlayBtn, updateSpeedBtn,
     wireInfoTips,
-    updateDynamicSections, updateCongressDiagrams, updateStandings,
+    updateDynamicSections, updateCongressDiagrams, updateStandings, renderHandover,
     updateStandingOrdersPanel,
     refreshTooltip,
     showPopupEvent,
@@ -40,8 +42,9 @@ import {
 } from './src/ticket.js';
 import { initSurface } from './src/surface.js';
 import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace } from './src/race-page.js';
-import { resetCounts, countDispatch, countChoice, countDevelopment, counts } from './src/counters.js';
+import { resetCounts, countDispatch, countChoice, countDevelopment, countPause, counts } from './src/counters.js';
 import { buildAlmanacRecord, appendAlmanac } from './src/almanac.js';
+import { initAlmanacView, renderAlmanac } from './src/almanac-view.js';
 import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
 import { checkEndings, generateEnding, determineOverlay, isTerminalSafeBeat } from './src/endings.js';
 import { computePositionValue, computePositionPnl } from './src/position-value.js';
@@ -718,6 +721,7 @@ function init() {
     });
     initPages(_onPageChange);
     initBrief();
+    initAlmanacView();
 
     // 1. Create the tape's renderer
     chart    = new ChartRenderer($.chartCanvas);
@@ -962,6 +966,7 @@ function init() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
+        _dealOpeningHand();
     } else {
         deactivateConsensus();
         deactivateComputeMarket();
@@ -1143,6 +1148,8 @@ function _onPageChange(page) {
     if (page === 'markets') renderTicket();
     setRaceVisible(page === 'race');
     if (page === 'meridian') {
+        renderHandover(dealtFixture());
+        renderAlmanac();
         _updateRegulationDisplay();
         _updateLobbyPills();
         if (eventEngine) updateStandings($, eventEngine.world, factions, getFactionDescriptor);
@@ -1156,6 +1163,7 @@ function _onThemeChange() {
     redrawMarkets();
     redrawTicket();
     drawRace();
+    if (currentPage() === 'meridian') renderAlmanac();
     dirty = true;
 }
 
@@ -1270,7 +1278,8 @@ function _syncMasthead(force = false) {
 function _updateWire() {
     const log = eventEngine ? eventEngine.eventLog : [];
     renderWire(log, chart.dayOrigin, _tapeSnapshot());
-    chart.setNews(log.map(e => ({ day: e.day, head: splitHeadline(e.headline).head, major: e.magnitude === 'major' })));
+    // Archived items (the predecessor's reports) predate the term: no news day on the tape.
+    chart.setNews(log.filter(e => !e.archive).map(e => ({ day: e.day, head: splitHeadline(e.headline).head, major: e.magnitude === 'major' })));
     dirty = true;
 }
 
@@ -1607,7 +1616,7 @@ function _processPopupQueue() {
             _showEpilogue(pages, true);   // terminal: no "keep playing"
             // The almanac (02a "The evening"): the last edition of a Dynamic run,
             // natural resolution and ejection alike, appends its record once.
-            if (_almanacRecord) { appendAlmanac(_almanacRecord); _almanacRecord = null; }
+            if (_almanacRecord) { appendAlmanac(_almanacRecord); _almanacRecord = null; renderAlmanac(); }
         }
         return;
     }
@@ -2052,8 +2061,7 @@ function _triggerGameOver(endingId) {
         const _dP = resolution && resolution.axes ? Math.abs(resolution.axes.dP || 0) : 0;
         // Personal overlay (surface the mapping; the epilogue picks slots, not tone).
         overlay = determineOverlay(endingId, ledgerTotals(), _dP, _firmVerdictFired);
-        // MERGE (pass B): the drawn opening fixture's id, from src/opening.js's getter; null until it lands.
-        const fixture = null;
+        const fixture = dealtFixture() ? dealtFixture().id : null;
         // INTERPRETATION: the record's terminal day and cause are the resolution's
         // (day, terminalCause); the desk's own ending (natural or an ejection) rides
         // beside them as `ending`.
@@ -2103,8 +2111,11 @@ function _runTerminalCloseout(resolution, geo) {
         bond: { rate: sim.r, a: market.a, b: market.b, sigmaR: market.sigmaR, day: sim.day, face: BOND_FACE_VALUE },
     });
     applyCloseoutRows(book.rows);   // credit cash + remove positions by id (preserves borrow accrual)
+    // Every unpaid obligation is paid out of the closeout's cash, so terminal equity
+    // (the scorecard's cash) is net of it (02a "The evening").
+    const obligations = payObligationsAtCloseout();
     // All nine cells reach the scorecard: the matrix book + the two finalizer P&L sets.
-    return { rows: book.rows, ctx: book.ctx, totalCash: book.totalCash, totalPnl: book.totalPnl, binary, compute };
+    return { rows: book.rows, ctx: book.ctx, totalCash: book.totalCash, totalPnl: book.totalPnl, binary, compute, obligations };
 }
 
 /**
@@ -2311,6 +2322,51 @@ function _portfolioEquity() {
     // sequester the whole notional), which can spuriously trip rogue-trading /
     // review thresholds -- so always go through portfolioValue.
     return portfolioValue(sim.S, market.sigma, sim.r, sim.day, sim.q);
+}
+
+/** A desk item on the wire (02a "The evening"): minor, category desk. Off the
+ *  front page it also arrives as a toast, as the day's events do. */
+function _postDeskItem(headline) {
+    if (!eventEngine) return;
+    eventEngine._logEvent(sim.day, { headline, category: 'desk' }, {}, 'minor');
+    _updateWire();
+    if (currentPage() !== 'front') _toast(headline, 5000);
+}
+
+const _capFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
+
+/**
+ * The obligations' close (02a "The evening"). An obligation due today is paid from
+ * cash, or, when cash is short, the shortfall is raised by the forced sale (which
+ * costs firmStanding 8) and any remainder goes on the margin loan. Five sessions
+ * ahead, a desk whose cash would not cover it gets a notice and pauses: not a
+ * dispatch, so nothing but the player's play resumes it. A covered obligation
+ * gives no notice.
+ */
+function _settleObligations() {
+    if (!portfolio.obligations.length) return;
+    const rel = _relDay();
+    for (const ob of portfolio.obligations.slice()) {
+        if (ob.dueDay <= rel) {
+            const res = settleObligation(ob, sim, sim.S, market.sigma, sim.r, sim.day, sim.q);
+            if (!res) continue;
+            if (res.forced) {
+                countDevelopment('forced_sale');
+                shiftFaction('firmStanding', -8);
+                _postDeskItem(`Operations sells a slice of the book to meet ${ob.label}; the desk was ${fmtBook(res.shortfall)} short on the day, and the risk committee has noted it.`);
+            } else {
+                _postDeskItem(`${_capFirst(ob.label)} is paid in full; ${fmtBook(ob.amount)} leaves the desk in cash.`);
+            }
+            bookDirty = true;
+        } else if (ob.dueDay - 5 === rel && portfolio.cash < ob.amount) {
+            _postDeskItem(`${_capFirst(ob.label)}, ${fmtBook(ob.amount)}, is due in five sessions; the desk holds ${fmtBook(portfolio.cash)} in cash.`);
+            countDevelopment('notice');
+            countPause('notice');
+            playing = false;
+            _resumeAfterDispatch = false;   // a dispatch answered later must not resume past the notice
+            updatePlayBtn($, playing);
+        }
+    }
 }
 
 /**
@@ -2861,6 +2917,13 @@ function _onDayComplete() {
     chainSkeleton = buildChainSkeleton(sim.S, sim.day, expiryMgr.update(sim.day));
     bookDirty = true;
 
+    // Obligations (02a "The evening"): one due on day d is settled at the close that
+    // turns day d - 1 into day d -- this close -- after expiry, the race block's
+    // settlements and the terminal check (a close that ended the run returned above,
+    // and its closeout paid what was unpaid), immediately before the rogue-trading
+    // and margin checks. The notice is checked at the same point.
+    _settleObligations();
+
     // Rogue trading check (before margin)
     const equity = _portfolioEquity();
     if (equity < portfolio.initialCapital * ROGUE_TRADING_THRESHOLD) {
@@ -3144,7 +3207,8 @@ function _resetCore(index) {
     _almanacRecord = null;
     resetCounts();                 // the interruption counters are run-scoped
     sim.reset(index);
-    resetPortfolio();
+    resetPortfolio();   // obligations too: Classic starts on cash; Dynamic boot deals the hand
+    resetOpening();
     resetImpactState();
     sim.prepopulate();
     _syncAll();
@@ -3160,6 +3224,27 @@ function _resetCore(index) {
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
     updateDynamicSections($, index);
+}
+
+/**
+ * The opening hand (02a "The evening"): a Dynamic run starts on an inherited desk,
+ * drawn from the race's seed by the hand's own stream and taken over at day 0's
+ * opening marks. Called at Dynamic boot once belief, valuation, compute and
+ * Consensus are quoting, so every mark exists. The predecessor's two archived
+ * reports go on the wire first and the memo last, so the memo is the newest item
+ * and leads Edition 1; the archived items are dated Archive, not by edition.
+ */
+function _dealOpeningHand() {
+    const fixture = dealOpeningHand(raceState.seed, expiryMgr.update(sim.day).map(e => e.day));
+    // INTERPRETATION: 02a gives the memo and the reports no magnitude; they post as
+    // minor, like the desk's other wire items, and the archived ones mark no news
+    // day on the tape (see _updateWire).
+    for (const r of fixture.reports) {
+        eventEngine._logEvent(sim.day, { headline: r.headline, category: r.category }, {}, 'minor').archive = true;
+    }
+    eventEngine._logEvent(sim.day, { headline: fixture.memo, category: 'desk' }, {}, 'minor');
+    if (currentPage() === 'meridian') renderHandover(fixture);
+    bookDirty = true;
 }
 
 function loadPreset(index) {
@@ -3189,6 +3274,7 @@ function loadPreset(index) {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine.world.geopolitical);
+        _dealOpeningHand();
     } else {
         eventEngine = null;
         raceState = null;
@@ -3239,6 +3325,7 @@ function resetSim() {
         _wireBeliefQuoters();
         refreshBinaryQuotes(raceState);
         refreshComputeQuotes(raceState, eventEngine ? eventEngine.world.geopolitical : null);
+        _dealOpeningHand();
     }
     _updateWire();
     updateCongressDiagrams($, eventEngine ? eventEngine.world : null);

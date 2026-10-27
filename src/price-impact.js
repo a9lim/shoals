@@ -243,6 +243,28 @@ export function recordOptionTrade(type, qty, sigma, logSK, dte, strike, expiryDa
  * @param {Object[]} positions  portfolio.positions array
  */
 export function rehedgeMM(positions) {
+    const requiredHedge = _requiredHedge(positions);
+    const diff = requiredHedge - _mmCurrentHedge;
+    const absDiff = Math.abs(diff);
+    if (absDiff < 0.01) return;
+
+    // Record the incremental hedge as stock volume
+    if (diff > 0) _cumStockBuy  += absDiff;
+    else           _cumStockSell += absDiff;
+    _mmCurrentHedge = requiredHedge;
+}
+
+/**
+ * Seat the MM's hedge at the takeover book's (02a "The evening"), recording no
+ * volume: the predecessor's history enters nothing, and only later changes in
+ * delta count as flow.
+ */
+export function baselineMMHedge(positions) {
+    _mmCurrentHedge = _requiredHedge(positions);
+}
+
+/** Shares the MM holds to hedge the player's options at the current market. */
+function _requiredHedge(positions) {
     let requiredHedge = 0;
     for (const p of positions) {
         if (p.type !== 'call' && p.type !== 'put') continue;
@@ -257,15 +279,7 @@ export function rehedgeMM(positions) {
         // MM is short what player is long: hedges by buying delta*qty shares
         requiredHedge += delta * p.qty;
     }
-
-    const diff = requiredHedge - _mmCurrentHedge;
-    const absDiff = Math.abs(diff);
-    if (absDiff < 0.01) return;
-
-    // Record the incremental hedge as stock volume
-    if (diff > 0) _cumStockBuy  += absDiff;
-    else           _cumStockSell += absDiff;
-    _mmCurrentHedge = requiredHedge;
+    return requiredHedge;
 }
 
 /* ── Layer 3: Parameter shifts from large exposure ── */
