@@ -29,7 +29,16 @@ The tuning objects are exported mutable for harness sweeps only:
 
 A number called a **gate** is asserted by a harness at its default N. A
 number called a **diagnostic** is printed but not asserted, and it moves
-with retunes.
+with retunes. On 2026-10-27 the harnesses were slimmed (a9: the reader is
+close enough, and the map fits the territory). They now assert structural
+invariants (settlement, conservation, the terminal path, public state
+only, determinism and resume) and loose headlines on the game's stance
+(the family table, liveness, the knife-edge ceilings, the crossing
+medians, the reader and V calibrated in the large, `B`'s edge and its
+close). Measurement-grade bands, calibration grids, challengers and
+bit-identity between configurations are no longer asserted: where a
+section below still calls one a gate, read it as a design target, and
+each harness's header lists what it does assert.
 
 Units: trading days (game = days 0–1008, 16 substeps/day); capability in
 rung units (R1 = 1 … R5 = 5); `S`, `heat`, τ, culture, pace in [0, 1].
@@ -438,9 +447,10 @@ each certifiable contract is genuinely two-sided. The listing base rate
 is the contract's published prior, and it lives only in `consensus.js`.
 It equals `B`'s day-0 quote, which is the same in every world because
 every world opens with the released frontier at R1. It is re-derived at
-each refit of the reader. Gates (`consensus-test`): each base rate within 0.03 of the mean
-day-0 quote, and each listing mid within 8 points of its measured *YES*
-frequency. The fallback branch is outside that comparison ("Belief, η,
+each refit of the reader. Gate (`consensus-test`): each base rate within
+0.03 of the mean day-0 quote. Each listing mid sat within 8 points of
+its measured *YES* frequency at the 2026-10-25 fit; that is no longer
+asserted. The fallback branch is outside that comparison ("Belief, η,
 and the firm": the settlement tree). No contract is degenerate.
 
 Binary longs are cash-funded (no leverage); shorts post full-notional
@@ -732,17 +742,19 @@ one-day spike, so full deadline quotes miss by up to eight points on
 those days (R4 at day 1: +0.085). Through those weeks the released
 frontier is R1 in nearly every world, η is 0, and `B` is its legible
 half, which is calibrated there. A nonlinear model class (boosted trees over the same
-features) is the next step if a later round needs a tighter stick. The
-assumed input schedule is not the event engine's,
-and the player's channels are absent from training, so live worlds sit
-off the training distribution by an amount nothing measures yet. The
+features) is the next step if a later round needs a tighter stick. Since
+2026-10-27 half the fit's worlds take the event engine's own inputs, but
+the player's channels are absent from training, so live worlds sit off
+the training distribution by an amount nothing measures yet. The
 reader is linear in its features. It is a measuring stick, not a bound
 on what a richer reader could learn. The ceiling gates are measured
 against it, and passing them does not establish when a world becomes
 inferentially determined.
 
-Gates (`reader-test`, test seeds, reported separately for neutral worlds
-and for each scenario of the input schedule, never averaged together):
+Design targets (`reader-test` asserts only the headlines since
+2026-10-27: each head calibrated in the large, the full head no worse
+than the legible, `B`'s edge positive early and closed late, and the
+reader-copier's edge positive), for neutral and engine worlds apart:
 
 - **Calibration.** On quarter events (rung R certifies within the next
   63 days) and live deadline events, at the sampled days, per rung and
@@ -923,8 +935,8 @@ deterministic least-squares fit to the pooled conditional CDF at days
 `t + 21k`, within the support. The projection is only a starting point
 for drawing. Following the market is a policy, not a drawing.
 
-**The edge, gated** (`reader-test`, test seeds). These gates are
-provisional: their bands are chosen on validation worlds once the
+**The edge** (`reader-test` asserts its headline only; these bands are
+design targets). They were provisional: their bands are chosen on validation worlds once the
 ratified hazard family is fit, because a multi-horizon recalibration can
 close more of the gap than the quarter-only probe did, and the numbers
 are recorded here then. An eligible rung-quarter is a rung in R2–R4
@@ -1170,7 +1182,8 @@ the reader-copier's averages 1.47 against a mean `S_P` of 0.80. So any
 right tail, which σ₀ under the market's own law understates, still came
 through.
 
-Calibration targets (gated by `forecast-test`):
+Calibration targets (set `K_CRED` at the 2026-10-25 fit; `forecast-test`
+now asserts only that the reader-copier's edge is positive):
 
 - The reader-copier clears the memo gate by day 882 in at least half of
   worlds (the edge gate under `B`, above). This target sets `K_CRED`.
@@ -1431,7 +1444,9 @@ gap reaches every downstream mark the normal way (`_syncAll`), and the
 markets snapshot is taken after it. Classic has no `V`. The decaying
 impulses stay, as texture: vol, jump intensity and a hair of drift.
 
-Gates (`valuation-test` and `reader-test`, test seeds). The survival
+Design targets (`valuation-test` asserts V's formula, bounds and
+corruption invariance, reconciliation, and V calibrated in the large;
+the rest are targets since 2026-10-27). The survival
 measure is the test worlds that do not end misaligned. Every series is
 the **stopped process**: after resolution, `V` is the realized mark
 `m_f`, so a world that resolves inside a window is never dropped from
@@ -1907,7 +1922,7 @@ demonstrate `k` again while an earlier demonstration of `k` is
 unevaluated or upheld, and after a narrowing or a withdrawal it may.
 Releasing `k` moves its next demonstration to `k + 1`.
 
-Tuning target (`race-mc`, a gate): 35–65% of Halcyon's internal R3
+Tuning target (`race-mc`, reported): 35–65% of Halcyon's internal R3
 crossings, and of its internal R4 crossings, are demonstrated before
 Halcyon releases the rung. The denominator is the crossings whose
 release falls within the horizon; the numerator counts a first
@@ -1967,7 +1982,7 @@ prices move with `B` through ΔΠ, as before.
 
 A demonstration moves no capability, heat, `S`, schedule or hazard, so
 under identical orchestrator inputs the race core is bit-identical with
-demonstrations on or off (a gate). In a whole run the market's response
+demonstrations on or off (by construction; no longer gated). In a whole run the market's response
 reaches event eligibility, and through it the world inputs; that is
 measured, not gated.
 
@@ -2011,14 +2026,14 @@ a new race substream `streams.releaseJitter`, so no other stream's draws
 change. Nothing else moves: a lab's first release keeps its timing, and
 no release history is invented, because `lastReleaseDay` is public. The
 early lockstep is chiefly Tianxia's releases on days 1, 46 and 91, and
-the jitter spreads every release after the first. Gates (`race-mc`): the
+the jitter spreads every release after the first. Targets (`race-mc`): the
 KM medians keep their bands, and the Act I claim excess in days 42–48 of
 the 63-day cycle (65% above average today) falls below 25%. The ruling
 first drew U(35, 55); that left the Act I excess at +30%, and the round
 widened it to meet the target (+16%, the whole run +4%). The rule of
-thumb's code doesn't change. Its frozen hash is re-derived by running
-HEAD 1343924's `belief.js` on the jittered worlds under the hash's own
-fixed input tape, and the current rule must still match it.
+thumb's code doesn't change: run on the jittered worlds, HEAD 1343924's
+`belief.js` and the current one agreed bit for bit (the frozen hash,
+since retired with the slimmed gates).
 
 **The refit.** The shipped fit (record schema 16) takes three changes:
 
@@ -2221,10 +2236,11 @@ and the no-player diagnostics use the bystander.
   Dynamic, Classic, then Dynamic again;
 - round trip: a scripted policy's run, recorded and replayed, reproduces
   its digest trail;
-- the fixture: a journal recorded in the browser (trades, a strategy, a
-  flatten, resting orders, an exercise, dispatch answers, forecast edits,
-  a standing order, a government action) replays headless to its digest
-  trail under its rules version;
+- the fixture: a journal recorded in the browser (dispatch answers,
+  forecast edits, a market order, a resting order, the flatten, a
+  government action and a strategy; the scripted policy covers an
+  exercise and a standing order) replays headless to its digest trail
+  under its rules version;
 - live equivalence, in the browser: a development hook
   (`shoalsReplayCheck()`) replays the current run's journal in a module
   worker, which has its own module instances, and compares digests with
@@ -2233,11 +2249,9 @@ and the no-player diagnostics use the bystander.
 - resume: replaying to an endpoint and continuing the policy matches an
   uninterrupted run;
 - order: a trace of the close matches the documented race-block order;
-- coupling: two runs that differ by one event draw the same values in
-  every slot neither event touches;
 - the bystander: every dispatch in the pool and every generator names a
   qualifying bystander choice;
-- Classic stays inert, and every existing bit-identity invariant holds;
+- Classic stays inert;
 - timing: a full bystander Dynamic run's wall time is reported, because
   the resume and the fit's worlds depend on it.
 

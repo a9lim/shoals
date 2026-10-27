@@ -29,26 +29,29 @@ the projects live from the working tree.
 
 ```bash
 for f in main.js colors.js src/*.js src/events/*.js src/race/*.js tools/*.mjs; do node --check "$f"; done
-node tools/race-mc.mjs         # [N] [--seed S], N=1000: race calibration vs 02a targets (~1 s)
-node tools/plumbing-test.mjs   # [N], N=2000: content plumbing, evidence, Act III, standing orders, room/intel, capex/concealment (~13 s)
-node tools/belief-test.mjs     # [N] [--seed S], N=300: the rule of thumb's ledger and frozen hash, B's pool, quoters, the posterior's arithmetic, impulse decay (~9 s)
-node tools/compute-test.mjs    # [N] [--seed S], N=300: compute-futures lifecycle, conservation, integrity (~2 s)
-node tools/consensus-test.mjs  # [N] [--seed S], N=500: binary settlement, regime split, accounting, listing base rates (~2 s)
-node tools/endings-test.mjs    # [N] [--seed S], N=2000: family distribution, player channels, closeout, terminal path, the reader's ceilings (~18 s)
-node tools/forecast-test.mjs   # [N] [--seed S] [--calibrate], N=500/scenario: properness, the copier, K_CRED vs the reader-copier, static presets (~22 s)
-node tools/valuation-test.mjs  # [N] [--seed S] [--validation], N=1000/scenario: V's corruption invariance, calibration, fairness, reconciliation (~54 s)
-node tools/rounds-test.mjs     # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~28 s)
-node tools/reader-test.mjs     # [N] [--seed S] [--sections A-G], N=2000/scenario: the reader's gates, B's edge and its close (~2 min)
-node tools/opening-test.mjs    # N=400 worlds: the inherited desks, obligations and their netting, the forced sale, the close, reduce-only closes, the skip's stops, the flatten ticket (~4 s)
-node tools/run-test.mjs        # [--seed S] [--rebaseline]: the run headless: no ambient randomness, determinism, isolation, round trip, the fixture, resume, the close's order, coupling, the bystander, Classic inert, timing (~4 s)
+node tools/race-mc.mjs         # [N] [--seed S], N=1000: KM crossing medians, the fizzle tail, the S4 rule, the chain's reports, Polaris's schedule (~4 s)
+node tools/plumbing-test.mjs   # [N], N=2000: content plumbing, evidence, Act III, standing orders, room/intel, capex/concealment, the bystander, demonstrations (~12 s)
+node tools/belief-test.mjs     # [N] [--seed S], N=60: the rule of thumb's ledger, B's pool and quoters, the posterior's arithmetic, the standing policy, impulse decay (~10 s)
+node tools/compute-test.mjs    # [N] [--seed S], N=300: compute-futures lifecycle, conservation, integrity (~3 s)
+node tools/consensus-test.mjs  # [N] [--seed S], N=500: binary settlement, regime split, accounting, integrity, the listing base rates (~1 s)
+node tools/endings-test.mjs    # [N] [--seed S], N=2000: family distribution, player channels, closeout, terminal path, late determination (~13 s)
+node tools/forecast-test.mjs   # [N] [--seed S], N=100/scenario: the market copier, properness, the reader-copier's edge (~8 s)
+node tools/valuation-test.mjs  # [N] [--seed S], N=150/scenario: V's formula and bounds, corruption invariance, V in the large, reconciliation (~11 s)
+node tools/rounds-test.mjs     # [N] [--seed S], N=100: Polaris rounds, Halcyon follow-ons, collateral, conservation, the run's chokepoints (~7 s)
+node tools/reader-test.mjs     # [N] [--seed S], N=200/scenario: schema and the public record, the reader in the large, B's edge and its close (~12 s)
+node tools/opening-test.mjs    # [N] [--seed S], N=400 worlds: the inherited desks, obligations and their netting, the forced sale, the close, reduce-only closes, the skip's stops, the flatten ticket (~1 s)
+node tools/run-test.mjs        # [--rebaseline] [--seed S]: the run headless: no ambient randomness, determinism, isolation, round trip, the fixture, resume, the close's order, the bystander, Classic inert, timing (~5 s)
 node tools/reader-fit.mjs      # the reader's offline fit; needs NumPy/SciPy (shared venv). Run only under 02a's refit rule
 ```
 
-The twelve harnesses import `src/` directly and exit 1 on any failure. They are the
-regression gate for anything that touches the Dynamic-mode systems. Run them at the
-default N, because their calibration bands are sized for it and small-N runs miss
-them legitimately. Each harness header lists its sections. The parent build doesn't
-stage `tools/`.
+The twelve harnesses import `src/` directly and exit 1 on any failure; run in
+parallel, they take about 15 s. They catch bugs (settlement exactly once, money
+conserved, the terminal path, public state only, determinism and resume) and keep
+loose headlines on the game's stance (the family table, the knife-edge, the reader
+calibrated in the large). They describe the game as it plays rather than hold it to
+measurement-grade bands (a9, 2026-10-27: the map fits the territory). When a headline
+disagrees with a healthy game, widen it with a dated note; a real bug gets fixed. Each
+harness header lists its sections. The parent build doesn't stage `tools/`.
 
 ## Layout
 
@@ -470,13 +473,13 @@ key is `shoals-theme`.
   the race page during play hold to the same rule; the race page's hidden tracks are
   drawn only after the run ends. The harnesses corrupt every
   hidden field and assert the quotes are unchanged.
-- **Bit-identity is a test invariant.** The harnesses assert bit-identical race
-  trajectories for no-player runs, stage-0 export controls and substream isolation,
-  and they assert that Classic stays inert. A new random draw belongs in its own
-  `deriveSeed` stream, or a `keyedRng` slot keyed by its semantic identity. No state
-  path draws `Math.random`; presentation draws from streams of its own, so a display
-  draw never moves the market. run-test asserts a run completes with `Math.random`
-  throwing.
+- **Determinism.** A run is its seed and its journal, so no state path draws
+  `Math.random`: a new random draw belongs in its own `deriveSeed` stream, or a
+  `keyedRng` slot keyed by its semantic identity, and presentation draws from streams
+  of its own, so a display draw never moves the market. run-test asserts a run
+  completes with `Math.random` throwing and that a journal replays to the same state.
+  Bit-identity between configurations (a subsystem on or off, a substream added) is
+  kept by construction where it's cheap, but no longer gated.
 - **Orchestrator inputs.** Race steps that need world facts take them as
   `advanceRace` inputs (strait tension, player coupling, export-control stage), and
   the regime ratchet is called by the run after `advanceRace`, never inside it.
@@ -518,8 +521,8 @@ key is `shoals-theme`.
   `consensus.js` and equal B's day-0 quote, which is the same in every world. Re-derive
   them on validation seeds whenever the reader is refit.
 - **The rule of thumb is frozen.** The reader's legible heads were fit on the
-  heuristic updater's exact trajectory. belief-test hashes it against commit 1343924;
-  changing the rule means refitting the reader.
+  heuristic updater's exact trajectory, so changing the rule means refitting the
+  reader. Nothing gates it any more; leave it alone.
 - **Reset paths.** One run exists at a time. `newRun` begins with `_resetRun`, which
   resets every module singleton the run touches; `resetRaceBridge()` runs
   unconditionally there, because the race is created after it and stale latches would
@@ -568,12 +571,13 @@ key is `shoals-theme`.
 embedded agency. The 2026-10-27 review reordered it around how the game plays for an
 evening, and a9 ratified it the same day (its rulings are listed there). The evening
 landed on 2026-10-27 (the forecast as a standing policy, the inherited desks with
-their obligations, pacing, the flatten, the almanac). Next is one decision chain end
-to end (a demonstration, a disputed inference, a position, a financing commitment with
-the terminal clip retired, a disclosure, the firm's response), with the transitions
-extracted from `main.js` alongside it so whole runs play headless and replay from a
-journal. Then come what the book bets beside what the player says, the accounting,
-Act III taking the player's judgment, widening into domains, and shared worlds. The
-backlog holds the instruments in waiting, the race's missing machinery, market
-integrity, satire, cleanup, and a9's play-test notes. The event-illustration pilot is
-its own session, briefed there.
+their obligations, pacing, the flatten, the almanac), and so did the first of the
+decision chain's three rounds, with the run made headless beside it: demonstrations
+and their disputes, evaluations and withdrawals; the transitions in `src/run.js`, the
+command journal, save and resume. Next is the chain's second round: a financing
+commitment conditional on an independent evaluation, the terminal clip retired, and
+matched-policy runs; then disclosure and the firm's response. Then come what the book
+bets beside what the player says, the accounting, Act III taking the player's
+judgment, widening into domains, and shared worlds. The backlog holds the instruments
+in waiting, the race's missing machinery, market integrity, satire, cleanup, and a9's
+play-test notes. The event-illustration pilot is its own session, briefed there.

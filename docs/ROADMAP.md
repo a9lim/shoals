@@ -259,18 +259,10 @@ it, what became binding, and who now holds you responsible.
 
 The chain:
 
-1. **A demonstration.** A lab publishes what its *unreleased* model did:
-   a third disclosure mode beside release and leak. In lore it arrives as
-   the Fixedpoint catalogue, and the codename's first public meaning is
-   seven hundred papers. Mathematics certifies fast and loud. The
-   demonstration is evidence about the existing rung contracts (which read
-   as AI research), never their settlement. It carries a correlated
-   withdrawal risk: one flawed lemma retracts its dependents. Labs facing
-   a funding deadline demonstrate more.
-2. **A disputed inference.** A scope dispute, the first dispute class an
-   event opens: the work solved a narrower problem than claimed, or the
-   checker proves a narrower statement. The dispute lifecycle exists and
-   is harness-exercised already.
+1. **A demonstration**: landed in round one (02a "Demonstrations"; 02
+   "Demonstrations").
+2. **A disputed inference**: landed in round one, as the scope dispute
+   and the independent evaluation.
 3. **A forecast and a position**, through the posterior and the ticket.
 4. **A conditional financing commitment.** Anchor Polaris's next round if
    an independent evaluation happens first.
@@ -280,23 +272,18 @@ The chain:
 The chain should admit several defensible policies, and it should
 sometimes punish a good decision through bad luck.
 
-- **One refit, two measurements.** The demonstration changes the record,
-  so the reader is refit in this round. The release jitter (section 10)
-  takes the same refit. Measure them apart, by ablation: the
-  demonstration's edge against the edge without it, and the jitter's
-  effect on its own.
-
 **Three rounds** (ratified 2026-10-27). The chain
 is taken in three rounds, with section 3's first cut in the first:
 
-1. **Evidence.** Demonstrations, the scope dispute and the independent
-   evaluation, the chain's reports on the Race page, the release jitter,
-   and one refit measured by ablation. Section 3 lands beside it: the
-   randomness boundary, the transitions out of `main.js`, the command
-   journal, save and resume, and the bystander. The run's replay gates
-   pass before the fit's worlds are generated, because the fit's input
-   scenario becomes the event engine's own. Rulings: 02a
-   "Demonstrations" and "The run, headless".
+1. **Evidence: landed 2026-10-27.** Demonstrations, the scope dispute and
+   the independent evaluation, the chain's reports on the Race page, the
+   release jitter, and the refit on engine worlds; section 3's first cut
+   beside it. Rulings and what was measured: 02a "Demonstrations" and
+   "The run, headless". As ruled, demonstrations add almost no edge
+   (+0.005 nats a run): the record already implies what they say.
+   Carried forward: four bystander choices that are the nearest
+   qualifying choice rather than a neutral one wait on a9 (02a, the
+   run's implementation readings).
 2. **Commitment.** The conditional financing commitment (anchor
    Polaris's next round if an independent evaluation lands first), the
    terminal clip retired for bounds where influence is exercised, and
@@ -308,28 +295,17 @@ is taken in three rounds, with section 3's first cut in the first:
 
 ### Durable evidence
 
-Today the Brief is a feed. The chain needs the reports it touches to
-persist with identities: the claim and its subject, occurrence and
-publication days where known, the source and related reports, correction
-status, and the contracts the report bears on. Start with the chain's own
-reports, not a general archive.
+The chain's own reports landed in round one: identities, citations,
+status beside the published text, and "new since your last forecast" on
+the Race page. What remains:
 
-- A withdrawal links to the demonstration it retracts and that
-  demonstration's dependents. A new incident links to an earlier
-  assurance.
-- "Since your last forecast" becomes possible.
+- A new incident links to an earlier assurance.
 - **Pinning:** the player can pin reports to a thesis and mark what would
   disconfirm it. Pins score nothing. They make reasoning inspectable, and
-  the last edition sets them beside what the player committed at the time.
-- Prose stays authored. Front-page priority uses public significance and
-  authored metadata, never a headline the engine knows foreshadows a
-  catastrophe.
-- **Gates:**
-  - archived editions never acquire later knowledge;
-  - hidden-state corruption cannot alter public records;
-  - private evidence cannot reach quotes before disclosure;
-  - corrections preserve the original's publication history;
-  - correlated reports keep their common source.
+  the last edition sets them beside what the player committed at the time
+  (round three).
+- Private evidence cannot reach quotes before disclosure (round three,
+  with the verbs).
 
 ### Spending the edge
 
@@ -498,43 +474,23 @@ threshold, so the terminal clip goes in the same round.
 
 ## 3. The run, headless
 
-Much of the rest waits on whole runs played without a page: save and
-resume, the authoring inspector, matched-policy gates, the counterfactual,
-shared seeds. It proceeds incrementally, alongside section 2, not as a
-platform project ahead of play.
+The first cut landed with section 2's first round (02a "The run,
+headless"): the randomness boundary, the transitions in `src/run.js`, the
+command journal, save and resume, the bystander and headless runs. What
+it buys next:
 
-- **Extract the transitions** from `main.js` into a DOM-free module, one
-  authoritative path at a time, starting with the ones the chain touches:
-  the substep, the day's open and close, the race block in its documented
-  order, the event engine, settlements, and the popup queue's state
-  machine with choices supplied by a policy. `main.js` keeps the rendering
-  and wiring. Each move is pure, with a recorded-run equivalence check,
-  because the ordering rules (`_midDayBaseline`, the popup barrier,
-  overlays removed LIFO) are easy to break.
-- **A randomness boundary first.** The event engine and the price path use
-  `Math.random`, and a command journal alone cannot reproduce that. They
-  draw instead through an injectable generator on named seeded streams,
-  kept apart from presentation so a display draw still never moves the
-  market. Addressing a draw by a semantic identity (the event's own id and
-  occurrence, the instrument and substep) rather than a chronological slot
-  keeps a branch that adds or removes one event from relabelling every
-  later draw. That is the coupling rule a counterfactual needs.
-- **A command journal:** every player command, recorded with the day and
-  substep it was made on, and the rules version the run was played under.
-  After a retune, an old save is retired with a notice, never replayed
-  silently under new rules.
-- **What it buys:**
-  - save and resume: a run is its seed, its journal and its version;
-  - whole-run harnesses with scripted player policies: interruption
-    metrics at scale, matched-policy gates, and the empirical spread of
-    whole-run scores the almanac needs;
-  - the authoring inspector: which seeds reached each beat, its
-    eligibility, its consequences, and follow-through that never arrived;
-  - the counterfactual (section 5) and shared seeds (section 8).
-- **Gates:**
-  - an unchanged journal reproduces a run exactly, headless against live;
-  - the extracted transitions keep the race block's order;
-  - Classic stays inert, and the existing bit-identity invariants hold.
+- **Matched-policy runs** for section 2's second round: scripted policies
+  over the same seeds.
+- **The authoring inspector:** which seeds reached each beat, its
+  eligibility, its consequences, and follow-through that never arrived.
+- **Interruption metrics at scale** and the spread of whole-run scores
+  the almanac needs.
+- **The counterfactual** (section 5) and **shared seeds** (section 8).
+  Replay is exact within one JavaScript engine only (Node and Chrome
+  round some `Math` functions differently in the last place), so worlds
+  shared across browsers would need portable math.
+- The remaining harnesses that rebuild pieces of `main.js` move to the
+  run module when they next change.
 
 ## 4. What the book bets
 
