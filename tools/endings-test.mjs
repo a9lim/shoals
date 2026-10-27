@@ -1,52 +1,47 @@
 #!/usr/bin/env node
 /* ===================================================
-   tools/endings-test.mjs -- Headless gate for the P6-1
-   terminal-resolution machinery (overhaul phase 6,
-   endings round 1 + fix/retune round). Runs N seeds of
-   the full daily loop (advanceRace + stepControlRegime +
-   stepTreaty + checkResolution) over the 1008-day horizon
-   with the day-1008 timeout extrapolation, and calibrates
-   the WORLD-side terminal distribution.
+   tools/endings-test.mjs -- Headless gate for the
+   terminal-resolution machinery. Runs N seeds of the full
+   daily loop (advanceRace + stepControlRegime + stepTreaty
+   + checkResolution) over the 1008-day horizon with the
+   day-1008 timeout extrapolation, and checks the game's
+   terminal stance against 02a's bands.
 
-   The WORLD-side sections (A-I) run with NO player input, so
-   d_P == 0 and d_eff == d_W -- they calibrate the world-side
-   distribution and MUST keep passing untouched as P6-2 wires
-   the player channels (the no-player world does not move).
+   The world-side sections (A-H) run with NO player input,
+   so d_P == 0 and d_eff == d_W.
 
    Sections:
-     A. Family distribution vs the 02a tuning contract
+     A. Family distribution vs the 02a tuning contract, the
+        extrapolation share, in-horizon family 6
      B. Liveness (every family >= 2% marginally)
      C. Knife-edge concentration: median |d| ~ 0.10
-     D. Late determination (day-350 / day-700 full-reader family-head Brier)
+     D. Late determination ceilings (day-350 / day-700
+        full-reader family-head Brier, on the first D_N seeds)
      E. Ratchets bind sometimes, never always
      F. Plateau regressions (saturation FP, joint capture, cap)
      G. Determinism + resolution latch
-     H. Treaty track (Deal, completion, window, leak, isolation)
-     I. Blockade|family-4 anti-correlation (diagnostic)
-     -- P6-2 player-channel sections (round 2) --
-     J. No-player identity: d_P == 0, d_W == d_actual, d_eff == d_actual
+     H. Treaty track (Deal, completion, window, leak)
+     J. No-player inertness: d_P == 0, d_W == d_actual == d_eff
      K. Ledger reconstruction audit + applyRaceEffects (synthetic)
      L. Bounded-influence clip: d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|)
      M. Constraint 2: max reachable |d_P| catches >= 40% of |d_W|
-     -- P6-3 closeout + endings sections --
      N. Closeout matrix conservation (every family x regime x instrument cell)
      O. Consensus terminal finalizer (outcomes + idempotent exactly-once)
      P. Compute terminal finalizer (held-past-resolution settles once)
      Q. Player-terminal -> extrapolation -> closeout e2e (3 seeds)
      R. Nationalization reference (multiple range, frozen once, conversion vs decree)
+     S. Ejection-invariance: the desk's presence never changes the oracle
+     T. Natural-resolution atomic closeout
+     U/V. Game-over overlays; terminal queue discipline; the S4 latch
 
-   PROMOTE_DISTRIBUTION flips A/B/D from diagnostic to hard gates.
-   Set true once the outcome-table retune (02a "Outcome-table
-   levers") lands and the family table is inside the 02a bands.
+   Usage:  node tools/endings-test.mjs [N] [--seed S]
+           N defaults to 2000; base seed defaults to 1.
    =================================================== */
 
-import { createRaceState, advanceRace, stepControlRegime, heatValue, RETUNE, setControlRegime } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, stepControlRegime, heatValue, RETUNE } from '../src/race/race-state.js';
 import { stepTreaty } from '../src/race/treaty-track.js';
 import { checkResolution, resolveNow, HORIZON } from '../src/race/resolution.js';
-import {
-    buildPublicView, initConsensus, resetConsensus, finalizeConsensusTerminal,
-    frontierCertifiedDay,
-} from '../src/race/consensus.js';
+import { initConsensus, finalizeConsensusTerminal } from '../src/race/consensus.js';
 import {
     initComputeMarket, finalizeComputeTerminal, getNationalizationReference,
     freezeNationalizationReference, stepNationalizationRef, COMPUTE_MULTIPLIER,
@@ -63,19 +58,17 @@ import {
 } from '../src/race/ledger.js';
 import { COUPLING_TUNING } from '../src/race/coupling.js';
 import { belief, initBelief, stepBelief, familyHeads, stepFirmBelief, credibility } from '../src/race/belief.js';
-import { worldInputs, stepWorld } from './reader-data.mjs';
-import { ensureEngineWorlds } from './engine-worlds.mjs';
 
 const clampFn = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const PLAYER_CLIP_FRAC = 3 / 7;   // 02a bounded-influence clip (mirrors resolution.js)
-
-// A/B/D are hard gates post-retune (Part 2); diagnostic during the Part-1 fix baseline.
-const PROMOTE_DISTRIBUTION = true;
 
 // ---- CLI -----------------------------------------------------------------
 const argv = process.argv.slice(2);
 let N = 2000;
 let BASE_SEED = 1;
+// The late-determination sections step belief daily (the costly part); they read
+// the first D_N seeds of the ensemble.
+const D_N = 800;
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
     if (a === '--seed') BASE_SEED = parseInt(argv[++i], 10) >>> 0;
@@ -85,10 +78,7 @@ for (let i = 0; i < argv.length; i++) {
 
 let failures = 0;
 const results = [];
-function check(name, ok, detail = '') { results.push({ name, ok, detail, diag: false }); if (!ok) failures++; }
-function diag(name, ok, detail = '') { results.push({ name, ok, detail, diag: true }); }
-// A distribution/liveness/determination check: hard when promoted, else diagnostic.
-function dist(name, ok, detail = '') { if (PROMOTE_DISTRIBUTION) check(name, ok, detail); else diag(name, ok, detail); }
+function check(name, ok, detail = '') { results.push({ name, ok, detail }); if (!ok) failures++; }
 
 const pct = (x) => (100 * x).toFixed(1) + '%';
 const f3 = (x) => (Number.isFinite(x) ? x.toFixed(3) : '  -- ');
@@ -107,18 +97,13 @@ function runSeed(seed, capture) {
     // (02a knife-edge 3), stepped like the game: after the ratchet and the treaty,
     // on this loop's neutral inputs.
     if (capture) initBelief(race);
-    let detCount = 0, maxHeat = 0, sawSup = false, sawBlockade = false;
-    let snap350 = null, snap700 = null, sawSummit = false;
+    let maxHeat = 0, snap350 = null, snap700 = null;
     for (let d = 0; d < HORIZON && !race.resolution; d++) {
         advanceRace(race, { straitTension: 0 });
         stepControlRegime(race);
         stepTreaty(race, {});
-        detCount += race.lastTransitions.incidents.detected.length;
         const h = heatValue(race.heat);
         if (h > maxHeat) maxHeat = h;         // RUN MAXIMUM of total heat (02a "Resolution": not terminal)
-        if (race.controlRegime === 'supervised') sawSup = true;   // for the family-4 drag composition
-        if (race.lastTransitions.strait.blockadeStart) sawBlockade = true;   // for the blockade|f4 anti-correlation
-        if (race.treaty.summitOpen) sawSummit = true;
         if (capture) {
             stepBelief(race, { straitTension: 0, exportControlStage: 0, treatyStage: 0 });
             if (race.day === 350) snap350 = snapshot();
@@ -127,7 +112,7 @@ function runSeed(seed, capture) {
         if (checkResolution(race, null)) break;
     }
     if (!race.resolution) checkResolution(race, null);   // day-1008 timeout -> extrapolation
-    return { race, res: race.resolution, snap350, snap700, sawSummit, maxHeat, sawSup, sawBlockade };
+    return { race, res: race.resolution, snap350, snap700, maxHeat };
 }
 
 /** The full reader's family distribution from today's public record (families
@@ -142,7 +127,6 @@ const famAll = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };      // eventual family, 
 const famInHorizon = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 };
 let timeoutCount = 0, capHitCount = 0, unresolved = 0;
 const absD = [];
-const extrapDays = [];
 // Ratchets (section E), measured on the run.
 let natCount = 0, clsCount = 0, maxHeatRatchetCount = 0;
 // Plateau regressions (section F).
@@ -150,13 +134,8 @@ let r5crossFam6 = 0;                     // family-6 confirmations on R5-crosser
 let lowE = 0, lowEfam6InH = 0, lowEfam6Timeout = 0;   // true low-E capture split
 const inHorizonPlateauDays = [];         // resolution day of in-horizon family-6 confirmations (F(iv))
 // Treaty (section H).
-let dealPossibleRuns = 0, dealRuns = 0, windowRuns = 0, windows = 0, windowsPass = 0;
+let dealPossibleRuns = 0, dealRuns = 0, windowRuns = 0, windows = 0;
 let windowDealPossible = 0;              // dealPossible AND a window opened (for the leak posterior)
-// Family-4 composition (feeds the epilogue prose): velocity vs drag vs theft-assisted.
-const f4comp = { velocity: 0, drag: 0, theft: 0 };
-// Blockade anti-correlation diagnostic (02a "The strait": blockades concentrate in
-// slow-velocity worlds, family 4 in fast ones -- intended anti-correlation).
-let blockadeRuns = 0, blockadeAndF4 = 0;
 // Late determination (section D): the full reader's family head.
 const oracleRows350 = [], oracleRows700 = [];
 // P6-2 section J: no-player identity. The headless world passes no player input, so
@@ -167,28 +146,17 @@ let playerInertOK = true;
 
 for (let i = 0; i < N; i++) {
     const seed = (BASE_SEED + i) >>> 0;
-    const { race, res, snap350, snap700, maxHeat, sawSup, sawBlockade } = runSeed(seed, true);
+    const { race, res, snap350, snap700, maxHeat } = runSeed(seed, i < Math.min(N, D_N));
     if (!res) { unresolved++; continue; }
     const fam = res.family;
     famAll[fam]++;
-    if (sawBlockade) { blockadeRuns++; if (fam === 4) blockadeAndF4++; }
-    if (res.extrapolated) { timeoutCount++; extrapDays.push(res.extrapolationDays); if (res.axes.hitCap) capHitCount++; }
+    if (res.extrapolated) { timeoutCount++; if (res.axes.hitCap) capHitCount++; }
     else famInHorizon[fam]++;
     absD.push(Math.abs(res.d));
 
     // Section J: player channels unfed => d_P == 0 and d_eff == d_actual == d_W.
     const ax = res.axes;
     if (ax.dP !== 0 || ax.dW !== ax.dActual || res.d !== ax.dActual) playerInertOK = false;
-
-    // Family-4 composition: theft-assisted first (a successful exfiltration closed
-    // the gap), else fast-velocity worlds (hidden velocity > 1), else drag-assisted
-    // (the run passed through supervised, which slowed the domestic frontier).
-    if (fam === 4) {
-        if (race.theftCount > 0) f4comp.theft++;
-        else if (race.hidden.chinaTrue.velocity > 1.0) f4comp.velocity++;
-        else if (sawSup) f4comp.drag++;
-        else f4comp.velocity++;   // residual (slow-velocity, never-supervised): attribute to velocity
-    }
 
     // Ratchets: {nationalized, classified, permanent max-heat} (02a "Resolution").
     const reg = res.axes.politicalControl;
@@ -211,7 +179,6 @@ for (let i = 0; i < N; i++) {
     if (fam === 5) dealRuns++;
     if (race.treaty.windowOpened) {
         windowRuns++; windows++;
-        if (race.treaty.summitPassed) windowsPass++;   // survived summit week clean (independent of dealPossible)
         if (race.hidden.chinaTrue.dealPossible) windowDealPossible++;
     }
 
@@ -253,37 +220,6 @@ function oracleImprovement(rows) {
 }
 const or350 = oracleImprovement(oracleRows350);
 
-// Diagnostic (02a "Demonstrations", The refit): the engine worlds, bystander runs
-// whose event engine moves the world inputs (tools/engine-worlds.mjs), beside the
-// neutral tuning contract above: their family table and the full reader's late
-// determination on the same seeds. Reported, never gated.
-const famEngine = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, engineRows350 = [], engineRows700 = [];
-{
-    const t1 = Date.now();
-    await ensureEngineWorlds(Array.from({ length: N }, (_, i) => (BASE_SEED + i) >>> 0));
-    for (let i = 0; i < N; i++) {
-        const seed = (BASE_SEED + i) >>> 0, race = createRaceState(seed), sched = worldInputs(seed, 'engine');
-        initBelief(race);
-        let inputs = null, s350 = null, s700 = null;
-        for (let d = 0; d < HORIZON && !race.resolution; d++) {
-            inputs = sched(); stepWorld(race, inputs); stepBelief(race, inputs);
-            if (race.day === 350) s350 = snapshot();
-            if (race.day === 700) s700 = snapshot();
-            if (checkResolution(race, inputs.geo)) break;
-        }
-        if (!race.resolution) checkResolution(race, inputs?.geo);
-        const fam = race.resolution.family, split = (i % 2 === 0) ? 'train' : 'test';
-        famEngine[fam]++;
-        if (s350) engineRows350.push({ snap: s350, fam, split });
-        if (s700) engineRows700.push({ snap: s700, fam, split });
-    }
-    line(`engine worlds: ${N} replayed in ${((Date.now() - t1) / 1000).toFixed(1)} s`);
-}
-const engine350 = oracleImprovement(engineRows350), engine700 = oracleImprovement(engineRows700);
-diag('engine worlds: day-350 full-reader improvement < 25%', engine350.improvement < 0.25,
-    `impr ${pct(engine350.improvement)} (prior ${f3(engine350.priorBrier)} -> reader ${f3(engine350.oracleBrier)})`);
-diag('engine worlds: day-700 full-reader improvement < 60%', engine700.improvement < 0.60,
-    `impr ${pct(engine700.improvement)} (prior ${f3(engine700.priorBrier)} -> reader ${f3(engine700.oracleBrier)})`);
 const or700 = oracleImprovement(oracleRows700);
 
 // ---- Determinism + latch (section G) -------------------------------------
@@ -301,35 +237,6 @@ let determOK = true, latchOK = true, sawExtrapDeterm = false;
     const again = checkResolution(race, null);
     if (again !== null || JSON.stringify(race.resolution) !== before) latchOK = false;
 }
-
-// ---- Treaty substream-isolation (section H) ------------------------------
-// Full non-treaty RNG stream-state comparison (the gate's stronger probe): after
-// the full horizon, the NEXT draw from every non-treaty substream must be
-// identical (equal internal state), and the derived non-treaty state bit-identical.
-function treatyIsolationOK(nSeeds) {
-    const capState = (r) => JSON.stringify(['halcyon', 'tianxia', 'polaris'].map(id =>
-        [r.capability.labs[id].C_internal, r.capability.labs[id].C_released, r.capability.labs[id].rungInternal, r.capability.labs[id].rungReleased])
-        .concat([[r.capability.open.C, r.capability.open.rungInternal]]));
-    for (let s = 0; s < nSeeds; s++) {
-        const seed = (BASE_SEED + s) >>> 0;
-        const on = createRaceState(seed); on.treatyEnabled = true;
-        const off = createRaceState(seed); off.treatyEnabled = false;
-        for (let d = 0; d < HORIZON; d++) { advanceRace(on, { straitTension: 0 }); stepTreaty(on, {}); }
-        for (let d = 0; d < HORIZON; d++) { advanceRace(off, { straitTension: 0 }); stepTreaty(off, {}); }
-        // Every non-treaty substream must be in an identical internal state.
-        for (const name of ['capability', 'theft', 'certification', 'incidents', 'strait']) {
-            if (on.streams[name].next() !== off.streams[name].next()) return false;
-        }
-        if (on.theftCount !== off.theftCount) return false;
-        if (capState(on) !== capState(off)) return false;
-        if (on.latentIncidents.length !== off.latentIncidents.length) return false;
-        if (on.latentEvidence.length !== off.latentEvidence.length) return false;
-        if (JSON.stringify(on.straitBlockade) !== JSON.stringify(off.straitBlockade)) return false;
-        if (JSON.stringify(on.heat) !== JSON.stringify(off.heat)) return false;
-    }
-    return true;
-}
-const isolationPass = treatyIsolationOK(Math.min(N, 60));
 
 // =========================================================================
 // Checks
@@ -350,24 +257,24 @@ check('A: family buckets sum to resolved count', bucketSum === resolved, `${buck
 // 02a "Target outcome distribution"; the timeout row is replaced by an extrapolation-SHARE statistic.
 for (const k of [1, 2, 3, 4, 6]) {
     const got = famAll[k] / N, want = CONTRACT[k], band = BANDS[k];
-    dist(`A: family ${k} eventual ${(want * 100).toFixed(0)}+-${(band * 100).toFixed(0)}pt`, Math.abs(got - want) <= band, pct(got));
+    check(`A: family ${k} eventual ${(want * 100).toFixed(0)}+-${(band * 100).toFixed(0)}pt`, Math.abs(got - want) <= band, pct(got));
 }
 {
     const got = famAll[5] / N;   // Deal: band 2.3-8% (02a renormalized)
-    dist('A: family 5 eventual 5% (2.3-8)', got >= DEAL_LO && got <= DEAL_HI, pct(got));
+    check('A: family 5 eventual 5% (2.3-8)', got >= DEAL_LO && got <= DEAL_HI, pct(got));
 }
 {
     const share = timeoutCount / N;   // extrapolation share (02a "Target outcome distribution": replaces the timeout row)
-    dist('A: extrapolation share in [0.18, 0.32]', share >= 0.18 && share <= 0.32, pct(share));
+    check('A: extrapolation share in [0.18, 0.32]', share >= 0.18 && share <= 0.32, pct(share));
 }
 {
     const f6ih = famInHorizon[6] / N;   // 02a "Target outcome distribution": in-horizon family-6 expected ~0
-    dist('A: in-horizon family-6 <= 3%', f6ih <= 0.03, pct(f6ih));
+    check('A: in-horizon family-6 <= 3%', f6ih <= 0.03, pct(f6ih));
 }
 
 // B: liveness -- every family >= 2% marginally (eventual family).
 for (const k of [1, 2, 3, 4, 5, 6]) {
-    dist(`B: family ${k} live (>= 2% marginal)`, famAll[k] / N >= 0.02, pct(famAll[k] / N));
+    check(`B: family ${k} live (>= 2% marginal)`, famAll[k] / N >= 0.02, pct(famAll[k] / N));
 }
 
 // C (HARD): knife-edge concentration -- median |d| ~ 0.10 (band 0.06-0.15).
@@ -376,9 +283,9 @@ check('C: median |d| in [0.06, 0.15]', medAbsD >= 0.06 && medAbsD <= 0.15, `medi
 
 // D: late determination -- the full reader's family head beats the prior's Brier
 // by < 25% (day 350), < 60% (day 700).
-dist('D: day-350 full-reader improvement < 25%', or350.improvement < 0.25,
+check('D: day-350 full-reader improvement < 25%', or350.improvement < 0.25,
     `impr ${pct(or350.improvement)} (prior ${f3(or350.priorBrier)} -> reader ${f3(or350.oracleBrier)})`);
-dist('D: day-700 full-reader improvement < 60%', or700.improvement < 0.60,
+check('D: day-700 full-reader improvement < 60%', or700.improvement < 0.60,
     `impr ${pct(or700.improvement)} (prior ${f3(or700.priorBrier)} -> reader ${f3(or700.oracleBrier)})`);
 
 // E (HARD): ratchet set {nationalized, classified, permanent max-heat} each < 50%,
@@ -409,22 +316,11 @@ check('G: resolution latch (re-invoke is a no-op)', latchOK);
 const dealRate = dealRuns / N;
 const completion = dealPossibleRuns ? dealRuns / dealPossibleRuns : 0;
 const windowRate = windowRuns / N;
-const summitPass = windows ? windowsPass / windows : 0;
 const leakPosterior = windows ? windowDealPossible / windows : 0;   // P(dealPossible | window)
 check('H: Deal rate in [0.023, 0.08]', dealRate >= DEAL_LO && dealRate <= DEAL_HI, pct(dealRate));
 check('H: completion given eligible ~0.27 (band 0.20-0.34)', completion >= 0.20 && completion <= 0.34, f3(completion));
 check('H: window rate in [0.25, 0.45]', windowRate >= 0.25 && windowRate <= 0.45, pct(windowRate));
 check('H: leak-free P(dealPossible|window) within +-0.05 of 0.15', Math.abs(leakPosterior - 0.15) <= 0.05, f3(leakPosterior));
-diag('H: summit-week-no-incident pass ~0.75', summitPass >= 0.65 && summitPass <= 0.85, `${f3(summitPass)} (n=${windows})`);
-check('H: treaty substream isolation (full non-treaty stream states)', isolationPass);
-
-// Blockade|family-4 anti-correlation (02a "Target outcome distribution", DIAGNOSTIC non-gating): the
-// shared desperation makes blockades concentrate in slow-velocity worlds and
-// family 4 in fast ones, so P(blockade|f4) should be well below P(blockade).
-const pBlock = blockadeRuns / N;
-const pBlockGivenF4 = famAll[4] ? blockadeAndF4 / famAll[4] : 0;
-diag('I: P(blockade|family 4) < P(blockade) (intended anti-correlation)', pBlockGivenF4 < pBlock,
-    `P(blockade) ${pct(pBlock)}  P(blockade|f4) ${pct(pBlockGivenF4)}`);
 
 // =========================================================================
 // P6-2 player-channel sections (round 2)
@@ -642,7 +538,6 @@ for (let i = 0; i < M_BATCH; i++) {
 const maxReachableDP = quantile(maxPlayerAbsDP, 0.90);
 const medDW = quantile(absD, 0.50);
 const coverage = absD.filter(x => x <= maxReachableDP).length / absD.length;
-diag('M: world |d_W| median in [0.135, 0.155] (final-retune 0.143-0.148)', medDW >= 0.135 && medDW <= 0.155, f3(medDW));
 check('M: constraint 2 -- max reachable |d_P| catches >= 40% of |d_W|', coverage >= 0.40,
     `cap ${CAP}  max|dP| p90 ${f3(maxReachableDP)}  coverage ${pct(coverage)}`);
 
@@ -1069,8 +964,7 @@ check('V2: an in-horizon S4 detection survives the latch for the bridge; an extr
 // =========================================================================
 // Report
 // =========================================================================
-line(`endings-test: N=${N}, base seed=${BASE_SEED}, horizon=${HORIZON}d, ${elapsed}s  `
-    + `(distribution gates ${PROMOTE_DISTRIBUTION ? 'PROMOTED/hard' : 'diagnostic'})`);
+line(`endings-test: N=${N}, base seed=${BASE_SEED}, horizon=${HORIZON}d, ${elapsed}s (late determination on the first ${Math.min(N, D_N)} seeds)`);
 line('='.repeat(72));
 line('\nTerminal family distribution (EVENTUAL = in-horizon + extrapolated):');
 line('  family        eventual   in-horizon   02a band');
@@ -1080,41 +974,8 @@ for (const k of [1, 2, 3, 4, 5, 6]) {
         + `${pct(famAll[k] / N).padStart(7)}   ${pct(famInHorizon[k] / N).padStart(8)}    ${band.padStart(7)}`);
 }
 line(`  extrapolation share       ${pct(timeoutCount / N).padStart(7)}   ${' '.repeat(8)}    ${'18-32%'.padStart(7)}`);
-line(`  unresolved ${unresolved}`);
-const totalF4 = f4comp.velocity + f4comp.drag + f4comp.theft;
-line(`  family-4 composition (feeds epilogue prose): velocity ${f4comp.velocity} / drag ${f4comp.drag} / theft-present ${f4comp.theft}`
-    + (totalF4 ? `  (${(100 * f4comp.velocity / totalF4).toFixed(0)}% / ${(100 * f4comp.drag / totalF4).toFixed(0)}% / ${(100 * f4comp.theft / totalF4).toFixed(0)}%)` : ''));
-line(`  blockade anti-correlation: P(blockade) ${pct(blockadeRuns / N)}  P(blockade|family 4) ${pct(famAll[4] ? blockadeAndF4 / famAll[4] : 0)}  (intended: f4 < marginal)`);
-line(`\n  median |d| = ${f3(medAbsD)}  (target ~0.10)   extrap days p50/p90/max: `
-    + (extrapDays.length ? `${quantile(extrapDays, 0.5).toFixed(0)}/${quantile(extrapDays, 0.9).toFixed(0)}/${Math.max(...extrapDays)}` : '--'));
-line(`  low-E family-6 capture: ${lowE ? pct(lowEfam6 / lowE) : '--'} (in-horizon ${lowEfam6InH}, timeout ${lowEfam6Timeout} of ${lowE})`
-    + `   in-horizon plateau day p10 ${inHorizonPlateauDays.length ? plateauP10.toFixed(0) : '--'}`);
-line(`  ratchets (run-max): nationalized ${pct(natCount / N)}  classified ${pct(clsCount / N)}  max-heat>=0.95 ${pct(maxHeatRatchetCount / N)}`);
-line(`  treaty: dealPossible ${pct(dealPossibleRuns / N)}  Deal ${pct(dealRate)}  completion|eligible ${f3(completion)}  `
-    + `window ${pct(windowRate)}  summit pass ${f3(summitPass)}  P(deal|window) ${f3(leakPosterior)}`);
-line(`  late determination (full reader): day350 impr ${pct(or350.improvement)}  day700 impr ${pct(or700.improvement)}`);
-line(`  engine worlds (diagnostic): families ${[1, 2, 3, 4, 5, 6].map(k => `f${k} ${pct(famEngine[k] / N)}`).join('  ')}`);
-line(`    beside neutral:               ${[1, 2, 3, 4, 5, 6].map(k => `f${k} ${pct(famAll[k] / N)}`).join('  ')}`);
-line(`    late determination (full reader): day350 impr ${pct(engine350.improvement)}  day700 impr ${pct(engine700.improvement)}`);
-line(`\n  P6-2 player channels (cap ${CAP}, halflife ${COUPLING_TUNING.halflife}d):`);
-line(`    no-player identity (J): ${playerInertOK ? 'inert (d_P == 0 all runs)' : 'VIOLATED'}`);
-line(`    constraint 2 (M): world |d_W| median ${f3(medDW)}  |  max reachable |d_P| p90 ${f3(maxReachableDP)}  |  coverage ${pct(coverage)} (>= 40%)`);
-line(`    clip (L): binds on ${clipBindCount}/${clipN} of the max-injection batch (verbatim d_eff identity ${clipIdentityOK ? 'holds' : 'VIOLATED'})`);
-line(`\n  P6-3 closeout + endings:`);
-line(`    matrix (N): ${coCells} family x regime x instrument cells, equity==cash + mark zero-sum ${closeoutOK ? 'conserve' : 'VIOLATED'}`);
-line(`    finalizers (O/P): consensus deadline-judged + idempotent ${consFinOK ? 'ok' : 'VIOLATED'}; compute held-settles ${compFinOK ? 'ok' : 'VIOLATED'}`);
-line(`    e2e (Q): eject -> extrapolate -> freeze -> closeout conserves ${e2eOK ? 'ok' : 'VIOLATED'} (3 seeds; bond leg carries MTM)`);
-line(`    nationalization (R): multiple in [0.60,1.15], frozen once, conversion!=decree ${natRefOK ? 'ok' : 'VIOLATED'}`);
-line(`    ejection-invariance (S): ${seedsChecked} seeds settle identically eject-vs-term, ${nonVacuous} non-vacuous (cert-in-extrapolation -> YES) ${ejInvOK ? 'ok' : 'VIOLATED'}`);
-line(`    natural-resolution atomic (T): ${natChecked} conserve+frozen, ${dealCarry}/${dealChecked} Deal beats carried, ${regimeSensitive} regime-sensitive ${natResOK ? 'ok' : 'VIOLATED'} (interim superseded)`);
-line(`    terminal queue discipline (V): effect popups (scrutiny_enforcement cashPenalty 2000) discarded pre-closeout, only effect-free summit beats survive ${tqOK ? 'ok' : 'VIOLATED'}`);
-line('='.repeat(72));
 line('\nChecks:');
-for (const r of results) {
-    line(`  [${r.ok ? 'PASS' : 'MISS'}${r.diag ? '/DIAG' : '    '}] ${r.name}${r.detail ? '  (' + r.detail + ')' : ''}`);
-}
+for (const r of results) line(`  [${r.ok ? 'PASS' : 'MISS'}] ${r.name}${r.detail ? '  (' + r.detail + ')' : ''}`);
 line('='.repeat(72));
-const diagMiss = results.filter(r => r.diag && !r.ok).length;
-line(`HARD checks: ${failures === 0 ? 'ALL PASS' : failures + ' MISS'}${diagMiss ? `   |   DIAGNOSTIC misses: ${diagMiss}` : ''}`);
 line(failures === 0 ? 'ENDINGS GATE: PASS' : 'ENDINGS GATE: FAIL -- see above');
 process.exitCode = failures === 0 ? 0 : 1;

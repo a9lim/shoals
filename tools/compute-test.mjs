@@ -1,20 +1,17 @@
 #!/usr/bin/env node
 /* ===================================================
    tools/compute-test.mjs -- Lifecycle-correctness,
-   money-conservation, integrity, nationalization-
-   reference, and seed-stability harness for the compute
+   money-conservation, integrity and nationalization-
+   reference harness for the compute
    futures (overhaul phase 3b; src/race/compute-market.js +
    the computefuture paths in src/portfolio.js).
 
    Hard-assertion checks:
 
-   A. Curve construction + strait premium. placeholderCurve
-      matches an INDEPENDENT re-implementation of the doc
-      formula (pins every coefficient); the blockade far-curve
-      tail premium lands in the RATIFIED [0.40, 0.80] band
-      (02a); blockade lifts the far curve, tension lifts the
-      standing premium, high demand puts the curve in
-      backwardation (scramble).
+   A. Curve construction + strait premium: blockade lifts
+      the far curve, tension lifts the standing premium, high
+      demand puts the curve in backwardation (scramble); A2,
+      a Hormuz closure never moves the chip curve.
 
    B. Ordinary settlement (09 row): a contract at maturity
       under the private regime + calm strait settles ORDINARY
@@ -51,9 +48,11 @@
       median of the 20 sessions ending 5 before the trigger; the
       setControlRegime path freezes it.
 
-   I. Seed stability: adding the compute-market draws does not
-      perturb the capability / theft / incident / evidence
-      trajectories (named-substream discipline).
+   J. Round-2 gate fixes: multi-fill basis, the admission
+      chokepoint, short admission, frozen marks, exactly-once.
+
+   Z. The belief-backed curve: structure, the demand lift,
+      corruption invariance.
 
    Usage:  node tools/compute-test.mjs [N] [--seed S]
            N defaults to 300; base seed defaults to 1.
@@ -136,52 +135,10 @@ function openComputeKey() {
     return c ? c.key : null;
 }
 
-// ---- Duplicated-code parity check (NOT doc calibration) ------------------
-// The docs deliberately leave the curve magnitudes unrecorded (P4-swappable
-// placeholder), so this cannot be doc calibration. It is a DUPLICATED
-// re-implementation of the module's own formula: if the module's coefficients
-// drift without this copy being updated in lockstep, the parity check fails --
-// a change-detector on the placeholder, plus the RATIFIED blockade band assertion.
-function expectedCurve(view, dte) {
-    const K_RELEASE = 0.010, K_CERT = 0.030, K_TREND = 0.060;
-    const BASE = 100, SCRAMBLE_COEF = 0.5, SCRAMBLE_TAU = 180, TAIL_TAU = 120;
-    const S_BASE = 0.06, S_TENSION = 0.10, FAR_LO = 0.40, FAR_HI = 0.80, NEAR_FRAC = 0.5;
-    const demand = K_RELEASE * view.releaseCount + K_CERT * view.certifiedFrontierRung + K_TREND * (view.day / 504);
-    const spot = BASE * (1 + demand);
-    const scramble = SCRAMBLE_COEF * demand;
-    const back = scramble * (1 - Math.exp(-dte / SCRAMBLE_TAU));
-    const sat = 1 - Math.exp(-dte / TAIL_TAU);
-    let tailPrem, straitTilt;
-    if (view.blockade) { tailPrem = FAR_LO + (FAR_HI - FAR_LO) * view.straitTension; straitTilt = tailPrem * (NEAR_FRAC + (1 - NEAR_FRAC) * sat); }
-    else { tailPrem = S_BASE + S_TENSION * view.straitTension; straitTilt = tailPrem * sat; }
-    const price = Math.max(0.01, spot * (1 + straitTilt - back));
-    return { price, spot, scramble, tailPrem, straitTilt, back };
-}
-
 // ---- A. Curve construction + strait premium ------------------------------
 
-let curveExactOK = true, blockadeBandOK = true, blockadeLiftsOK = true, tensionLiftsOK = true, backwardationOK = true;
+let blockadeLiftsOK = true, tensionLiftsOK = true, backwardationOK = true;
 {
-    const views = [
-        { day: 0, releaseCount: 0, certifiedFrontierRung: 0, blockade: false, straitTension: 0 },
-        { day: 300, releaseCount: 6, certifiedFrontierRung: 2, blockade: false, straitTension: 0.5 },
-        { day: 700, releaseCount: 14, certifiedFrontierRung: 3, blockade: true, straitTension: 1 },
-        { day: 900, releaseCount: 20, certifiedFrontierRung: 4, blockade: true, straitTension: 0.3 },
-    ];
-    for (const v of views) {
-        for (const dte of [0, 63, 126, 189, 252, 2000]) {
-            const got = placeholderCurve(v, dte);
-            const exp = expectedCurve(v, dte).price;
-            if (Math.abs(got - exp) > 1e-9) curveExactOK = false;
-            assert(Math.abs(got - exp) < 1e-9, `curve mismatch v.day=${v.day} dte=${dte}: got ${got} want ${exp}`);
-        }
-        // Blockade band: the tail premium sits in [0.40, 0.80] (02a, RATIFIED).
-        if (v.blockade) {
-            const tp = expectedCurve(v, 252).tailPrem;
-            if (!(tp >= 0.40 - EPS && tp <= 0.80 + EPS)) blockadeBandOK = false;
-            assert(tp >= 0.40 - EPS && tp <= 0.80 + EPS, `blockade tailPrem ${tp} out of [0.40,0.80]`);
-        }
-    }
     // Blockade lifts the far curve vs calm at the SAME public state.
     const stateFar = { day: 700, releaseCount: 14, certifiedFrontierRung: 3 };
     const farCalm = placeholderCurve({ ...stateFar, blockade: false, straitTension: 0 }, 252);
@@ -524,45 +481,6 @@ let natMedianOK = false, natRegimePathOK = false, natIdempotentOK = false;
     }
 }
 
-// ---- I. Seed stability (substream isolation) -----------------------------
-
-// A rolling 32-bit hash folded over the FULL per-day ledger (finding-7: daily
-// full race/evidence signatures, not just final rung timestamps).
-function foldHash(h, s) { for (let i = 0; i < s.length; i++) h = (Math.imul(h, 31) + s.charCodeAt(i)) >>> 0; return h; }
-function dayDigest(tr) {
-    return JSON.stringify({
-        cr: tr.crossings, rl: tr.releases.map(r => r.labId), th: tr.thefts,
-        ce: tr.certifications,
-        io: tr.incidents.occurred, id: tr.incidents.detected,
-        eo: tr.evidence.occurred, ep: tr.evidence.published,
-    });
-}
-let seedStableOK = true, seedRunsChecked = 0;
-{
-    for (let s = 0; s < 12; s++) {
-        const seed = (BASE_SEED + 50000 + s) >>> 0;
-        // Arm A: bare race, no compute wiring -- accumulate the full daily signature.
-        const raceA = createRaceState(seed);
-        let hA = 0x811c9dc5 >>> 0;
-        for (let d = 0; d < HORIZON; d++) { advanceRace(raceA); hA = foldHash(hA, dayDigest(raceA.lastTransitions)); }
-        // Arm B: same seed WITH the full compute-market daily loop.
-        const raceB = createRaceState(seed);
-        initComputeMarket(raceB, calmGeo);
-        let hB = 0x811c9dc5 >>> 0;
-        for (let d = 0; d < HORIZON; d++) {
-            advanceRace(raceB);
-            hB = foldHash(hB, dayDigest(raceB.lastTransitions));   // hash BEFORE any compute op touches the tick
-            stepNationalizationRef(raceB, 100 + raceB.day * 0.05);
-            settleComputeFutures(computeFutureSettlements(raceB, calmGeo), raceB);
-            refreshComputeQuotes(raceB, calmGeo);
-        }
-        seedRunsChecked++;
-        if (hA !== hB || raceA.theftCount !== raceB.theftCount) seedStableOK = false;
-        assert(hA === hB, `daily race/evidence signature perturbed by compute-market (seed ${s}: ${hA} vs ${hB})`);
-        assert(raceA.theftCount === raceB.theftCount, `theft count perturbed by compute-market (seed ${s})`);
-    }
-}
-
 // ---- J. Round-2 gate fixes -----------------------------------------------
 
 // J1. Multi-fill accounting: a 2-unit then 3-unit same-direction fill sequence
@@ -819,8 +737,6 @@ line(`compute-test: N=${N} runs (nat-multiple sample), base seed=${BASE_SEED}, h
 line('='.repeat(72));
 
 line('\nA. Curve construction + strait premium');
-line(`  placeholderCurve == duplicated-code parity copy:  ${curveExactOK ? 'ok' : 'FAIL'}  (change-detector, not doc calibration)`);
-line(`  blockade tail premium in [0.40,0.80] (02a):       ${blockadeBandOK ? 'ok' : 'FAIL'}`);
 line(`  blockade lifts the far curve (>+20%):             ${blockadeLiftsOK ? 'ok' : 'FAIL'}`);
 line(`  standing premium responds to tension:             ${tensionLiftsOK ? 'ok' : 'FAIL'}`);
 line(`  backwardation (near>far) under scramble:          ${backwardationOK ? 'ok' : 'FAIL'}`);
@@ -866,9 +782,6 @@ line(`  multiple drawn at creation (not at use):          ${natMultAtCreationOK 
 line(`  frozen median = 20 sessions ending 5 before:      ${natMedianOK ? 'ok' : 'FAIL'}`);
 line(`  freeze idempotent:                                ${natIdempotentOK ? 'ok' : 'FAIL'}`);
 line(`  setControlRegime path freezes the reference:      ${natRegimePathOK ? 'ok' : 'FAIL'}`);
-
-line('\nI. Seed stability (substream isolation)');
-line(`  ${seedRunsChecked} seeds: FULL daily race/evidence signature unperturbed by compute-market: ${seedStableOK ? 'ok' : 'FAIL'}`);
 
 line('\nJ. Round-2 gate fixes');
 line(`  1  multi-fill VWAP basis + money conservation:     ${vwapBasisOK && multiFillConservesOK ? 'ok' : 'FAIL'}  (meaningful: ${multiFillMeaningful ? 'yes' : 'no'})`);

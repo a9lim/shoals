@@ -190,11 +190,5 @@ export function keyedRng(seed, name, ...keys) {
         x = Math.imul(x ^ (x >>> 15), 0x735a2d97) >>> 0;
         x = (x ^ (x >>> 15)) >>> 0;
     }
-    const rng = createRng(x);
-    return _keyedTap ? _keyedTap(seed, name, keys, rng) : rng;
+    return createRng(x);
 }
-
-let _keyedTap = null;
-/** A harness's tap on every keyed slot (run-test's coupling gate): `fn(seed,
- *  name, keys, rng)` returns the rng the slot uses. null removes it. */
-export function tapKeyedRng(fn) { _keyedTap = fn; }

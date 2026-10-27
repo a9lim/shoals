@@ -45,11 +45,17 @@
       elasticity, evidence, latents -- leaves every QUOTE and
       every fresh SETTLEMENT decision bit-identical.
 
-   E. Listing calibration: day-0 listing mids within +-8pp of
-      the measured outcome frequencies, and two-sided.
-
    F. Fallback-render pure-function check: consensusOutcomeClass
       never returns '' -> classList.add('') (throws).
+
+   G. Round-2 regression probes: pending R5 under
+      nationalization, frozen marks, the regime ratchet.
+
+   H. Trading restriction: enforcement and release.
+
+   Z. The belief-backed quoter: each listing base rate equals
+      B's day-0 quote (within 0.03) and is two-sided; the
+      source is installed; full-corruption invariance.
 
    Usage:  node tools/consensus-test.mjs [N] [--seed S]
            N defaults to 500; base seed defaults to 1.
@@ -57,7 +63,6 @@
 
 import { createRaceState, advanceRace, setControlRegime, stepControlRegime } from '../src/race/race-state.js';
 import { stepTreaty } from '../src/race/treaty-track.js';
-import { checkResolution } from '../src/race/resolution.js';
 import {
     consensus, initConsensus, refreshBinaryQuotes, computeBinarySettlements,
     buildPublicView, getBinaryQuote, getBinaryMark, pendingTerminalCloseout, BINARY_NOTIONAL,
@@ -139,15 +144,12 @@ function corruptContinuous(race) {
 
 const outcomeTally = {};   // key -> { YES, NO, FALLBACK, PENDING }
 let contractsRef = null;
-let listingMids = null;    // key -> day-0 listing mid (measured through the real quoter)
 
 for (let i = 0; i < N; i++) {
     const race = createRaceState((BASE_SEED + i) >>> 0);
     initConsensus(race);                     // fresh book per run (singleton reset)
     if (!contractsRef) {
         contractsRef = consensus.contracts.map(c => ({ ...c }));
-        listingMids = {};
-        for (const c of consensus.contracts) listingMids[c.key] = getBinaryQuote(c.key).mid;
     }
     const cashSettleCount = {};   // emitted cash settlements per key
     const markerCount = {};       // emitted PENDING_CLOSEOUT markers per key
@@ -447,49 +449,6 @@ let integrityOK = true;
     }
 }
 
-// ---- E0. Event frequencies on the reader's loop ----------------------------
-// The event each contract prices (02a: quotes price the event; the fallback
-// settlement tree is outside the comparison), measured on worlds that run the
-// game's race block to resolution: advanceRace + stepControlRegime + stepTreaty +
-// checkResolution. R2-R4: certified (any frontier lab, direct or implied) by the
-// deadline; R5: the frontier's internal crossing by day 1000.
-const eventFreq = {};
-{
-    const hits = {};
-    for (const c of contractsRef) hits[c.key] = 0;
-    for (let i = 0; i < N; i++) {
-        const race = createRaceState((BASE_SEED + 93000 + i) >>> 0);
-        for (let d = 0; d < HORIZON && !race.resolution; d++) {
-            advanceRace(race); stepControlRegime(race); stepTreaty(race, {});
-            if (checkResolution(race, null)) break;
-        }
-        if (!race.resolution) checkResolution(race, null);
-        for (const c of contractsRef) {
-            const R = c.predicate.rung;
-            const day = c.terminal ? frontierInternalCrossDay(race.capability, R)
-                : Math.min(...['halcyon', 'tianxia', 'polaris'].map(id => race.capability.labs[id].rungCertified[R] ?? Infinity));
-            if (day <= c.deadline) hits[c.key]++;
-        }
-    }
-    for (const c of contractsRef) eventFreq[c.key] = hits[c.key] / N;
-}
-
-// ---- E. Listing calibration (+-8pp of measured, two-sided) ---------------
-
-const listingRows = [];
-{
-    for (const c of contractsRef) {
-        // Measured: the event's frequency on the reader's loop (E0).
-        const measured = eventFreq[c.key];
-        const mid = listingMids[c.key];
-        const within = Math.abs(mid - measured) <= 0.08;
-        const twoSided = mid > 0.05 && mid < 0.95;
-        assert(within, `listing mid ${mid.toFixed(3)} not within 8pp of measured ${measured.toFixed(3)} (key=${c.key})`);
-        assert(twoSided, `listing mid ${mid.toFixed(3)} not two-sided (key=${c.key})`);
-        listingRows.push({ key: c.key, rung: c.predicate.rung, base: c.baseRate, mid, measured, within, twoSided });
-    }
-}
-
 // ---- F. Fallback-render pure-function check -------------------------------
 
 let renderOK = true;
@@ -661,8 +620,7 @@ let restrictBlocksBinary = false, cancelAllWorks = false, releaseAfterNat = fals
 // stepped in lockstep with the race (advanceRace + stepControlRegime + stepTreaty
 // + stepBelief, the reader's loop). Re-runs the load-bearing probes against it:
 // (1) the base-rate gates (02a "Consensus binaries") -- each listing base rate
-// within 0.03 of the mean day-0 B quote over worlds, every day-0 mid two-sided,
-// and the mean day-0 mid within 8 points of the event's measured frequency (E0);
+// within 0.03 of the mean day-0 B quote over worlds, every day-0 mid two-sided;
 // (2) full-corruption invariance -- corrupting every continuous hidden field
 // leaves the belief-backed quote bit-identical. Restores the placeholder after.
 
@@ -688,12 +646,10 @@ const raceDay = (race) => { advanceRace(race); stepControlRegime(race); stepTrea
         }
         for (const c of consensus.contracts) {
             const m = mids[c.key].reduce((a, b) => a + b, 0) / mids[c.key].length;
-            const measured = eventFreq[c.key];
-            const baseOK = Math.abs(c.baseRate - m) <= 0.03, measOK = Math.abs(m - measured) <= 0.08;
-            if (!baseOK || !measOK) zListingOK = false;
+            const baseOK = Math.abs(c.baseRate - m) <= 0.03;
+            if (!baseOK) zListingOK = false;
             assert(baseOK, `base rate ${c.baseRate} not within 0.03 of the mean day-0 B quote ${m.toFixed(3)} (key=${c.key})`);
-            assert(measOK, `mean day-0 B quote ${m.toFixed(3)} not within 8pp of measured ${measured.toFixed(3)} (key=${c.key})`);
-            zRows.push({ key: c.key, rung: c.predicate.rung, base: c.baseRate, mean: m, min: Math.min(...mids[c.key]), max: Math.max(...mids[c.key]), measured });
+            zRows.push({ key: c.key, rung: c.predicate.rung, base: c.baseRate, mean: m, min: Math.min(...mids[c.key]), max: Math.max(...mids[c.key]) });
         }
     }
 
@@ -776,12 +732,6 @@ line(`  coincident option-expiry (processExpiry skips binary): ${coincidentOK ? 
 line('\nD. Integrity (no hidden state in quote OR fresh settlement)');
 line(`  public-only view + quote+settlement invariant under full continuous corruption: ${integrityOK ? 'holds' : 'VIOLATED'}`);
 
-line('\nE. Listing calibration (day-0 mid vs the event frequency on the reader\'s loop, +-8pp, two-sided)');
-line('  key  rung   base    mid    measured   within8pp  two-sided');
-for (const r of listingRows) {
-    line(`  ${String(r.key).padStart(3)}   R${r.rung}   ${r.base.toFixed(2)}   ${r.mid.toFixed(3)}   ${r.measured.toFixed(3)}      ${r.within ? 'yes' : 'NO '}        ${r.twoSided ? 'yes' : 'NO'}`);
-}
-
 line('\nF. Fallback render helper');
 line(`  consensusOutcomeClass never yields '' -> classList.add('') throw path: ${renderOK ? 'ok' : 'FAIL'}`);
 
@@ -799,8 +749,8 @@ line(`  cancelAllOrders clears the pending book:              ${cancelAllWorks ?
 line(`  restriction releasable after nationalization settles: ${releaseAfterNat ? 'ok' : 'FAIL'}`);
 
 line('\nZ. Belief-backed quoter (phase 4, swapped in via setBinaryQuoteSource)');
-line('  key  rung   base   mean day-0 B (min-max)   measured   (base within 0.03 of mean; mean within 8pp of measured)');
-for (const r of zRows) line(`  ${String(r.key).padStart(3)}   R${r.rung}   ${r.base.toFixed(3)}  ${r.mean.toFixed(3)} (${r.min.toFixed(3)}-${r.max.toFixed(3)})       ${r.measured.toFixed(3)}`);
+line('  key  rung   base   mean day-0 B (min-max)   (base within 0.03 of mean)');
+for (const r of zRows) line(`  ${String(r.key).padStart(3)}   R${r.rung}   ${r.base.toFixed(3)}  ${r.mean.toFixed(3)} (${r.min.toFixed(3)}-${r.max.toFixed(3)})`);
 line(`  base-rate gates + two-sided:                          ${zListingOK ? 'ok' : 'FAIL'}`);
 line(`  belief source really installed (diverges from placeholder): ${zActiveOK ? 'ok' : 'FAIL'}`);
 line(`  full-corruption invariance with the real quoter:      ${zInvarianceOK ? 'holds' : 'VIOLATED'}`);

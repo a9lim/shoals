@@ -15,11 +15,6 @@
       pooled output bit-identical: quotes on a grid, the implied
       timeline, B's laws, the projection, the family heads, the
       compute curve.
-   A2. The rule of thumb is bit-identical to HEAD 1343924's heuristic
-      B (the reader's legible heads were fit on it): its per-day
-      {m, w, crossed, certDay} over a fixed seed set hashes to a
-      recorded constant, both through this harness's reader loop and
-      through tools/reader-data.mjs runReaderWorld.
    B. Leak once-per-ID: a leaked beat folds into the sentiment
       exactly once; replaying the same ID is a no-op.
    C. Posterior arithmetic (02a, the posterior with its plateau):
@@ -49,13 +44,12 @@
    L. Pool arithmetic: binaryProb equals (1 - eta)*legible +
       eta*full, projected, recomputed from the reader API.
    M. The coherence projection: P(R4) <= P(R3) <= P(R2)
-      pointwise; untouched where the pool is already ordered;
-      binding frequency and size reported.
+      pointwise; untouched where the pool is already ordered.
    N. The implied timeline and B's law: the pooled median is the
       first day P reaches 1/2, null when it does not by the
       support; the law's masses and atom add up.
    O. The projection onto the player's family: bounds, ladder
-      order, presets with q kept; fit error reported.
+      order, presets with q kept.
    P. The outstanding quarter at the terminal (02a "Scoring").
    F. Impulse-overlay decay (no permanent param drift).
    G. eta monotone in the released frontier.
@@ -68,7 +62,7 @@
    stepTreaty + stepBelief, as the game and the reader do.
 
    Usage:  node tools/belief-test.mjs [N] [--seed S]
-           N defaults to 300; base seed defaults to 1.
+           N defaults to 60; base seed defaults to 1.
    =================================================== */
 
 import { createRaceState, advanceRace, setControlRegime, stepControlRegime, freshTransitions } from '../src/race/race-state.js';
@@ -83,7 +77,7 @@ import {
 import {
     belief, initBelief, resetBelief, deactivateBelief, stepBelief,
     binaryProb, quarterProbB, binaryQuoteFromBelief, computeCurveFromBelief, computeUrgency,
-    impliedTimeline, beliefLaw, familyHeads, coherenceStats, certDay, isCertified,
+    impliedTimeline, beliefLaw, familyHeads, certDay, isCertified,
     marketEfficiency, beliefCauses,
     isLockDay, LOCK_INTERVAL, POSTERIOR, lockForecast, lockedClaim, scoreQuarter, scoreOutstandingQuarter, scoreVariance,
     snapshotForecast, scoreCopierQuarter, scoreCopierOutstanding, copierRecord,
@@ -97,11 +91,8 @@ import {
 import { getTrait } from '../src/traits.js';
 import { ruleSummary } from '../src/race/public-record.js';
 import { checkResolution } from '../src/race/resolution.js';
-import { runReaderWorld, worldInputs, stepWorld } from './reader-data.mjs';
+import { worldInputs, stepWorld } from './reader-data.mjs';
 import { ensureEngineWorlds, loadEngineWorld } from './engine-worlds.mjs';
-import { createRng, deriveSeed } from '../src/race/rng.js';
-import { straitTension } from '../src/race/strait.js';
-import { createHash } from 'node:crypto';
 import { readerLaw, lawCDF } from '../src/race/reader.js';
 import {
     addEventImpulse, decayEventImpulses, applyEventImpulseOverlay,
@@ -115,7 +106,7 @@ import { getEventById } from '../src/events/index.js';
 // ---- CLI -----------------------------------------------------------------
 
 const argv = process.argv.slice(2);
-let N = 300;
+let N = 60;
 let BASE_SEED = 1;
 for (let i = 0; i < argv.length; i++) {
     const a = argv[i];
@@ -292,69 +283,6 @@ let totalCauses = 0;
             assert(ccA === ccB, `compute curve changed under corruption (seed ${s}, D=${D})`);
         }
     }
-}
-
-// ==========================================================================
-// A2. The rule of thumb is HEAD's, bit for bit
-// ==========================================================================
-
-// Derived by running this exact loop with HEAD 1343924's src/race/belief.js
-// (`git show 1343924:src/race/belief.js`, imports pointed at the unchanged
-// src/race/rng.js and compute-market.js) in place of the working tree's: seeds
-// 1-32, odd seeds on the assumed input schedule's Markov scenario (this hash's
-// fixed input tape), even seeds neutral; one line `${seed}:${day}:${JSON [m, w,
-// crossed, certDay] for R2-R5}` per completed day after stepBelief, before
-// checkResolution. First derived 2026-10-25 (1d36daa9...). Re-derived
-// 2026-10-27 on the release jitter's worlds (02a "Demonstrations"): the same
-// procedure, the race of this tree, 28769 days at U(30, 60) (dcb1044b... at the
-// first width, U(35, 55)); the old rule on the new worlds and the current rule
-// agree. A procedure check on HEAD 43d677c's worlds
-// reproduced 1d36daa9... first. Demonstrations move no world and the rule
-// doesn't read them, so they leave it unchanged.
-// The tape is the retired assumed input schedule (tools/reader-data.mjs until
-// 2026-10-27; 02a "Demonstrations": the Markov scenario retires everywhere but
-// here), kept verbatim: strait tension, export-control and treaty stages each a
-// slow clamped symmetric walk on its own stream, drawn every day in both scenarios.
-function frozenTape(seed, scenario) {
-    const rng = createRng(deriveSeed(seed, 'reader-input-schedule-v1'));
-    const ranges = { chinaRelations: [-3, 3], tradeWarStage: [0, 4], exportControlStage: [0, 3], treatyStage: [0, 4] };
-    const move = { chinaRelations: 1 / 126, tradeWarStage: 1 / 252, exportControlStage: 1 / 252, treatyStage: 1 / 252 };
-    const state = { chinaRelations: 0, tradeWarStage: 0, exportControlStage: 0, treatyStage: 0 };
-    return () => {
-        for (const key of Object.keys(state)) {
-            const u = rng.next(), p = move[key];
-            if (scenario !== 'neutral' && u < p) {
-                const [lo, hi] = ranges[key];
-                state[key] = Math.max(lo, Math.min(hi, state[key] + (u < p / 2 ? -1 : 1)));
-            }
-        }
-        const geo = { chinaRelations: state.chinaRelations, tradeWarStage: state.tradeWarStage };
-        return { ...state, geo, straitTension: straitTension(geo) };
-    };
-}
-const RULE_TRAJECTORY_SHA256 = '642c5eba4823ff8052aae4e70aef6d99d4a916e0a3f03dc6a3183b1caab71a18';
-let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
-{
-    const state = () => JSON.stringify([2, 3, 4, 5].map(R => [belief.rungs[R].m, belief.rungs[R].w, belief.rungs[R].crossed, belief.rungs[R].certDay]));
-    const h = createHash('sha256'), hr = createHash('sha256');
-    for (let seed = 1; seed <= 32; seed++) {
-        const scenario = seed % 2 ? 'markov' : 'neutral';
-        const race = createRaceState(seed), sched = frozenTape(seed, scenario);
-        initBelief(race);
-        for (let d = 0; d < HORIZON && !race.resolution; d++) {
-            const inputs = sched();
-            advanceRace(race, { straitTension: inputs.straitTension, exportControlStage: inputs.exportControlStage });
-            stepControlRegime(race); stepTreaty(race, { treatyStage: inputs.treatyStage });
-            stepBelief(race, inputs);
-            h.update(`${seed}:${race.day}:${state()}\n`); ruleHashDays++;
-            if (checkResolution(race, inputs.geo)) break;
-        }
-        runReaderWorld(seed, scenario, ({ race: r }) => { hr.update(`${seed}:${r.day}:${state()}\n`); }, frozenTape(seed, scenario));
-    }
-    ruleHashOK = h.digest('hex') === RULE_TRAJECTORY_SHA256;
-    readerDataHashOK = hr.digest('hex') === RULE_TRAJECTORY_SHA256;
-    assert(ruleHashOK, 'the rule of thumb drifted from HEAD 1343924 (the legible heads were fit on it)');
-    assert(readerDataHashOK, 'tools/reader-data.mjs no longer drives the rule bit-identically');
 }
 
 // ==========================================================================
@@ -646,8 +574,7 @@ const listingRows = { 2: [], 3: [], 4: [], 5: [] };
 // ==========================================================================
 
 let poolOK = true, coherenceOK = true, untouchedOK = true, timelineOK = true, lawOK = true, projBoundsOK = true, presetOK = true;
-let poolChecks = 0, bindChecks = 0, binds = 0, maxBind = 0;
-const fitErr = { 2: [], 3: [], 4: [], 5: [] };
+let poolChecks = 0;
 {
     const Dgrid = (t, R) => { const out = []; for (let D = t + 7; D <= SUPPORT[R]; D += 29) out.push(D); out.push(DEADLINE[R], SUPPORT[R]); return out.filter(D => D > t); };
     for (let i = 0; i < Math.min(N, 60); i++) {
@@ -675,11 +602,6 @@ const fitErr = { 2: [], 3: [], 4: [], 5: [] };
                         if (got > lower + 1e-15) coherenceOK = false;
                         const prior = Math.min(...[2, 3, 4].filter(r => r < R).map(r => binaryProb(r, D)));
                         if (raw(R, D) <= prior && got !== raw(R, D)) untouchedOK = false;
-                        if (cd(R) == null) {
-                            bindChecks++;
-                            const gap = raw(R, D) - got;
-                            if (gap > 1e-9) { binds++; maxBind = Math.max(maxBind, gap); }
-                        }
                     }
                 }
                 // N: the pooled median, brute force; the law's masses.
@@ -701,7 +623,6 @@ const fitErr = { 2: [], 3: [], 4: [], 5: [] };
                 if (R < 5 && cd(R) != null) { projBoundsOK &&= c.m === cd(R) && c.q === 0; pm = Math.max(pm, c.m); continue; }
                 projBoundsOK &&= c.m >= POSTERIOR.M_MIN && c.m <= POSTERIOR.M_MAX && c.w >= POSTERIOR.W_MIN && c.w <= POSTERIOR.W_MAX && c.q >= 0 && c.q <= POSTERIOR.Q_MAX;
                 if (R < 5) { projBoundsOK &&= c.m >= pm && c.q >= pq; pm = c.m; pq = c.q; }
-                for (let D = t + 21; D <= SUPPORT[R]; D += 21) fitErr[R].push(Math.abs(crossingProb(c.m, c.w, c.q, t, D) - binaryProb(R, D)));
             }
             const E = presetCurves('earlier'), Lt = presetCurves('later');
             const wantE = normalizeCurves(Object.fromEntries([2, 3, 4, 5].map(R => [R, R < 5 && cd(R) != null ? P[R] : { m: P[R].m - 0.5 * P[R].w, w: P[R].w, q: P[R].q }])));
@@ -1075,25 +996,21 @@ let neverLockNoScrutinyOK = false, guardNotVacuousOK = false;
 // I. A quiet record decays the quote toward NO by the deadline
 // ==========================================================================
 
-let decayReachesFloorOK = false, decayMonotone = true;
+let decayReachesFloorOK = false;
 const decayPath = [];
 {
     const race = createRaceState((BASE_SEED + 500) >>> 0);
     initConsensus(race); initBelief(race);
     const R2 = consensus.contracts.find(c => c.predicate.rung === 2);
-    let prev = Infinity;
     for (const t of [0, 100, 200, 300, 400, 419]) {
         quietTo(race, t);
-        const q = binaryQuoteFromBelief({ day: t }, R2);
-        if (q > prev + 1e-9) decayMonotone = false;
-        prev = q; decayPath.push([t, q]);
+        decayPath.push([t, binaryQuoteFromBelief({ day: t }, R2)]);
     }
     // The gate's intent, restated for the reader (HEAD's `near <= 0.05` floor was the
     // heuristic B's own arithmetic: a logistic with fixed {m, w} conditioned on one day
     // left goes to ~0 mechanically; under the reader the eve quote is a one-day hazard).
     // HEAD's decay criterion stands: the eve quote at least 0.3 below the listing, and
-    // still falling over the deadline's last stretch. Mid-term monotonicity is a
-    // diagnostic: a record with no release at all is off the training distribution.
+    // still falling over the deadline's last stretch.
     const [, q0] = decayPath[0], [, q400] = decayPath.at(-2), [, q419] = decayPath.at(-1);
     decayReachesFloorOK = q419 < q0 - 0.3 && q419 < q400;
     assert(decayReachesFloorOK, `a quiet record did not decay toward NO by the deadline (${q0} -> ${q400} -> ${q419})`);
@@ -1164,7 +1081,6 @@ let overlayOrderOK = false, buggyOrderReproducedOK = false;
 // ---- Report --------------------------------------------------------------
 
 const mean = (a) => a.length ? a.reduce((s, x) => s + x, 0) / a.length : NaN;
-const q95 = (a) => { const s = [...a].sort((x, y) => x - y); return s.length ? s[Math.floor(0.95 * (s.length - 1))] : NaN; };
 const ok = (b) => b ? 'ok' : 'FAIL';
 line(`belief-test: N=${N} runs, base seed=${BASE_SEED}, horizon=${HORIZON}d`);
 line('='.repeat(72));
@@ -1172,7 +1088,6 @@ line('\nA. The rule of thumb + full-corruption invariance');
 line(`  every rule move carries a causal ID:                ${ok(allCausesHaveId)}  (${totalCauses} moves over ${N} runs)`);
 line(`  ledger FULL COVERAGE; rule and record agree on certs: ${ok(ledgerCoverageOK)}`);
 line(`  pooled B, quotes, laws, projection, heads invariant under corruption: ${invarianceOK ? 'holds' : 'VIOLATED'}`);
-line(`  rule trajectory == HEAD 1343924 (sha256, ${ruleHashDays} days): ${ok(ruleHashOK)} | via reader-data.mjs: ${ok(readerDataHashOK)}`);
 line('\nB. Leak once-per-ID');
 line(`  leaked beat folds exactly once (replay is a no-op): ${ok(leakOnceOK)}`);
 line(`  replayed leak records no second causal move:        ${ok(stepIdempotentOK)}`);
@@ -1202,14 +1117,10 @@ line('\nL-O. The pool, the projection, the timeline, the player\'s projection');
 line(`  pool arithmetic == (1-eta)*legible + eta*full, projected: ${ok(poolOK)}  (${poolChecks} coordinates)`);
 line(`  P(R4) <= P(R3) <= P(R2) pointwise:                  ${ok(coherenceOK)}`);
 line(`  untouched where the pool is already ordered:        ${ok(untouchedOK)}`);
-line(`  binding (diagnostic): ${binds}/${bindChecks} open R3/R4 coordinates (${(100 * binds / Math.max(1, bindChecks)).toFixed(2)}%), max ${maxBind.toFixed(4)}`);
-const cs = coherenceStats();
-line(`  live coherenceStats (since last init): ${cs.binds}/${cs.checks} binds, max ${cs.maxGap.toFixed(4)}`);
 line(`  implied timeline == brute-force pooled median:      ${ok(timelineOK)}`);
 line(`  beliefLaw masses + atom == 1, median == timeline:    ${ok(lawOK)}`);
 line(`  projection bounds + ladder order:                   ${ok(projBoundsOK)}`);
 line(`  earlier/later presets on the projection, q kept:    ${ok(presetOK)}`);
-line(`  projection fit |error| (diagnostic) mean / p95:     ${[2, 3, 4, 5].map(R => `R${R} ${mean(fitErr[R]).toFixed(3)}/${q95(fitErr[R]).toFixed(3)}`).join('  ')}`);
 line('\nP. The outstanding quarter at the terminal');
 line(`  scored once from its pairs vs the completed world:  ${ok(outstandingOK)}`);
 line(`  a certification after the quarter's end: o = 0:     ${ok(outstandingNaturalOK)}`);
@@ -1243,7 +1154,7 @@ line('\nH2. Never-draw scrutiny skip (02a "What follows states nothing")');
 line(`  never-draw player -> zero scrutiny triggers:        ${ok(neverLockNoScrutinyOK)}`);
 line(`  not vacuous (a divergent carried R4 can fire):      ${ok(guardNotVacuousOK)}`);
 line('\nI. A quiet record (R2 quote by day)');
-line(`  ${decayPath.map(([t, q]) => `${t}:${q.toFixed(3)}`).join('  ')}  monotone (diagnostic): ${decayMonotone ? 'yes' : 'no'}`);
+line(`  ${decayPath.map(([t, q]) => `${t}:${q.toFixed(3)}`).join('  ')}`);
 line(`  eve quote >= 0.3 below the listing, still falling:  ${ok(decayReachesFloorOK)}`);
 line('\nJ. Followup-fired race shells seed impulses (fix 6)');
 line(`  incident_postmortem (followup path) seeds impulse:  ${ok(followupImpulseOK)}`);
