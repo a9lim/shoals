@@ -199,7 +199,7 @@ export const RACE_EVENTS = [
         /* PROSE: draft, awaiting a9 */
         headlines: [
             'The independent evaluation of {lab}’s catalogue is in, and it is short: the results hold, at the scope claimed. The model that produced them still isn’t for sale. Sharma: “So now we know what they have. We still don’t know when they’ll sell it.”',
-            'Evaluators sign off on {lab}’s demonstration, every lemma and every scope. The dispute ends in a footnote. {rungName} is now something {lab}’s unreleased model has demonstrably done, which is not the same as something the {rung} contract pays on.',
+            'Evaluators sign off on {lab}’s demonstration, every lemma and every scope. {rungName} is now something {lab}’s unreleased model has demonstrably done, which is not the same as something the {rung} contract pays on.',
         ],
         params: {},
     },
