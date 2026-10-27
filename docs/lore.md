@@ -328,6 +328,21 @@ The player's firm. The player: senior derivatives trader, Barron era.
 - **Riggs** — a colleague and rival on the floor: leans over with what
   the Street is saying about the player's book.
 - **The risk committee** — quarterly.
+- **The predecessors** — the player takes over one book of four, each
+  left by a portfolio manager who is gone, with a handover memo that is
+  fallible by design:
+  - **Paul Brennan** — left for a multi-manager fund in Greenwich. A
+    momentum man: the HCN long is the trade, and it's working. Owed the
+    Ostrander redemption.
+  - **Ines Varga** — retired after twenty-two years at Meridian. Own
+    the stock, own a floor under it, never pretend to know the date.
+    Left a term financing due.
+  - **Teodor Lindqvist** — let go in the spring. Long the far VXHCN
+    future in a size it would take a month to sell properly; the race
+    will make HCN violent. Owed the Ashby family office.
+  - **Nadia Kerr** — on leave, writing a book. The wall is real and
+    Consensus is pricing a staircase; short the far rungs, long bonds.
+    Owed the Sorensen Foundation.
 
 ---
 

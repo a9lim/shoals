@@ -39,10 +39,11 @@ node tools/forecast-test.mjs   # [N] [--seed S] [--calibrate], N=500/scenario: p
 node tools/valuation-test.mjs  # [N] [--seed S] [--validation], N=1000/scenario: V's corruption invariance, calibration, fairness, reconciliation (~54 s)
 node tools/rounds-test.mjs     # [N] [--seed S], N=300: Polaris rounds, Halcyon follow-ons, collateral, conservation, main-thread helpers (~28 s)
 node tools/reader-test.mjs     # [N] [--seed S] [--sections A-G], N=2000/scenario: the reader's gates, B's edge and its close (~2 min)
+node tools/opening-test.mjs    # N=400 worlds: the inherited desks, obligations and their netting, the forced sale, the close (~3 s)
 node tools/reader-fit.mjs      # the reader's offline fit; needs NumPy/SciPy (shared venv). Run only under 02a's refit rule
 ```
 
-The ten harnesses import `src/` directly and exit 1 on any failure. They are the
+The eleven harnesses import `src/` directly and exit 1 on any failure. They are the
 regression gate for anything that touches the Dynamic-mode systems. Run them at the
 default N, because their calibration bands are sized for it and small-N runs miss
 them legitimately. Each harness header lists its sections. The parent build doesn't
@@ -76,11 +77,14 @@ src/events/            authored event pools by domain + param-ranges.js; index.j
 src/events/race-bridge.js, race-events.js  race ledger → narrative shells
 src/world-state.js, faction-standing.js, traits.js, regulations.js, lobbying.js  narrative state
 src/endings.js         ending triggers, family/overlay selection, slot-based 5-page epilogue
+src/opening.js         the inherited desks (fixtures), the draw and the takeover (DOM-free)
+src/almanac.js, almanac-view.js  the almanac's records and summary (DOM-free); its Meridian view
+src/counters.js        development-only interruption counters (`shoalsCounts()` in the console)
 src/race/              hidden race model and its markets (DOM-free; see below), the public
                        record and the reader (reader-constants.js is generated; never edit it)
 src/act3.js, standing-orders.js  Act III driver/latency/degradation; menu-authored precommitments
 src/audio.js           all music and SFX, synthesized
-tools/*.mjs            the ten headless harnesses, the reader's fit tool and its data/metrics
+tools/*.mjs            the eleven headless harnesses, the reader's fit tool and its data/metrics
                        modules; tools/reader-optimizer.py (the fit's optimizer)
 docs/design/, docs/lore.md, docs/ROADMAP.md
 ```
@@ -110,17 +114,20 @@ Layer-3 and impulse overlays. `_runSubstep()` runs substep → `_clampRate()` �
 decay → `_syncAll()` → market-maker rehedge → pending-order check, then the Act III
 boundary work (deferred manual fills, the substep event lane, a popup drain).
 `_closeTradingDay()` finalizes the bar and removes the overlays LIFO before
-`_onDayComplete()`. That handles borrow, dividends, expiry, the quarterly review,
-traits, the race block, the event engine and endings, impact and Layer-3 decay, the
-rogue-trading and margin checks, UI and the popup drain. `tick()` in `main.js` has no
+`_onDayComplete()`. That opens with the forecast's snapshot on a lock day (before
+anything else steps, so it is still the lock day's), then handles borrow, dividends,
+expiry, the quarterly review, traits, the race block, the event engine and endings,
+impact and Layer-3 decay, the obligations (`_settleObligations`: payment, the forced
+sale, the notice), the rogue-trading and margin checks, UI and the popup drain. `tick()` in `main.js` has no
 callers.
 
 Race-block order in `_onDayComplete`: `stepCoupling` → `advanceRace(race,
 {straitTension, playerCoupling, exportControlStage})` → `stepControlRegime` →
 `stepTreaty` → `_syncRaceToWorld()` (the mirrors) → `setBaseRateScale` →
 `_stepAct3()` → standing-order sync → `stepBelief` → Consensus and compute
-settlement → standing day rules → on lock days, quarter scoring (`scoreQuarter`)
-then the forecast lock, scrutiny and firm conversion → `checkResolution` →
+settlement → standing day rules → on lock days, quarter scoring (`scoreQuarter`, and the
+reader-copier's), the quarter's close line, `F`, scrutiny and firm conversion →
+`checkResolution` →
 `_checkRoom`. After the event engine and the bridge pass, `_stepRaceMarkets` applies
 the valuation gap (and any follow-on dilution) to the closed day, fills resting orders
 at the post-gap price and queues the round offers; `marketsDayClose` snapshots after it.
@@ -235,11 +242,15 @@ them headless.
 - `belief.js` holds market belief B: the rule of thumb (the old heuristic updater,
   ledgered, kept bit-identical; the reader was fit on it) and the pool
   (1−η)·legible + η·full over the reader's laws, made coherent up the ladder; the
-  player's posterior (a drawn draft of per-rung `{m, w, q}` curves, quarterly locks
-  that store the clamped probability pairs, `scoreQuarter`'s log-likelihood ratio,
-  the outstanding quarter scored at the terminal, credibility = tanh(S_P/K_CRED), and
-  σ₀ reported); and firm belief F with scrutiny, where `playerPilled` mirrors
-  `marketPilled`'s 252-day horizon. It feeds the
+  player's posterior (a standing policy per rung: each rung follows `B`'s projection
+  until the player draws on it, then carries its `{m, w, q}` curve; `lockForecast`
+  snapshots it each quarter, classifying every rung once as followed or carried and
+  storing the clamped probability pairs, `p_P ≡ p_M` on a followed rung;
+  `scoreQuarter`'s log-likelihood ratio, the outstanding quarter scored at the
+  terminal, credibility = tanh(S_P/K_CRED), and σ₀ reported); the reader-copier's
+  record beside it (`copierRecord`, the almanac's, never shown in play); and firm
+  belief F with scrutiny, where `playerPilled` mirrors `marketPilled`'s 252-day
+  horizon and is null when the latest lock follows R4 (no stated posterior). It feeds the
   real quoters into `consensus.js` (milestone binaries settled off certifications,
   disputes, R5 settled only at terminal closeout) and `compute-market.js` (the Cambria
   quarterly futures ladder, settled on race-day maturities through
@@ -276,13 +287,17 @@ key is `shoals-theme`.
   over a band of the range.
 - **The book.** The front page's rail (`portfolio-renderer.js`): the value in ink with
   a line comparing it to holding HCN (the sparkline's dashed ghost), the account,
-  positions (binaries included) as contract, quantity and P&L, strategy groups,
+  unpaid obligations (label, due edition, amount), positions (binaries included) as contract, quantity and P&L, strategy groups,
   working orders and the Greeks. A position's name hands its contract to the ticket
   (`shoals:toTicket`).
 - **Opening.** The desk opens playing on Edition 1 unless the platform asks for reduced
-  motion, which opens paused on a complete frame. The day-0 forecast lock is queued at
-  boot and arrives as a dispatch when day 0 closes (the popup barrier holds the day, so
-  it is still a day-0 lock).
+  motion, which opens paused on a complete frame. In Dynamic, `_dealOpeningHand`
+  (`src/opening.js`) deals one of four inherited desks from the run's seed (its own
+  `'opening'` stream) and takes it over at day 0's marks, cash solved so equity net of
+  the obligation is `INITIAL_CAPITAL`. The predecessor's memo leads Edition 1, with two
+  archived reports (dated `Archive`, no news day) under it. Classic starts on cash.
+  There is no forecast dispatch: the desk snapshots the standing policy at each lock
+  day's close (02a "The standing policy").
 - **Dispatches and the last edition.** Popups keep their single path
   (`_queuePopup`/`_processPopupQueue`/`showPopupEvent`); only the markup and styles
   changed. The epilogue overlay is the last edition, with a "The race, revealed" button
@@ -325,10 +340,15 @@ key is `shoals-theme`.
   shows publication only. The page is also the posterior's editor: the draft's daily
   mass drawn in ink over B's on each open rung, on one scale; the bead is the median
   (drag across; up and down for width), the square on the term-end gauge the plateau
-  (beside B's tick), with 02a's keys on the focused canvas. The lock dispatch's
-  "Adjust first" opens the page with the Lock shown (`setForecastPending`) and holds
-  the quarter (`_lockPending`): play and step refuse until it is pressed.
-- **Meridian.** The settings (regime, sound, the pricing parameters) sit at its foot.
+  (beside B's tick), with 02a's keys on the focused canvas. A followed rung draws only
+  B; ink appears only on carried rungs. Delete or Backspace returns the focused rung to
+  the market, and "Follow the market" returns every rung (`followMarket`). The ladder's
+  Locked column reads `Market` for a rung the latest lock followed.
+- **Meridian.** The record shows quarters stated (a carried rung scored) and the
+  predecessor's handover (`renderHandover`). The almanac (`almanac-view.js`) sits under
+  the columns: summary rows, the latest runs, a reliability canvas and the families
+  beside the neutral-input baseline, rendered on page open, theme change and the last
+  edition's append. The settings (regime, sound, the pricing parameters) sit at its foot.
   Sections marked `data-dynamic` (Meridian's columns, the race page's forecast notes)
   hide in Classic. Congress is one seat bar per chamber: Farmer-Labor solid, the
   Federalists hatched, a rule at the majority.
@@ -401,9 +421,15 @@ key is `shoals-theme`.
 - **Machinery vs the player's hand.** The latency ladder and spread multiplier apply
   to every manual entry (the ticket's market legs, binaries, compute futures,
   strategies) plus position close and strategy unwind, all via `_deferManual`.
-  Exercise, popup trades, margin liquidation, standing orders and terminal paths
+  Exercise, popup trades, margin liquidation, a forced sale, standing orders and terminal paths
   stay instant. Lag 0 bypasses the queue and `spreadMult === 1`
   short-circuits, because the general formula is not bit-exact at 1.
+- **Obligations** (02a "The evening") are liabilities: `unpaidObligations` nets them out
+  of every actual and prospective equity calculation (`portfolioValue`,
+  `collateralEquity`, `checkMargin`, short admission, the endings check). They are paid
+  in cash at the close due on their day; a shortfall is raised by `settleObligation`'s
+  pro-rata forced sale, a machinery reduce-only close at `FORCED_SALE_SPREAD_MULT`
+  times the spread. The terminal closeout pays what is unpaid.
 - **Settlement chokepoints.** Every binary settlement row goes through
   `portfolio.applyBinarySettlementRows` (cash, exactly-once). Credibility is scored
   quarterly by `scoreQuarter`, never at settlement.

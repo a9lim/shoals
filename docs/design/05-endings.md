@@ -116,6 +116,21 @@ player's term before the bounded-influence clip, so it could claim more
 than the clip allowed. The ledger is the same in every family, with no
 gate — flinching in the dooms would read as the game protecting you.
 
+## The almanac
+
+One run's forecast record is mostly noise; a career's may not be. The
+last edition of every Dynamic run, ejections included, writes one
+record to the browser's almanac: the seed and the hand, the family and
+overlay, the sampled world, and the scored record, beside a reference
+reader's record on the same world. That reader reads only the public
+record and is scored by the same rule; it stays out of view until the
+run ends. The Meridian page shows the almanac across runs: the
+cumulative score beside the reader's, how often the rungs the player
+gave each probability certified that quarter, and the families seen
+beside the baseline measured with no player in the world (02a, "The
+evening"). Without storage the almanac is empty and nothing else
+changes.
+
 ## Tone discipline
 
 No family gets a lecture. The satire register is barred from the

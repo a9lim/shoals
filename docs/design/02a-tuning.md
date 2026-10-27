@@ -1800,8 +1800,9 @@ ticket stays the only order entry.
 **The almanac.** Browser storage under `shoals-almanac`, versioned. The
 last edition of every Dynamic run, natural resolution and ejection
 alike, appends one record, and the almanac keeps the latest 200. A
-record holds the seed and fixture, the family, overlay, terminal day and
-cause, the sampler's draws, and the scored record: per quarter and rung,
+record holds the seed and fixture, the family and overlay, the desk's
+last day and ending, the world's terminal day and cause (an extrapolated
+resolution runs past the desk), the sampler's draws, and the scored record: per quarter and rung,
 `o`, `p_P`, `p_M` and the lock's classification, with `S_P`, σ₀ and
 credibility. Beside it is the reader-copier's record on the same world:
 at each snapshot, the full reader's quarter probability for each open

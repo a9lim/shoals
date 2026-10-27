@@ -70,27 +70,70 @@ constants are in [02a-tuning.md](02a-tuning.md).
   HCN the only equity book, this lives in event prose and HCN's own
   impulses, not a second chart.
 
+## The desk you inherit
+
+A Dynamic run opens on someone else's book. The player takes over from
+a portfolio manager who has left Meridian, and the hand is one of four,
+dealt by the run's seed (constants and the fixture table in
+[02a](02a-tuning.md), "The evening"):
+
+- **The catalyst** — a levered HCN long with calls into a release its
+  owner expected, and a redemption due before it that the cash doesn't
+  cover; a resting sell at 106 was the plan to raise it.
+- **The insurance** — HCN with puts on every share that expire at the
+  first quarter's end, a front VXHCN future, a stop under the puts, and
+  a loan repayment the cash covers unless it buys the next floor.
+- **The illiquid** — the far VXHCN future in more size than trades in
+  several sessions, a little HCN, and a redemption the cash covers by
+  half.
+- **The wall** — Consensus's R3 and R4 contracts sold short, long-dated
+  bonds for the capex stall the thesis expects, a redemption due first,
+  and most of the cash posted against the shorts.
+
+The predecessor's handover memo leads the first edition, with two of
+the archived reports they relied on beneath it; the memo names a
+timeline against the market's day-0 quote, which is the same in every
+world, and it is fallible by design. The book is marked at the day-0
+opening and the cash set so equity is the usual starting capital: P&L,
+the comparison with holding HCN and every review measure from the
+takeover, never from the predecessor's entries. From then on the book is
+the player's. An inherited HCN long feeds the cost-of-capital channel
+from the first close like any position, so keeping it is a choice the
+ledger sees. Classic starts on cash.
+
+**Obligations** are dated, public and mundane: a redemption or a loan
+repayment, outside the race. Each is a liability from the takeover,
+netted out of every measure of equity, and it is met in cash, never on
+the margin loan. Five sessions out, if the cash won't cover it, a wire
+notice pauses the desk. On the day the desk pays it; if it is short,
+operations sells the same slice of every long position at three times
+the spread, instantly, and the firm notes it. Being right about next
+year doesn't meet next month's obligation.
+
 ## The posterior and the implied timeline
 
 The **market's implied timeline** is `B`, per rung a crossing-date law
 whose quotes are the binaries; its implied date is the day the law is
 even odds, or "not this term". The **player's posterior** is a
 logistic per rung with a plateau, drawn on the Race page over the
-evidence it is a reading of: on each uncertified rung, the player's
-crossing-date distribution in ink over Consensus's in indigo, on one
-scale per rung, starting from a fit of `B` into the player's family. The
-bead on the rung is the median; it drags along the rung, and up or down
-for width. A square on a gauge at the term's end sets the chance the
-rung lands this term at all, beside a tick for the market's. Arrow keys
-move the median 5 days (21 with Shift) and tighten or loosen it, Page Up
-and Page Down move the plateau, and Tab moves between rungs. "Match the
-market" resets the draft to the fit. The Markets page's Consensus panel
-shows the draft read-only, on the rungs where it differs from the
-market. The draft is locked each quarter through the forecast-lock
-dispatch — as drawn, the market's, earlier or later than the market, or
-"adjust first", which opens the Race page and holds the quarter until
-its Lock is pressed. Locking the market's curves is a policy, not a
-drawing: it scores exactly what the market scores.
+evidence it is a reading of. Each rung follows the market until the
+player draws on it: a followed rung shows only Consensus's distribution
+in indigo, and a rung the player has drawn carries their own in ink over
+it, on one scale per rung, held where they left it while the market
+moves. The bead on the rung is the median; it drags along the rung, and
+up or down for width. A square on a gauge at the term's end sets the
+chance the rung lands this term at all, beside a tick for the market's.
+Arrow keys move the median 5 days (21 with Shift) and tighten or loosen
+it, Page Up and Page Down move the plateau, Delete returns the focused
+rung to the market, and Tab moves between rungs. "Follow the market"
+returns every rung. The Markets page's Consensus panel shows the draft
+read-only, on the rungs the player has drawn.
+
+There is no forecast dispatch. The forecast is a standing policy, and
+the desk records it as each quarter opens, at the close of that
+quarter's first edition, per rung as followed or carried. Following the
+market is a policy, not a drawing: a followed rung scores exactly what
+the market scores. A revision reaches only the next quarter's record.
 
 At each quarter's close, every open rung is scored for the player and
 for the market's snapshot alike, from the probabilities both stored at
@@ -102,8 +145,9 @@ skilled reader, so it moves slowly and luck can still carry a bold
 early caller through a gate. Credibility is the player's
 demonstrated edge over the market (copying the market scores exactly
 zero), and it is the currency that converts the firm and unlocks
-agency. The Desk shows the track record and credibility; the Race page
-shows the locked medians beside the market's. The gap between the curves
+agency. A quarter that scored a drawn rung closes with one line on the
+wire. Meridian shows the track record and credibility; the Race page
+shows the recorded medians beside the market's. The gap between the curves
 is available alpha; the gap closing is the world waking up. The player
 literally trades their distribution against the market's — the game's
 thesis as an interface.
@@ -165,9 +209,10 @@ same tape.
 
 ## The scrutiny loop (firm belief `F`)
 
-The risk committee watches the gap between the player's locked
-pilledness and the firm's belief `F` (both read on the same horizon, so
-a player who copies the market draws no heat):
+The risk committee watches the gap between the player's recorded
+pilledness and the firm's belief `F`, both read on the same horizon. A
+player who follows the market on R4 has stated nothing there and draws
+no heat:
 
 - **Player more pilled than the firm** (the early default): an
   AGI-flavored book draws committee heat.
