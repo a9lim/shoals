@@ -280,10 +280,8 @@ is taken in three rounds, with section 3's first cut in the first:
    release jitter, and the refit on engine worlds; section 3's first cut
    beside it. Rulings and what was measured: 02a "Demonstrations" and
    "The run, headless". As ruled, demonstrations add almost no edge
-   (+0.005 nats a run): the record already implies what they say.
-   Carried forward: four bystander choices that are the nearest
-   qualifying choice rather than a neutral one wait on a9 (02a, the
-   run's implementation readings).
+   (+0.005 nats a run): the record already implies what they say. a9
+   ratified the round's prose and the bystander choices the same day.
 2. **Commitment.** The conditional financing commitment (anchor
    Polaris's next round if an independent evaluation lands first), the
    terminal clip retired for bounds where influence is exercised, and

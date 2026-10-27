@@ -147,7 +147,6 @@ export const RACE_EVENTS = [
         id: 'demo_fixedpoint_catalogue',
         category: 'release',
         magnitude: 'major',
-        /* PROSE: draft, awaiting a9 */
         headline: 'Halcyon posts seven hundred papers overnight, each on a problem somebody had given up on, under a cover note signed by no one and titled Fixedpoint: a catalogue. The model that wrote them isn’t one Halcyon sells; the note calls it “an internal build.” About four in ten come with a proof a machine can check. Mathematicians spend the morning checking the ones in their field and the afternoon not saying much. Consensus barely moves: a theorem isn’t a release. Sharma: “Seven hundred papers is a sentence about the model they haven’t shipped.”',
         params: {},
         impulse: ROUTINE_FRONTIER_IMPULSE,
@@ -159,7 +158,6 @@ export const RACE_EVENTS = [
         id: 'demo_halcyon',
         category: 'release',
         magnitude: 'moderate',
-        /* PROSE: draft, awaiting a9 */
         headlines: [
             '{lab} publishes another catalogue from the build it hasn’t shipped, and this one says what it is: work at the level the {rung} contract describes, {rungName}, by a model nobody outside can run. Referees have the proofs; everyone else has the abstract. Sharma: “A demonstration is a release you can’t buy.”',
             'Another {lab} catalogue, quieter than the first: fewer papers, harder problems, and a cover note that says {rungName} once and then stops, as if it had said too much. The model isn’t {model}; it’s whatever comes after. The Brief: “They’re showing us the next release without selling it to us.”',
@@ -171,7 +169,6 @@ export const RACE_EVENTS = [
         id: 'demo_polaris',
         category: 'release',
         magnitude: 'moderate',
-        /* PROSE: draft, awaiting a9 */
         headlines: [
             'Polaris publishes what Holt’s next build can do before anyone can use it: a catalogue of results it calls {rungName}, with Gottlieb’s name on the cover note and a paragraph on safety in every section. Boulder doesn’t do launch events. It does preprints, and investors read them.',
             'A Polaris catalogue lands on a Sunday: Holt’s unreleased build, results claimed at the level of the {rung} contract, every proof attached and half of them checkable by machine. The Brief: “Polaris can’t outspend Halcyon. It can out-publish it.”',
@@ -185,7 +182,6 @@ export const RACE_EVENTS = [
         id: 'demo_dispute',
         category: 'release',
         magnitude: 'minor',
-        /* PROSE: draft, awaiting a9 */
         headlines: [
             'A referee’s note on {lab}’s catalogue travels faster than the catalogue did: the headline result, it says, proves a narrower statement than the abstract claims, and the machine-checked version is narrower still. {lab} says the scope is as stated. Nobody can settle it by Friday, which is the only deadline the tape knows.',
             'Two groups say {lab}’s demonstration solved an easier problem than the one it names: the checker proved what it was given, and what it was given was smaller. {lab}’s reply runs three pages and concedes nothing. The evaluation, when it lands, will be the first word from someone without a stake.',
@@ -196,7 +192,6 @@ export const RACE_EVENTS = [
         id: 'demo_upheld',
         category: 'release',
         magnitude: 'minor',
-        /* PROSE: draft, awaiting a9 */
         headlines: [
             'The independent evaluation of {lab}’s catalogue is in, and it is short: the results hold, at the scope claimed. The model that produced them still isn’t for sale. Sharma: “So now we know what they have. We still don’t know when they’ll sell it.”',
             'Evaluators sign off on {lab}’s demonstration, every lemma and every scope. {rungName} is now something {lab}’s unreleased model has demonstrably done, which is not the same as something the {rung} contract pays on.',
@@ -207,7 +202,6 @@ export const RACE_EVENTS = [
         id: 'demo_narrowed',
         category: 'release',
         magnitude: 'minor',
-        /* PROSE: draft, awaiting a9 */
         headlines: [
             'The evaluation of {lab}’s catalogue upholds the proofs and narrows the claim: the work is real, and the problems were smaller than the abstract said. Close, the evaluators write, but not {rungName}. {lab} calls this a confirmation. The Brief calls it a measurement.',
             '{lab}’s demonstration comes back narrowed. Every theorem stands; the headline doesn’t. What the unreleased model did is now on the record at its true size, a little short of the rung the cover note implied.',
@@ -220,9 +214,7 @@ export const RACE_EVENTS = [
         id: 'demo_withdrawn',
         category: 'release',
         magnitude: 'moderate',
-        /* PROSE: draft, awaiting a9 */
         headline: '{lab} withdraws its catalogue’s central result: a lemma on page eleven fails, and the proofs that leaned on it fall with it. The retraction notice is two sentences long. Sharma: “One bad lemma is a typo. A citation graph is a margin call.”',
-        /* PROSE: draft, awaiting a9 */
         headlineDependents: 'A flawed lemma in an earlier {lab} catalogue takes {n} down with it: the citations ran through the one proof that failed. The withdrawal is careful, complete and public, which is more than most retractions manage, and it still leaves the market not knowing what the model can actually do.',
         params: {},
         impulse: reversed(ROUTINE_FRONTIER_IMPULSE),

@@ -1876,8 +1876,9 @@ from the console (`shoalsCounts()`) in a9's play-tests and never shown:
 
 ## Demonstrations
 
-Ratified 2026-10-27 (ROADMAP §2's first round: the chain's evidence). Player-facing prose (the wire's items and the Race
-page's report lines) is authored and ratified by a9.
+Ratified 2026-10-27 (ROADMAP §2's first round: the chain's evidence).
+The player-facing prose (the wire's items, the Race page's lines and the
+save notices) is authored, and a9 ratified it as written the same day.
 
 **What one is.** A frontier lab publishes what its unreleased model did,
 a third disclosure mode beside a release and a leak. Halcyon and Polaris
@@ -2281,7 +2282,7 @@ move to the run module when they next change.
 - The margin call's bystander choice is "Liquidate all positions" (moot:
   the bystander holds nothing), and game over's single choice is flagged.
   Four flags are the nearest qualifying choice rather than a neutral one,
-  and wait on a9: export controls ("Fight the controls", which grants the
+  ratified by a9 as they stand (2026-10-27): export controls ("Fight the controls", which grants the
   inert Accelerationist conviction), the treaty window ("Counsel
   against"), the reporting regime ("Let it die in committee", which drops
   the insider channel's trust below its gate) and enforcement ("Fight
