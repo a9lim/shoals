@@ -16,6 +16,13 @@
    H. The terminal pays what is unpaid; Classic stays cash
    I. main.js: notice, pause, payment and the forced
       sale's cost at the close
+   J. The flatten's reduce-only legs: the cap by id, the
+      reversal skip, partial shorts, the estimate's
+      non-mutation and its agreement with execution
+   K. The skip's stop classifier on synthetic closes
+   L. The ticket's flatten: size one, bound legs, an edit
+      unbinds them, the readout and the names left off
+   M. main.js: the skip's latch, its stop and its pause
 
    Usage: node tools/opening-test.mjs [N] [--seed S]
           N worlds, default 400; base seed defaults to 1.
@@ -27,7 +34,7 @@ import { market, syncMarket } from '../src/market.js';
 import { computeVXHCNSpot } from '../src/pricing.js';
 import * as book from '../src/portfolio.js';
 import { unitPrice } from '../src/position-value.js';
-import { resetImpactState, rehedgeMM, baselineMMHedge, getStockImpact, getBondImpact, getVxhcnImpact } from '../src/price-impact.js';
+import { resetImpactState, rehedgeMM, baselineMMHedge, getStockImpact, getBondImpact, getVxhcnImpact, getOptionImpact } from '../src/price-impact.js';
 import { createRaceState, advanceRace } from '../src/race/race-state.js';
 import { consensus, initConsensus, setBinaryQuoteSource, refreshBinaryQuotes, getBinaryQuote, BINARY_NOTIONAL } from '../src/race/consensus.js';
 import { initComputeMarket, setComputePriceSource, refreshComputeQuotes } from '../src/race/compute-market.js';
@@ -41,7 +48,9 @@ import { checkEndings } from '../src/endings.js';
 import { resetRegulations, activateRegulation } from '../src/regulations.js';
 import { resetFactions, getFaction, shiftFaction, capitalMultiplier } from '../src/faction-standing.js';
 import { FIXTURES, drawFixture, takeover, dealOpeningHand, dealtFixture, resetOpening } from '../src/opening.js';
-import { INITIAL_CAPITAL as E0, INITIAL_PRICE, ROGUE_TRADING_THRESHOLD, REG_T_MARGIN, STRIKE_INTERVAL, FORCED_SALE_SPREAD_MULT } from '../src/config.js';
+import { INITIAL_CAPITAL as E0, INITIAL_PRICE, ROGUE_TRADING_THRESHOLD, REG_T_MARGIN, STRIKE_INTERVAL, FORCED_SALE_SPREAD_MULT, BOOK_MOVE_STOP, SKIP_DAYS_PER_SEC } from '../src/config.js';
+import { closeStop, majorSince, SKIP_CAUSES } from '../src/pacing.js';
+import * as ticket from '../src/ticket.js';
 import { fmtBook } from '../src/format-helpers.js';
 import { readFileSync } from 'node:fs';
 import { createContext, runInContext } from 'node:vm';
@@ -501,6 +510,242 @@ const seatAtMark = (type, qty, strike, expiryDay) =>
     check('I: a short desk is force-sold with its wire item and costs firmStanding 8, without pausing',
         forced.items[0] === 'Operations sells a slice of the book to meet the Ostrander redemption; the desk was $2,400k short on the day, and the risk committee has noted it.'
         && forced.dFirm === -8 && forced.state.playing && P.obligations.length === 0, forced.items[0]);
+}
+
+// ---- J. The flatten's reduce-only legs ---------------------------------------------
+const reduce = (posId, side, qty, mult) => book.reduceOnlyClose(sim, posId, side, qty, sim.S, market.sigma, sim.r, sim.day, sim.q, mult);
+const estimate = (legs, mult) => book.estimateReduceOnly(legs, sim.S, market.sigma, sim.r, sim.day, sim.q, mult);
+const buy = (type, side, qty, strike, expiryDay, name) =>
+    book.executeMarketOrder(sim, type, side, qty, sim.S, market.sigma, sim.r, sim.day, strike, expiryDay, name, sim.q);
+const closeLeg = (p) => ({ posId: p.id, side: p.qty > 0 ? 'short' : 'long', qty: Math.abs(p.qty) });
+{
+    // J1. The cap: a position traded down while the leg waited closes what remains.
+    boot(BASE_SEED); freshBook();
+    const stock = seatAtMark('stock', 100);
+    const leg = closeLeg(stock);
+    buy('stock', 'short', 60);
+    const cash0 = P.cash;
+    const r = reduce(leg.posId, leg.side, leg.qty);
+    check('J: a leg is capped at what its position still holds, by id',
+        r.status === 'filled' && r.qty === 40 && !P.positions.some(p => p.id === stock.id) && P.cash > cash0
+        && !P.positions.some(p => p.type === 'stock'), `${r.status} ${r.qty}`);
+    // J2. Gone: nothing left closes nothing.
+    const sig = bookSig();
+    const g = reduce(leg.posId, leg.side, leg.qty);
+    check('J: a leg whose position is gone closes nothing', g.status === 'gone' && g.qty === 0 && bookSig() === sig);
+    // J3. Reversed: the position flipped sign under the same id; the stale side is never traded.
+    freshBook();
+    const flip = seatAtMark('stock', 50);
+    const fleg = closeLeg(flip);
+    buy('stock', 'short', 80);
+    const after = P.positions.find(p => p.id === flip.id);
+    const sig2 = bookSig();
+    const rv = reduce(fleg.posId, fleg.side, fleg.qty);
+    check('J: a leg whose position reversed sign is skipped, never traded on its stale side',
+        after && after.qty === -30 && rv.status === 'reversed' && bookSig() === sig2, `qty ${after && after.qty}`);
+    // J4. A partial chassis short returns the same fraction of its collateral.
+    freshBook();
+    const short = buy('stock', 'short', 50);
+    const res0 = short._reservedMargin, cashS = P.cash;
+    const mid = unitPrice('stock', sim.S, market.sigma, sim.r, sim.day, undefined, undefined, sim.q);
+    const ps = reduce(short.id, 'long', 20);
+    check('J: a partial close of a short keeps its side and returns its share of the collateral',
+        ps.status === 'filled' && short.qty === -30 && near(short._reservedMargin, res0 * 0.6, 1e-9)
+        && P.cash - cashS < res0 * 0.4 && P.cash - cashS > res0 * 0.4 - 20 * mid * 1.05, `${short.qty}`);
+    // J5. A partial Consensus short, through the binary chokepoint.
+    freshBook();
+    const key = consensus.contracts.find(c => !consensus.quotes[c.key]?.settled).key;
+    const bin = book.seatPosition('binary', -42, unitPrice('binary', sim.S, market.sigma, sim.r, sim.day, key, undefined, sim.q), sim.day, key, consensus.contracts.find(c => c.key === key).deadline);
+    const pb = reduce(bin.id, 'long', 20);
+    check('J: a partial Consensus close nets through the binary chokepoint',
+        pb.status === 'filled' && bin.qty === -22 && near(bin._reservedMargin, 22 * BINARY_NOTIONAL), `${bin.qty}`);
+    // J6. A restricted account trades nothing.
+    P.restricted = true;
+    const rr = reduce(bin.id, 'long', 5);
+    check('J: a restricted account closes nothing', rr.status === 'rejected' && bin.qty === -22);
+    P.restricted = false;
+}
+{
+    // J7. The estimate: non-mutating, and exactly what immediate execution does
+    //     (distinct pools, at a widened ladder multiple, a regulation spread on).
+    boot(BASE_SEED); freshBook();
+    activateRegulation('transaction_tax');
+    buy('stock', 'long', 90); buy('bond', 'long', 30, undefined, EXPIRIES[3]);
+    buy('vxhcnfuture', 'long', 40, undefined, EXPIRIES[0]);
+    buy('call', 'long', 25, 105, EXPIRIES[1]); buy('put', 'short', 15, 95, EXPIRIES[2], 'Strangle');
+    const key = consensus.contracts.find(c => !consensus.quotes[c.key]?.settled).key;
+    book.executeBinaryTrade(key, 'short', 12);
+    const legs = P.positions.map(closeLeg);
+    legs[0].qty += 7;   // a leg larger than its holding is capped
+    const pools = () => JSON.stringify([getStockImpact(market.sigma), getBondImpact(market.sigmaR), getVxhcnImpact(market.xi),
+        getOptionImpact('call', 105, EXPIRIES[1], market.sigma, 0.1, 30), getOptionImpact('put', 95, EXPIRIES[2], market.sigma, 0.1, 30)]);
+    const sig = bookSig(), pool0 = pools();
+    const est = estimate(legs, 2.5);
+    check('J: the estimate mutates neither the book nor the impact pools', bookSig() === sig && pools() === pool0);
+    const est1 = estimate(legs, 1);
+    const gross = P.positions.reduce((s, p) => s + Math.abs(p.qty * unitPrice(p.type, sim.S, market.sigma, sim.r, sim.day, p.strike, p.expiryDay, sim.q)), 0);
+    const cash0 = P.cash;
+    let ok = true;
+    for (const L of legs) ok = reduce(L.posId, L.side, L.qty, 2.5).status === 'filled' && ok;
+    const released = P.cash - cash0;
+    check('J: the estimate\'s released cash is what execution releases, short collateral included',
+        ok && P.positions.length === 0 && near(est.released, released, 1e-6), `${est.released.toFixed(6)} vs ${released.toFixed(6)}`);
+    check('J: the cost is the spread at the ladder multiple plus impact, apart from the cash released',
+        est.cost > 0 && est.cost < gross * 0.2 && est.cost > est1.cost, `cost ${est.cost.toFixed(3)} at x2.5, ${est1.cost.toFixed(3)} at x1`);
+    resetRegulations();
+}
+
+// ---- K. The skip's stop classifier ---------------------------------------------------
+{
+    const base = { extra: false, majorWire: false, development: false, notice: false, quarterLine: false,
+        equityPrev: 10000, equity: 10000, day: 300, optionExpiries: [] };
+    const at = (o) => closeStop({ ...base, ...o });
+    check('K: a quiet close does not stop', at({}) === null);
+    check('K: each close stop is taken, in 02a\'s order',
+        at({ extra: true }) === 'extra' && at({ majorWire: true }) === 'wire' && at({ development: true }) === 'development'
+        && at({ notice: true }) === 'notice' && at({ quarterLine: true }) === 'quarter'
+        && at({ equity: 10300 }) === 'book' && at({ optionExpiries: [301] }) === 'expiry'
+        && at({ extra: true, development: true, equity: 9000 }) === 'extra' && at({ notice: true, equity: 9000 }) === 'notice');
+    check('K: the book move is 3% of the previous close\'s equity, either way, net of obligations',
+        BOOK_MOVE_STOP === 0.03 && at({ equity: 10299.99 }) === null && at({ equity: 9700 }) === 'book'
+        && at({ equityPrev: 5000, equity: 5149 }) === null && at({ equityPrev: 5000, equity: 5150 }) === 'book'
+        && at({ equityPrev: null, equity: 0 }) === null);
+    check('K: a held option stops the close that opens its last trading day, and only that one',
+        at({ optionExpiries: [302, 301] }) === 'expiry' && at({ optionExpiries: [300] }) === null && at({ optionExpiries: [302] }) === null);
+    const a = { day: 3, magnitude: 'major', archive: true }, b = { day: 4, magnitude: 'minor' }, c = { day: 5, magnitude: 'major' }, d = { day: 6, magnitude: 'moderate' };
+    check('K: a major wire item counts only after the mark, and an archived report never',
+        majorSince([a, b], null) === false && majorSince([a, b, c, d], b) === true && majorSince([a, b, c, d], c) === false
+        && majorSince([c, d], null) === true);
+    check('K: every cause is named, the dispatch first', SKIP_CAUSES[0] === 'dispatch' && SKIP_CAUSES.length === 8 && SKIP_DAYS_PER_SEC === 8);
+}
+
+// ---- L. The ticket's flatten ---------------------------------------------------------
+{
+    // ticket.js reaches the DOM only through its init and render; a stand-in DOM is enough.
+    const els = new Map();
+    const fakeEl = (id) => ({ id, value: id === 'tk-size' ? '7' : id === 'tk-horizon' ? '63' : '', textContent: '', innerHTML: '',
+        hidden: false, disabled: false, checked: false, placeholder: '', dataset: {}, rows: [], style: {},
+        classList: { toggle() {}, add() {}, remove() {}, contains: () => false },
+        addEventListener() {}, setAttribute() {}, querySelectorAll: () => [],
+        getContext: () => new Proxy({}, { get: () => () => {} }),
+        getBoundingClientRect: () => ({ width: 0, height: 0, left: 0 }), parentElement: {} });
+    const el = (id) => { if (!els.has(id)) els.set(id, fakeEl(id)); return els.get(id); };
+    Object.assign(globalThis, {
+        document: { getElementById: el, activeElement: null }, window: { devicePixelRatio: 1 },
+        ResizeObserver: class { observe() {} },
+        _forms: { bindSlider() {}, updateSliderFill() {} },
+        _themePalette: () => ({ canvas: '#FCFCFB', accent: '#983432', text: '#161514', textMuted: '#666463', inks: { viridian: '#317B55' } }),
+        _parseHex: (h) => [1, 3, 5].map(i => parseInt(h.slice(i, i + 2), 16) / 255),
+    });
+    const trades = [];
+    const race = boot(BASE_SEED); freshBook();
+    ticket.initTicket({
+        sim, race: () => race, geo: () => GEO, positions: () => P.positions, expiries: () => [],
+        expiryDay: () => EXPIRIES[1], vxVariance: () => market.v, spreadMult: () => 1,
+    }, { onChange() {}, onTrade: (o) => trades.push(o), toast() {} });
+    const stock = seatAtMark('stock', 110);
+    const call = buy('call', 'long', 14, 115, EXPIRIES[1], 'Bull');
+    const key = consensus.contracts.find(c => !consensus.quotes[c.key]?.settled).key;
+    const bin = book.seatPosition('binary', -42, unitPrice('binary', sim.S, market.sigma, sim.r, sim.day, key, undefined, sim.q), sim.day, key, consensus.contracts.find(c => c.key === key).deadline);
+    // main.js _loadFlatten's shape: the closing quantity, the id and the strategy name.
+    const legsOf = (ps) => ps.map(p => {
+        const keyed = p.type === 'binary' || p.type === 'computefuture';
+        return { posId: p.id, strategyName: p.strategyName || null, type: p.type, qty: -p.qty,
+            strike: keyed ? undefined : p.strike, key: keyed ? p.strike : undefined, expiryDay: p.expiryDay };
+    });
+    check('L: the ticket starts at a size other than one (the reset is observable)', el('tk-size').value === '7');
+    ticket.loadFlatten(legsOf([stock, call, bin]), ['Polaris, private']);
+    check('L: loading the flatten resets the size to one', el('tk-size').value === 1 && el('tk-size-val').textContent === '1k' && ticket.ticketIsFlatten());
+    ticket.tradeTicket();
+    const f = trades.at(-1);
+    check('L: the flatten sends reduce-only legs bound to their positions, closing each whole holding',
+        f && f.kind === 'flatten' && f.legs.length === 3
+        && f.legs.every((l, i) => l.posId === [stock, call, bin][i].id && l.qty === Math.abs([stock, call, bin][i].qty))
+        && f.legs[0].side === 'short' && f.legs[2].side === 'long' && f.legs[1].strategyName === 'Bull' && f.legs[0].strategyName === null,
+        f ? f.legs.map(l => `${l.side} ${l.qty} #${l.posId} ${l.strategyName}`).join('; ') : 'nothing sent');
+    const cost = el('tk-cost').innerHTML;
+    check('L: the readout shows the cost apart from the cash released, and names what is left off',
+        /^Cost <b>\$[\d.]+k<\/b> · releases <b>−?\$[\d.]+k<\/b><br><span class="tk-off">Not on the ticket: Polaris, private\.<\/span>$/.test(cost), cost);
+    ticket.pickPoint({ id: 'stock', type: 'stock', desc: 'HCN shares' });   // a click removes the short stock leg
+    ticket.tradeTicket();
+    const o = trades.at(-1);
+    check('L: an edit to its legs makes the flatten an ordinary ticket, unbound',
+        !ticket.ticketIsFlatten() && o.kind === 'legs' && o.legs.length === 2 && o.legs.every(l => l.posId === undefined)
+        && !el('tk-cost').innerHTML.includes('Not on the ticket'));
+    ticket.loadFlatten([{ posId: 99, strategyName: null, type: 'stock', qty: -27.43 }], []);
+    ticket.tradeTicket();
+    check('L: a fractional holding loads rounded up to a whole unit (execution caps it)', trades.at(-1).legs[0].qty === 28);
+    ticket.loadFlatten([], ['Polaris, private']);
+    check('L: a book with nothing tradeable still names what is left off', el('tk-cost').innerHTML === '<span class="tk-off">Not on the ticket: Polaris, private.</span>');
+    ticket.resetTicket();
+    for (const k of ['document', 'window', 'ResizeObserver', '_forms', '_themePalette', '_parseHex']) delete globalThis[k];
+}
+
+// ---- M. main.js: the skip's latch, stop and pause ------------------------------------
+{
+    const source = readFileSync(new URL('../main.js', import.meta.url), 'utf8');
+    const main = source.replace(/^import[\s\S]*?from '[^']+';\n/gm, '')
+        .replace(/^cacheDOMElements\(\$\);[\s\S]*?^init\(\);/m, '');
+    const pauses = [], developments = [], lerp = [];
+    const context = createContext({
+        Simulation: class { constructor() { Object.assign(this, { S: 100, v: 0.06, r: 0.04, day: BOOT_DAY + 10, q: 0 }); } },
+        ExpiryManager: class {},
+        portfolio: P, market, portfolioValue: book.portfolioValue, settleObligation: book.settleObligation, shiftFaction, fmtBook,
+        closeStop, majorSince, SPEED_OPTIONS: [0.125, 0.25, 0.5, 1, 2], SKIP_DAYS_PER_SEC, INTRADAY_STEPS: 16,
+        performance: { now: () => 5000 },
+        currentPage: () => 'front', updatePlayBtn: () => {}, showToast: () => {},
+        countDevelopment: (k) => developments.push(k), countPause: (c) => pauses.push(c),
+    });
+    runInContext(main + `
+        chart = { dayOrigin: ${BOOT_DAY}, setSubstepInterval(v) { globalThis.__lerp.push(v); } };
+        eventEngine = { eventLog: [], _logEvent(day, ev, p, magnitude) { const e = { day, headline: ev.headline, category: ev.category, magnitude }; this.eventLog.push(e); return e; } };
+        _updateWire = () => {};
+        globalThis.mainTest = {
+            sim, skip: skipToNextEdition, develop: _develop, close: _skipClose, settle: _settleObligations,
+            toggle: togglePlay, step, worth: _worthReading,
+            over(v) { _gameOver = v; },
+            state() { return { playing, skipping: _skipping, resume: _resumeAfterDispatch, rate: _daysPerSec() }; },
+        };
+    `, Object.assign(context, { __lerp: lerp }), { filename: 'main.js (headless skip)' });
+    const api = context.mainTest;
+    freshBook(); resetFactions();
+    api.close();                                        // a close before the skip: the baseline
+    api.develop('fill');                                // seen before the skip: never stops it
+    api.skip();
+    let st = api.state();
+    check('M: a skip plays at SKIP_DAYS_PER_SEC, the lerp with it, and the speed setting is untouched',
+        st.playing && st.skipping && st.rate === SKIP_DAYS_PER_SEC && lerp.at(-1) === 1000 / (SKIP_DAYS_PER_SEC * 16));
+    api.close();
+    st = api.state();
+    check('M: a quiet close does not stop the skip, and a development before it began is not latched', st.playing && st.skipping && pauses.length === 0);
+    api.develop('fill');
+    check('M: a development is counted and latched, not taken until the close', developments.at(-1) === 'fill' && api.state().skipping);
+    api.close();
+    st = api.state();
+    check('M: the close stops on it, paused, records skip:development, and play resumes at the speed setting',
+        !st.playing && !st.skipping && !st.resume && pauses.at(-1) === 'skip:development' && st.rate === 0.5 && lerp.at(-1) === 1000 / (0.5 * 16));
+    api.skip(); P.cash *= 1.031; api.close();
+    check('M: equity net of obligations moving 3% of the previous close\'s equity stops the skip', pauses.at(-1) === 'skip:book' && !api.state().playing);
+    api.skip(); api.worth('extra'); api.develop('settlement'); api.close();
+    check('M: of two stops at one close, the first in 02a\'s order names it', pauses.at(-1) === 'skip:extra' && pauses.length === 3);
+    // The notice: one pause, counted as the skip's stop.
+    api.skip();
+    P.cash = 1000; P.obligations = [OB(2500, 15, 'the Ostrander redemption')];
+    api.sim.day = BOOT_DAY + 10; api.settle(); api.close();
+    check('M: an obligation\'s notice during a skip is its stop, one pause counted once',
+        pauses.at(-1) === 'skip:notice' && !pauses.includes('notice') && !api.state().playing && P.obligations.length === 1);
+    P.obligations = [];
+    api.skip(); api.toggle();
+    st = api.state();
+    check('M: play ends a skip in progress, paused and uncounted', !st.playing && !st.skipping && pauses.length === 4);
+    api.skip(); api.step();
+    check('M: step ends a skip in progress the same way', !api.state().skipping && !api.state().playing && pauses.length === 4);
+    api.over(true); api.skip();
+    check('M: the skip does nothing in a finished run', !api.state().skipping && !api.state().playing);
+    api.over(false);
+    const queue = source.slice(source.indexOf('function _processPopupQueue()'), source.indexOf('function _resumeAfterDispatches()'));
+    check('M: a shown dispatch stops a skip at once and never arms the resume',
+        /if \(_skipping\) _endSkip\('dispatch'\);\s*else if \(playing\) _resumeAfterDispatch = true;/.test(queue));
 }
 
 // ---- The built books -------------------------------------------------------------

@@ -10,6 +10,12 @@ export const QUARTERLY_CYCLE = 63; // trading days per quarter
 export const HISTORY_CAPACITY = 252;
 export const BINOMIAL_STEPS = 128;
 export const SPEED_OPTIONS = [0.125, 0.25, 0.5, 1, 2];
+// To the next edition worth reading (02a "The evening", "Pacing"): a skip plays at
+// four times the fastest speed setting, which it never changes, and one of its
+// stops is equity net of obligations moving by this fraction of the previous
+// close's equity, or more.
+export const SKIP_DAYS_PER_SEC = 8;
+export const BOOK_MOVE_STOP = 0.03;
 
 // -- Instruments --
 export const INITIAL_PRICE = 100;

@@ -43,6 +43,8 @@ export function cacheDOMElements($) {
     $.playBtn     = document.getElementById('play-btn');
     $.speedBtn    = document.getElementById('speed-btn');
     $.stepBtn     = document.getElementById('step-btn');
+    $.skipBtn     = document.getElementById('skip-btn');       // to the next edition worth reading (02a "The evening")
+    $.bookFlatten = document.getElementById('book-flatten');   // loads the flatten into the ticket
     $.book        = document.getElementById('book');
     $.defaultPositions  = document.getElementById('default-positions');
     $.strategyPositions = document.getElementById('strategy-positions');
