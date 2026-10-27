@@ -2044,12 +2044,7 @@ function _triggerGameOver(endingId) {
         // against its original end date and the completed trajectory.
         scoreOutstandingQuarter(raceState);
         closeout = _runTerminalCloseout(resolution, geo);
-        // Agency/movability (05 OPEN): compute + STORE on the resolution, surface nothing.
         const _dP = resolution && resolution.axes ? Math.abs(resolution.axes.dP || 0) : 0;
-        if (resolution && resolution.axes) {
-            const dW = Math.abs(resolution.axes.dW || 0);
-            resolution.movability = { dP: _dP, dW, realizedShare: (_dP + dW) > 0 ? _dP / (_dP + dW) : 0 };
-        }
         // Personal overlay (surface the mapping; the epilogue picks slots, not tone).
         overlay = determineOverlay(endingId, ledgerTotals(), _dP, _firmVerdictFired);
     }

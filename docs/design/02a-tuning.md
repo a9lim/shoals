@@ -1672,8 +1672,10 @@ stay code-local.
 **Epilogue engine:** `EPILOGUE_SLOTS[family][overlay][page]` with
 fallback `[fam][ov]` → `[fam]['*']` → `['*']['*']` and no cross-family
 overlay fallback (overlay prose is placed per family). The engine
-composes no sentences. `resolution.movability` renders always, as a
-number.
+composes no sentences. The ledger page prints no share of the outcome
+(a9, 2026-10-27): the realized share it printed was taken before the
+clip and reached 74.5% against the clip's 30% in one run, and no share is
+a causal answer.
 
 ## Act III
 

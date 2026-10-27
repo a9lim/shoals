@@ -8,9 +8,9 @@ moves into the design doc it belongs to, and it leaves this file.
 The direction was set in the 2026-10-25 ideation round (a9, Claude, and an
 independent read from Codex). The 2026-10-27 review (Claude, with two
 independent reads from Codex) reordered the queue around how the game plays
-for an evening. That order is proposed, not ratified: the calls it needs
-from a9 are listed under "Open calls". Sections 1–8 are the main line, in
-order; the sections after them are the backlog, grouped by subject.
+for an evening, and a9 ratified it the same day, with the rulings listed
+under "Rulings (2026-10-27)". Sections 1–8 are the main line, in order; the
+sections after them are the backlog, grouped by subject.
 
 How a round runs:
 
@@ -73,8 +73,9 @@ a citation of results.
   inside it. They read a filtered public record. Their own fills are in the
   tape (the impact overlay), their leaks change the record they read, and
   their credibility becomes part of what the market believes. A public call
-  moves the market they are forecasting (section 2). The reader is the
-  formal version of what a bounded observer can know.
+  moves the market they are forecasting, and with enough credibility makes
+  minor events come true (section 2). The reader is the formal version of
+  what a bounded observer can know.
 - **Decision theory.** "What if I hadn't?" can't be observed, only
   modelled. The last edition runs the model's counterfactual and labels it
   as the model's (section 5).
@@ -107,9 +108,8 @@ the world that resolved.
   soon after the legible event that reveals it, so a position taken on it
   cannot be unwound at the old price. Mandates and stakes carry exit costs.
   Decisions stick.
-- **The licensed reader is in** (section 6). Whether its displayed
-  forecast carries a small τ-keyed tilt is an open call; the 2026-10-27
-  review recommends against it.
+- **The licensed reader is in** (section 6). Its displayed forecast
+  carries no τ-keyed tilt (a9, 2026-10-27).
 - **A disclosure the player chooses may move `B`.** This reopens the
   ruling that the ledger's `B` channel is closed, for dissemination only
   (section 2).
@@ -189,36 +189,40 @@ proposals; the sections below carry its caveats.
 - **The back half drifted into clearing machinery** whose payoff a player
   wouldn't feel in a short act. Most of it moves to the backlog (section
   12), taken when a feature needs it.
-- **Two corrections.** The wire keeps twenty log entries, not the forty
-  the Brief asks for (`MAX_EVENT_LOG`, *checked*). The firm's verdict is
-  not inert: it is one of the room's six seat criteria and makes the
-  personal overlay gray eminence (*checked*). What's missing is any change
-  to how the desk operates, which its prose promises.
+- **Two corrections.** The wire kept twenty log entries against the
+  forty the Brief asked for (`MAX_EVENT_LOG`, *checked*); it now keeps
+  forty under the lead. The firm's verdict is not inert: it is one of the
+  room's six seat criteria and makes the personal overlay gray eminence
+  (*checked*). What's missing is any change to how the desk operates,
+  which its prose promises.
 
-### Open calls
+### Rulings (2026-10-27)
 
-The review's proposals that need a9's ruling before their rounds:
+a9 ratified the review's recommendations:
 
 1. **The order.** The evening first (section 1), then one chain end to end
    (2) with the run made headless alongside it (3), then what the book
    bets (4), the accounting (5), delegation in Act III (6), widening (7),
    and sharing (8).
-2. **The opening hand.** Each Dynamic run starts on an inherited desk
-   with a dated obligation instead of cash and a lock dispatch
+2. **The opening hand is in.** Each Dynamic run starts on an inherited
+   desk with a dated obligation instead of cash and a lock dispatch
    (section 1).
-3. **The book beside the forecast.** First an exposure comparison; later,
-   once a valuation contract holds, a Kelly-equivalent reading and "follow
-   my book" as a forecast policy (section 4).
+3. **The book beside the forecast,** as narrowed: an exposure comparison
+   first; a Kelly-equivalent reading and "follow my book" as a forecast
+   policy only once a valuation contract holds (section 4).
 4. **No τ tilt** in the licensed reader's displayed forecast (section 6).
-   Claude and Codex both recommend cutting it.
-5. **A public call** on MarketWire as a disclosure verb, and whether a
-   call may partly cause what it forecasts. That needs a financing
-   transmission the game doesn't have (section 2).
+5. **Public calls hyperstition minor events.** A call on MarketWire moves
+   `B` by the caller's credibility, and with enough credibility can make
+   certain minor events come true. Rung crossings, certifications,
+   settlements, incidents and the terminal families stay out of a call's
+   reach (section 2).
 6. **Domains wait.** The chain's demonstration enters as evidence about
    the existing rung contracts; the domain grid and per-domain curves wait
    until players want the distinction (sections 2 and 7).
 7. **The clearing machinery moves to the backlog** (section 12), except
    halt settlement, which ships with halts (section 6).
+8. **The epilogue's share row goes now**, ahead of the accounting that
+   replaces it (section 5).
 
 ## 1. The evening: an opening hand, the forecast held lightly
 
@@ -321,17 +325,6 @@ Dispatches by cause, repeated choices, and actionable developments
 between decisions can be counted in live play now, without waiting for
 section 3's headless runs: a development-only counter in `main.js`, read
 in a9's play-tests. It is the measure the political pool's trim waits on.
-
-### Fix now
-
-Small enough to take ahead of any round:
-
-- Remove the epilogue's "Of the margin that decided it, yours" row
-  (`src/endings.js`, `resolution.movability`). It prints the unclipped
-  share, which reached 74.5% on a China-first page whose prose says
-  nothing on the table decided it (2026-10-25 run). Section 5 replaces it.
-- The wire: raise `MAX_EVENT_LOG` to the forty items the Brief renders,
-  or render twenty, and make AGENTS.md agree.
 
 ## 2. One chain, end to end
 
@@ -437,21 +430,41 @@ forecasts. Sharma already quotes the odds on air (`lore.md`).
   new record row teaches the fitted reader nothing, so routing it both
   ways would count it twice. Through the quotes and V it reprices the
   player's own book.
-- **Whether a call can cause itself** is a separate design. Today nothing
-  finances Halcyon because its valuation rose: the cost-of-capital
-  coupling reads the player's own exposure and primary allocations
-  (`src/race/coupling.js`), so a flat player's bullish call supplies no
-  capital. A performative call needs a stated transmission, for example
-  follow-on proceeds that scale with HCN's price, so a higher valuation
-  buys more compute. It goes in 02a apart from the coupling channel's 5%
-  bound.
+- **Hyperstition (a9, 2026-10-27).** With enough credibility, a call can
+  make certain minor events come true: a fiction that makes itself real,
+  the other half of 00's Landian thread. The class of events and the
+  credibility threshold are the round's to set. Candidates, each public
+  and each something whose timing plausibly follows belief:
+  - a Polaris round pulled forward or upsized;
+  - a lab's demonstration pulled forward (labs facing a funding window
+    demonstrate more);
+  - a Halcyon follow-on upsized;
+  - Consensus listing a contract on the called milestone;
+  - a Cambria allocation or capex announcement;
+  - the Street's echo: Sharma's follow-up, a herd of analyst notes.
+- **The bound.** Rung crossings, certifications, settlements, incidents
+  and the terminal families stay out of a call's reach. A hyperstitioned
+  event affects the race only through the channels that event already
+  has (a Polaris round through the primary market, for example); the call
+  adds no route of its own. Today nothing finances Halcyon because its
+  valuation rose (`src/race/coupling.js` reads the player's own exposure
+  and primary allocations), and the call doesn't change that.
+- **Mechanics.** A call raises the hazard of, or pulls forward, events in
+  the class, scaled by credibility above the threshold and decaying with
+  time. The draws come from their own named stream, so runs without a call
+  stay bit-identical.
 - **The record and the receipt stay apart.** 02a already notes the score
   stops being proper when the player's forecasts change the process. The
-  call is ledgered as an intervention; the forecast record scores it only
-  from credibility and benchmarks frozen before it.
-- **Gates:** buy, announce, then sell; repeated announcements; and
-  credibility feeding back into itself are each tested. A call traded
-  against draws regulatory exposure the way a tip does (proposed).
+  call and every event it hyperstitioned are ledgered as interventions;
+  the forecast record scores the call only from credibility and
+  benchmarks frozen before it.
+- **Gates:**
+  - buy, announce, then sell; repeated announcements; and credibility
+    feeding back into itself are each tested;
+  - a call below the threshold changes no event's hazard;
+  - no call can move a rung, a settlement, an incident or a family;
+  - a call traded against draws regulatory exposure the way a tip does
+    (proposed).
 
 ### The financing commitment, and bounding the intervention
 
@@ -664,6 +677,10 @@ because of it. It separates three things:
 - **Unresolved attribution:** interactions with no unique personal share,
   said plainly.
 
+The ledger page prints channels and no share of the outcome: the share it
+used to print was unclipped, and no share is a causal answer. The
+counterfactual is the answer to "what changed because of you".
+
 **A first slice, labelled for what it is: player race channels removed,
 recorded external inputs held fixed.** The race is seeded and runs
 headless, so it can be rerun before section 3 lands. It needs every channel
@@ -739,13 +756,13 @@ Its name comes from `06-naming.md`. It is the reader in the fiction.
 - **The displacement is the story.** The record shows how much of the
   player's forecast and book the reader wrote: "in the last year, 94% of
   your locks were the reader's."
-- **The τ tilt, recommended cut.** The 2026-10-25 round left open a small
-  τ-keyed tilt in the product's displayed forecast in low-τ worlds. Codex
-  and Claude both recommend against it: a product can be commercially
-  interested, selectively presented and institutionally overtrusted
-  without secretly changing its numbers by a hidden parameter, and the
-  tilt would need an exception to the public-state corruption invariant.
-  The delegation problem is rich without it. a9's call (open call 4).
+- **No τ tilt (a9, 2026-10-27).** The 2026-10-25 round left open a small
+  τ-keyed tilt in the product's displayed forecast in low-τ worlds. It is
+  cut: a product can be commercially interested, selectively presented
+  and institutionally overtrusted without secretly changing its numbers
+  by a hidden parameter, and the tilt would have needed an exception to
+  the public-state corruption invariant. The delegation problem is rich
+  without it.
 
 ### The Brief's own editor
 
@@ -846,7 +863,7 @@ From 2026-10-25:
 - **Deferred until the section 2 chain works:** the wider Consensus
   (section 9), Russia as a second buyer, and new incident classes.
 
-From the 2026-10-27 review (proposed; see "Open calls"):
+From the 2026-10-27 review (ratified):
 
 - **Modal quarterly locks** are cut, not replaced by sixteen
   notifications (section 1).

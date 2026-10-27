@@ -461,10 +461,6 @@ function _pageLedger(family, overlay, ctx, factionState, traitIds) {
     if (t.F != null && t.F !== 0) ledgerRows.push(['Firm belief moved (F)', _num(t.F)]);
     if (t.treaty != null && t.treaty !== 0) ledgerRows.push(['Treaty advanced', `${_num(t.treaty, 0)} stage(s)`]);
     if (ledgerRows.length === 0) ledgerRows.push(['Attributable channels', 'none (the desk moved nothing that counts)']);
-    // The agency line (05, RESOLVED by a9 2026-07-24): always, as a number — every
-    // family, no gate. A quantity, never a verdict; the reader does the classifying.
-    const m = ctx.resolution && ctx.resolution.movability;
-    if (m) ledgerRows.push(['Of the margin that decided it, yours', _pctAbs(m.realizedShare || 0)]);
     body += _statSection('The complicity ledger', ledgerRows);
 
     // Final scorecard (structural).

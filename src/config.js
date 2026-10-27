@@ -73,7 +73,7 @@ export const COMPLIANCE_THRESHOLD_CRED_COEFF = 0.15; // threshold scaling per cr
 export const TIP_REAL_PROBABILITY = 0.70;     // probability insider tip is real
 
 // -- Event engine --
-export const MAX_EVENT_LOG = 20;           // max event log entries displayed
+export const MAX_EVENT_LOG = 41;           // the front page's lead and the forty wire items under it
 export const MAX_FOLLOWUP_DEPTH = 5;       // max recursion depth for MTTH chains
 export const FED_MEETING_INTERVAL = 32;    // ~252/8 trading days between FOMC meetings
 export const MIDTERM_DAY = HISTORY_CAPACITY + 504;            // ~2 years into live trading

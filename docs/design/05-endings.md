@@ -110,14 +110,11 @@ not a score, a *statement*, in the accounting sense and the other one.
 In family 3 it reads as an indictment nobody is left to file; in family
 5, as the only receipt that mattered.
 
-The agency line appears **always, as a number** — one cold ledger line
-in every family, a quantity, never a verdict. The machinery stores
-`resolution.movability = {dP, dW, realizedShare}`; the ledger page prints
-the realized share and lets the reader do the classifying, per the tone
-discipline below. Soft-everywhere applied to the Landian question: the
-number is the soft answer; "a low-agency world" would be the hard one.
-No family gate — flinching in the dooms would read as the game
-protecting you.
+The ledger page prints the channels and no share of the outcome: no
+share is a causal answer, and the one it used to print measured the
+player's term before the bounded-influence clip, so it could claim more
+than the clip allowed. The ledger is the same in every family, with no
+gate — flinching in the dooms would read as the game protecting you.
 
 ## Tone discipline
 

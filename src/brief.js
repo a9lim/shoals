@@ -190,8 +190,8 @@ export function renderWire(log, origin, tape) {
         }
         _leadKey = key;
     }
-    // The wire: the rest of the log, newest first.
-    const rest = items.slice(-41, -1).reverse();
+    // The wire: the rest of the log (MAX_EVENT_LOG bounds it), newest first.
+    const rest = items.slice(0, -1).reverse();
     const sig = rest.map(e => e.day + e.headline.length).join(',');
     if (sig === _briefSig) return;
     _briefSig = sig;
