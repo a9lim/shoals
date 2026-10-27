@@ -8,7 +8,8 @@
    (circle Halcyon, square Tianxia, triangle Polaris); a
    claim is a hollow diamond on the rung, its
    certification a filled one, joined by the adjudication
-   lag. The released frontier steps along the rungs. On
+   lag. A demonstration is its lab's mark, hollow, at the
+   rung it bears on. The released frontier steps along the rungs. On
    every rung still ahead, Consensus's implied crossing
    date is drawn as a distribution (belief B, survival-
    conditioned on today). The self-graded Fixedpoint Index
@@ -43,6 +44,7 @@ import {
 import { consensus } from './race/consensus.js';
 import { HORIZON } from './race/resolution.js';
 import { renderReports } from './reports-view.js';
+import { chainReports } from './race/public-record.js';
 
 export const RUNG_NAME = { 1: 'Reliable agent', 2: 'Autonomous engineer', 3: 'Autonomous researcher', 4: 'Recursion', 5: 'Takeoff threshold' };
 const LABS = [
@@ -546,6 +548,26 @@ export function drawRace() {
         _shape(c, L.shape, X(r.day), Y(v), r.seed ? 3.4 : 4.3, ink[L.ink], pal.canvas);
     }
 
+    // Demonstrations (02a "Demonstrations"), from the public record: hollow, in the
+    // lab's lane at the rung they bear on. Dashed while disputed, a dot once upheld,
+    // short of the rung once narrowed, struck through once withdrawn.
+    const rec = belief.active ? belief.record : null;
+    if (rec && rec.demonstrations) {
+        for (const d of chainReports(rec, rec.day)) {
+            const L = LAB[d.lab];
+            if (d.kind !== 'demonstration' || !L) continue;
+            const gone = d.status === 'withdrawn', col = gone ? muted : ink[L.ink];
+            const v = d.status === 'narrowed' ? (_bandV(d.rung, L.lane) + _bandV(d.rung - 1, L.lane)) / 2 : _bandV(d.rung, L.lane);
+            const x = X(d.day), y = Y(v), rr = 4.6;
+            c.lineWidth = 1.3;
+            if (d.status === 'disputed') c.setLineDash([2, 2]);
+            _shape(c, L.shape, x, y, rr, pal.canvas, col);
+            c.setLineDash([]);
+            if (d.status === 'upheld') _shape(c, 'circle', x, y, 1.6, col, null);
+            if (gone) { c.strokeStyle = col; c.beginPath(); c.moveTo(x - rr - 1, y + rr + 1); c.lineTo(x + rr + 1, y - rr - 1); c.stroke(); }
+        }
+    }
+
     // Lab names beside today.
     c.font = font(13); c.textAlign = 'left'; c.textBaseline = 'middle';
     const last = LABS.map(L => { const rs = rel.filter(r => r.lab === L.id); return rs.length ? [L, Y(_bandV(rs[rs.length - 1].rung, L.lane))] : null; }).filter(Boolean).sort((a, b) => a[1] - b[1]);
@@ -811,7 +833,7 @@ function _key() {
     const items = [
         ['circle', 'var(--ink-ochre)', 'Halcyon'], ['square', 'var(--ink-mulberry)', 'Tianxia'], ['triangle', 'var(--ink-verdigris)', 'Polaris'],
         ['hatch', 'var(--ink-umber)', 'open weights'], ['claim', 'var(--text)', 'claim'], ['cert', 'var(--text)', 'certified'],
-        ['ridge', 'var(--ink-indigo)', 'Consensus'],
+        ['demo', 'var(--text)', 'demonstration'], ['ridge', 'var(--ink-indigo)', 'Consensus'],
     ];
     // The hidden tracks, once shown: solid in house, dashed shipped.
     if (_st.revealed) items.push(['solid', 'var(--text)', 'in house'], ['dashed', 'var(--text)', 'shipped']);
@@ -823,6 +845,7 @@ function _key() {
             hatch: `<path d="M1 11 5 3M5 11 9 3M9 11 13 3" stroke="${col}" stroke-width="1"/>`,
             claim: `<path d="M7 1.8 12.2 7 7 12.2 1.8 7Z" fill="none" stroke="${col}" stroke-width="1.3"/>`,
             cert: `<path d="M7 1.8 12.2 7 7 12.2 1.8 7Z" fill="${col}"/>`,
+            demo: `<circle cx="7" cy="7" r="4.3" fill="none" stroke="${col}" stroke-width="1.3"/>`,
             ridge: `<path d="M1 7C4 7 5 3 7 3S10 7 13 7C10 7 9 11 7 11S4 7 1 7Z" fill="${col}" fill-opacity=".3" stroke="${col}" stroke-width=".8"/>`,
             solid: `<path d="M1 7H13" stroke="${col}" stroke-width="1.5"/>`,
             dashed: `<path d="M1 7H13" stroke="${col}" stroke-width="1" stroke-dasharray="3 2"/>`,
