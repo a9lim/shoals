@@ -709,7 +709,9 @@ record fields (domains, the evidence archive), dissemination,
 intervention-bounded influence, and the replayable headless runs of
 section 3, which replace the assumed input schedule with the event
 engine's own. A schema mismatch fails `reader-test` outright; a stale fit
-fails its calibration gates.
+fails its calibration gates. Player inputs are not among these: the
+headless worlds the reader is fit on take none, so the opening hand
+needs no refit ("The evening").
 
 **Known limits.** Within a lock day, the reader misreads some pre-claim
 cohorts. The clearest case is legible R2 before its claim at days
@@ -918,7 +920,7 @@ less than half the mass lands within the support. The posterior editor
 starts from `B`'s **projection** onto the player's family (below): a
 deterministic least-squares fit to the pooled conditional CDF at days
 `t + 21k`, within the support. The projection is only a starting point
-for drawing. Copying the market is a lock policy, not a drawing.
+for drawing. Following the market is a policy, not a drawing.
 
 **The edge, gated** (`reader-test`, test seeds). These gates are
 provisional: their bands are chosen on validation worlds once the
@@ -987,8 +989,9 @@ F(x) = (1 − q)·σ((x − m)/w)
 mass on never. "Not this term" is larger: `q` plus the logistic's tail
 past day 1008, since nothing certifies after the term. Bounds:
 `w ∈ [25, 400]`, `m ∈ [0, 2016]`, `q ∈ [0, 0.95]`. Medians and plateaus
-are monotone over the certification rungs (`m₂ ≤ m₃ ≤ m₄`,
-`q₂ ≤ q₃ ≤ q₄`), and dragging one pushes its neighbours. R5 is not
+are monotone over the carried certification rungs (`m₂ ≤ m₃ ≤ m₄`,
+`q₂ ≤ q₃ ≤ q₄`; the standing policy below says which rungs carry), and
+dragging one pushes its carried neighbours. R5 is not
 ordered against them: an internal R5 crossing can end a world before R4
 certifies. A certified rung is frozen at its certification day. The
 player edits a standing **draft** at any time on the Race page (moved
@@ -996,28 +999,123 @@ from the Markets page's Consensus panel by a9's ruling, 2026-10-26):
 median, width, and plateau, with the same keys. The plateau handle edits the conditional
 curve's height at the term's end, `1 − S(1008)/S(t)`, the chance of a
 crossing this term given none yet, and `q` follows from it given `m` and
-`w`. Day 0's draft is `B`'s projection.
+`w`. Day 0's draft follows the market on every rung.
+
+**The standing policy** (ratified 2026-10-27, ROADMAP §1; replaces the
+quarterly lock dispatch). The forecast is a policy the player sets per
+rung, and the desk snapshots it each quarter without asking. Each rung
+R2–R5 either **follows the market** or **carries** the player's curve,
+and every rung starts following. The draft is three things kept apart:
+the per-rung policy, the carried curves, and the **effective** curves,
+where a followed rung's effective curve is `B`'s projection, live, and a
+carried rung's is its carried curve. The editor draws the effective
+curves, so a followed rung shows only `B`; ink appears only where the
+player has stated something.
+
+- **An edit carries.** An edit on a followed rung (a drag, a key, the
+  plateau handle) first copies the projection into its carried curve,
+  clamps that copy's median and plateau between its carried neighbours'
+  (moving no neighbour), and sets it carrying; then it applies the
+  change. Without the clamp, a width key on a rung whose projection
+  crosses a carried neighbour would carry a set that fails validation.
+  *Follow the market*, on the focused rung or on every rung at once,
+  sets rungs back to following.
+- **Order holds among carried rungs only.** Medians and plateaus stay
+  monotone over the carried, uncertified rungs of R2–R4, and an edit
+  restores that order by pushing carried neighbours, as a median or
+  plateau drag does today. A width edit moves no neighbour. An edit
+  cannot place a median before the latest certification day (the
+  editor's floor, as today); that limits edits and never moves a curve.
+  `_orderCurves` stays for `B`'s projection, apart from the carried
+  ordering. Followed
+  rungs are never pushed and never pushed against, so a followed rung's
+  effective curve may cross a carried one. Each rung is scored on its
+  own, so the crossing costs nothing but coherence, and the player can
+  see it.
+- **Certification freezes one rung and moves nothing else.** The
+  certified rung's curve becomes its certification day; carried curves
+  stay where the player left them, and survival conditioning handles a
+  median that is now in the past.
+- **Validation** checks every rung's bounds and the order among carried
+  uncertified rungs only.
 
 **Locks** stay quarterly: days 0, 63, 126, …, on-grid, immutable, with
-idempotent replay only. This round keeps the lock dispatch; the standing
-policy that replaces it (ROADMAP §1) is the next round. Each lock day
-raises the lock dispatch, which
-holds the day (it counts in `_popupBarrier`) until a lock is recorded.
-The choices are *as drawn*, *the market's curves*, *earlier than the
-market* (`B`'s projection with `m − 0.5·w` on each uncertified rung,
-`w` and `q` kept), *later than the market* (`m + 0.5·w`), or *adjust
-first*. Adjust first dismisses the dispatch, opens the Race page with
-the editor focused, and keeps the day held until its Lock is pressed.
+idempotent replay only. Every snapshot is taken at the start of the
+close that ends the lock day's edition (the top of `_onDayComplete`,
+after its game-over guard, which `frame`, `step` and the popup barrier's
+drain all reach), before the race steps, while
+`race.day` and `belief.day` still equal the lock day: `B` and the record
+are the lock day's, and nothing from later reaches it. The closing
+quarter is scored one close earlier, in the lock-day block of the close
+that brings `race.day` to the lock day, where `F`, scrutiny and the firm
+conversion also read the closing quarter's lock, as they do today. The
+player reads the quarter's close in the lock day's edition and has that
+whole edition to revise. Day 0's snapshot is the close of Edition 1, two
+seconds in at the default speed, so under the default policy the first
+quarter follows and scores exactly 0. A run that resolves or ejects
+before a lock day's snapshot takes no snapshot: no lock opens a quarter
+the run never trades, and none is ever taken on day 1008. A revision
+during a quarter reaches only later snapshots. The reader-copier's
+record (below, "The evening") snapshots at the same boundary.
 
+A lock classifies each rung once, and every consumer reads that
+classification: **followed** if its policy followed or its carried curve
+is bit-equal to today's projection (an untouched drawing is the market's
+call), **carried** otherwise. The standing policy itself is left as set.
 A lock stores, for every rung it will score, the quarter's probability
 from each side: `p_P` from the player's law and `p_M` from `B` at the
-lock. It also stores the player's curves and `B`'s projection for
-display. `scoreQuarter` reads the stored pair and never re-evaluates
-`B`. *The market's curves* records a **market-policy** lock: `p_P ≡ p_M`,
-and its pilledness and claims read `B`'s own (below). So does any lock,
-from the dispatch or the Race page, of a draft still equal to today's
-projection on every open rung: an untouched drawing is the market's
-call, and the Brief says so.
+lock. A followed rung stores `p_P ≡ p_M` and scores exactly 0, and its
+claim reads `B`'s quote at the lock. A lock whose every rung is followed
+is a **market-policy** lock. The lock also stores the effective curves
+and `B`'s projection for display. `scoreQuarter` reads the stored pair
+and never re-evaluates `B`.
+
+Nothing raises a forecast dispatch, and nothing holds a day for the
+forecast. Revising is drawing, so ROADMAP §1's revision dispatch is
+superseded; a dispatch comes only from an authored decision.
+
+**A quarter's close is one line in the Brief.** When the closing quarter
+scored a carried rung, the lock day's edition carries one desk item on
+the wire: the quarter's increment and the record, in nats against
+Consensus. A quarter whose every rung was followed prints nothing, since
+it scored exactly 0.
+
+**What follows states nothing.** A followed R4 is no stated posterior,
+so `playerPilled` is null when the lock reads R4 as followed. Each
+consumer handles null explicitly:
+
+- The scrutiny loop skips the quarter. The market-policy lock used to
+  read `marketPilled` here, and the gap is measured against `F`, which
+  wakes slowly; copying the market drew the committee's heat (a seed-1
+  probe: `marketPilled` 59.2 against `F` 17.0 at day 630, a gap of 42).
+- Firm conversion uses `marketPilled`: a credible desk that agrees with
+  the market on R4 pulls the firm toward the market.
+- The belief-keyed convictions (`agi_pilled`, `doomer`) don't fire.
+  Convictions already earned stay.
+
+`hasEverLocked` becomes `hasStatedForecast`: some lock has carried some
+rung. It gates the `F` advice row.
+
+Gates (`belief-test`, `forecast-test`):
+
+- A snapshot matches its declared policy exactly: a followed rung stores
+  `p_P ≡ p_M`, and a carried rung stores its carried curve bit-for-bit.
+- A draft change after a snapshot leaves the stored lock unchanged and
+  reaches only the next one.
+- Mixed policies: a followed rung's moves never move a carried rung, a
+  certification moves no carried rung, and validation accepts a crossing
+  between a followed and a carried rung.
+- A player who never draws: every lock follows on every rung, `S_P` and
+  σ₀ are exactly 0 for the whole run, and there is no scrutiny trigger,
+  belief-keyed conviction or `F` advice row.
+- No lock is taken after the run ends or on day 1008. A run that ends
+  mid-edition takes no snapshot; a snapshot held behind the popup
+  barrier is still taken at that close's start, with the lock day's
+  state; and the trait evaluation later in the same close sees the new
+  lock.
+
+The old assertions that a market-policy lock's `playerPilled` equals
+`marketPilled` are replaced by the null contract above.
 
 **Scoring.** At each lock day `L_{q+1}`, every rung R ∈ {2, 3, 4} that
 was uncertified at `L_q` is scored for the quarter `(L_q, L_{q+1}]` from
@@ -1098,11 +1196,10 @@ set the old scale. Early quarters carry little score, because both laws clamp at
 until a rung is in reach.
 
 `lockedClaim(R)` is the latest lock's P(T_R ≤ D_R) at the contract
-deadline; for a market-policy lock it is `B`'s quote at the lock.
+deadline; for a rung the lock followed it is `B`'s quote at the lock.
 `marketPilled` is 100 × `P_B`(R4 within 252 days of today | not yet
-crossed), and `playerPilled` reads the same measure off the latest lock.
-A market-policy lock reads `marketPilled` itself, live, so copying the
-market draws no scrutiny gap or trait. Consensus settlement scores
+crossed), and `playerPilled` reads the same measure off the latest lock
+when it carried R4, and is null when it followed. Consensus settlement scores
 nothing. The editor and the record's display are in
 [03](03-market-mechanics.md).
 
@@ -1114,7 +1211,7 @@ asymmetry: firm culture wakes on the visible recursion-adjacent frontier,
 compute demand scrambles on the terminal rung. The **scrutiny** loop
 fires on a belief gap > 20 with a ±3 `firmStanding` nudge, **two-sided**:
 −3 divergent and underperforming, +3 divergent and outperforming (the
-committee grudgingly respects P&L). No lock, no stated posterior, no gap.
+committee grudgingly respects P&L). No carried R4, no stated posterior, no gap.
 
 **Firm conversion** (checked on lock days after the `F` step): the memo
 fires once when the memo gate is open and `F ≥ 40`; the verdict fires once
@@ -1451,7 +1548,7 @@ survived the weather.
 player-attributable conversion term (advice acts — locks scored by
 credibility) and the autonomous `B`-wake term; `stepFirmBelief` exposes
 the split and the ledger records ONLY the player component, gated on
-`hasEverLocked`. The orchestrator consumes the exposed delta and never
+`hasStatedForecast`. The orchestrator consumes the exposed delta and never
 recomputes the split. The decomposition survives exact cancellation:
 when wake and conversion oppose to a net-zero interior step, both raw
 components stand unscaled — *preventing* the autonomous move is
@@ -1532,6 +1629,204 @@ follow-on offering:
 - It is ledgered on the C channel under the offering's id.
 
 Secondary fills still finance nothing.
+
+## The evening
+
+Ratified 2026-10-27 (ROADMAP §1). The forecast's standing policy is under
+"Belief, η, and the firm". This section holds the rest: the opening
+hand, obligations, pacing, the flatten, the almanac and the interruption
+counters. Player-facing prose (memos, archived reports, notices, wire
+items) is authored and ratified by a9.
+
+**Dates.** Every date in this section is a run-relative day, which equals
+`race.day` during play (Edition N is day N − 1). The chassis counts from
+the backfill: at boot `sim.day` is 252, so a chassis expiry or entry day
+is the relative day plus 252. The first two listed option expiries are
+relative days 63 and 126. Compute maturities are keyed in race days.
+Two boundaries matter. Something **due on day d** happens at the close
+that turns day d − 1 into day d, the same close at which a chassis
+expiry on day d is processed. A **snapshot on lock day L** happens at
+the start of the close that ends day L, before it advances (under
+"Belief, η, and the firm").
+
+**The opening hand.** A Dynamic run starts on an inherited desk instead
+of cash: the book of a portfolio manager who has left Meridian, drawn
+from the fixture table below by `createRng(deriveSeed(seed, 'opening'))`,
+uniformly. The draw consumes no race stream, and a seed always deals the
+same hand. Classic starts on cash: it is the pure trading sim, and the
+fixtures' theses are about the race.
+
+Edition 1 leads with the predecessor's handover memo: their thesis in a
+few sentences, naming a timeline against `B`'s day-0 quote (the same in
+every world, so the memo stays true to the market it was written
+against). The memo is fallible by design. The Meridian page keeps it for
+the run. Two of the predecessor's archived reports sit on the wire under
+it. The wire dates them *Archive*, not with an edition, and they assert
+only what holds at day 0 in every world, or claims attributed to a named
+source. The player's draft starts following the market, not the
+predecessor: the memo is someone else's thesis.
+
+**The takeover** happens at boot, at day 0's opening marks: S = 100,
+v = θ, r = b, Consensus at `B`'s day-0 quote and compute at its day-0
+curve. It is not a trade, so it pays no spread or impact and counts no
+fill, trade or ledger row. Each position enters at its takeover mark on
+day 0, so P&L and every comparison measure from the takeover, never from
+the predecessor's entries. Cash is solved so that takeover equity, net of
+the obligation, is exactly `INITIAL_CAPITAL`; `initialCapital`, the
+holding-HCN benchmark, the quarterly reviews, the rogue-trading threshold
+and the peak all start where they did on cash.
+
+From the takeover the book is the player's. The coupling channel, the
+impact pools, the margin check, the convictions and the epilogue read it
+like any book, and keeping it is a choice the ledger sees. The coupling
+EMA starts at 0, the impact pools start empty, and the market maker's
+hedge accumulator starts at the takeover book's hedge without recording
+volume, so the predecessor's history enters nothing and only later
+changes in delta count as flow. An inherited HCN long is still a thumb
+on the scale from the first close. The catalyst's book saturates the
+channel's input at once, and held without a sale its velocity effect
+approaches the +5% cap (+2.9% after a quarter, +4.1% after two). A
+player who keeps it all run will probably read as involved rather than
+a bystander in the last edition; that is a prediction, to be measured
+in the round. Race trajectories match across fixtures only where the
+player's inputs match, and different books are different inputs.
+
+No refit follows. The reader is fit on headless worlds, which take no
+player inputs, and an inherited book is a player input like a trade. The
+target outcome distribution stays the neutral-input baseline.
+
+| Fixture | Book (E₀ = takeover equity) | Working order | Obligation | The problem |
+|---|---|---|---|---|
+| The catalyst | HCN long 1.10 E₀; calls, K 115, expiring day 126, ≈ 0.04 E₀ | limit sell of 0.30 E₀ of the HCN at 106 | investor redemption 0.25 E₀, day 40 | cash ≈ 0.11 E₀: the winning position has to pay the redemption before its catalyst |
+| The insurance | HCN long 0.80 E₀; puts on the same shares, K 90, expiring day 63; VXHCN front future long 0.10 E₀ | stop sell of the HCN at 85 | financing maturity 0.15 E₀, day 84 | cash ≈ 0.24 E₀ covers the maturity, unless it buys much of the next insurance |
+| The illiquid | VXHCN, the farthest listed future, long 0.80 E₀, several days of its volume; HCN long 0.30 E₀ | none | investor redemption 0.20 E₀, day 50 | cash ≈ 0.10 E₀, and a forced sale sells VXHCN into its own impact |
+| The wall | Consensus R3 and R4 short, maximum loss ≈ 0.175 E₀ each; bonds, the farthest listed maturity, long 0.60 E₀ | none | investor redemption 0.10 E₀, day 30 | a later-than-market timeline, its collateral posted against it and little cash beside |
+
+Sizes are targets: the implementation rounds them to whole contracts and
+listed strikes, then solves cash. Gates (`opening-test`, new): takeover
+equity equals `INITIAL_CAPITAL` to 1e-9 in every world; every fixture
+passes the margin check at takeover with headroom, and neither the
+margin check nor the rogue-trading threshold fires at the takeover; the
+fixture draw consumes no race stream; no fixture's construction reads
+hidden state.
+
+**Obligations.** An obligation is `{kind, label, amount, dueDay}`:
+public, mundane, and outside the race. Each fixture has one in the first
+two quarters, and section 6 will add later ones as Act III's objective.
+It is a liability from the takeover. One helper nets every unpaid
+obligation out of every actual and prospective equity calculation:
+`portfolioValue`, `collateralEquity`, `checkMargin`, short-order
+admission, the initial-margin debit check and the private-stake headroom.
+Paying one moves cash and the liability together and leaves equity
+unchanged. It is met in cash, never on the margin loan. At the terminal,
+the closeout pays every unpaid obligation out of its cash, so terminal
+equity is net of it.
+
+- **Notice.** At the close due on day `dueDay − 5`, if cash is below
+  the amount, a wire item gives notice and the desk pauses. It
+  is not a dispatch, and the pause holds until the player plays. A
+  covered obligation gives no notice. The book rail lists every unpaid
+  obligation by label, due edition and amount.
+- **Payment.** At the close due on `dueDay`, after expiry, the race
+  block's settlements and the terminal check, and immediately before the
+  rogue-trading and margin checks, the desk pays from cash and a wire
+  item reports it. On a close that ends the run, the closeout pays it
+  instead. The notice is checked at the same point.
+- **Forced sale.** If cash is short, the shortfall `max(0, amount − cash)`
+  is raised by a forced sale: a desk on a margin debit has no cash to pay
+  with. The desk sells the same fraction of every eligible long position,
+  the smallest that covers the shortfall: a redemption takes a slice of
+  the whole book, illiquid parts included. Each sale is a machinery
+  reduce-only close: instant, with no ladder lag, at
+  `FORCED_SALE_SPREAD_MULT = 3` times the ordinary spread plus the
+  ordinary impact. It bypasses the account restriction, the short-sale
+  ban and the binary cash rule, which guard new exposure, and it never
+  touches a frozen, pending, disputed or settled contract, a private
+  stake or a short. A slice is sized from executable quotes taken
+  together before any fill: a pure helper returns each position's bid
+  with the instrument's own spread, the regulation multiplier, the ×3
+  and execution's price floor ($0.01 for chassis instruments, 0 for
+  Consensus), before impact, since a trial fill would move the impact
+  pools. The fraction is capped at one, and each position's quantity is
+  rounded up to whole units, capped at what it holds, so the slice is
+  pro rata to within a unit. Positions then fill in a stable order
+  (bonds, HCN, VXHCN futures, options by expiry then strike, compute,
+  Consensus), each separately, impact accruing as they go. What impact
+  leaves short is raised by up to two more slices, sized the same way;
+  if the eligible longs quote zero, nothing is sold. Any remainder goes
+  on the margin loan, after which the ordinary margin check runs. The forced sale costs `firmStanding` 8 and
+  has its own wire item.
+
+The ×3 spread replaces the roadmap's "at the ladder's cost". Every
+fixture's obligation falls in Act I, where the ladder costs nothing, so
+that wording would make missing one nearly free.
+
+**Pacing.** *To the next edition worth reading* plays at
+`SKIP_DAYS_PER_SEC = 8`, four times the fastest speed setting, and stops
+at the first of these:
+
+- a dispatch, at once, mid-day if that is when it opens;
+- at the close, an extra or a major wire item;
+- at the close, a position change the player did not make by hand that
+  day: a resting order filling, a standing order trading, the player's
+  own deferred order completing under the latency ladder, exercise or
+  assignment, a held contract settling, a forced sale or a margin
+  liquidation;
+- at the close, an obligation's notice or a quarter's close line;
+- at the close, equity (net of obligations) moving by `BOOK_MOVE_STOP`,
+  3% of the previous close's equity, or more;
+- at the close of the last trading day before a held option expires.
+
+A stop pauses and stays paused: answering a dispatch the skip stopped on
+does not resume play. A stop never changes the speed setting. The player
+resumes with play, or skips again.
+
+**The flatten.** One control loads the ticket with a closing leg for
+every position: reduce-only, carrying the position's id and strategy
+name, with the ticket's size reset to one. Sending it trades leg by leg
+through `_deferManual` like any ticket, so the ladder and spreads apply,
+and cancels the resting orders and every working manual entry, which
+could otherwise reopen the book. When a leg executes it is capped at what
+its position still holds, so a position that settles, expires or is
+traded down while the leg waits closes what remains, or nothing; a leg
+whose position has reversed sign since it was sent is skipped, never
+traded on its stale side. Positions that cannot trade (private stakes,
+frozen Consensus, a restricted account) are left off the ticket and
+named there. Before it is sent, the ticket shows the flatten's estimated
+cost (the spread at the current ladder multiple, plus impact) apart
+from the cash it releases, returned short collateral included. The
+ticket stays the only order entry.
+
+**The almanac.** Browser storage under `shoals-almanac`, versioned. The
+last edition of every Dynamic run, natural resolution and ejection
+alike, appends one record, and the almanac keeps the latest 200. A
+record holds the seed and fixture, the family, overlay, terminal day and
+cause, the sampler's draws, and the scored record: per quarter and rung,
+`o`, `p_P`, `p_M` and the lock's classification, with `S_P`, σ₀ and
+credibility. Beside it is the reader-copier's record on the same world:
+at each snapshot, the full reader's quarter probability for each open
+rung is stored beside `B`'s `p_M` (the pairs `forecast-test` scores) and
+scored by the same rule at the same closes, the outstanding quarter
+included. The reader-copier reads only the public record. It stays out
+of view until the run ends: during play it would be section 6's licensed
+reader, which is not yet licensed.
+
+The Meridian page shows the almanac: the runs; the cumulative score
+beside the reader-copier's; a reliability diagram over the player's
+carried rung-quarters (deciles of `p_P` against the observed frequency,
+with counts); and the families seen beside the neutral-input baseline,
+labelled as that. Every read and write is wrapped in try/catch. Without
+storage the almanac is empty and the game is unchanged.
+
+**Interruption counters.** Development-only counters in `main.js`, read
+from the console (`shoalsCounts()`) in a9's play-tests and never shown:
+
+- dispatches by category, split into shown, queued and intercepted by a
+  standing order;
+- choices repeated from earlier in the run (same event, same choice);
+- pauses by cause (notice, skip stop);
+- actionable developments by kind (fills, settlements, notices, forced
+  sales), and how many fall between consecutive dispatches.
 
 ## Resolution
 

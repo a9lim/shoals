@@ -229,7 +229,12 @@ a9 ratified the review's recommendations:
 The first thirty minutes ask for confidence before giving a reason to
 care. This section gives the opening something to hold and takes the
 interruptions out of the forecast. It is mostly authoring and wiring, with
-no refit.
+no refit. Its rulings were ratified into 02a on 2026-10-27 ("The evening",
+and the standing policy under "Belief, η, and the firm"), including a9's
+four calls: an inherited book counts as the player's from the takeover,
+the coupling channel included; a missed obligation's forced sale takes
+three times the spread; Classic starts on cash; and revising is drawing,
+so no revision dispatch.
 
 ### The forecast as a standing policy
 
