@@ -28,7 +28,9 @@
    =================================================== */
 
 import { createHash } from 'node:crypto';
-import { createRaceState, advanceRace, heatValue, RACE_TUNING } from '../src/race/race-state.js';
+import { createRaceState, advanceRace, heatValue, RACE_TUNING, freshTransitions } from '../src/race/race-state.js';
+import { createPublicRecord, stepPublicRecord, publicRecordRow, foldPublicRecordRow, createRecordFromSnapshot, chainReports } from '../src/race/public-record.js';
+import { stepDemonstrations, closeDemonstrations, freshDemonstrationState } from '../src/race/demonstrations.js';
 import { buildPublicView } from '../src/race/consensus.js';
 import { initRounds, stepRounds, polarisRoundDays, ROUNDS_TUNING } from '../src/race/rounds.js';
 import { createRng, deriveSeed } from '../src/race/rng.js';
@@ -378,6 +380,107 @@ for (let s = 1; s <= ISO_SEEDS; s++) {
 }
 const demoIsolationPass = demoCoreOn === demoCoreOff && demoStreamsPass;
 
+// ---- The chain's reports (02a "Demonstrations": gates) ---------------------
+// R1 replaying the fixed public rows (JSON) reproduces every report, at every
+//    day; reports as of an earlier day equal the reports that day.
+// R2 corrupting the hidden truth and schedule after publication changes neither
+//    that day's row nor any report as of that day (later rows may differ).
+// R3 every report keeps its publication's day, rung and citation edge, the
+//    withdrawn and narrowed included.
+const REPORT_SEEDS = Math.min(N, 100);
+let replayReportsPass = true, corruptReportsPass = true, keepClaimPass = true, keptChecked = 0, corruptDiverged = 0;
+function corruptDemonstrations(race) {
+    for (const d of race.demonstrations.list) {
+        d.truth = { reach: d.truth.reach === 'sound' ? 'overScoped' : 'sound', flawed: !d.truth.flawed, C: 99 };
+        if (d.evalDay != null) d.evalDay += 5;
+        if (d.disputeDay != null) d.disputeDay += 3; else if (d.status === 'standing') d.disputeDay = race.day + 2;
+    }
+}
+for (let s = 1; s <= REPORT_SEEDS; s++) {
+    const a = createRaceState(s), b = createRaceState(s);
+    const recA = createPublicRecord(a), recB = createPublicRecord(b);
+    const rows = [], asOf = new Map();
+    const D = 300 + 7 * s;   // the corruption day
+    for (let d = 0; d < HORIZON; d++) {
+        advanceRace(a); advanceRace(b);
+        const row = JSON.stringify(publicRecordRow(a));
+        if (b.day === D) {
+            corruptDemonstrations(b);
+            if (JSON.stringify(publicRecordRow(b)) !== row) corruptReportsPass = false;
+        }
+        stepPublicRecord(recA, a); stepPublicRecord(recB, b);
+        rows.push(row);
+        if (a.day % 21 === 0) asOf.set(a.day, JSON.stringify(chainReports(recA)));
+    }
+    const replay = createRecordFromSnapshot(JSON.parse(JSON.stringify(recA.initial)));
+    for (const row of rows) {
+        foldPublicRecordRow(replay, JSON.parse(row));
+        if (replay.day % 21 === 0 && JSON.stringify(chainReports(replay)) !== asOf.get(replay.day)) replayReportsPass = false;
+    }
+    for (const [day, json] of asOf) if (JSON.stringify(chainReports(recA, day)) !== json) replayReportsPass = false;
+    if (JSON.stringify(chainReports(recB, D)) !== asOf.get(D) && asOf.has(D)) corruptReportsPass = false;
+    if (JSON.stringify(chainReports(recB, D)) !== JSON.stringify(chainReports(recA, D))) corruptReportsPass = false;
+    if (JSON.stringify(recB.demonstrations.filter(r => r.day <= D)) !== JSON.stringify(recA.demonstrations.filter(r => r.day <= D))) corruptReportsPass = false;
+    if (JSON.stringify(recB.demonstrations) !== JSON.stringify(recA.demonstrations)) corruptDiverged++;   // later rows may differ
+    const pubs = new Map(recA.demonstrations.filter(r => r.kind === 'publication').map(r => [r.id, r]));
+    for (const rep of chainReports(recA)) {
+        if (rep.kind !== 'demonstration') continue;
+        const p = pubs.get(rep.id);
+        if (rep.day !== p.day || rep.rung !== p.rung || rep.cites !== p.cites || rep.lab !== p.lab) keepClaimPass = false;
+        if (rep.status === 'withdrawn' || rep.status === 'narrowed') keptChecked++;
+    }
+}
+
+// R4 the cascade, constructed (MC worlds almost never cite a demonstration still
+// awaiting its evaluation, so the withdrawal's reach is checked on a fixed chain).
+let cascadePass = true;
+const cascadeNotes = [];
+{
+    const race = createRaceState(1);
+    race.capability.labs.halcyon.active = false;   // no new publications in the fixture
+    race.demonstrations = freshDemonstrationState();
+    const st = race.demonstrations;
+    const fixture = [];
+    const add = (lab, rung, day, cites, flawed, reach, evalDay, disputeDay) => {
+        const seq = fixture.length + 1;
+        fixture.push({ id: 'D' + seq, seq, lab, rung, day, cites, ordinal: seq, truth: { reach, flawed, C: rung }, evalDay, disputeDay,
+            status: 'standing', disputeId: null, evaluationId: null, withdrawnBy: null, root: null });
+    };
+    add('halcyon', 2, 11, null, true, 'overScoped', 50, 55);    // D1 flawed root; its dispute falls after it is withdrawn
+    add('halcyon', 3, 20, 'D1', false, 'sound', 40, null);      // D2 upheld on day 40, then taken
+    add('halcyon', 4, 30, 'D2', false, 'overScoped', 50, null); // D3 due the root's day: taken first, never evaluated
+    add('halcyon', 4, 35, null, false, 'sound', 50, 52);        // D4 unrelated, upheld on 50; its dispute cancelled
+    add('polaris', 2, 36, null, true, 'sound', 80, 45);         // D5 disputed on 45, untouched
+    st.nextId = fixture.length + 1;
+    race.day = 10;
+    const rec = createPublicRecord(race);
+    for (let day = 10; day < 60; day++) {
+        race.day = day + 1;
+        const tr = freshTransitions();
+        tr.demonstrations = stepDemonstrations(race, tr, day, day + 1);
+        // The fixture's publications enter at their close, last, as the step's do.
+        for (const d of fixture.filter(x => x.day === day + 1)) {
+            st.list.push(d);
+            tr.demonstrations.push({ kind: 'publication', id: d.id, lab: d.lab, rung: d.rung, cites: d.cites, ordinal: d.ordinal });
+        }
+        race.lastTransitions = tr;
+        foldPublicRecordRow(rec, publicRecordRow(race));
+    }
+    const reps = new Map(chainReports(rec).map(r => [r.id, r]));
+    const kinds = rec.demonstrations.filter(r => r.kind !== 'publication').map(r => `${r.day}:${r.kind}:${r.on}${r.took ? '>' + r.took.join('+') : ''}${r.outcome ? '=' + r.outcome : ''}`).join(' ');
+    const want = '40:evaluation:D2=upheld 45:dispute:D5 50:withdrawal:D1>D2+D3 50:evaluation:D4=upheld';
+    const expect = (ok, note) => { if (!ok) { cascadePass = false; cascadeNotes.push(note); } };
+    expect(kinds === want, `rows ${kinds}`);
+    expect(['D1', 'D2', 'D3'].every(id => reps.get(id).status === 'withdrawn' && reps.get(id).root === 'D1'), 'root and status');
+    expect(JSON.stringify(reps.get('D3').ancestry) === '["D2","D1"]' && reps.get('D3').cites === 'D2', 'ancestry and edge');
+    expect(reps.get('D4').status === 'upheld' && reps.get('D5').status === 'disputed', 'bystanders');
+    // The world resolves: everything pending is cancelled and no row is written.
+    race.resolution = { family: 6 };
+    const after = stepDemonstrations(race, freshTransitions(), 60, 61);
+    expect(after.length === 0 && st.closed && st.list.every(d => d.evalDay == null && d.disputeDay == null), 'close');
+    closeDemonstrations(race);   // idempotent
+}
+
 /** Week-of-cycle excess: each bin over the weekly mean, minus one. */
 function weekExcess(bins) {
     const m = bins.reduce((a, b) => a + b, 0) / bins.length;
@@ -528,6 +631,10 @@ for (const id of ['halcyon', 'polaris']) {
     line(`    ${id.padEnd(8)} R2 ${share(demoBefore[id][2])}   R3 ${share(demoBefore[id][3])}   R4 ${share(demoBefore[id][4])}`);
 }
 line(`  race core bit-identical with demonstrations on/off, other streams undrawn (${ISO_SEEDS} seeds): ${demoIsolationPass ? 'PASS' : 'FAIL'}`);
+line(`  reports (${REPORT_SEEDS} seeds): replay from fixed rows ${replayReportsPass ? 'PASS' : 'FAIL'};  `
+    + `hidden truth corrupted after publication ${corruptReportsPass ? 'PASS' : 'FAIL'} (later rows diverged in ${corruptDiverged});  `
+    + `day, claim and citation kept ${keepClaimPass ? 'PASS' : 'FAIL'} (${keptChecked} withdrawn or narrowed);  `
+    + `cascade fixture ${cascadePass ? 'PASS' : 'FAIL ' + cascadeNotes.join('; ')}`);
 
 // ---- Calibration PASS/MISS against 02a targets ---------------------------
 
@@ -595,6 +702,11 @@ for (const k of [3, 4]) {
 }
 line(`  ${'demonstrations isolated'.padEnd(28)} ${'ident.'.padStart(6)}   ${(demoIsolationPass ? 'yes' : 'no').padStart(6)}    ${demoIsolationPass ? 'PASS' : 'MISS'}`);
 if (!demoIsolationPass) allPass = false;
+{
+    const pass = replayReportsPass && corruptReportsPass && keepClaimPass && cascadePass;
+    if (!pass) allPass = false;
+    line(`  ${'chain reports'.padEnd(28)} ${'4 gates'.padStart(6)}   ${(pass ? 'held' : 'broke').padStart(6)}    ${pass ? 'PASS' : 'MISS'}   (replay, corruption, kept claims, cascade)`);
+}
 {
     const pass = roundsMismatch === 0 && roundsChecked > 0;
     if (!pass) allPass = false;

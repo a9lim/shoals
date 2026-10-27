@@ -36,12 +36,25 @@ export function publicSnapshot(race) {
 }
 
 export function createPublicRecord(race) { return createRecordFromSnapshot(publicSnapshot(race)); }
+// INTERPRETATION: the demonstration chain's rows (02a "Demonstrations") enter the
+// record here while RECORD_SCHEMA stays 15 and no feature reads them: the
+// features and the bump to schema 16 come with the refit (pass F).
 export function createRecordFromSnapshot(initial) {
     return { schema: RECORD_SCHEMA, initial: copy(initial), day: initial.day, snapshot: copy(initial),
         spawnDay: Object.fromEntries(LABS.map(id => [id, initial.labs[id].active ? initial.day : null])),
         releases: [], incidents: [], thefts: [], grayZone: [], blockades: [], blockadeEnds: [],
-        regimeDay: initial.day, treatyWindows: [], treatyOutcomes: [],
+        regimeDay: initial.day, treatyWindows: [], treatyOutcomes: [], demonstrations: [],
         inputs: { straitTension: 0, exportControlStage: 0, treatyStage: 0 } };
+}
+
+/** 02a "Demonstrations": one chain row, whitelisted by kind. Publication rows are
+ *  immutable; each later event is its own dated row. No truth, no schedule. */
+function demonstrationRow(r) {
+    const base = { kind: r.kind, id: r.id, lab: r.lab, rung: r.rung };
+    if (r.kind === 'publication') return { ...base, cites: r.cites, ordinal: r.ordinal };
+    if (r.kind === 'evaluation') return { ...base, on: r.on, outcome: r.outcome };
+    if (r.kind === 'withdrawal') return { ...base, on: r.on, took: [...r.took] };
+    return { ...base, on: r.on };   // dispute
 }
 
 /** Whitelist and redact the ledger BEFORE anything is accumulated. Source
@@ -68,6 +81,7 @@ export function publicRecordRow(race, inputs = {}) {
         regimeChange: tr.regimeChange ? { from: tr.regimeChange.from, to: tr.regimeChange.to } : null,
         treatyWindow: !!tr.treatyWindowOpen,
         treatyOutcome: tr.treatyOutcome ? { implemented: !!tr.treatyOutcome.implemented } : null,
+        demonstrations: tr.demonstrations.map(demonstrationRow),
     };
 }
 
@@ -86,11 +100,69 @@ export function foldPublicRecordRow(rec, row) {
     if (row.regimeChange) rec.regimeDay = day;
     if (row.treatyWindow) rec.treatyWindows.push(day);
     if (row.treatyOutcome) rec.treatyOutcomes.push({ day, ...row.treatyOutcome });
+    for (const r of row.demonstrations) rec.demonstrations.push({ day, ...copy(r) });
     return rec;
 }
 export function stepPublicRecord(rec, race, inputs = {}) {
     if (race.day === rec.day) return rec;
     return foldPublicRecordRow(rec, publicRecordRow(race, inputs));
+}
+
+const REPORT_KIND = { publication: 'demonstration', dispute: 'dispute', evaluation: 'evaluation', withdrawal: 'withdrawal' };
+
+/**
+ * The chain's reports (02a "Demonstrations"), read from the record's rows alone,
+ * as of `asOf` (default: the record's day). One report per row, in row order:
+ *   { id, kind: 'demonstration'|'dispute'|'evaluation'|'withdrawal', lab, rung,
+ *     day,            this report's publication day
+ *     cites,          demonstration: the report it cites (the direct edge) or null
+ *     ordinal,        demonstration: the lab's nth
+ *     on,             a ruling: the demonstration it rules on
+ *     outcome,        evaluation: 'upheld' | 'narrowed'
+ *     took,           withdrawal: the dependents withdrawn with it, publication order
+ *     root,           a withdrawn demonstration: the flawed one it descends from (itself for the root)
+ *     ancestry,       a withdrawn dependent: its citation path up to the root (ids)
+ *     withdrawnBy,    a withdrawn demonstration: the withdrawal's id
+ *     status }        'standing'|'disputed'|'upheld'|'narrowed'|'withdrawn': a
+ *                     demonstration's own; a ruling carries its demonstration's
+ * Fields that don't apply are null. A later row never rewrites an earlier
+ * report's day, rung or citation; it changes only status and the links.
+ * DOM-free; the Race page renders it.
+ */
+export function chainReports(rec, asOf = rec.day) {
+    const reports = [], demos = new Map();
+    for (const row of rec.demonstrations) {
+        if (row.day > asOf) break;
+        const rep = { id: row.id, kind: REPORT_KIND[row.kind], lab: row.lab, rung: row.rung, day: row.day,
+            cites: null, ordinal: null, on: null, outcome: null, took: null,
+            root: null, ancestry: null, withdrawnBy: null, status: null };
+        if (row.kind === 'publication') {
+            rep.cites = row.cites; rep.ordinal = row.ordinal; rep.status = 'standing';
+            demos.set(row.id, rep);
+        } else {
+            rep.on = row.on;
+            const target = demos.get(row.on);
+            if (row.kind === 'dispute') target.status = 'disputed';
+            else if (row.kind === 'evaluation') { rep.outcome = row.outcome; target.status = row.outcome; }
+            else {
+                rep.took = [...row.took];
+                for (const id of [row.on, ...row.took]) {
+                    const d = demos.get(id);
+                    d.status = 'withdrawn'; d.withdrawnBy = row.id; d.root = row.on;
+                }
+            }
+        }
+        reports.push(rep);
+    }
+    for (const rep of reports) {
+        if (rep.on) rep.status = demos.get(rep.on).status;
+        if (rep.kind === 'demonstration' && rep.root && rep.root !== rep.id) {
+            const path = [];
+            for (let id = rep.cites; id; id = demos.get(id).cites) { path.push(id); if (id === rep.root) break; }
+            rep.ancestry = path;
+        }
+    }
+    return reports;
 }
 
 /** Stable logistic survival ratio, identical mathematically to binaryProb.
