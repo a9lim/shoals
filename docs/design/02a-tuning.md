@@ -1858,6 +1858,366 @@ from the console (`shoalsCounts()`) in a9's play-tests and never shown:
 - actionable developments by kind (fills, settlements, notices, forced
   sales), and how many fall between consecutive dispatches.
 
+## Demonstrations
+
+Ratified 2026-10-27 (ROADMAP §2's first round: the chain's evidence). Player-facing prose (the wire's items and the Race
+page's report lines) is authored and ratified by a9.
+
+**What one is.** A frontier lab publishes what its unreleased model did,
+a third disclosure mode beside a release and a leak. Halcyon and Polaris
+demonstrate. Tianxia ships nearly everything it has, and the open
+ecosystem holds nothing back, so neither does. A demonstration bears on
+one rung, `k` = the lab's released rung + 1. It never bears on R5, whose
+internal crossing resolves the world. Mathematics certifies fast and
+loud, so a demonstration is a catalogue of results. The first one
+Halcyon publishes before the Fixedpoint leak is the Fixedpoint
+catalogue, seven hundred papers, and that is the codename's first public
+meaning. A demonstration is evidence about the rung contracts, which
+read as AI research. It never settles one.
+
+**Truth** is read from `C_int[lab]` at publication and kept on the
+demonstration's hidden record, which nothing public reads:
+
+- *sound*: `C_int ≥ k`. The model has crossed rung `k` internally, so a
+  release that claims it is likely coming, unless the world resolves
+  first.
+- *over-scoped*: `k − 0.15 ≤ C_int < k`. Close but not there: the work
+  solved a narrower problem than claimed.
+- Either is independently *flawed* with probability 0.15: a lemma fails.
+
+**Hazard,** per lab per day, from a new race substream
+`streams.demonstrations`:
+
+```
+λ = λ₀ · ( 1[C_int ≥ k] + φ · 1[k − 0.15 ≤ C_int < k] ) · F
+λ₀ = 1/60 per trading day       φ = 0.5       F = 1
+Polaris, in the 42 trading days before a scheduled round:  F = 2.5, φ = 1.0
+```
+
+Labs facing a funding deadline demonstrate more, and they stretch more.
+The window reads Polaris's nominal round schedule: the founding round 21
+days after the spawn, then each next round 126 ± 21 days after the last,
+drawn in order from the `rounds` substream. The schedule is one shared
+function of the seed and the spawn day, kept apart from whether a round
+executes (`stepRounds` uses it too), so headless worlds see the windows
+that play does. The founding round's whole 21-day wait lies inside its
+window. A lab has at most one live demonstration per rung: it doesn't
+demonstrate `k` again while an earlier demonstration of `k` is
+unevaluated or upheld, and after a narrowing or a withdrawal it may.
+Releasing `k` moves its next demonstration to `k + 1`.
+
+Tuning target (`race-mc`, a gate): 35–65% of Halcyon's internal R3
+crossings, and of its internal R4 crossings, are demonstrated before
+Halcyon releases the rung. The denominator is the crossings whose
+release falls within the horizon; the numerator counts a first
+publication of the rung before that release, withdrawn ones included.
+Estimated on the drafted rate (and independently by Codex): 50% and 46%,
+with internal-to-release leads of 21 and 28 days at the median.
+Halcyon's internal R2 crossing leads its release by about 143 days, so
+R2 is demonstrated in nearly every world (about 96%) at any useful rate.
+Its share is reported, and the edge target below bounds what it adds.
+
+**Citations.** A new demonstration cites the lab's most recent
+demonstration that hasn't been withdrawn, of any rung, with probability
+0.5, and the citation is public. A withdrawal takes everything that
+cites it, transitively and on the same day, whatever their own truth.
+One flawed lemma retracts its dependents. The record keeps each direct
+citation, and a withdrawal names the flawed demonstration it descends
+from.
+
+**The scope dispute** is the first dispute class an event opens.
+Exp(10 trading days) after publication, a demonstration draws one with
+probability 0.6 if it is over-scoped or flawed and 0.2 if it is sound:
+rivals and critics contest sound work too. The scope dispute has the
+dispute lifecycle's shape, opened by an event and closed by a ruling,
+but it halts and settles no Consensus contract, because a demonstration
+settles nothing. Its ruling is the evaluation.
+
+**The independent evaluation** lands U(20, 60) trading days after
+publication, and it is exact:
+
+- a flawed demonstration is *withdrawn*, with its dependents;
+- otherwise an over-scoped one is *narrowed*: the record now reads the
+  work as short of `k` at publication;
+- otherwise it is *upheld*.
+
+**Order.** A demonstration's events happen at the close, in the race's
+step after the day's releases and certifications: withdrawals
+(cascading through citations), then evaluations, then disputes, then new
+publications. Lags are drawn in trading days and rounded up to whole
+days. An evaluation or a withdrawal cancels a dispute still pending. A
+demonstration withdrawn as a dependent before its own evaluation is
+never evaluated; a withdrawal also reaches a dependent already upheld.
+A demonstration's publication row never changes, and each later event
+adds a dated row. When the world resolves, every pending dispute and
+evaluation is cancelled, and the record ends where the run did.
+
+**What reaches the market.** Each publication, dispute, evaluation and
+withdrawal is a public record row (record schema 16). `B`'s full heads
+read them after the refit. The frozen rule of thumb doesn't: the
+market's crude reading of the headlines doesn't read the catalogue, and
+that is where the edge on information sits. V reads the rows through the
+full family heads. At η = 0 (released R1) a demonstration changes
+neither `B` nor V directly. Its wire item carries the lab's ordinary
+release shell's impulse, because a headline is a headline, so HCN still
+moves for a few days. A withdrawal carries the same impulse with its
+sign reversed, and disputes and evaluations carry none. Polaris's round
+prices move with `B` through ΔΠ, as before.
+
+A demonstration moves no capability, heat, `S`, schedule or hazard, so
+under identical orchestrator inputs the race core is bit-identical with
+demonstrations on or off (a gate). In a whole run the market's response
+reaches event eligibility, and through it the world inputs; that is
+measured, not gated.
+
+**Features.** The full heads read, for Halcyon and Polaris and each of
+rungs 2–4, the state of the lab's latest demonstration of that rung that
+hasn't been withdrawn (none, standing, disputed, upheld or narrowed) as
+indicators, with its age encoded as the record's other ages are, and the
+log count of withdrawals. The legible and prior heads don't change.
+
+**The chain's reports** are the durable-evidence layer's first
+instance. Each demonstration, dispute, evaluation and withdrawal is a
+report with an id, its lab and rung, its publication day, the report it
+cites or rules on, and its status as of today: standing, disputed,
+upheld, narrowed or withdrawn. Reports live in the public record, which
+is the replay contract.
+
+- The wire prints each report as it happens, in authored prose, and
+  never rewrites a printed item. Status lives beside a report on the
+  Race page, never in its text, so an archived edition never acquires
+  later knowledge.
+- The Race page marks each demonstration on its lab's lane at the rung
+  it bears on, with its status. It lists the chain's reports with their
+  links: a withdrawal names what it took with it, and a narrowing names
+  the claim it narrowed.
+- Reports published since the latest snapshot are marked as new since
+  your last forecast.
+- Front-page priority uses public significance and authored metadata
+  only.
+- Pins wait for the receipt (ROADMAP §2's third round).
+
+Gates: replaying fixed public rows reproduces every report and quote,
+whatever hidden state sits beside them. (A different hidden truth can
+legitimately produce different later rows; the gate is about the rows
+already published.) A withdrawal or narrowing keeps the original's
+publication day and claim, dependents keep their citation edges, and no
+quote before a report's publication day changes because of it.
+
+**Release jitter** (ROADMAP §10). The cooldown after each release is
+drawn per release from U(35, 55) trading days (the mean stays 45), from
+a new race substream `streams.releaseJitter`, so no other stream's draws
+change. Nothing else moves: a lab's first release keeps its timing, and
+no release history is invented, because `lastReleaseDay` is public. The
+early lockstep is chiefly Tianxia's releases on days 1, 46 and 91, and
+the jitter spreads every release after the first. Gates (`race-mc`): the
+KM medians keep their bands, and the Act I claim excess in days 42–48 of
+the 63-day cycle (65% above average today) falls below 25%. The rule of
+thumb's code doesn't change. Its frozen hash is re-derived by running
+HEAD 1343924's `belief.js` on the jittered worlds under the hash's own
+fixed input tape, and the current rule must still match it.
+
+**The refit.** One shipped fit takes three changes:
+
+1. demonstrations in the record;
+2. the release jitter;
+3. the fit's input scenario: the assumed Markov schedule is retired, and
+   its worlds are bystander headless runs with the event engine's own
+   world inputs ("The run, headless").
+
+The Markov scenario retires everywhere except the frozen hash's tape.
+`reader-test`, `forecast-test`, `valuation-test` and `belief-test` take
+engine worlds beside neutral ones, from one shared generator that runs
+on worker threads and caches each world's record and outcomes, keyed by
+rules version and reader hash, in an ignored directory. The neutral
+scenario stays, and so does the neutral-input tuning contract;
+`endings-test` reports the engine worlds' family table beside it as a
+diagnostic. Engine worlds are generated only after the run passes its
+replay gates. A full engine world is estimated at 0.1–0.3 s, so 10,000
+cost 17–50 minutes on one thread; the extracted run is benchmarked
+before any are generated.
+
+The changes are measured by ablation: leave-one-out fits on common
+validation seeds, beside the old fit as the baseline. The report gives
+the reader-copier's `S` against `B`, per run and per act, for each.
+Every existing band in `reader-test`, `forecast-test`, `valuation-test`,
+`consensus-test` and `endings-test` holds, the late-determination
+ceilings included, and the listing base rates and `K_CRED` are
+re-derived.
+
+Engine worlds are priced by whichever reader is in place when they are
+generated. After the fit, the validation engine worlds are regenerated
+under the new reader, and every calibration band, the copier's edge and
+the family ceilings are checked again there. If a band fails, the fit is
+repeated once on worlds generated under the new reader; if it fails
+again, the round stops and brings the numbers to a9.
+
+Targets for the demonstrations: the reader-copier's edge rises by at
+least 0.2 nats per run, and its total stays under 2.0, so the catalogue
+is worth reading and the forecast doesn't become a reading exercise.
+These are tuning targets, not predictions. The late-determination
+ceilings read the full family head, which η doesn't shield, so they bind
+first if demonstrations make worlds legible too early. The levers are
+λ₀, then the evaluation lag.
+
+## The run, headless
+
+Ratified 2026-10-27 (ROADMAP §3's first cut, taken alongside §2's first
+round and ahead of its fit).
+
+**The randomness boundary.** Every draw that can change a run's state
+comes from the run's seed. The run seed is the race seed in Dynamic, so
+a harness world's seed is the same run's seed; Classic draws one too.
+`randomSeed()` at a new run is the one ambient draw left, and a static
+gate finds no other `Math.random` in `main.js` or `src/` outside the
+presentation streams. A draw is addressed by its semantic identity
+rather than its place in a sequence: `keyedRng(seed, name, ...keys)`
+returns a fresh mulberry32 stream for one slot, hashed from the seed,
+the stream's name and integer keys. The classes:
+
+| Stream | Keyed by | What it draws |
+|---|---|---|
+| `price` | day, substep | the substep's normals and jump count |
+| `backfill` | bar, substep | the prepopulated history |
+| `events.accept`, `events.pick`, `events.cooldown`, `events.lane` | day | the discretionary draw, its pick, its cooldown, its substep |
+| `events.pulse` | the pulse's id, its occurrence | its scheduling jitter and its pick |
+| `events.followup` | the chain's id, day | which sibling fires |
+| `events.delay` | the parent's id and occurrence, the followup's index | an event followup's delay |
+| `events.choiceDelay` | the event's id and occurrence, the choice, the followup's index | a choice followup's delay |
+| `events.election` | day | the election's noise |
+| `tips` | the incident's id, or the event's id and occurrence | the tip's pick, and whether it is real |
+| `lobby` | the action, day | whether the action is traced |
+
+The implementation enumerates every call site against this table. A
+followup chain's id becomes deterministic (the parent's id, day and
+occurrence) instead of a random suffix. A spare normal never carries
+from one slot to the next. Event-array order and tie-breaking are
+preserved. A branch that adds or removes an event relabels only the
+draws keyed on that event, which is the coupling a counterfactual needs
+(ROADMAP §5). Presentation keeps its own streams (Act III's display
+stream, the impact toast's pick, the band's), and none of them feeds
+state. The strategy library's ids stay outside replay, because the
+journal records resolved orders. The race's streams don't change.
+
+**The transitions.** A DOM-free module (`src/run.js`) owns a run's
+state and its transitions: opening a day, a substep, the close (the race
+block in its documented order), the dispatch queue as a state machine,
+commands and the terminal path. `main.js` keeps the rendering, the
+wiring, the clock (play, step and the skip) and the dispatch's display.
+The run tells the shell what happened through one sink (toasts,
+developments, the skip's stops, wire refreshes, a dispatch to show,
+stingers, extra editions); a headless run leaves it empty. The popup
+barrier reads the run's state, a dispatch awaiting an answer, never the
+DOM. A substep's deferred fills are processed atomically, with no
+command inside them.
+
+One run exists at a time in a page or a process. `resetRun()`
+initializes every module singleton the run touches (rounds, valuation,
+belief, the portfolio, factions, traits, regulations, lobbying, impact,
+Act III, and the bridge's and the room's rotations among them), and a
+replay writes nothing to browser storage or the almanac. The moves are
+pure, and behaviour doesn't change, which the equivalence gates check.
+
+**Commands.** Everything the player does that changes state is a
+command through one entry point. Commands are ticket sends (legs,
+strategies, the flatten), resting orders and their cancellation, closes
+and unwinds, exercise, dispatch answers, the forecast, standing orders,
+government affairs and the pricing settings. Speed, pause, the skip,
+pages, theme and sound change no state and aren't journaled.
+
+- A command carries what it resolved to: a ticket send names its
+  contracts, quantities, strategy name and reduce-only bindings, never
+  a reference to the strategy library.
+- Admission is checked inside the run (affordability, cooldowns, gates),
+  never by a disabled button.
+- The forecast editor works on a copy during a gesture and commits it on
+  the gesture's end (a pointer's release, or each key), so the run's
+  draft changes only by command and a lock never sees a half-finished
+  drag. The command holds the draft's whole state (every rung's policy
+  and carried curve), because a median edit can push a carried
+  neighbour; replay sets the state rather than repeating the gesture.
+- A dispatch answer names the dispatch it answers by its occurrence id,
+  and replay fails loudly if a different one is on screen.
+
+The journal records each command with its position: the day, and how
+many of that day's substeps had run (0 between days, 16 for a finished
+day a dispatch holds open). Journal order breaks ties among commands at
+one position. The journal records commands, never outcomes; replay
+recomputes them. Its header holds the rules version, the seed and the
+preset.
+
+**The rules version.** `RULES_VERSION` in `config.js` names the rules a
+journal replays under. Any change that alters what a journal replays to
+bumps it. `run-test` keeps a fixture journal recorded in the browser
+with its digest trail: under an unchanged version the trail must match,
+and a bump re-derives the trail headless (`--rebaseline`), re-recording
+the fixture only if one of its commands no longer applies.
+
+**Save and resume.** The run writes its save to browser storage
+(`shoals-run`) at each close and after each command made between days,
+in Dynamic and Classic alike: the header, the journal and the endpoint
+(the day, the phase, the substeps run and the command count). Opening
+the page replays it headless to exactly that endpoint, and the desk
+opens paused there, with the wire, the tape, the book and the Race page
+as they stood. The close's save follows its dispatch drain, so a
+dispatch left unanswered comes back. A day in progress is lost with its
+commands. A save under an older rules version is retired with a
+one-line notice, never replayed under new rules, and the desk opens a
+new run. A new run (a reset, a mode change, the epilogue's restart)
+replaces the save, and the last edition clears it once the almanac
+record is written. Every read and write is wrapped in try/catch; without
+storage nothing is saved and the game is unchanged.
+
+**Headless policies.** A headless run takes a policy: commands by
+position, and an answer for each dispatch. The bystander is the desk
+that takes no position. It sends no commands and starts on cash, with
+no inherited desk. Every dispatch names its bystander choice: pass on
+financing, decline a discretionary intervention, say nothing. Generated
+dispatches (round offers, margin calls, the room) name theirs in their
+generators. A bystander choice carries no trade, subscription, race
+effect, leak or regime push, and the event pool's validation fails a
+dispatch without one. Where no authored choice qualifies, the round
+brings the dispatch to a9 rather than writing a choice. The fit's worlds
+and the no-player diagnostics use the bystander.
+
+**Gates** (`tools/run-test.mjs`, the twelfth harness):
+
+- no ambient randomness: with `Math.random` replaced by a function that
+  throws, a Dynamic run and a Classic run complete;
+- determinism: a seed and a journal replay twice to the same per-day
+  digest. The digest hashes the price process, the book with its resting
+  orders and deferred entries, the race, `B`'s quotes, the forecast
+  state and its locks, the dispatch queue and pending followups, the
+  complete wire, the world state and the counters;
+- isolation: runs A, B, then A again reproduce A's trail, and so do
+  Dynamic, Classic, then Dynamic again;
+- round trip: a scripted policy's run, recorded and replayed, reproduces
+  its digest trail;
+- the fixture: a journal recorded in the browser (trades, a strategy, a
+  flatten, resting orders, an exercise, dispatch answers, forecast edits,
+  a standing order, a government action) replays headless to its digest
+  trail under its rules version;
+- live equivalence, in the browser: a development hook
+  (`shoalsReplayCheck()`) replays the current run's journal in a module
+  worker, which has its own module instances, and compares digests with
+  the live run's. It is run in every round that touches the run module
+  or the shell;
+- resume: replaying to an endpoint and continuing the policy matches an
+  uninterrupted run;
+- order: a trace of the close matches the documented race-block order;
+- coupling: two runs that differ by one event draw the same values in
+  every slot neither event touches;
+- the bystander: every dispatch in the pool and every generator names a
+  qualifying bystander choice;
+- Classic stays inert, and every existing bit-identity invariant holds;
+- timing: a full bystander Dynamic run's wall time is reported, because
+  the resume and the fit's worlds depend on it.
+
+What waits for later rounds: the authoring inspector, matched-policy
+gates (§2's second round uses them), the counterfactual (§5) and shared
+seeds (§8). The remaining harnesses that rebuild pieces of `main.js`
+move to the run module when they next change.
+
 ## Resolution
 
 ```

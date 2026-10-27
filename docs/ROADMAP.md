@@ -286,6 +286,26 @@ sometimes punish a good decision through bad luck.
   demonstration's edge against the edge without it, and the jitter's
   effect on its own.
 
+**Three rounds** (ratified 2026-10-27). The chain
+is taken in three rounds, with section 3's first cut in the first:
+
+1. **Evidence.** Demonstrations, the scope dispute and the independent
+   evaluation, the chain's reports on the Race page, the release jitter,
+   and one refit measured by ablation. Section 3 lands beside it: the
+   randomness boundary, the transitions out of `main.js`, the command
+   journal, save and resume, and the bystander. The run's replay gates
+   pass before the fit's worlds are generated, because the fit's input
+   scenario becomes the event engine's own. Rulings: 02a
+   "Demonstrations" and "The run, headless".
+2. **Commitment.** The conditional financing commitment (anchor
+   Polaris's next round if an independent evaluation lands first), the
+   terminal clip retired for bounds where influence is exercised, and
+   the knife-edge recalibrated on effective outcomes with matched-policy
+   runs.
+3. **Disclosure and the firm.** Spending the edge (the five verbs), the
+   public call and its hyperstition, the firm's response, pins, and the
+   terminal receipt.
+
 ### Durable evidence
 
 Today the Brief is a feed. The chain needs the reports it touches to
