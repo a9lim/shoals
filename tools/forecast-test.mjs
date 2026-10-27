@@ -6,8 +6,9 @@
    src/race/belief.js).
 
    Each world runs the reader's loop (advanceRace,
-   stepControlRegime, stepTreaty, stepBelief with the assumed
-   input schedule's inputs, checkResolution), N per scenario.
+   stepControlRegime, stepTreaty, stepBelief with the world's
+   inputs, checkResolution), N per scenario: neutral, and engine
+   (a bystander run's input tape, tools/engine-worlds.mjs).
    Pass 1 records the world's certification days (the truth the
    oracle and the informed player are handed; it exists only
    inside this harness). Pass 2 replays the same seed
@@ -72,8 +73,7 @@
            sweeps K over the recorded paths; no gates.
    =================================================== */
 
-import { createRaceState, advanceRace, stepControlRegime } from '../src/race/race-state.js';
-import { stepTreaty } from '../src/race/treaty-track.js';
+import { createRaceState } from '../src/race/race-state.js';
 import { checkResolution } from '../src/race/resolution.js';
 import { initConsensus } from '../src/race/consensus.js';
 import {
@@ -87,7 +87,8 @@ import { buildAlmanacRecord, appendAlmanac, readAlmanac, summarizeAlmanac, ALMAN
 import { ruleSummary } from '../src/race/public-record.js';
 import { readerLaw, lawQuarter } from '../src/race/reader.js';
 import { createRng } from '../src/race/rng.js';
-import { inputSchedule } from './reader-data.mjs';
+import { WORLD_SCENARIOS, worldInputs, stepWorld } from './reader-data.mjs';
+import { ensureEngineWorlds } from './engine-worlds.mjs';
 
 // ---- CLI -----------------------------------------------------------------
 
@@ -107,7 +108,7 @@ const NONE = 2016;                       // the oracle's target for a rung that 
 const MEMO_GATE = 0.55, FUND_GATE = 0.65;   // 02a, mirrored from belief.js for the K sweep
 const FUND_BY = 756, MEMO_BY = 882;
 const REPORT_DAYS = [350, 700, 882];
-const SCENARIOS = ['neutral', 'markov'];
+const SCENARIOS = WORLD_SCENARIOS.scenarios;
 const clampP = (p) => Math.min(0.98, Math.max(0.02, p));
 
 // ---- Assertion plumbing --------------------------------------------------
@@ -160,12 +161,11 @@ const freshStore = () => ({ policy: { 2: 'follow', 3: 'follow', 4: 'follow', 5: 
 /** Pass 1: the world's certification days R2-R4 within the term (the record's
  *  predicate: any frontier lab, direct or implied), on the reader's loop. */
 function truthOfWorld(seed, scenario) {
-    const race = createRaceState(seed), sched = inputSchedule(seed, scenario);
+    const race = createRaceState(seed), sched = worldInputs(seed, scenario);
     let inputs = null;
     for (let d = 0; d < HORIZON && !race.resolution; d++) {
         inputs = sched();
-        advanceRace(race, { straitTension: inputs.straitTension, exportControlStage: inputs.exportControlStage });
-        stepControlRegime(race); stepTreaty(race, { treatyStage: inputs.treatyStage });
+        stepWorld(race, inputs);
         if (checkResolution(race, inputs.geo)) break;
     }
     if (!race.resolution) checkResolution(race, inputs?.geo);
@@ -178,6 +178,7 @@ function truthOfWorld(seed, scenario) {
     return out;
 }
 
+await ensureEngineWorlds(Array.from({ length: N }, (_, i) => (BASE_SEED + i) >>> 0));
 const worlds = [];
 let copierExactOK = true, copierPilledOK = true, lockRejected = 0;
 let copierDetail = '', pilledDetail = '', predicateOK = true, predicateDetail = '';
@@ -207,7 +208,7 @@ for (const scenario of SCENARIOS) for (let i = 0; i < N; i++) {
     const seed = (BASE_SEED + i) >>> 0;
     const truth = truthOfWorld(seed, scenario);
     // Pass 2: the same seed, bit-identical, with every player on the real API.
-    const race = createRaceState(seed), sched = inputSchedule(seed, scenario);
+    const race = createRaceState(seed), sched = worldInputs(seed, scenario);
     initConsensus(race); initBelief(race);
     const stores = Object.fromEntries(NAMES.map(n => [n, freshStore()]));
     const path = Object.fromEntries(ALL.map(n => [n, []]));      // per lock day: { day, S, v (sigma0^2) }
@@ -274,8 +275,7 @@ for (const scenario of SCENARIOS) for (let i = 0; i < N; i++) {
     let inputs = null, endDay = HORIZON;
     for (let d = 0; d < HORIZON && !race.resolution; d++) {
         inputs = sched();
-        advanceRace(race, { straitTension: inputs.straitTension, exportControlStage: inputs.exportControlStage });
-        stepControlRegime(race); stepTreaty(race, { treatyStage: inputs.treatyStage });
+        stepWorld(race, inputs);
         stepBelief(race, inputs);
         const lock = isLockDay(race.day);
         if (lock) scoreDay(race.day);

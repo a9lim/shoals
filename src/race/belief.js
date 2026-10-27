@@ -132,9 +132,11 @@ const SCORED_RUNGS = [2, 3, 4];       // RATIFIED: R5 is never scored -- nothing
 const SCORE_P_MIN = 0.02, SCORE_P_MAX = 0.98;   // RATIFIED clamp on each quarter's crossing probability
 // credibility = tanh(S_P / K_CRED). K_CRED = 1.35 (02a), set by
 // `node tools/forecast-test.mjs 2000 --calibrate` on the validation seeds
-// 2,000,001+ under reader schema 11: the largest K at which the reader-copier
-// clears the memo gate by day 882 in half of worlds with two standard errors to
-// spare (53.1%; the "earlier" preset 5.6%). It was 1.8 against the heuristic `B`.
+// 2,000,001+: the largest K at which the reader-copier clears the memo gate by
+// day 882 in half of worlds with two standard errors to spare. Re-derived under
+// reader schema 16 on neutral and engine worlds (2026-10-27): 1.35 again (54.6%
+// at 1.30, 51.4% at 1.40; the "earlier" preset 2.9% at 1.30). It was 1.8
+// against the heuristic `B`.
 // Mutable so the harness can sweep it.
 export const forecastTuning = { K_CRED: 1.35 };
 const MEMO_GATE = 0.55;               // RATIFIED memo gate

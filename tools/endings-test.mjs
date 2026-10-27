@@ -63,6 +63,8 @@ import {
 } from '../src/race/ledger.js';
 import { COUPLING_TUNING } from '../src/race/coupling.js';
 import { belief, initBelief, stepBelief, familyHeads, stepFirmBelief, credibility } from '../src/race/belief.js';
+import { worldInputs, stepWorld } from './reader-data.mjs';
+import { ensureEngineWorlds } from './engine-worlds.mjs';
 
 const clampFn = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 const PLAYER_CLIP_FRAC = 3 / 7;   // 02a bounded-influence clip (mirrors resolution.js)
@@ -250,6 +252,38 @@ function oracleImprovement(rows) {
     return { improvement, priorBrier, oracleBrier };
 }
 const or350 = oracleImprovement(oracleRows350);
+
+// Diagnostic (02a "Demonstrations", The refit): the engine worlds, bystander runs
+// whose event engine moves the world inputs (tools/engine-worlds.mjs), beside the
+// neutral tuning contract above: their family table and the full reader's late
+// determination on the same seeds. Reported, never gated.
+const famEngine = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0 }, engineRows350 = [], engineRows700 = [];
+{
+    const t1 = Date.now();
+    await ensureEngineWorlds(Array.from({ length: N }, (_, i) => (BASE_SEED + i) >>> 0));
+    for (let i = 0; i < N; i++) {
+        const seed = (BASE_SEED + i) >>> 0, race = createRaceState(seed), sched = worldInputs(seed, 'engine');
+        initBelief(race);
+        let inputs = null, s350 = null, s700 = null;
+        for (let d = 0; d < HORIZON && !race.resolution; d++) {
+            inputs = sched(); stepWorld(race, inputs); stepBelief(race, inputs);
+            if (race.day === 350) s350 = snapshot();
+            if (race.day === 700) s700 = snapshot();
+            if (checkResolution(race, inputs.geo)) break;
+        }
+        if (!race.resolution) checkResolution(race, inputs?.geo);
+        const fam = race.resolution.family, split = (i % 2 === 0) ? 'train' : 'test';
+        famEngine[fam]++;
+        if (s350) engineRows350.push({ snap: s350, fam, split });
+        if (s700) engineRows700.push({ snap: s700, fam, split });
+    }
+    line(`engine worlds: ${N} replayed in ${((Date.now() - t1) / 1000).toFixed(1)} s`);
+}
+const engine350 = oracleImprovement(engineRows350), engine700 = oracleImprovement(engineRows700);
+diag('engine worlds: day-350 full-reader improvement < 25%', engine350.improvement < 0.25,
+    `impr ${pct(engine350.improvement)} (prior ${f3(engine350.priorBrier)} -> reader ${f3(engine350.oracleBrier)})`);
+diag('engine worlds: day-700 full-reader improvement < 60%', engine700.improvement < 0.60,
+    `impr ${pct(engine700.improvement)} (prior ${f3(engine700.priorBrier)} -> reader ${f3(engine700.oracleBrier)})`);
 const or700 = oracleImprovement(oracleRows700);
 
 // ---- Determinism + latch (section G) -------------------------------------
@@ -1059,6 +1093,9 @@ line(`  ratchets (run-max): nationalized ${pct(natCount / N)}  classified ${pct(
 line(`  treaty: dealPossible ${pct(dealPossibleRuns / N)}  Deal ${pct(dealRate)}  completion|eligible ${f3(completion)}  `
     + `window ${pct(windowRate)}  summit pass ${f3(summitPass)}  P(deal|window) ${f3(leakPosterior)}`);
 line(`  late determination (full reader): day350 impr ${pct(or350.improvement)}  day700 impr ${pct(or700.improvement)}`);
+line(`  engine worlds (diagnostic): families ${[1, 2, 3, 4, 5, 6].map(k => `f${k} ${pct(famEngine[k] / N)}`).join('  ')}`);
+line(`    beside neutral:               ${[1, 2, 3, 4, 5, 6].map(k => `f${k} ${pct(famAll[k] / N)}`).join('  ')}`);
+line(`    late determination (full reader): day350 impr ${pct(engine350.improvement)}  day700 impr ${pct(engine700.improvement)}`);
 line(`\n  P6-2 player channels (cap ${CAP}, halflife ${COUPLING_TUNING.halflife}d):`);
 line(`    no-player identity (J): ${playerInertOK ? 'inert (d_P == 0 all runs)' : 'VIOLATED'}`);
 line(`    constraint 2 (M): world |d_W| median ${f3(medDW)}  |  max reachable |d_P| p90 ${f3(maxReachableDP)}  |  coverage ${pct(coverage)} (>= 40%)`);
