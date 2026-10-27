@@ -5,7 +5,7 @@
    rendering, autoplay, and event handlers.
    ===================================================== */
 
-import { SPEED_OPTIONS, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD, BOND_FACE_VALUE } from './src/config.js';
+import { SPEED_OPTIONS, SKIP_DAYS_PER_SEC, PRESETS, INTRADAY_STEPS, HISTORY_CAPACITY, QUARTERLY_CYCLE, CHART_SLOT_PX, CHART_LEFT_MARGIN, CHART_RIGHT_MARGIN, DEFAULT_PRESET, ROGUE_TRADING_THRESHOLD, BOND_FACE_VALUE } from './src/config.js';
 import { fmtDollar, fmtSigned, fmtBook } from './src/format-helpers.js';
 import { createSparkHistory, pushSparkSample } from './src/sparkline.js';
 import { Simulation } from './src/simulation.js';
@@ -18,7 +18,7 @@ import {
     computeNetDelta, computeGrossNotional, portfolioValue,
     executeBinaryTrade, settleComputeFutures, applyBinarySettlementRows, applyCloseoutRows,
     isExpiredForTrading, allocatePrivateStake, allocatePrimaryStock,
-    settleObligation, payObligationsAtCloseout,
+    settleObligation, payObligationsAtCloseout, reduceOnlyClose,
 } from './src/portfolio.js';
 import { dealOpeningHand, resetOpening, dealtFixture } from './src/opening.js';
 import { ChartRenderer } from './src/chart.js';
@@ -38,11 +38,13 @@ import { initBrief, resetBrief, updateMasthead, renderWire, markExtra, splitHead
 import { initMarkets, setMarketsVisible, marketsDayClose, resetMarkets, refreshMarkets, redrawMarkets, marketsSubstep, smileExpiryDay } from './src/markets.js';
 import {
     initTicket, pickPoint, addToTicket, legState, renderTicket, resetTicket, refreshTicketQuotes, redrawTicket,
-    invalidateTicket, tradeTicket, ticketLegCount,
+    invalidateTicket, tradeTicket, ticketLegCount, loadFlatten,
 } from './src/ticket.js';
+import { positionLabel } from './src/portfolio-renderer.js';
 import { initSurface } from './src/surface.js';
 import { initRacePage, resetRacePage, recordRaceDay, endRacePage, revealRace, setRaceVisible, drawRace } from './src/race-page.js';
 import { resetCounts, countDispatch, countChoice, countDevelopment, countPause, counts } from './src/counters.js';
+import { closeStop, majorSince } from './src/pacing.js';
 import { buildAlmanacRecord, appendAlmanac } from './src/almanac.js';
 import { initAlmanacView, renderAlmanac } from './src/almanac-view.js';
 import { EventEngine, eventBaseRateScale, SUBSTEP_LANE_RUNG } from './src/events.js';
@@ -110,12 +112,12 @@ import { checkResolution, resolveNow, HORIZON } from './src/race/resolution.js';
 import {
     consensus, initConsensus, resetConsensus, deactivateConsensus,
     refreshBinaryQuotes, computeBinarySettlements, setBinaryQuoteSource,
-    buildPublicView, openDispute, ruleDispute, finalizeConsensusTerminal,
+    buildPublicView, openDispute, ruleDispute, finalizeConsensusTerminal, getBinaryQuote,
 } from './src/race/consensus.js';
 import {
     computeMarket, initComputeMarket, resetComputeMarket, deactivateComputeMarket,
     refreshComputeQuotes, computeFutureSettlements, stepNationalizationRef, setComputePriceSource,
-    finalizeComputeTerminal,
+    finalizeComputeTerminal, isComputeTradeable,
 } from './src/race/compute-market.js';
 import { closeoutBook } from './src/race/closeout.js';
 import { initValuation, stepValuation, lastValuation, resetValuation } from './src/race/valuation.js';
@@ -154,6 +156,11 @@ let camera;
 let chainSkeleton = [];
 let playing = false;
 let _resumeAfterDispatch = false;   // the desk was running when a dispatch paused it; resume once they are all answered
+// To the next edition worth reading (02a "The evening", "Pacing").
+let _skipping = false;          // a skip is running: the clock plays at SKIP_DAYS_PER_SEC
+const _skipLatch = new Set();   // the stops latched since the skip began, taken at the close
+let _skipLogMark = null;        // the newest wire entry when the skip began or the last close ended
+let _prevCloseEquity = null;    // equity net of obligations at the previous close (null: the run's start)
 let speedIndex = 2;
 let dirty = true;
 let bookDirty = true;     // the book changed: the markets tables and the ticket re-read holdings
@@ -306,7 +313,7 @@ function _applyBinaryRows(rows) {
     if (!rows || rows.length === 0) return [];
     const { fresh, cashResults } = applyBinarySettlementRows(rows);   // cash, exactly-once
     for (const r of cashResults) {
-        countDevelopment('settlement');
+        _develop('settlement');
         _toast('Consensus: ' + r.label + ' settled ' + r.outcome + ' — P&L ' + fmtDollar(r.pnl), 4500);
     }
     for (const r of fresh) {
@@ -531,7 +538,7 @@ function _executeDeferred(entry) {
             p.strike, p.expiryDay, undefined, sim.q, mult
         );
         if (pos) {
-            countDevelopment('fill');
+            _develop('fill');
             const label = p.side === 'short' ? 'Shorted' : 'Bought';
             _toast(label + ' ' + p.qty + 'k ' + p.type + ' at $' + pos.fillPrice.toFixed(2), 3000);
             _haptic('success');
@@ -549,7 +556,7 @@ function _executeDeferred(entry) {
             p.key, p.key, undefined, sim.q, mult
         );
         if (pos) {
-            countDevelopment('fill');
+            _develop('fill');
             _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k Compute Q@' + p.key, 2500);
             _haptic('success');
         } else {
@@ -559,7 +566,7 @@ function _executeDeferred(entry) {
     } else if (entry.kind === 'binary') {
         const pos = executeBinaryTrade(p.key, p.side, p.qty, mult);
         if (pos) {
-            countDevelopment('fill');
+            _develop('fill');
             _toast((p.side === 'long' ? 'Bought' : 'Sold') + ' ' + p.qty + 'k Yes', 2500);
             _haptic('success');
         } else {
@@ -567,18 +574,43 @@ function _executeDeferred(entry) {
             _haptic('error');
         }
     } else if (entry.kind === 'strategy') {
-        if (executeWithRollback(p.legs, p.name, p.mult, mult)) countDevelopment('fill');
+        if (executeWithRollback(p.legs, p.name, p.mult, mult)) _develop('fill');
     } else if (entry.kind === 'close') {
         // The position may have expired / settled / been flattened by machinery
         // while the close was working -- report it, never fabricate a fill.
         if (!_closePositionAction(p.id, mult)) {
             _toast('Working close expired — the position closed without you.', 4000);
-        } else countDevelopment('fill');
+        } else _develop('fill');
     } else if (entry.kind === 'unwind') {
         if (_unwindStrategyAction(p.name, mult) === 0) {
             _toast('Working unwind expired — no legs left in "' + p.name + '".', 4000);
-        } else countDevelopment('fill');
+        } else _develop('fill');
+    } else if (entry.kind === 'reduce') {
+        // A flatten leg that waited closes what its position still holds, or nothing.
+        const res = _reduceLeg(p, mult);
+        if (res.status === 'filled') {
+            _develop('fill');
+            _toast('Closed ' + (Math.round(res.qty * 100) / 100) + 'k ' + p.desc + '.', 3000);   /* PROSE */
+            _haptic('success');
+        } else if (res.status === 'reversed') {
+            _toast('Working close skipped — ' + p.desc + ' changed sides inside the window.', 4000);   /* PROSE */
+        } else if (res.status === 'gone') {
+            _toast('Working close expired — the position closed without you.', 4000);
+        } else {
+            _toast('Order died at the fill — margin or the rulebook moved inside the window.', 2500);
+            _haptic('error');
+        }
     }
+}
+
+/** One flatten leg at the desk (02a "The flatten"): reduce-only, capped at what
+ *  its position still holds, skipped when the position reversed sign. Shared by
+ *  the immediate path and the deferred executor; an HCN leg records its impact
+ *  like any ticket's stock leg. */
+function _reduceLeg(p, spreadMult) {
+    const res = reduceOnlyClose(sim, p.posId, p.side, p.qty, sim.S, market.sigma, sim.r, sim.day, sim.q, spreadMult);
+    if (res.status === 'filled' && res.type === 'stock') _recordImpact(sim.day, p.side === 'long' ? 1 : -1, res.qty, 'Stock trade');
+    return res;
 }
 
 /**
@@ -604,6 +636,173 @@ function _deferManual(kind, payload) {
 }
 
 // ---------------------------------------------------------------------------
+// Pacing: to the next edition worth reading (02a "The evening")
+// ---------------------------------------------------------------------------
+
+/** The clock's rate in days a second: the skip's while one runs, otherwise the
+ *  speed setting's, which a skip never changes. */
+function _daysPerSec() { return _skipping ? SKIP_DAYS_PER_SEC : SPEED_OPTIONS[speedIndex]; }
+
+/** Something worth reading happened: latched while a skip runs, taken at the close. */
+function _worthReading(cause) { if (_skipping) _skipLatch.add(cause); }
+
+/**
+ * An actionable development the player did not make by hand (02a "Pacing"): a
+ * resting order filling, a standing order trading, the player's own deferred
+ * order completing under the ladder, exercise or assignment at expiry, a held
+ * contract settling, a forced sale, a margin liquidation, or an obligation's
+ * notice. Every site counts it (counters.js) and the skip latches it through
+ * this one hook.
+ * INTERPRETATION: the latch is fed only while a skip runs, so what happened
+ * before the player pressed it (and has seen) never stops it.
+ */
+function _develop(kind) {
+    countDevelopment(kind);
+    _worthReading(kind === 'notice' ? 'notice' : 'development');
+}
+
+/** Start a skip from a paused or playing desk. Nothing in a finished run, while a
+ *  dispatch holds the desk, or while a skip already runs. */
+function skipToNextEdition() {
+    if (_gameOver || _skipping || _popupBarrier()) return;
+    _skipping = true;
+    _skipLatch.clear();
+    const log = eventEngine ? eventEngine.eventLog : [];
+    _skipLogMark = log.length ? log[log.length - 1] : null;
+    _resumeAfterDispatch = false;
+    playing = true;
+    lastTickTime = _resumeClockOrigin();
+    _syncLerpSpeed();
+    updatePlayBtn($, playing);
+    _syncSkipBtn();
+    _haptic('medium');
+}
+
+/**
+ * End a skip. A stop (`cause`) pauses the desk and it stays paused: only play or
+ * another skip resumes it, and answering the dispatch it stopped on does not.
+ * Play, step, the terminal and a reset end a skip the same way, uncounted.
+ */
+function _endSkip(cause) {
+    if (!_skipping) return;
+    _skipping = false;
+    _skipLatch.clear();
+    playing = false;
+    _resumeAfterDispatch = false;
+    if (cause) countPause('skip:' + cause);
+    _syncLerpSpeed();
+    updatePlayBtn($, playing);
+    _syncSkipBtn();
+}
+
+/** The skip control reads pressed while a skip runs and is disabled in a finished run. */
+function _syncSkipBtn() {
+    const b = $.skipBtn;
+    if (!b) return;
+    b.setAttribute('aria-pressed', String(_skipping));
+    b.disabled = _gameOver;
+}
+
+/**
+ * The end of every close (02a "Pacing"): a skip in progress stops at the first
+ * of the close's stops (src/pacing.js), and this close's equity is the next
+ * one's baseline for the book move.
+ * INTERPRETATION: the run's first close measures from its starting equity (the
+ * takeover's, or the cash start), the close before Edition 1 being the takeover.
+ */
+function _skipClose() {
+    const equity = _portfolioEquity();
+    const equityPrev = _prevCloseEquity ?? portfolio.initialCapital;
+    _prevCloseEquity = equity;
+    const log = eventEngine ? eventEngine.eventLog : [];
+    const mark = _skipLogMark;
+    _skipLogMark = log.length ? log[log.length - 1] : null;
+    if (!_skipping) return;
+    const cause = closeStop({
+        extra: _skipLatch.has('extra'),
+        majorWire: majorSince(log, mark),
+        development: _skipLatch.has('development'),
+        notice: _skipLatch.has('notice'),
+        quarterLine: _skipLatch.has('quarter'),
+        equityPrev, equity,
+        day: sim.day,
+        optionExpiries: portfolio.positions.filter(p => p.type === 'call' || p.type === 'put').map(p => p.expiryDay),
+    });
+    _skipLatch.clear();
+    if (cause) _endSkip(cause);
+}
+
+// ---------------------------------------------------------------------------
+// The flatten (02a "The evening")
+// ---------------------------------------------------------------------------
+
+/** A position the flatten can close: not a private stake, not a frozen,
+ *  pending, disputed or settled Consensus leg or an untradeable compute future,
+ *  and nothing on a restricted account or in a finished run. */
+function _flattenable(pos) {
+    if (_gameOver || portfolio.restricted || pos.type === 'privatestake') return false;
+    if (pos.type === 'binary') {
+        if (!raceState || !consensus.active || consensus.frozen) return false;
+        const q = getBinaryQuote(pos.strike);
+        return !!q && !q.settled && !q.frozen && !q.pending && !q.disputed;
+    }
+    if (pos.type === 'computefuture') return !!raceState && computeMarket.active && isComputeTradeable(pos.strike);
+    return !isExpiredForTrading(pos.type, pos.expiryDay, sim.day);
+}
+
+/**
+ * Load the flatten (X, or the book's Flatten): a closing leg for every position
+ * that can trade, reduce-only, carrying the position's id and strategy name, the
+ * ticket at size one, and the Markets page shown. The rest are named under it.
+ */
+function _loadFlatten() {
+    const legs = [], off = [];
+    for (const pos of portfolio.positions) {
+        if (!_flattenable(pos)) { off.push(positionLabel(pos, sim.day)); continue; }
+        const keyed = pos.type === 'binary' || pos.type === 'computefuture';
+        legs.push({
+            posId: pos.id, strategyName: pos.strategyName || null, type: pos.type, qty: -pos.qty,
+            strike: keyed ? undefined : pos.strike, key: keyed ? pos.strike : undefined, expiryDay: pos.expiryDay,
+        });
+    }
+    loadFlatten(legs, off);
+    showPage('markets');
+    _haptic('light');
+}
+
+/**
+ * Send the flatten: cancel the resting orders and every working manual entry,
+ * which could otherwise reopen the book, then trade leg by leg through the
+ * ladder like any ticket, each leg reduce-only. The toast reports what filled,
+ * what is working and what found nothing left to close.
+ */
+function _sendFlatten(legs) {
+    const cancelled = cancelAllOrders() + clearDeferredOrders();
+    let ok = 0, deferred = 0;
+    const skipped = [], failed = [];
+    for (const L of legs) {
+        const p = { posId: L.posId, side: L.side, qty: L.qty, desc: L.desc };
+        if (_deferManual('reduce', p)) { deferred++; continue; }
+        const res = _reduceLeg(p);
+        if (res.status === 'filled') ok++;
+        else if (res.status === 'rejected') failed.push(L.desc);
+        else skipped.push(L.desc);
+    }
+    const parts = [];
+    if (cancelled) parts.push(`${cancelled} order${cancelled > 1 ? 's' : ''} cancelled`);   /* PROSE */
+    if (ok) parts.push(legs.length === 1 ? 'filled' : `${ok} leg${ok > 1 ? 's' : ''} filled`);
+    if (deferred) parts.push(`${deferred} working`);
+    if (skipped.length) parts.push(`nothing left to close: ${skipped.join(', ')}`);   /* PROSE */
+    if (failed.length) parts.push(`rejected (margin, or the contract closed): ${failed.join(', ')}`);
+    const msg = parts.join('; ') || 'Nothing traded';
+    _toast(msg.charAt(0).toUpperCase() + msg.slice(1) + '.', failed.length ? 5000 : 3000);
+    _haptic(failed.length ? 'error' : 'success');
+    bookDirty = true;
+    updateUI();
+    dirty = true;
+}
+
+// ---------------------------------------------------------------------------
 // Standing orders (P7-2) -- the delegation layer's wiring
 // ---------------------------------------------------------------------------
 
@@ -619,7 +818,10 @@ function _standingCtx() {
  *  run the same post-trade refresh a machinery trade does. */
 function _reportStanding(reports) {
     if (!reports || reports.length === 0) return;
-    for (const rep of reports) _toast(rep.message, 4500);
+    for (const rep of reports) {
+        _toast(rep.message, 4500);
+        if (rep.legs > 0) _develop('standing');   // a refusal traded nothing
+    }
     _haptic('medium');
     bookDirty = true;
     updateUI();
@@ -771,6 +973,7 @@ function init() {
         { key: '.', label: 'Speed up',            group: 'Simulation', action: () => cycleSpeed() },
         { key: ',', label: 'Slow down',            group: 'Simulation', action: () => decycleSpeed() },
         { key: '/', label: 'Step forward one day', group: 'Simulation', action: () => step() },
+        { key: 'n', label: 'To the next edition worth reading', group: 'Simulation', action: () => skipToNextEdition() },
         { key: 'r', label: 'Reset simulation',    group: 'Simulation', action: () => resetSim() },
         { key: 's', label: 'Show or hide your book', group: 'View',   action: () => _toggleRail() },
         { key: '[', label: 'Previous page',        group: 'View',       action: () => cyclePage(-1) },
@@ -784,6 +987,7 @@ function init() {
         { key: '0', label: 'Reset zoom',           group: 'View',       action: () => { if (camera) { camera.zoom = CHART_SLOT_PX; _repositionCamera(); } } },
         { key: 'Enter', label: 'Trade the ticket', group: 'Trade',      action: () => { if (currentPage() === 'markets') tradeTicket(); },
           when: () => !document.activeElement || document.activeElement === document.body },
+        { key: 'x', label: 'Load the flatten', group: 'Trade', action: () => _loadFlatten() },
         { key: '1', label: PRESETS[0].name,   group: 'Presets',    action: () => loadPreset(0) },
         { key: '2', label: PRESETS[1].name,   group: 'Presets',    action: () => loadPreset(1) },
         { key: '3', label: PRESETS[2].name,   group: 'Presets',    action: () => loadPreset(2) },
@@ -824,6 +1028,9 @@ function init() {
         onReset:          () => resetSim(),
         onSliderChange:   (param, value) => syncSliderToSim(param, value),
     });
+    if ($.skipBtn) $.skipBtn.addEventListener('click', () => skipToNextEdition());
+    if ($.bookFlatten) $.bookFlatten.addEventListener('click', () => _loadFlatten());
+    _syncSkipBtn();
 
     // 10. Wire custom events from ui.js position rows
     document.addEventListener('shoals:closePosition', (e) => {
@@ -1068,6 +1275,7 @@ function init() {
         vxVariance: () => publishedVariance(market.v),
         vxSpot: () => publishedVxhcn(market.vxhcn),
         expiryDay: () => smileExpiryDay(),
+        spreadMult: () => _latency().spreadMult,   // the ladder's multiple now (the flatten's estimate)
     };
     initTicket(_mkCtx, {
         onChange: () => { redrawMarkets(); setFolioCount('markets', ticketLegCount()); },
@@ -1178,6 +1386,7 @@ function _onThemeChange() {
  */
 function _tradeTicket(order) {
     if (_blockedByRestriction()) return;
+    if (order.kind === 'flatten') { _sendFlatten(order.legs); return; }
     if (order.kind === 'strategy') {
         const mult = order.size;
         const scaled = order.legs.map(l => ({ ...l, _baseQty: Math.abs(l.qty), qty: l.qty * mult }));
@@ -1387,7 +1596,8 @@ function _abortPartialDay() {
 
 function frame(now) {
     if (playing) {
-        const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
+        // A skip runs the same loop at its own rate: at most one day closes a frame.
+        const tickInterval = 1000 / _daysPerSec();
         const substepInterval = tickInterval / INTRADAY_STEPS;
 
         if (!dayInProgress) {
@@ -1461,7 +1671,7 @@ function frame(now) {
 function _fillPendingOrders() {
     const filledOrders = checkPendingOrders(sim, sim.S, market.sigma, sim.r, sim.day, sim.q);
     for (const pos of filledOrders) {
-        countDevelopment('fill');
+        _develop('fill');
         const side = pos.qty > 0 ? 'Bought' : 'Sold';
         _toast(side + ' ' + Math.abs(pos.qty) + 'k ' + pos.type + ' @ $' + pos.fillPrice.toFixed(2));
         bookDirty = true;
@@ -1631,7 +1841,11 @@ function _processPopupQueue() {
         eventEngine?._logEvent(sim.day, event, {}, event.magnitude);
         _updateWire();
     }
-    if (playing) _resumeAfterDispatch = true;
+    // A dispatch stops a skip at once, mid-day if that is when it opens, and the
+    // stop stays paused (02a "Pacing"); otherwise a running desk resumes once
+    // every dispatch is answered.
+    if (_skipping) _endSkip('dispatch');
+    else if (playing) _resumeAfterDispatch = true;
     playing = false;
     updatePlayBtn($, playing);
 
@@ -1886,6 +2100,7 @@ function _applyPopupChoice(event, choice) {
     // Margin call actions
     if (event._marginAction) {
         const vol = market.sigma;
+        const _heldBefore = portfolio.positions.length;
         // P7-2 rule (c): the standing liquidation PREFERENCE. Not an action that
         // fires -- an ordering the forced liquidation consumes (bonds first above
         // 80% utilization). null while disarmed, and the chassis order is then
@@ -1932,6 +2147,7 @@ function _applyPopupChoice(event, choice) {
                 }
             }
         }
+        if (portfolio.positions.length < _heldBefore) _develop('liquidation');
         _haptic('heavy');
     }
     // Rogue trading / margin-deficit game over: the announcement popup is the
@@ -2014,7 +2230,9 @@ function _triggerGameOver(endingId) {
     //    and the machines do not notice. Dynamic modes only -- Classic never enters
     //    the machine register at all.
     if (raceState) silenceDesk();
+    _endSkip(null);
     _gameOver = true;
+    _syncSkipBtn();
     playing = false;
     _resumeAfterDispatch = false;
     updatePlayBtn($, playing);
@@ -2253,6 +2471,7 @@ function _quarterCloseLine(scored) {
         + `${fmtSigned(rec.S, 2)} over ${rec.quarters} ${rec.quarters === 1 ? 'quarter' : 'quarters'} scored.`;
     eventEngine._logEvent(sim.day, { headline, category: 'desk' }, {}, 'minor');
     _updateWire();
+    _worthReading('quarter');
 }
 
 function _updateTraitDisplay() {
@@ -2351,7 +2570,7 @@ function _settleObligations() {
             const res = settleObligation(ob, sim, sim.S, market.sigma, sim.r, sim.day, sim.q);
             if (!res) continue;
             if (res.forced) {
-                countDevelopment('forced_sale');
+                _develop('forced_sale');
                 shiftFaction('firmStanding', -8);
                 _postDeskItem(`Operations sells a slice of the book to meet ${ob.label}; the desk was ${fmtBook(res.shortfall)} short on the day, and the risk committee has noted it.`);
             } else {
@@ -2360,8 +2579,10 @@ function _settleObligations() {
             bookDirty = true;
         } else if (ob.dueDay - 5 === rel && portfolio.cash < ob.amount) {
             _postDeskItem(`${_capFirst(ob.label)}, ${fmtBook(ob.amount)}, is due in five sessions; the desk holds ${fmtBook(portfolio.cash)} in cash.`);
-            countDevelopment('notice');
-            countPause('notice');
+            _develop('notice');
+            // INTERPRETATION: one pause, one cause: during a skip the notice's pause
+            // is the skip's stop, counted at the close as 'skip:<cause>'.
+            if (!_skipping) countPause('notice');
             playing = false;
             _resumeAfterDispatch = false;   // a dispatch answered later must not resume past the notice
             updatePlayBtn($, playing);
@@ -2505,7 +2726,7 @@ function _onDayComplete() {
     const { expired, unwound } = processExpiry(sim, sim.day, sim.S, sim.day, market.sigma, sim.r, sim.q);
     // INTERPRETATION: a chassis expiry (an option, bond or VXHCN future reaching its
     // date) counts as its own kind beside Consensus and compute settlements.
-    for (let i = 0; i < expired.length; i++) countDevelopment('expiry');
+    for (let i = 0; i < expired.length; i++) _develop('expiry');
     if (unwound.length > 0) {
         const names = [...new Set(unwound.map(p => p.strategyName))];
         for (const name of names) {
@@ -2663,7 +2884,7 @@ function _onDayComplete() {
         if (cSettlements.length) {
             const cSettled = settleComputeFutures(cSettlements, raceState);
             for (const r of cSettled) {
-                countDevelopment('settlement');
+                _develop('settlement');
                 _toast('Compute Q@' + r.key + ' ' + r.kind.toLowerCase().replace('_', ' ')
                     + ' — P&L ' + fmtDollar(r.pnl), 4500);
             }
@@ -2786,6 +3007,7 @@ function _onDayComplete() {
         if (hasSupereventPopups || fired.some(ev => ev.category === 'compound' || ev.superevent)
             || (_tr && (_tr.regimeChange || (_tr.strait && _tr.strait.blockadeStart)))) {
             markExtra(_relDay());
+            _worthReading('extra');
         }
         // The race page records the day's public ledger (and, for the epilogue, the hidden tracks).
         if (raceState) recordRaceDay(raceState, eventEngine.world);
@@ -2988,6 +3210,7 @@ function _onDayComplete() {
     dirty = true;
 
     _processPopupQueue();
+    _skipClose();
 }
 
 // ---------------------------------------------------------------------------
@@ -3082,6 +3305,7 @@ function togglePlay() {
     // day marked closed with its partial bar standing in history and the sim clock
     // deliberately un-advanced. Resuming would open a SECOND bar on that same day.
     if (_gameOver) return;
+    if (_skipping) { _endSkip(null); _haptic('light'); return; }   // ends a skip in progress, paused
     _resumeAfterDispatch = false;
     playing = !playing;
     if (playing) {
@@ -3102,13 +3326,14 @@ function togglePlay() {
  */
 function _resumeClockOrigin() {
     const now = performance.now();
-    const tickInterval = 1000 / SPEED_OPTIONS[speedIndex];
+    const tickInterval = 1000 / _daysPerSec();
     // No day open: the first frame should begin one immediately.
     if (!dayInProgress) return now - Math.max(2000, tickInterval);
     return now - sim.substepsDone * (tickInterval / INTRADAY_STEPS);
 }
 
 function step() {
+    if (_skipping) { _endSkip(null); return; }   // ends a skip in progress, paused
     if (playing) return;
     if (_gameOver) return;   // same reason as togglePlay: never reopen an aborted day
 
@@ -3142,7 +3367,7 @@ function step() {
 }
 
 function _syncLerpSpeed() {
-    chart.setSubstepInterval(1000 / (SPEED_OPTIONS[speedIndex] * INTRADAY_STEPS));
+    chart.setSubstepInterval(1000 / (_daysPerSec() * INTRADAY_STEPS));
 }
 
 function cycleSpeed() {
@@ -3160,6 +3385,9 @@ function decycleSpeed() {
 }
 
 function _resetCore(index) {
+    _endSkip(null);
+    _prevCloseEquity = null;
+    _skipLogMark = null;
     resetBrief();
     resetMarkets();
     resetTicket();
@@ -3223,6 +3451,7 @@ function _resetCore(index) {
     _resumeAfterDispatch = false;
     syncSettingsUI($, _simSettingsObj());
     updatePlayBtn($, playing);
+    _syncSkipBtn();
     updateDynamicSections($, index);
 }
 

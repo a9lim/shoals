@@ -22,7 +22,7 @@ import {
 } from './config.js';
 
 import { allocGreekTrees, prepareGreekTrees, computeGreeksWithTrees, computeEffectiveSigma, computeSkewSigma, vasicekBondPrice, vasicekDuration, computeVXHCNSpot } from './pricing.js';
-import { recordStockTrade, recordBondTrade, recordVxhcnTrade, recordOptionTrade } from './price-impact.js';
+import { recordStockTrade, recordBondTrade, recordVxhcnTrade, recordOptionTrade, previewImpact } from './price-impact.js';
 import { getRegulationEffect } from './regulations.js';
 import { capitalMultiplier } from './faction-standing.js';
 
@@ -865,21 +865,28 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
  * liquidateAll, margin trims, popup trades): the ladder binds the player's hand,
  * never the machinery's.
  *
+ * `qty` (the flatten's reduce-only cap, 02a "The evening") closes that many units
+ * of it instead, returning the same fraction of a short's collateral; omitted, or
+ * at least the holding, closes all of it.
+ *
  * @returns {boolean} true if position was found and closed.
  */
-export function closePosition(sim, positionId, currentPrice, currentVol, currentRate, currentDay, q, spreadMult) {
+export function closePosition(sim, positionId, currentPrice, currentVol, currentRate, currentDay, q, spreadMult, qty) {
     const idx = portfolio.positions.findIndex(p => p.id === positionId);
     if (idx === -1) return false;
 
     const pos = portfolio.positions[idx];
     if (pos.type === 'privatestake') return false;   // illiquid until terminal closeout, including liquidation
+    const absQty = Math.abs(pos.qty);
+    const partial = qty != null && qty < absQty;
+    const n = partial ? qty : absQty;
 
     // Binaries close through the canonical binary quote/netting op -- NEVER the
     // option-impact _fillPrice path. Returns false if the contract is
     // frozen/settled/pending and cannot be flattened (reported by liquidateAll).
     if (pos.type === 'binary') {
-        const side = pos.qty > 0 ? 'short' : 'long';   // close = opposite side, full size
-        return executeBinaryTrade(pos.strike, side, Math.abs(pos.qty), spreadMult) != null;
+        const side = pos.qty > 0 ? 'short' : 'long';   // close = opposite side
+        return executeBinaryTrade(pos.strike, side, n, spreadMult) != null;
     }
 
     // A frozen/settled compute future cannot be flattened (mobilized decree
@@ -889,25 +896,130 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
         return false;
     }
 
-    const absQty = Math.abs(pos.qty);
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
     const spreadVol = _spreadVol(pos.type, currentVol);
 
+    let fill;
     if (pos.qty > 0) {
-        const fill = _fillPrice(sim, pos.type, 'short', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
-        portfolio.cash += fill * absQty;
+        fill = _fillPrice(sim, pos.type, 'short', n, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
+        portfolio.cash += fill * n;
     } else {
-        const fill = _fillPrice(sim, pos.type, 'long', absQty, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
-        const returnedMargin = pos._reservedMargin ?? _marginForShort(
+        fill = _fillPrice(sim, pos.type, 'long', n, mid, currentPrice, pos.strike, spreadVol, pos.expiryDay || 0, currentDay, spreadMult);
+        const reserved = pos._reservedMargin ?? _marginForShort(
             pos.type, absQty, pos.entryPrice, currentPrice, currentVol,
             currentRate, currentDay, pos.strike, pos.expiryDay
         );
-        portfolio.cash += returnedMargin - fill * absQty;
+        const returnedMargin = partial ? reserved * (n / absQty) : reserved;
+        portfolio.cash += returnedMargin - fill * n;
+        if (partial && pos._reservedMargin != null) pos._reservedMargin -= returnedMargin;
+    }
+    if (partial) {
+        // The position keeps its side, entry and accrued borrow (executeMarketOrder's reduce).
+        pos.qty -= Math.sign(pos.qty) * n;
+        pos.fillPrice = fill;
+        return true;
     }
 
     if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;
     portfolio.positions.splice(idx, 1);
     return true;
+}
+
+// ---------------------------------------------------------------------------
+// The flatten's reduce-only legs (02a "The evening")
+// ---------------------------------------------------------------------------
+
+/** A reduce-only leg's position, capped quantity and status: the position by id,
+ *  `gone` when it no longer exists (settled, expired, traded out), `reversed`
+ *  when its sign is no longer the one `side` closes. */
+function _reduceTarget(posId, side, qty) {
+    const pos = portfolio.positions.find(p => p.id === posId);
+    if (!pos || pos.qty === 0) return { status: 'gone', pos: null, n: 0 };
+    if (Math.sign(pos.qty) !== (side === 'short' ? 1 : -1)) return { status: 'reversed', pos, n: 0 };
+    return { status: 'ok', pos, n: Math.min(qty, Math.abs(pos.qty)) };
+}
+
+/**
+ * One reduce-only flatten leg at execution: `qty` units on the closing `side`,
+ * capped at what the position `posId` still holds, so a position that settled,
+ * expired or was traded down while the leg waited closes what remains, or
+ * nothing; a position whose sign reversed since the leg was sent is skipped,
+ * never traded on its stale side. The player's hand, like any ticket leg: a
+ * restricted account trades nothing, the contract's own gates apply
+ * (closePosition's), and `spreadMult` is the ladder's.
+ * @returns {{ status: 'filled'|'gone'|'reversed'|'rejected', qty: number, type: string|null }}
+ */
+export function reduceOnlyClose(sim, posId, side, qty, currentPrice, currentVol, currentRate, currentDay, q, spreadMult) {
+    if (portfolio.restricted) return { status: 'rejected', qty: 0, type: null };
+    const t = _reduceTarget(posId, side, qty);
+    if (t.status !== 'ok') return { status: t.status, qty: 0, type: t.pos ? t.pos.type : null };
+    const type = t.pos.type;
+    if (!(t.n > 0) || !closePosition(sim, posId, currentPrice, currentVol, currentRate, currentDay, q, spreadMult, t.n)) {
+        return { status: 'rejected', qty: 0, type };
+    }
+    return { status: 'filled', qty: t.n, type };
+}
+
+/**
+ * The flatten's estimate before it is sent: its cost (the spread at `spreadMult`,
+ * the current ladder multiple, plus impact accruing leg by leg) apart from the
+ * cash it releases (a long's proceeds; a short's returned collateral less its
+ * buyback). Each leg is capped, skipped or priced exactly as reduceOnlyClose
+ * would execute it now, in order. Pure: impact comes from previewImpact, which
+ * reads the pools and never writes them.
+ * INTERPRETATION: every leg is marked at today's mid. A leg sharing an impact
+ * pool with an earlier one (the same contract held in two strategies) pays the
+ * earlier legs' accrued impact in its fill cost, but its mark does not move with
+ * the overlay as it would at execution; with no shared pool the estimate is what
+ * immediate execution does, to the cent.
+ * @param {Array<{posId: number, side: string, qty: number}>} legs
+ * @returns {{ cost: number, released: number }}
+ */
+export function estimateReduceOnly(legs, currentPrice, currentVol, currentRate, currentDay, q, spreadMult) {
+    const sMult = getRegulationEffect('spreadMult', 1) * (spreadMult || 1);
+    const rows = [], trades = [];
+    for (const L of legs) {
+        const t = _reduceTarget(L.posId, L.side, L.qty);
+        if (t.status !== 'ok' || !(t.n > 0) || t.pos.type === 'privatestake') continue;
+        const pos = t.pos, n = t.n, buy = pos.qty < 0;
+        if (pos.type === 'binary') {
+            const quote = getBinaryQuote(pos.strike);
+            if (!quote) continue;
+            // executeBinaryTrade's own widening: about the mid, clamped to [0, 1].
+            const raw = buy ? quote.ask : quote.bid;
+            const mult = spreadMult > 1 ? spreadMult : 1;
+            const px = mult === 1 ? raw
+                : Math.max(0, Math.min(1, buy ? quote.mid + (raw - quote.mid) * mult : quote.mid - (quote.mid - raw) * mult));
+            rows.push({ pos, n, buy, mid: quote.mid * BINARY_NOTIONAL, fill: px * BINARY_NOTIONAL, trade: -1 });
+            continue;
+        }
+        if (pos.type === 'computefuture' && (computeMarket.frozen || computeMarket.settled[pos.strike])) continue;
+        const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);
+        const sv = _spreadVol(pos.type, currentVol);
+        const opt = pos.type === 'call' || pos.type === 'put';
+        const ba = opt ? computeOptionBidAsk(mid, currentPrice, pos.strike, sv) : computeBidAsk(mid, sv);
+        const spreadFill = buy ? mid + (ba.ask - mid) * sMult : mid - (mid - ba.bid) * sMult;
+        rows.push({ pos, n, buy, mid, spreadFill, trade: trades.length });
+        trades.push({
+            type: pos.type, qty: buy ? n : -n, vol: sv, strike: pos.strike, expiryDay: pos.expiryDay || 0,
+            logSK: opt ? Math.log(currentPrice / pos.strike) : 0,
+            dte: Math.max(1, (pos.expiryDay || 0) - currentDay),
+        });
+    }
+    const impact = previewImpact(trades);
+    let cost = 0, released = 0;
+    for (const r of rows) {
+        const fill = r.trade < 0 ? r.fill : Math.max(0.01, r.spreadFill + impact[r.trade]);
+        cost += (r.buy ? fill - r.mid : r.mid - fill) * r.n;
+        if (!r.buy) { released += fill * r.n; continue; }
+        const absQty = Math.abs(r.pos.qty);
+        const reserved = r.pos.type === 'binary'
+            ? (r.pos._reservedMargin ?? BINARY_NOTIONAL * absQty)
+            : (r.pos._reservedMargin ?? _marginForShort(r.pos.type, absQty, r.pos.entryPrice, currentPrice, currentVol,
+                currentRate, currentDay, r.pos.strike, r.pos.expiryDay));
+        released += (r.n < absQty ? reserved * (r.n / absQty) : reserved) - fill * r.n;
+    }
+    return { cost, released };
 }
 
 // ---------------------------------------------------------------------------

@@ -231,6 +231,46 @@ export function recordOptionTrade(type, qty, sigma, logSK, dte, strike, expiryDa
     return cost;
 }
 
+/**
+ * The impact fill costs a sequence of trades would pay, accruing across them as
+ * they would on execution, read from the pools and never written to them (the
+ * flatten's estimate, 02a "The evening"). The formulas are the record functions'.
+ * Each trade is { type, qty (signed), vol } plus { logSK, dte, strike, expiryDay }
+ * for an option; `vol` is what _fillPrice hands its record call (sigmaR for a bond,
+ * xi for a VXHCN future, sigma otherwise). Compute futures and binaries carry no
+ * pool and cost 0.
+ * @returns {number[]} signed cost per trade
+ */
+export function previewImpact(trades) {
+    const added = new Map();
+    return trades.map(t => {
+        const absQty = Math.abs(t.qty);
+        if (!(absQty > 0)) return 0;
+        const sign = t.qty > 0 ? 1 : -1, buy = t.qty > 0, side = buy ? ':buy' : ':sell';
+        let key, cumRef, coeff, adv;
+        if (t.type === 'stock') {
+            key = 'stock' + side; cumRef = buy ? _cumStockBuy : _cumStockSell;
+            coeff = IMPACT_COEFF * t.vol; adv = modeledStockADV(t.vol);
+        } else if (t.type === 'bond') {
+            key = 'bond' + side; cumRef = buy ? _cumBondBuy : _cumBondSell;
+            coeff = BOND_IMPACT_COEFF * t.vol; adv = modeledBondADV(t.vol);
+        } else if (t.type === 'vxhcnfuture') {
+            key = 'vx' + side; cumRef = buy ? _cumVxhcnBuy : _cumVxhcnSell;
+            coeff = VXHCN_IMPACT_COEFF * t.vol; adv = modeledVxhcnADV(t.vol);
+        } else if (t.type === 'call' || t.type === 'put') {
+            const pool = `${t.type}_${t.strike}_${t.expiryDay}`;
+            const cum = _cumOption.get(pool);
+            key = pool + side; cumRef = cum ? (buy ? cum.buy : cum.sell) : 0;
+            coeff = OPT_IMPACT_COEFF * t.vol; adv = modeledOI(t.type, t.logSK, t.dte, t.vol);
+        } else {
+            return 0;
+        }
+        cumRef += added.get(key) || 0;
+        added.set(key, (added.get(key) || 0) + absQty);
+        return coeff * (Math.sqrt((cumRef + absQty) / adv) - Math.sqrt(cumRef / adv)) * sign;
+    });
+}
+
 /* ── Dynamic market-maker rehedging ── */
 
 /**
