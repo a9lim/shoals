@@ -260,7 +260,8 @@ key is `shoals-theme`.
 - **The wire.** Every event-log refresh goes through main.js `_updateWire()`, which
   also sets the front page's lead (the newest log entry, split at its first clause
   break by `splitHeadline`; the text is quoted, never rewritten), the wire under it
-  (the log's last forty items, the paper's archive) and the tape's news days. Event
+  (the rest of the log, which the engine caps at `MAX_EVENT_LOG`, twenty entries, though
+  `brief.js` asks for forty) and the tape's news days. Event
   toasts show only off the front page, where the lead carries them. A quiet first
   edition leads with the tape.
 - **Pages.** One job each (2026-10-26): the Front page reads (lead and wire, the tape,
@@ -458,12 +459,15 @@ key is `shoals-theme`.
 
 `docs/ROADMAP.md` is the queue, in order, and opens with the direction set on
 2026-10-25: know, commit, lose your grip, and an honest accounting, read through
-embedded agency. The reader and `B` as a designed inefficiency landed in that round;
-next is the forecast as a standing policy, then domains and the demonstration channel,
-with a refit. Then come the decision chain (editions as evidence, dissemination, mandates,
-Meridian), influence bounded at the intervention with a replayable accounting, Act III
-taking the player's judgment, a price for alignment, and the run as an object. The
-event-illustration pilot is its own session, briefed there. a9's play-test covers the
-posterior's feel, the valuation gaps, the rounds' cadence, the score, the
-reality-beats content, the capex rates channel and the `ACT3_TUNING` first-pass
-numbers.
+embedded agency. The 2026-10-27 review reordered it around how the game plays for an
+evening; that order is proposed, and its open calls for a9 are listed there. Next is
+the evening (an inherited desk with a dated obligation as the opening hand, the
+forecast as a standing policy, pacing, a minimal almanac), then one decision chain end
+to end (a demonstration, a disputed inference, a position, a financing commitment with
+the terminal clip retired, a disclosure, the firm's response), with the transitions
+extracted from `main.js` alongside it so whole runs play headless and replay from a
+journal. Then come what the book bets beside what the player says, the accounting,
+Act III taking the player's judgment, widening into domains, and shared worlds. The
+backlog holds the instruments in waiting, the race's missing machinery, market
+integrity, satire, cleanup, and a9's play-test notes. The event-illustration pilot is
+its own session, briefed there.
