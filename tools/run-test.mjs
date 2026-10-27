@@ -374,6 +374,19 @@ let recScripted = null;
     check('H: two runs that differ by one event draw identical values in every slot both open',
         differ === 0 && shared > 0.9 * A.size && priceShared,
         `${shared} slots shared, ${differ} differ, ${onlyA} only without the event, ${onlyB} only with it (${extra.id} on run day ${EXTRA_DAY})`);
+
+    // A portfolio trigger that fires twice is two occurrences: each firing draws its
+    // tip and its followups from a slot of its own (Codex review, 2026-10-27).
+    quiet(() => newRun({ preset: DEFAULT_PRESET, seed: BASE_SEED, hand: true }));
+    const ev = run.engine._triggerPool.find(e => e.id === 'desk_analyst_info_edge');
+    const saved = { trigger: ev.trigger, cooldown: ev.cooldown, era: ev.era };
+    ev.trigger = () => true; ev.cooldown = 0; ev.era = undefined;
+    const fire = (day) => run.engine.evaluateTriggers(run.sim, day).find(e => e.id === ev.id);
+    const t1 = fire(run.sim.day + 48), t2 = fire(run.sim.day + 348);
+    Object.assign(ev, saved);
+    check('H: a portfolio trigger that fires twice draws from two occurrences',
+        !!t1 && !!t2 && t1._fireOcc != null && t1._fireOcc !== t2._fireOcc,
+        t1 && t2 ? `occurrences ${t1._fireOcc} and ${t2._fireOcc}` : 'the trigger did not fire');
 }
 
 // ---- I. The bystander -------------------------------------------------------------------

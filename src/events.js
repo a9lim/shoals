@@ -488,7 +488,11 @@ export class EventEngine {
             try {
                 if (ev.trigger(sim, this.world, this._playerCtx)) {
                     this._triggerCooldowns[ev.id] = day;
-                    triggered.push(ev);
+                    // Each firing is its own occurrence, on the counter _fireEvent
+                    // keeps, so a repeated trigger draws from a fresh slot (02a
+                    // "The run, headless").
+                    const occ = this._occ[ev.id] = (this._occ[ev.id] || 0) + 1;
+                    triggered.push({ ...ev, _fireOcc: occ });
                 }
             } catch (e) { /* guard — portfolio state may be inconsistent mid-reset */ }
         }
