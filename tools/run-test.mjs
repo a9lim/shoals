@@ -7,6 +7,7 @@
       and a Classic run complete
    B. Determinism: a seed and a journal replay twice to
       the same per-day digest
+   C. Isolation: A, B, A; Dynamic, Classic, Dynamic
    D. Round trip: a scripted policy's run (every command
       kind), recorded and replayed
    E. The fixture: tools/fixtures/run-fixture.json replays
@@ -20,18 +21,17 @@
    J. Classic stays inert
    K. Timing: a full Dynamic headless run's wall time
 
-   Usage: node tools/run-test.mjs [--rebaseline] [--record-interim] [--seed S]
+   Usage: node tools/run-test.mjs [--rebaseline] [--seed S]
      --rebaseline      re-derive the fixture's digest trail after a
-                       RULES_VERSION bump (fails if a command no longer applies)
-     --record-interim  regenerate the interim, headless-generated fixture
-                       from the scripted policy (Claude replaces it with a
-                       browser recording: window.shoalsJournal())
+                       RULES_VERSION bump (fails if a command no longer applies);
+                       record a new fixture in the browser with
+                       window.shoalsJournal()
    =================================================== */
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { RULES_VERSION, DEFAULT_PRESET, STRIKE_INTERVAL } from '../src/config.js';
 import { run, newRun, setSink, runInternals } from '../src/run.js';
-import { runHeadless, drive, replayTo, keepDigests } from '../src/run-replay.js';
+import { runHeadless, drive, replayTo, keepDigests, BYSTANDER } from '../src/run-replay.js';
 import { portfolio } from '../src/portfolio.js';
 import { consensus } from '../src/race/consensus.js';
 import { computeMarket, isComputeTradeable } from '../src/race/compute-market.js';
@@ -44,7 +44,6 @@ import { roomChoices } from '../src/events/room.js';
 
 const argv = process.argv.slice(2);
 const REBASELINE = argv.includes('--rebaseline');
-const RECORD_INTERIM = argv.includes('--record-interim');
 let BASE_SEED = 20261027;
 for (let i = 0; i < argv.length; i++) if (argv[i] === '--seed') BASE_SEED = parseInt(argv[++i], 10) >>> 0;
 
@@ -63,22 +62,6 @@ const quiet = (fn) => { console.log = () => {}; try { return fn(); } finally { c
 const NOT_BYSTANDER = ['trades', 'round', 'raceEffects', 'raceLeak', '_applyReportingRegime', '_openDispute', '_ruleDispute', 'regulatoryAction', '_tipAction'];
 const qualifies = (c) => !!c && !NOT_BYSTANDER.some(k => c[k] != null && c[k] !== false);
 
-/**
- * TEST POLICY, not the bystander: answers the choice flagged `bystander: true`
- * where a dispatch has one, else the first choice that would qualify, else the
- * first. It stands in for BYSTANDER in the determinism gates until pass B's
- * flags cover every dispatch (section I reports which do not).
- */
-const TEST_BYSTANDER = Object.freeze({
-    name: 'test-bystander (interim)', hand: false, commands: null,
-    answer(ev) {
-        const cs = ev.choices || [];
-        let i = cs.findIndex(c => c.bystander);
-        if (i < 0) i = cs.findIndex(qualifies);
-        return i < 0 ? 0 : i;
-    },
-});
-
 /** The listed expiries and an at-the-money strike, as the ticket resolves them. */
 const expiries = () => run.expiryMgr.update(run.sim.day).map(e => e.day);
 const atm = () => Math.round(run.sim.S / STRIKE_INTERVAL) * STRIKE_INTERVAL;
@@ -86,12 +69,12 @@ const leg = (type, side, qty, extra = {}) => ({ type, side, qty, desc: type, ...
 
 /**
  * The scripted policy: every command kind at a fixed run day (between days) or
- * substep, resolved the way the page resolves it, answering dispatches like the
- * test policy. Stateless in position, so a resumed run continues it exactly.
+ * substep, resolved the way the page resolves it, answering dispatches as the
+ * bystander does. Stateless in position, so a resumed run continues it exactly.
  */
 const SCRIPTED = Object.freeze({
     name: 'scripted', hand: true,
-    answer: TEST_BYSTANDER.answer,
+    answer: BYSTANDER.answer,
     commands(pos) {
         const rel = pos.day - run.origin, sub = pos.substeps, out = [];
         const ex = expiries();
@@ -175,8 +158,8 @@ function replayRecord(rec) {
     Math.random = () => { throw new Error('ambient Math.random in a run'); };
     try {
         quiet(() => {
-            runHeadless({ seed: BASE_SEED, policy: TEST_BYSTANDER });
-            runHeadless({ seed: BASE_SEED, preset: 0, policy: TEST_BYSTANDER, until: 252 });
+            runHeadless({ seed: BASE_SEED, policy: BYSTANDER });
+            runHeadless({ seed: BASE_SEED, preset: 0, policy: BYSTANDER, until: 252 });
             runHeadless({ seed: BASE_SEED + 1, policy: SCRIPTED, until: 60 });
         });
     } catch (e) { threw = e; }
@@ -209,6 +192,22 @@ let recScripted = null;
         ['legs/market', 'strategy/market', 'legs/limit', 'flatten/undefined'].every(k => orderKinds.has(k)), [...orderKinds].join(' '));
 }
 
+// ---- C. Isolation -------------------------------------------------------------------
+// A run leaves nothing behind for the next: a reset that missed a module would
+// show here before a player met it on Restart.
+{
+    const A1 = quiet(() => runHeadless({ seed: BASE_SEED + 11, policy: BYSTANDER, until: 300, digests: true }));
+    const tA = trail(A1.digests);
+    quiet(() => runHeadless({ seed: BASE_SEED + 22, policy: SCRIPTED, until: 200, digests: true }));
+    const A2 = quiet(() => runHeadless({ seed: BASE_SEED + 11, policy: BYSTANDER, until: 300, digests: true }));
+    const d1 = firstDiff(tA, trail(A2.digests));
+    check('C: runs A, B, then A again reproduce A\'s trail', d1 < 0, d1 < 0 ? `${tA.length} closes` : `first difference at close ${d1}`);
+    quiet(() => runHeadless({ seed: BASE_SEED + 11, preset: 0, policy: SCRIPTED, until: 100, digests: true }));
+    const A3 = quiet(() => runHeadless({ seed: BASE_SEED + 11, policy: BYSTANDER, until: 300, digests: true }));
+    const d2 = firstDiff(tA, trail(A3.digests));
+    check('C: Dynamic, Classic, then Dynamic again reproduce the Dynamic trail', d2 < 0, d2 < 0 ? '' : `first difference at close ${d2}`);
+}
+
 // ---- D. Round trip ------------------------------------------------------------------
 {
     const t = trail(recScripted.digests);
@@ -228,17 +227,6 @@ let recScripted = null;
 
 // ---- E. The fixture -------------------------------------------------------------------
 {
-    if (RECORD_INTERIM) {
-        const rec = clone(recScripted);
-        const fixture = {
-            source: 'headless-generated (interim): tools/run-test.mjs --record-interim, the scripted policy. '
-                + 'Replace with a browser recording (window.shoalsJournal()) of trades, a strategy, a flatten, resting '
-                + 'orders, an exercise, dispatch answers, forecast edits, a standing order and a government action.',
-            header: rec.header, journal: rec.journal, endpoint: rec.endpoint, digests: rec.digests,
-        };
-        writeFileSync(FIXTURE, JSON.stringify(fixture, null, 1) + '\n');
-        console.log(`wrote the interim fixture: ${rec.journal.length} commands, ${rec.digests.length} closes`);
-    }
     let fx = null;
     try { fx = JSON.parse(readFileSync(FIXTURE, 'utf8')); } catch (e) { check('E: the fixture loads', false, e.message); }
     if (fx) {
@@ -306,7 +294,7 @@ let recScripted = null;
         run.trace = [];
         let mark = 0;
         setSink({ afterClose: () => { traces.push(run.trace.slice(mark)); mark = run.trace.length; } });
-        try { drive(TEST_BYSTANDER, 400); } finally { setSink(null); run.trace = null; }
+        try { drive(BYSTANDER, 400); } finally { setSink(null); run.trace = null; }
     });
     const RACE = ['stepCoupling', 'advanceRace', 'stepControlRegime', 'stepTreaty', 'syncRaceToWorld', 'setBaseRateScale', 'stepAct3',
         'syncStandingOrders', 'stepBelief', 'settleConsensus', 'settleCompute', 'standingDayRules', 'checkResolution', 'checkRoom', 'maybeFire', 'raceBridge',
@@ -343,7 +331,7 @@ let recScripted = null;
     named('generator: margin call', runInternals.marginCallDispatch({ triggered: true, equity: 100, collateralEquity: 100, required: 200 }).choices);
     named('generator: game over', runInternals.gameOverDispatch('probe', 'forced_resignation', 'probe').choices);
     const shown = missing.slice(0, 12).join('; ') + (missing.length > 12 ? `; and ${missing.length - 12} more` : '');
-    check('I: every pool dispatch and generator names a qualifying bystander choice (pass B adds the flags)',
+    check('I: every pool dispatch and generator names a qualifying bystander choice',
         missing.length === 0, `${pool.length} pool dispatches; ${missing.length} without: ${shown}`);
     if (missing.length) console.log(`I: dispatches without a qualifying bystander choice (${missing.length}):\n  ` + missing.join('\n  '));
 }
@@ -362,15 +350,15 @@ let timing = '';
     const ms = [], days = [];
     for (let i = 0; i < 5; i++) {
         const t = Date.now();
-        const r = quiet(() => runHeadless({ seed: BASE_SEED + 100 + i, policy: TEST_BYSTANDER }));
+        const r = quiet(() => runHeadless({ seed: BASE_SEED + 100 + i, policy: BYSTANDER }));
         ms.push(Date.now() - t);
         days.push(r.endpoint.day - run.origin);
     }
     const t = Date.now();
-    quiet(() => runHeadless({ seed: BASE_SEED + 100, policy: TEST_BYSTANDER, digests: true }));
+    quiet(() => runHeadless({ seed: BASE_SEED + 100, policy: BYSTANDER, digests: true }));
     const withDigests = Date.now() - t;
     const mean = ms.reduce((a, b) => a + b, 0) / ms.length;
-    timing = `a full Dynamic headless run (test bystander, no digests): mean ${(mean / 1000).toFixed(2)} s over ${ms.length} seeds `
+    timing = `a full Dynamic headless run (the bystander, no digests): mean ${(mean / 1000).toFixed(2)} s over ${ms.length} seeds `
         + `(${ms.map(x => (x / 1000).toFixed(2)).join(', ')} s; ${days.join(', ')} run days); with the digest trail ${(withDigests / 1000).toFixed(2)} s`;
     check('K: a full Dynamic headless run completes (timing reported)', ms.length === 5, timing);
 }
