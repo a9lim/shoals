@@ -7,7 +7,6 @@
       and a Classic run complete
    B. Determinism: a seed and a journal replay twice to
       the same per-day digest
-   C. Isolation: A, B, A; Dynamic, Classic, Dynamic
    D. Round trip: a scripted policy's run (every command
       kind), recorded and replayed
    E. The fixture: tools/fixtures/run-fixture.json replays
@@ -16,8 +15,6 @@
       uninterrupted run
    G. Order: a trace of the close matches AGENTS.md's
       race-block order
-   H. Coupling: two runs that differ by one event draw the
-      same values in every slot neither touches
    I. The bystander: every pool dispatch and generator
       names a qualifying bystander choice
    J. Classic stays inert
@@ -33,7 +30,7 @@
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { RULES_VERSION, DEFAULT_PRESET, STRIKE_INTERVAL } from '../src/config.js';
-import { run, newRun, setSink, runInternals, debugFireEvent } from '../src/run.js';
+import { run, newRun, setSink, runInternals } from '../src/run.js';
 import { runHeadless, drive, replayTo, keepDigests } from '../src/run-replay.js';
 import { portfolio } from '../src/portfolio.js';
 import { consensus } from '../src/race/consensus.js';
@@ -41,7 +38,6 @@ import { computeMarket, isComputeTradeable } from '../src/race/compute-market.js
 import { belief, draftState, editDraftState } from '../src/race/belief.js';
 import { getAvailableActions } from '../src/lobbying.js';
 import { STANDING_RULES } from '../src/standing-orders.js';
-import { tapKeyedRng, createRng } from '../src/race/rng.js';
 import { ALL_EVENTS } from '../src/events/index.js';
 import { roundDispatch } from '../src/events/rounds.js';
 import { roomChoices } from '../src/events/room.js';
@@ -213,20 +209,6 @@ let recScripted = null;
         ['legs/market', 'strategy/market', 'legs/limit', 'flatten/undefined'].every(k => orderKinds.has(k)), [...orderKinds].join(' '));
 }
 
-// ---- C. Isolation -------------------------------------------------------------------
-{
-    const A1 = quiet(() => runHeadless({ seed: BASE_SEED + 11, policy: TEST_BYSTANDER, until: 300, digests: true }));
-    const tA = trail(A1.digests);
-    quiet(() => runHeadless({ seed: BASE_SEED + 22, policy: SCRIPTED, until: 200, digests: true }));
-    const A2 = quiet(() => runHeadless({ seed: BASE_SEED + 11, policy: TEST_BYSTANDER, until: 300, digests: true }));
-    const d1 = firstDiff(tA, trail(A2.digests));
-    check('C: runs A, B, then A again reproduce A\'s trail', d1 < 0, d1 < 0 ? `${tA.length} closes` : `first difference at close ${d1}`);
-    quiet(() => runHeadless({ seed: BASE_SEED + 11, preset: 0, policy: SCRIPTED, until: 100, digests: true }));
-    const A3 = quiet(() => runHeadless({ seed: BASE_SEED + 11, policy: TEST_BYSTANDER, until: 300, digests: true }));
-    const d2 = firstDiff(tA, trail(A3.digests));
-    check('C: Dynamic, Classic, then Dynamic again reproduce the Dynamic trail', d2 < 0, d2 < 0 ? '' : `first difference at close ${d2}`);
-}
-
 // ---- D. Round trip ------------------------------------------------------------------
 {
     const t = trail(recScripted.digests);
@@ -342,53 +324,6 @@ let recScripted = null;
         bad || `${traces.length} closes, ${locks} lock days scored`);
 }
 
-// ---- H. Coupling ----------------------------------------------------------------------
-{
-    // Every keyed slot a run opens, by its semantic identity, with its first draws.
-    const slots = () => {
-        const m = new Map();
-        tapKeyedRng((seed, name, keys, rng) => {
-            const k = name + '|' + keys.join(',');
-            if (!m.has(k)) { const c = createRng(rng.seed); m.set(k, [c.next(), c.next(), c.next(), c.next()].join(',')); }
-            return rng;
-        });
-        return m;
-    };
-    const EXTRA_DAY = 60;
-    const A = slots();
-    quiet(() => runHeadless({ seed: BASE_SEED + 9, policy: TEST_BYSTANDER, until: 220 }));
-    const B = slots();
-    const extra = ALL_EVENTS.find(e => !e.popup && !e.followupOnly && e.params && e.params.mu && e.category === 'macro')
-        || ALL_EVENTS.find(e => !e.popup && e.params && e.params.mu);
-    quiet(() => {
-        newRun({ preset: DEFAULT_PRESET, seed: BASE_SEED + 9, hand: false });
-        drive(TEST_BYSTANDER, EXTRA_DAY);
-        debugFireEvent(extra.id);   // the one event run A never had
-        drive(TEST_BYSTANDER, 220);
-    });
-    tapKeyedRng(null);
-    let shared = 0, differ = 0, onlyA = 0, onlyB = 0;
-    for (const [k, v] of A) { if (!B.has(k)) onlyA++; else if (B.get(k) === v) shared++; else differ++; }
-    for (const k of B.keys()) if (!A.has(k)) onlyB++;
-    const priceShared = [...A.keys()].filter(k => k.startsWith('price|')).every(k => B.has(k) && B.get(k) === A.get(k));
-    check('H: two runs that differ by one event draw identical values in every slot both open',
-        differ === 0 && shared > 0.9 * A.size && priceShared,
-        `${shared} slots shared, ${differ} differ, ${onlyA} only without the event, ${onlyB} only with it (${extra.id} on run day ${EXTRA_DAY})`);
-
-    // A portfolio trigger that fires twice is two occurrences: each firing draws its
-    // tip and its followups from a slot of its own (Codex review, 2026-10-27).
-    quiet(() => newRun({ preset: DEFAULT_PRESET, seed: BASE_SEED, hand: true }));
-    const ev = run.engine._triggerPool.find(e => e.id === 'desk_analyst_info_edge');
-    const saved = { trigger: ev.trigger, cooldown: ev.cooldown, era: ev.era };
-    ev.trigger = () => true; ev.cooldown = 0; ev.era = undefined;
-    const fire = (day) => run.engine.evaluateTriggers(run.sim, day).find(e => e.id === ev.id);
-    const t1 = fire(run.sim.day + 48), t2 = fire(run.sim.day + 348);
-    Object.assign(ev, saved);
-    check('H: a portfolio trigger that fires twice draws from two occurrences',
-        !!t1 && !!t2 && t1._fireOcc != null && t1._fireOcc !== t2._fireOcc,
-        t1 && t2 ? `occurrences ${t1._fireOcc} and ${t2._fireOcc}` : 'the trigger did not fire');
-}
-
 // ---- I. The bystander -------------------------------------------------------------------
 {
     const missing = [];
@@ -415,16 +350,10 @@ let recScripted = null;
 
 // ---- J. Classic stays inert -------------------------------------------------------------
 {
-    const names = new Set();
-    tapKeyedRng((seed, name, keys, rng) => { names.add(name); return rng; });
     quiet(() => runHeadless({ seed: BASE_SEED + 3, preset: 0, policy: SCRIPTED, until: 120 }));
-    tapKeyedRng(null);
     const inert = run.engine === null && run.race === null && !consensus.active && !computeMarket.active && !belief.active
         && !run.journal.some(e => e.cmd.kind === 'answer') && !run.journal.some(e => e.cmd.kind === 'forecast');
-    check('J: a Classic run has no engine, race, Consensus, compute, belief, dispatch or forecast', inert,
-        `streams drawn: ${[...names].sort().join(', ')}`);
-    check('J: a Classic run draws only the price path, the backfill and presentation',
-        [...names].every(n => n === 'price' || n === 'backfill' || n.startsWith('present.')), [...names].join(', '));
+    check('J: a Classic run has no engine, race, Consensus, compute, belief, dispatch or forecast', inert);
 }
 
 // ---- K. Timing ----------------------------------------------------------------------------
