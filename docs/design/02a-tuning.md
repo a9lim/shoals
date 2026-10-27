@@ -672,16 +672,17 @@ split by world:
 | test | the harnesses' (base 1) | the gates |
 
 Half the training worlds run neutral (no strait tension, stage 0, treaty
-stage 0). The other half run under a declared **assumed input schedule**:
-strait tension, the export-control stage and the treaty stage each step
-as a slow Markov process over their public ranges. The fit tool states
-the schedule.
+stage 0). The other half are **engine worlds**: bystander headless runs
+whose strait tension, export-control stage and treaty stage come from
+the event engine itself ("Demonstrations", the refit; "The run,
+headless"). Until 2026-10-27 that half ran an assumed schedule, a slow
+Markov process over the inputs' public ranges.
 
 Each run is sampled every 21 days from day 0 while it is unresolved,
 and again every 21 days from its own offset (the seed mod 21), before
-any extrapolation mutates the race. Early releases fall on nearly the
-same calendar in every world (on days 1, 46 and 91 in nine worlds in
-ten), and the treaty window opens on day 700 in a third of worlds, so a
+any extrapolation mutates the race. Early releases fell on nearly the
+same calendar in every world before the release jitter (on days 1, 46
+and 91 in nine worlds in ten), and the treaty window opens on day 700 in a third of worlds, so a
 fixed grid would never train on those phases. The hazard heads train on
 both series, and the calibration stage matches on the grid series. Every
 hazard and family head is fit by maximum likelihood with an L2 penalty
@@ -692,7 +693,7 @@ and SciPy come from the shared venv's `data` column and are needed only
 to refit. Every head must converge; none may stop on its iteration
 budget. The fit then writes `src/race/reader-constants.js`, which is
 generated and never hand-edited. That file is compact and holds only
-what evaluation needs: the record's schema version, the input schedule,
+what evaluation needs: the record's schema version, the input scenarios,
 the basis and its knots, the feature standardization and the weights.
 A compact validation report goes beside the tool, in
 `tools/reader-fit-report.json`: what `reader-test` reads, plus a summary.
@@ -2019,48 +2020,37 @@ thumb's code doesn't change. Its frozen hash is re-derived by running
 HEAD 1343924's `belief.js` on the jittered worlds under the hash's own
 fixed input tape, and the current rule must still match it.
 
-**The refit.** One shipped fit takes three changes:
+**The refit.** The shipped fit (record schema 16) takes three changes:
 
-1. demonstrations in the record;
+1. demonstrations in the record, read as above;
 2. the release jitter;
-3. the fit's input scenario: the assumed Markov schedule is retired, and
-   its worlds are bystander headless runs with the event engine's own
-   world inputs ("The run, headless").
+3. engine inputs: the assumed Markov input schedule is retired, and half
+   the fit's worlds are bystander headless runs with the event engine's
+   own world inputs ("The run, headless"). The other half stay neutral,
+   and so does the tuning contract. `tools/engine-worlds.mjs` generates
+   them on worker threads and caches each world's public rows and
+   outcomes under `.cache/`, keyed by rules version and reader hash.
 
-The Markov scenario retires everywhere except the frozen hash's tape.
-`reader-test`, `forecast-test`, `valuation-test` and `belief-test` take
-engine worlds beside neutral ones, from one shared generator that runs
-on worker threads and caches each world's record and outcomes, keyed by
-rules version and reader hash, in an ignored directory. The neutral
-scenario stays, and so does the neutral-input tuning contract;
-`endings-test` reports the engine worlds' family table beside it as a
-diagnostic. Engine worlds are generated only after the run passes its
-replay gates. A full engine world is estimated at 0.1–0.3 s, so 10,000
-cost 17–50 minutes on one thread; the extracted run is benchmarked
-before any are generated.
+The listing base rates were re-derived (R2 0.700, R3 0.575, R4 0.518, R5
+0.629), and `K_CRED` stayed at 1.35.
 
-The changes are measured by ablation: leave-one-out fits on common
-validation seeds, beside the old fit as the baseline. The report gives
-the reader-copier's `S` against `B`, per run and per act, for each.
-Every existing band in `reader-test`, `forecast-test`, `valuation-test`,
-`consensus-test` and `endings-test` holds, the late-determination
-ceilings included, and the listing base rates and `K_CRED` are
-re-derived.
-
-Engine worlds are priced by whichever reader is in place when they are
-generated. After the fit, the validation engine worlds are regenerated
-under the new reader, and every calibration band, the copier's edge and
-the family ceilings are checked again there. If a band fails, the fit is
-repeated once on worlds generated under the new reader; if it fails
-again, the round stops and brings the numbers to a9.
-
-Targets for the demonstrations: the reader-copier's edge rises by at
-least 0.2 nats per run, and its total stays under 2.0, so the catalogue
-is worth reading and the forecast doesn't become a reading exercise.
-These are tuning targets, not predictions. The late-determination
-ceilings read the full family head, which η doesn't shield, so they bind
-first if demonstrations make worlds legible too early. The levers are
-λ₀, then the evaluation lag.
+What the round measured, as the reader-copier's `S` against `B` per run
+on validation worlds: 0.72 under the old fit, 0.78 under the new fit
+without the demonstration features, and 0.78 with them (+0.005). As
+ruled, demonstrations carry little the rest of the record doesn't. The
+full reader leans on them, but without them it infers nearly the same
+from release history and claim ages: at R3 and R4 the internal crossing
+leads the release by only three to four weeks, and the evaluation lands
+20–60 days after publication. Most of the +0.06 comes from refitting on
+the jittered worlds. The ruled target of +0.2 was dropped (a9,
+2026-10-27: the reader is close enough, not an instrument), and
+demonstrations stay at their ruled rates, as evidence that is loud on
+the wire and mostly redundant with the record. Worlds generated under
+the old reader and the new one came out identical, because the reader
+never reaches a bystander world's inputs, so one fit is converged. The
+late-determination ceilings hold: the full family head beats the
+prior's Brier by 16.6% at day 350 and 25.8% at day 700, against 25% and
+60%.
 
 **Implementation readings** (the round's interpretation calls, kept):
 
