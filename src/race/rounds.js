@@ -50,13 +50,34 @@ export const ROUNDS_TUNING = {
 };
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
-let _active = false, _rng = null, _spawnDay = null, _nextDay = null;
+let _active = false, _seed = null, _spawnDay = null, _schedule = null, _roundIndex = 0;
 let _last = null, _lastPi = null, _series = 0;
 const _primary = new Map();
 
+/**
+ * Polaris's NOMINAL round schedule (02a "Demonstrations"): the founding round
+ * `foundingDelay` days after the public spawn day, then each next round
+ * `spacing` ± `spacingJitter` days after the last, drawn in order from the
+ * `rounds` substream. One function of the seed and the spawn day, kept apart
+ * from whether a round executes: stepRounds opens rounds on these days, and the
+ * demonstration hazard's funding window reads them, so headless worlds see the
+ * windows play does. Returns every scheduled day up to `throughDay` and the
+ * first one past it. The draws come in order, so a longer schedule extends a
+ * shorter one and never changes its prefix.
+ */
+export function polarisRoundDays(seed, spawnDay, throughDay) {
+    const T = ROUNDS_TUNING;
+    const rng = createRng(deriveSeed(seed, 'rounds'));
+    const days = [spawnDay + T.foundingDelay];
+    while (days[days.length - 1] <= throughDay) {
+        days.push(days[days.length - 1] + T.spacing + rng.int(2 * T.spacingJitter + 1) - T.spacingJitter);
+    }
+    return days;
+}
+
 /** Clear all marks, clocks and primary commitments, including in Classic. */
 export function resetRounds() {
-    _active = false; _rng = null; _spawnDay = null; _nextDay = null;
+    _active = false; _seed = null; _spawnDay = null; _schedule = null; _roundIndex = 0;
     _last = null; _lastPi = null; _series = 0;
     _primary.clear();
 }
@@ -66,7 +87,7 @@ export function initRounds(race) {
     resetRounds();
     if (!race) return;
     _active = true;
-    _rng = createRng(deriveSeed(race.seed, 'rounds'));
+    _seed = race.seed;
 }
 
 /** The public price-ratio rule; inputs are changes since the previous round. */
@@ -88,11 +109,11 @@ export function stepRounds(race, pi) {
     const view = buildPublicView(race);
     if (_spawnDay == null && (race.lastTransitions?.spawned || []).includes('polaris')) {
         _spawnDay = view.day;
-        _nextDay = _spawnDay + ROUNDS_TUNING.foundingDelay;
+        _schedule = polarisRoundDays(_seed, _spawnDay, _spawnDay);
     }
     // Active status is the public walkout, not capability. Below-ladder Polaris
     // still holds its founding round; a zero claimed rung is a valid public price input.
-    if (_nextDay == null || view.day < _nextDay || !race.capability.labs.polaris.active) return [];
+    if (_schedule == null || view.day < _schedule[_roundIndex] || !race.capability.labs.polaris.active) return [];
     const claimedRung = view.claimedRung.polaris;
     const founding = !_last;
     const previousPrice = _last ? _last.price : ROUNDS_TUNING.foundingPrice;
@@ -108,8 +129,8 @@ export function stepRounds(race, pi) {
         founding,
     });
     _last = round; _lastPi = pi;
-    const T = ROUNDS_TUNING;
-    _nextDay = view.day + T.spacing + _rng.int(2 * T.spacingJitter + 1) - T.spacingJitter;
+    // The next nominal day; extend the schedule when the run outlives it.
+    if (++_roundIndex >= _schedule.length) _schedule = polarisRoundDays(_seed, _spawnDay, view.day);
     return [round];
 }
 

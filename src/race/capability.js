@@ -199,6 +199,9 @@ function makeLab(id, C_internal, C_released, compute0, computeGrowth, talent, se
         rungCertified: freshRungs(),   // settled certification day (Consensus, phase 3)
         releaseCount: 0,
         lastReleaseDay: -Infinity,     // release-cooldown bookkeeping
+        // The cooldown drawn at this lab's last release (02a "Demonstrations",
+        // release jitter). 0 before the first: the first release keeps its timing.
+        releaseCooldown: 0,
     };
 }
 

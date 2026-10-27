@@ -16,11 +16,22 @@
    unconditional quantile is the p-quantile of the full
    N-sample with non-crossers placed at +infinity.
 
+   02a "Demonstrations" adds the release jitter's gates (the
+   race core at zero jitter width against HEAD 43d677c's
+   fingerprint, the claim excess in days 42-48 of the
+   63-day cycle) and Polaris's nominal round schedule
+   (rounds open on exactly the days the old clock opened
+   them).
+
    Usage:  node tools/race-mc.mjs [N] [--seed S]
            N defaults to 1000; base seed defaults to 1.
    =================================================== */
 
+import { createHash } from 'node:crypto';
 import { createRaceState, advanceRace, heatValue, RACE_TUNING } from '../src/race/race-state.js';
+import { buildPublicView } from '../src/race/consensus.js';
+import { initRounds, stepRounds, polarisRoundDays, ROUNDS_TUNING } from '../src/race/rounds.js';
+import { createRng, deriveSeed } from '../src/race/rng.js';
 
 // ---- CLI -----------------------------------------------------------------
 
@@ -110,13 +121,48 @@ let nonImmediate = 0, tipCount = 0;    // insider-tip rate over non-immediate oc
 
 const T_CAP = RACE_TUNING.prolifCap / RACE_TUNING.prolifInc;   // releases needed to hit the cap
 
+// ---- Release jitter: claims by week of the 63-day cycle (02a) -------------
+// A claim is a released rung newly crossed by a release (R1 included: the early
+// lockstep is chiefly Tianxia's R1 claims on days 1, 46 and 91). Bins are the
+// nine 7-day weeks of day mod 63; the excess is a week's count over the weekly
+// mean, minus one. The gate reads the whole run; the Act I slice (released
+// frontier at or below R2 before the claim) is reported beside it.
+const claimWeeks = new Array(9).fill(0), claimWeeksAct1 = new Array(9).fill(0), releaseWeeks = new Array(9).fill(0);
+
+// ---- Polaris's nominal schedule vs the old clock ----------------------------
+// HEAD 43d677c's stepRounds, called every day: the founding round 21 days after
+// the spawn, then each next one 126 + int(43) - 21 days after the day a round
+// opened, drawn from the `rounds` substream as rounds executed.
+function legacyRoundDays(seed, spawnDay, untilDay) {
+    const rng = createRng(deriveSeed(seed, 'rounds'));
+    const out = [];
+    let next = spawnDay + 21;
+    for (let day = spawnDay; day <= untilDay; day++) {
+        if (day >= next) { out.push(day); next = day + 126 + rng.int(43) - 21; }
+    }
+    return out;
+}
+let roundsChecked = 0, roundsMismatch = 0, roundsTotal = 0;
+
 const t0 = Date.now();
 for (let i = 0; i < N; i++) {
     const race = createRaceState((BASE_SEED + i) >>> 0);
+    initRounds(race);
+    const roundDays = [];
+    let spawnDay = null;
     let leaderC888 = null;
     let eOcc = 0, lOcc = 0, tOcc = 0, s4 = 0;   // per-run occurrence tallies
     for (let d = 0; d < HORIZON; d++) {
+        const frontierBefore = buildPublicView(race).releasedFrontierRung;
         advanceRace(race);
+        for (const round of stepRounds(race, 0)) roundDays.push(round.day);
+        if (race.lastTransitions.spawned.includes('polaris')) spawnDay = race.day;
+        for (const rel of race.lastTransitions.releases) {
+            const week = Math.floor((race.day % 63) / 7);
+            releaseWeeks[week]++;
+            claimWeeks[week] += rel.releasedCrossings.length;
+            if (frontierBefore <= 2) claimWeeksAct1[week] += rel.releasedCrossings.length;
+        }
         if (race.day === 350) sAt[350].push(leaderSafety(race));
         if (race.day === 700) sAt[700].push(leaderSafety(race));
         if (race.day === 888) leaderC888 = leaderInternal(race).C;
@@ -128,6 +174,14 @@ for (let i = 0; i < N; i++) {
         for (const o of occ) if (o.severity >= 4) s4++;
     }
     const cap = race.capability;
+
+    // Rounds open on the nominal schedule, which is the old clock's days.
+    if (spawnDay != null) {
+        roundsChecked++; roundsTotal += roundDays.length;
+        const legacy = legacyRoundDays(race.seed, spawnDay, HORIZON);
+        const nominal = polarisRoundDays(race.seed, spawnDay, HORIZON).filter(d => d <= HORIZON);
+        if (JSON.stringify(roundDays) !== JSON.stringify(legacy) || JSON.stringify(roundDays) !== JSON.stringify(nominal)) roundsMismatch++;
+    }
 
     // Incident occurrence / detection / evidence per-run summaries.
     incTotal.push(tOcc); incEarly.push(eOcc); incLate.push(lOcc); s4PerRun.push(s4);
@@ -227,6 +281,46 @@ function isolationOK(nSeeds) {
 const ISO_SEEDS = Math.min(N, 50);
 const isolationPass = isolationOK(ISO_SEEDS);
 
+// ---- The jitter's own stream (02a "Demonstrations") ------------------------
+// At zero width every cooldown is 45 days, the pre-jitter constant, while the
+// jitter stream is still drawn once per release. The race core must then match
+// HEAD 43d677c bit for bit (seeds 1-50): drawing the cooldown perturbs no other
+// stream. Fingerprint derived on HEAD 43d677c with this exact function.
+const PRE_JITTER_CORE_SHA256 = '45769e9b8c21a364fff50d0972fe6c7c588054169c2a4f830583884a0f745340';
+function coreFingerprint(seeds, setup = () => {}) {
+    const h = createHash('sha256');
+    for (let seed = 1; seed <= seeds; seed++) {
+        const race = createRaceState(seed);
+        setup(race);
+        for (let d = 0; d < 1008; d++) {
+            const tr = advanceRace(race);
+            const cap = race.capability;
+            const labs = ['halcyon', 'tianxia', 'polaris'].map(id => {
+                const l = cap.labs[id];
+                return [l.active, l.C_internal, l.C_released, l.releaseCount, Number.isFinite(l.lastReleaseDay) ? l.lastReleaseDay : null];
+            });
+            h.update(JSON.stringify([seed, race.day, labs, cap.open.C, race.safety, race.heat, race.theftCount,
+                tr.releases.length, tr.certifications.length, tr.incidents.occurred.length, tr.incidents.detected.length,
+                tr.theftDisclosures.length]) + '\n');
+        }
+    }
+    return h.digest('hex');
+}
+let jitterIsolationPass;
+{
+    const saved = { lo: RACE_TUNING.releaseCooldownMin, hi: RACE_TUNING.releaseCooldownMax };
+    RACE_TUNING.releaseCooldownMin = RACE_TUNING.releaseCooldownMax = 45;
+    jitterIsolationPass = coreFingerprint(50) === PRE_JITTER_CORE_SHA256;
+    RACE_TUNING.releaseCooldownMin = saved.lo; RACE_TUNING.releaseCooldownMax = saved.hi;
+}
+
+/** Week-of-cycle excess: each bin over the weekly mean, minus one. */
+function weekExcess(bins) {
+    const m = bins.reduce((a, b) => a + b, 0) / bins.length;
+    return bins.map(x => m > 0 ? x / m - 1 : 0);
+}
+const claimExcess = weekExcess(claimWeeks), claimExcessAct1 = weekExcess(claimWeeksAct1), releaseExcess = weekExcess(releaseWeeks);
+
 /** Leader = per-run argmax C_internal across active labs + open (no hardcoded Halcyon). */
 function leaderInternal(race) {
     const cap = race.capability;
@@ -254,7 +348,7 @@ function frontierCrossed(cap, r) {
 
 const line = (s = '') => console.log(s);
 line(`race-mc: N=${N}, base seed=${BASE_SEED}, horizon=${HORIZON}d, ${elapsed}s`);
-line(`tuned proliferation triple (RACE_TUNING): releaseCooldown=${RACE_TUNING.releaseCooldown}d, `
+line(`tuned proliferation triple (RACE_TUNING): releaseCooldown=U(${RACE_TUNING.releaseCooldownMin}, ${RACE_TUNING.releaseCooldownMax})d, `
     + `prolifInc=${RACE_TUNING.prolifInc}, prolifCap=${RACE_TUNING.prolifCap} `
     + `(cap needs ${T_CAP.toFixed(1)} Tianxia releases)`);
 line('='.repeat(70));
@@ -341,6 +435,17 @@ line(`  published/run mean ${f2(mean(evPublished))}   (02a ratified cadence ~40 
 line('\nSubstream isolation (incidents ON vs OFF, ' + ISO_SEEDS + ' seeds)');
 line(`  capability + theft trajectories bit-identical: ${isolationPass ? 'PASS' : 'FAIL'}`);
 
+const pctSigned = x => (x >= 0 ? '+' : '') + (100 * x).toFixed(0) + '%';
+line('\nRelease jitter (02a "Demonstrations"): week of the 63-day cycle, excess over the weekly mean');
+line(`  releases          ${releaseExcess.map(pctSigned).join(' ')}`);
+line(`  claims            ${claimExcess.map(pctSigned).join(' ')}   (n=${claimWeeks.reduce((a, b) => a + b, 0)})`);
+line(`  claims, Act I     ${claimExcessAct1.map(pctSigned).join(' ')}   (released frontier <= R2 before the claim; diagnostic)`);
+line(`  days 42-48: claims ${pctSigned(claimExcess[6])}, Act I slice ${pctSigned(claimExcessAct1[6])} (HEAD 43d677c: +58% and +128% at N=1000)`);
+line(`  zero width reproduces HEAD 43d677c's race core (seeds 1-50): ${jitterIsolationPass ? 'PASS' : 'FAIL'}`);
+
+line('\nPolaris rounds: the nominal schedule vs the old clock');
+line(`  ${roundsChecked} spawned worlds, ${roundsTotal} rounds, ${roundsMismatch} world(s) whose rounds moved`);
+
 // ---- Calibration PASS/MISS against 02a targets ---------------------------
 
 line('\n' + '='.repeat(70));
@@ -390,6 +495,20 @@ checkVal('incident early cadence (d)', eIA, '~13d', OCC_EARLY_TARGET * 0.65, OCC
 // Substream isolation is a hard invariant.
 line(`  ${'substream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(isolationPass ? 'yes' : 'no').padStart(6)}    ${isolationPass ? 'PASS' : 'MISS'}`);
 if (!isolationPass) allPass = false;
+// Release jitter (02a "Demonstrations"): the claim excess in days 42-48 falls
+// below 25%, and the jitter's draw perturbs no other stream.
+{
+    const pass = claimExcess[6] < 0.25;
+    if (!pass) allPass = false;
+    line(`  ${'claim excess, days 42-48'.padEnd(28)} ${'<25%'.padStart(6)}   ${pctSigned(claimExcess[6]).padStart(6)}    ${pass ? 'PASS' : 'MISS'}`);
+}
+line(`  ${'jitter stream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(jitterIsolationPass ? 'yes' : 'no').padStart(6)}    ${jitterIsolationPass ? 'PASS' : 'MISS'}`);
+if (!jitterIsolationPass) allPass = false;
+{
+    const pass = roundsMismatch === 0 && roundsChecked > 0;
+    if (!pass) allPass = false;
+    line(`  ${'Polaris rounds unmoved'.padEnd(28)} ${'0 moved'.padStart(6)}   ${String(roundsMismatch).padStart(6)}    ${pass ? 'PASS' : 'MISS'}   (of ${roundsChecked} worlds, ${roundsTotal} rounds)`);
+}
 
 line('='.repeat(70));
 line(allPass ? 'ALL CALIBRATION TARGETS PASS' : 'ONE OR MORE TARGETS MISS -- see above');
