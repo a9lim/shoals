@@ -1119,6 +1119,7 @@ function _resume(data) {
         console.error('[shoals] the saved run did not replay; a new run begins.', e);
         _replaying = false;
         try { localStorage.removeItem(SAVE_KEY); } catch { /* storage unavailable */ }
+        _toast('Your saved run couldn’t be replayed in this browser. A new run begins.', 6000);
         return false;
     }
     _replaying = false;

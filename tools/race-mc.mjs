@@ -606,7 +606,7 @@ const pctSigned = x => (x >= 0 ? '+' : '') + (100 * x).toFixed(0) + '%';
 line('\nRelease jitter (02a "Demonstrations"): week of the 63-day cycle, excess over the weekly mean');
 line(`  releases          ${releaseExcess.map(pctSigned).join(' ')}`);
 line(`  claims            ${claimExcess.map(pctSigned).join(' ')}   (n=${claimWeeks.reduce((a, b) => a + b, 0)})`);
-line(`  claims, Act I     ${claimExcessAct1.map(pctSigned).join(' ')}   (released frontier <= R2 before the claim; diagnostic)`);
+line(`  claims, Act I     ${claimExcessAct1.map(pctSigned).join(' ')}   (released frontier <= R2 before the claim; gated)`);
 line(`  days 42-48: claims ${pctSigned(claimExcess[6])}, Act I slice ${pctSigned(claimExcessAct1[6])} (HEAD 43d677c: +58% and +128% at N=1000)`);
 line(`  zero width reproduces HEAD 43d677c's race core (seeds 1-50): ${jitterIsolationPass ? 'PASS' : 'FAIL'}`);
 
@@ -685,12 +685,12 @@ checkVal('incident early cadence (d)', eIA, '~13d', OCC_EARLY_TARGET * 0.65, OCC
 // Substream isolation is a hard invariant.
 line(`  ${'substream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(isolationPass ? 'yes' : 'no').padStart(6)}    ${isolationPass ? 'PASS' : 'MISS'}`);
 if (!isolationPass) allPass = false;
-// Release jitter (02a "Demonstrations"): the claim excess in days 42-48 falls
-// below 25%, and the jitter's draw perturbs no other stream.
+// Release jitter (02a "Demonstrations"): the Act I claim excess in days 42-48
+// falls below 25%, and the jitter's draw perturbs no other stream.
 {
-    const pass = claimExcess[6] < 0.25;
+    const pass = claimExcessAct1[6] < 0.25;
     if (!pass) allPass = false;
-    line(`  ${'claim excess, days 42-48'.padEnd(28)} ${'<25%'.padStart(6)}   ${pctSigned(claimExcess[6]).padStart(6)}    ${pass ? 'PASS' : 'MISS'}`);
+    line(`  ${'Act I claim excess, d 42-48'.padEnd(28)} ${'<25%'.padStart(6)}   ${pctSigned(claimExcessAct1[6]).padStart(6)}    ${pass ? 'PASS' : 'MISS'}`);
 }
 line(`  ${'jitter stream isolation'.padEnd(28)} ${'ident.'.padStart(6)}   ${(jitterIsolationPass ? 'yes' : 'no').padStart(6)}    ${jitterIsolationPass ? 'PASS' : 'MISS'}`);
 if (!jitterIsolationPass) allPass = false;

@@ -292,11 +292,12 @@ let totalCauses = 0;
 // crossed, certDay] for R2-R5}` per completed day after stepBelief, before
 // checkResolution. First derived 2026-10-25 (1d36daa9...). Re-derived
 // 2026-10-27 on the release jitter's worlds (02a "Demonstrations"): the same
-// procedure, the race of this tree, 28718 days; the old rule on the new worlds
-// and the current rule agree. A procedure check on HEAD 43d677c's worlds
+// procedure, the race of this tree, 28769 days at U(30, 60) (dcb1044b... at the
+// first width, U(35, 55)); the old rule on the new worlds and the current rule
+// agree. A procedure check on HEAD 43d677c's worlds
 // reproduced 1d36daa9... first. Demonstrations move no world and the rule
 // doesn't read them, so they leave it unchanged.
-const RULE_TRAJECTORY_SHA256 = 'dcb1044be84f135755097121b711a9f2bb24bcfcdaaf470a5654dc7e6fd57887';
+const RULE_TRAJECTORY_SHA256 = '642c5eba4823ff8052aae4e70aef6d99d4a916e0a3f03dc6a3183b1caab71a18';
 let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
 {
     const state = () => JSON.stringify([2, 3, 4, 5].map(R => [belief.rungs[R].m, belief.rungs[R].w, belief.rungs[R].crossed, belief.rungs[R].certDay]));
