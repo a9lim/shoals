@@ -755,7 +755,7 @@ function _table() {
         // Locked: the latest lock per rung, conditioned on today like the market's
         // beside it. A rung the lock read as followed is the market's (02a).
         const lock = race && belief.active ? latestLock() : null;
-        const locked = !lock ? '—' : lock.classes[R] === 'followed' && !cert ? 'Market' /* PROSE */ : med(_law(R, t0, lock.curves[R]));
+        const locked = !lock ? '—' : lock.classes[R] === 'followed' && !cert ? 'Market' : med(_law(R, t0, lock.curves[R]));
         // The standing policy as the canvas reads it: a followed rung, the market's day.
         const draft = race && belief.active && !_st.ended ? draftCurves() : null;
         const drawn = draft && law ? (draftPolicy()[R] === 'carry' ? _law(R, t0, draft[R]) : law) : null;

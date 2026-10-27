@@ -590,10 +590,10 @@ function _executeDeferred(entry) {
         const res = _reduceLeg(p, mult);
         if (res.status === 'filled') {
             _develop('fill');
-            _toast('Closed ' + (Math.round(res.qty * 100) / 100) + 'k ' + p.desc + '.', 3000);   /* PROSE */
+            _toast('Closed ' + (Math.round(res.qty * 100) / 100) + 'k ' + p.desc + '.', 3000);
             _haptic('success');
         } else if (res.status === 'reversed') {
-            _toast('Working close skipped — ' + p.desc + ' changed sides inside the window.', 4000);   /* PROSE */
+            _toast('Working close skipped — ' + p.desc + ' changed sides inside the window.', 4000);
         } else if (res.status === 'gone') {
             _toast('Working close expired — the position closed without you.', 4000);
         } else {
@@ -789,10 +789,10 @@ function _sendFlatten(legs) {
         else skipped.push(L.desc);
     }
     const parts = [];
-    if (cancelled) parts.push(`${cancelled} order${cancelled > 1 ? 's' : ''} cancelled`);   /* PROSE */
+    if (cancelled) parts.push(`${cancelled} order${cancelled > 1 ? 's' : ''} cancelled`);
     if (ok) parts.push(legs.length === 1 ? 'filled' : `${ok} leg${ok > 1 ? 's' : ''} filled`);
     if (deferred) parts.push(`${deferred} working`);
-    if (skipped.length) parts.push(`nothing left to close: ${skipped.join(', ')}`);   /* PROSE */
+    if (skipped.length) parts.push(`nothing left to close: ${skipped.join(', ')}`);
     if (failed.length) parts.push(`rejected (margin, or the contract closed): ${failed.join(', ')}`);
     const msg = parts.join('; ') || 'Nothing traded';
     _toast(msg.charAt(0).toUpperCase() + msg.slice(1) + '.', failed.length ? 5000 : 3000);

@@ -247,8 +247,6 @@ Carried forward from this section:
   40 days, so the skip reads as "the next few days". A threshold scaled
   to the book's own daily volatility is the likely fix; it waits on a9's
   play-test.
-- **Prose to ratify**: the four memos and their archived reports, the
-  obligation and quarter-close lines, and the flatten's ticket lines.
 
 ## 2. One chain, end to end
 

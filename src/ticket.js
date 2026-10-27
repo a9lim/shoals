@@ -228,7 +228,7 @@ export function loadFlatten(legs, off, orders = 0) {
     _st.size = 1;
     const el = _st.el['tk-size'];
     if (el) { el.value = 1; _forms.updateSliderFill(el); _st.el['tk-size-val'].textContent = '1k'; }
-    _say(`Loaded the flatten, ${legs.length} leg${legs.length === 1 ? '' : 's'}.`);   /* PROSE */
+    _say(`Loaded the flatten, ${legs.length} leg${legs.length === 1 ? '' : 's'}.`);
     _changed();
 }
 
@@ -544,7 +544,7 @@ function _renderControls() {
     const named = !!_st.name.trim();
     const cancelOnly = !!_st.flat && !_st.legs.length && _st.flat.orders > 0;
     el['tk-trade'].disabled = !_st.legs.length && !cancelOnly;
-    el['tk-trade'].textContent = cancelOnly ? `Cancel ${_st.flat.orders} order${_st.flat.orders > 1 ? 's' : ''}`   /* PROSE */
+    el['tk-trade'].textContent = cancelOnly ? `Cancel ${_st.flat.orders} order${_st.flat.orders > 1 ? 's' : ''}`
         : !_st.legs.length ? 'Trade'
         : _st.order !== 'market' ? `Place ${_st.order} order`
         : named && _strategyable() && !_st.flat ? `Trade ${_st.size}k ${_st.name.trim()}`
@@ -586,14 +586,14 @@ function _renderFlattenCost() {
         const est = estimateReduceOnly(legs, market.S, market.sigma, s.r, s.day, s.q, mult);
         for (const id of est.blocked) { const L = legs.find(l => l.posId === id); if (L) blocked.push(L.desc); }
         const money = (v) => (v < -0.005 ? '−' : '') + fmtDollar(Math.abs(v));
-        parts.push(`Cost <b>${money(est.cost)}</b> · releases <b>${money(est.released)}</b>`);   /* PROSE */
+        parts.push(`Cost <b>${money(est.cost)}</b> · releases <b>${money(est.released)}</b>`);
     }
     const esc = (t) => t.replace(/[<&]/g, (c) => (c === '<' ? '&lt;' : '&amp;'));
     if (_st.flat.off.length) {
-        parts.push(`<span class="tk-off">Not on the ticket: ${esc(_st.flat.off.join(', '))}.</span>`);   /* PROSE */
+        parts.push(`<span class="tk-off">Not on the ticket: ${esc(_st.flat.off.join(', '))}.</span>`);
     }
     if (blocked.length) {
-        parts.push(`<span class="tk-off">Not tradeable now: ${esc(blocked.join(', '))}.</span>`);   /* PROSE */
+        parts.push(`<span class="tk-off">Not tradeable now: ${esc(blocked.join(', '))}.</span>`);
     }
     el['tk-cost'].innerHTML = parts.join('<br>');
 }
