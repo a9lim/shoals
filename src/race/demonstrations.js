@@ -49,9 +49,6 @@ const TOP_RUNG = 4;        // R5's internal crossing resolves the world
 // is the timeout's headless extrapolation, which the record never sees.
 const LIVE_HORIZON = 1008;
 
-/** Statuses a demonstration report can hold (02a "The chain's reports"). */
-export const DEMO_STATUS = Object.freeze(['standing', 'disputed', 'upheld', 'narrowed', 'withdrawn']);
-
 /** Fresh per-run hidden state. */
 export function freshDemonstrationState() {
     return {
@@ -69,7 +66,10 @@ function claimedRung(lab) {
     return 0;
 }
 
-/** Polaris is in a funding window when a nominal round falls in the next 42 days. */
+/** Polaris is in a funding window when a nominal round falls in the next 42 days.
+ *  INTERPRETATION: "the 42 trading days before a scheduled round" are the
+ *  publication days s - 42 .. s - 1; a round's own close is outside (its
+ *  demonstrations would precede the round within that close). */
 function inFundingWindow(state, day) {
     if (!state.polarisRounds) return false;
     return state.polarisRounds.some(s => s > day && s <= day + DEMO_TUNING.fundingWindow);
@@ -220,6 +220,8 @@ export function stepDemonstrations(race, tr, day, endDay) {
         const phi = funding ? T.fundingPhi : T.phi;
         const reach = C >= k ? 1 : C >= k - T.band ? phi : 0;
         if (reach === 0) continue;
+        // A hazard per day: the day's probability is 1 - exp(-lambda), as the
+        // theft and incident hazards read theirs.
         const lambda = T.lambda0 * reach * (funding ? T.fundingF : 1);
         if (rng.next() < 1 - Math.exp(-lambda)) rows.push(publish(state, rng, labId, lab, k, endDay));
     }
