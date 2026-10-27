@@ -2051,6 +2051,7 @@ function _triggerGameOver(endingId) {
     let resolution = null, closeout = null, overlay = 'bystander';
     if (raceState) {
         const geo = eventEngine ? eventEngine.world.geopolitical : null;
+        const deskDay = raceState.day;                    // the desk's last day, before any extrapolation
         resolution = resolveNow(raceState, geo);          // existing record, or extrapolate + latch (freezeLedger first)
         // The outstanding quarter (02a "Scoring"): the unscored lock is scored once,
         // against its original end date and the completed trajectory; the
@@ -2062,11 +2063,11 @@ function _triggerGameOver(endingId) {
         // Personal overlay (surface the mapping; the epilogue picks slots, not tone).
         overlay = determineOverlay(endingId, ledgerTotals(), _dP, _firmVerdictFired);
         const fixture = dealtFixture() ? dealtFixture().id : null;
-        // INTERPRETATION: the record's terminal day and cause are the resolution's
-        // (day, terminalCause); the desk's own ending (natural or an ejection) rides
-        // beside them as `ending`.
+        // The record keeps both clocks: the desk's last day and its ending (natural or
+        // an ejection), and the world's resolution day and cause, which an
+        // extrapolation can carry past the desk.
         _almanacRecord = buildAlmanacRecord({
-            race: raceState, resolution, overlay, ending: endingId, fixture,
+            race: raceState, resolution, overlay, ending: endingId, deskDay, fixture,
             player: forecastRecord(), copier: copierRecord(),
         });
     }

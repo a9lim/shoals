@@ -43,11 +43,13 @@ function _scored(rec) {
 
 /**
  * Build one run's record. `race` gives the seed and the sampler's draws (read
- * only once the run has ended); `resolution` the family, terminal day and cause;
- * `ending` the desk's own ending (natural or an ejection); `fixture` the opening
- * hand's id, or null; `player` and `copier` the two scored records.
+ * only once the run has ended); `resolution` the family, the world's terminal
+ * day and cause; `ending` and `deskDay` the desk's own ending (natural or an
+ * ejection) and its last day, which an extrapolated resolution runs past;
+ * `fixture` the opening hand's id, or null; `player` and `copier` the two scored
+ * records.
  */
-export function buildAlmanacRecord({ race, resolution, overlay, ending, fixture = null, player, copier }) {
+export function buildAlmanacRecord({ race, resolution, overlay, ending, deskDay = null, fixture = null, player, copier }) {
     const h = race.hidden;
     return {
         seed: race.seed,
@@ -58,6 +60,7 @@ export function buildAlmanacRecord({ race, resolution, overlay, ending, fixture 
         cause: resolution ? resolution.terminalCause : null,
         extrapolated: resolution ? !!resolution.extrapolated : false,
         ending: ending ?? null,
+        deskDay: deskDay ?? null,
         draws: {
             tau: h.tau, takeoffSharpness: h.takeoffSharpness, scalingElasticity: h.scalingElasticity,
             chinaPosition: h.chinaTrue.position, chinaVelocity: h.chinaTrue.velocity, dealPossible: h.chinaTrue.dealPossible,

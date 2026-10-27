@@ -429,13 +429,19 @@ function _diffPositionRows(container, positions, S, vol, rate, day, q) {
 }
 
 function _diffOrderRows(container, orders, day) {
-    const currentIds = new Set(orders.map(o => String(o.id)));
+    // A row belongs to one order object, as a position row does: order ids also
+    // restart at every reset, and a new hand's working order may reuse the old one's.
+    const live = new Map(orders.map(o => [String(o.id), o]));
     for (const row of container.querySelectorAll('[data-order-id]')) {
-        if (!currentIds.has(row.dataset.orderId)) row.remove();
+        if (live.get(row.dataset.orderId) !== row._order) row.remove();
     }
     // Orders don't change once placed, so only new ones are built.
     for (const order of orders) {
         const orderId = String(order.id);
-        if (!container.querySelector('[data-order-id="' + orderId + '"]')) container.appendChild(_buildOrderRow(order, day));
+        if (!container.querySelector('[data-order-id="' + orderId + '"]')) {
+            const row = _buildOrderRow(order, day);
+            row._order = order;
+            container.appendChild(row);
+        }
     }
 }

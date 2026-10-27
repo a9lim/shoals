@@ -646,10 +646,21 @@ function _wireEditor() {
         if (dr) {
             if (dr.plateau) setDraftPlateau(dr.R, (dr.y0 - y) / dr.G);
             else {
-                // Across for the median, up and down for the width, from where the drag began.
+                // The first move carries a followed rung (its copy clamped between its
+                // carried neighbours), and the drag runs from that copy. Across moves the
+                // median, up and down the width, each only once the pointer has moved
+                // that way: a width drag moves no neighbour (02a "The standing policy").
+                if (!dr.carried) {
+                    dr.carried = true;
+                    _carryFirst(dr.R);
+                    const c = draftCurves()[dr.R];
+                    dr.m0 = c.m; dr.w0 = c.w;
+                }
+                dr.across = dr.across || x !== dr.x;
+                dr.along = dr.along || y !== dr.y;
                 const perPx = HORIZON / Math.max(1, _st.geom.R0 - _st.geom.L0);
-                setDraftMedian(dr.R, dr.m0 + (x - dr.x) * perPx);
-                setDraftWidth(dr.R, dr.w0 * Math.exp((y - dr.y) / EDIT_W_PX));
+                if (dr.across) setDraftMedian(dr.R, dr.m0 + (x - dr.x) * perPx);
+                if (dr.along) setDraftWidth(dr.R, dr.w0 * Math.exp((y - dr.y) / EDIT_W_PX));
             }
             drawRace();
             return;
@@ -681,11 +692,22 @@ function _wireEditor() {
  * like the thumbs of a multi-thumb slider, letting focus leave past either end;
  * Home and End choose the first and last.
  */
+const _EDIT_KEYS = new Set(['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown', 'PageUp', 'PageDown']);
+
+/** Carry a followed rung without changing it: a width edit to its own width
+ *  copies and clamps the projection and moves no neighbour. */
+function _carryFirst(R) {
+    if (draftPolicy()[R] !== 'carry') setDraftWidth(R, draftCurves()[R].w);
+}
+
 function _editKey(e) {
     if (!_editable()) return;
-    const d = draftCurves();
     const R = _st.sel, open = openRungs();
-    if (!d || !d[R]) return;
+    if (!draftCurves() || !draftCurves()[R]) return;
+    // An edit key on a followed rung carries it first, so the step runs from the
+    // clamped copy rather than the projection.
+    if (_EDIT_KEYS.has(e.key)) _carryFirst(R);
+    const d = draftCurves();
     if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
         setDraftMedian(R, d[R].m + (e.key === 'ArrowRight' ? 1 : -1) * (e.shiftKey ? EDIT_STEP_BIG : EDIT_STEP));
     } else if (e.key === 'ArrowUp') setDraftWidth(R, d[R].w / EDIT_W_STEP);

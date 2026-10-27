@@ -1818,10 +1818,11 @@ export function forcedSaleQuote(pos, currentPrice, currentVol, currentRate, curr
     if (pos.type === 'binary') {
         const quote = getBinaryQuote(pos.strike);
         if (!quote) return 0;
-        // INTERPRETATION: binary execution (executeBinaryTrade) applies no regulation
-        // spread multiplier, so the quote that sizes a slice applies none either: an
-        // executable quote is what the fill pays.
-        const px = Math.max(0, Math.min(1, quote.mid - (quote.mid - quote.bid) * FORCED_SALE_SPREAD_MULT));
+        // 02a's forced-sale quote carries the regulation multiplier for every
+        // instrument, Consensus included, though an ordinary binary trade applies none;
+        // the forced close fills at this quote.
+        const sMult = getRegulationEffect('spreadMult', 1) * FORCED_SALE_SPREAD_MULT;
+        const px = Math.max(0, Math.min(1, quote.mid - (quote.mid - quote.bid) * sMult));
         return px * BINARY_NOTIONAL;
     }
     const mid = unitPrice(pos.type, currentPrice, currentVol, currentRate, currentDay, pos.strike, pos.expiryDay, q);

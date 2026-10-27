@@ -29,7 +29,7 @@ import * as book from '../src/portfolio.js';
 import { unitPrice } from '../src/position-value.js';
 import { resetImpactState, rehedgeMM, baselineMMHedge, getStockImpact, getBondImpact, getVxhcnImpact } from '../src/price-impact.js';
 import { createRaceState, advanceRace } from '../src/race/race-state.js';
-import { consensus, initConsensus, setBinaryQuoteSource, refreshBinaryQuotes, BINARY_NOTIONAL } from '../src/race/consensus.js';
+import { consensus, initConsensus, setBinaryQuoteSource, refreshBinaryQuotes, getBinaryQuote, BINARY_NOTIONAL } from '../src/race/consensus.js';
 import { initComputeMarket, setComputePriceSource, refreshComputeQuotes } from '../src/race/compute-market.js';
 import { initBelief, binaryQuoteFromBelief, computeCurveFromBelief } from '../src/race/belief.js';
 import { initValuation } from '../src/race/valuation.js';
@@ -331,15 +331,16 @@ const seatAtMark = (type, qty, strike, expiryDay) =>
     const bin = book.seatPosition('binary', 10, 1, sim.day, key, consensus.contracts[0].deadline);
     consensus.quotes[key] = { bid: 0, ask: 0.02, mid: 0.01, settled: false, frozen: false };
     check('G: a chassis quote floors at $0.01 and a Consensus quote at 0', quote(cheap) === 0.01 && quote(bin) === 0);
-    // The regulation multiplier widens chassis quotes; binaries execute without it.
+    // The regulation multiplier widens every forced-sale quote, Consensus included.
     boot(BASE_SEED); freshBook();
     const st = seatAtMark('stock', 10);
     const b2 = book.seatPosition('binary', 10, 50, sim.day, key, consensus.contracts[0].deadline);
     const qs = quote(st), qb = quote(b2);
     activateRegulation('transaction_tax');
     const mid = unitPrice('stock', sim.S, market.sigma, sim.r, sim.day);
-    check('G: the regulation multiplier widens the chassis quote, x3 on top of it',
-        near(mid - quote(st), (mid - qs) * 1.5, 1e-9) && quote(b2) === qb
+    const bq = getBinaryQuote(key), bmid = bq.mid * BINARY_NOTIONAL;
+    check('G: the regulation multiplier widens every forced-sale quote, x3 on top of it',
+        near(mid - quote(st), (mid - qs) * 1.5, 1e-9) && near(bmid - quote(b2), (bmid - qb) * 1.5, 1e-9)
         && near(mid - qs, mid * 0.001 * (1 + market.sigma) * FORCED_SALE_SPREAD_MULT, 1e-9));
     resetRegulations();
 }
