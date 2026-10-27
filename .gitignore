@@ -27,3 +27,7 @@ Thumbs.db
 # Reader refit diagnostics (compact fit report remains tracked)
 tools/reader-fit-detail.json
 tools/reader-test-report.json
+
+# Engine worlds (tools/engine-worlds.mjs): one cached file per world, keyed by
+# rules version and reader hash; regenerated on demand
+.cache/

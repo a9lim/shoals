@@ -20,7 +20,8 @@ import { spawn } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { createHash } from 'node:crypto';
 import { RECORD_SCHEMA, FEATURE_NAMES, READER_CLOCK_DAYS, readerCalibrationDays, RULE_HAZARD_FLOOR } from '../src/race/public-record.js';
-import { INPUT_SCHEDULE, runReaderWorld, encodeSample } from './reader-data.mjs';
+import { WORLD_SCENARIOS, runReaderWorld, samplesFromRows, encodeSample, SAMPLE_LAYOUT } from './reader-data.mjs';
+import { ensureEngineWorlds, loadEngineWorld, engineKey } from './engine-worlds.mjs';
 
 const args = process.argv.slice(2), option = name => args.includes(name) ? args[args.indexOf(name) + 1] : null;
 const stage = option('--stage') || 'all';
@@ -29,17 +30,26 @@ const reused = option('--reuse-data');
 const dir = resolve(reused || option('--work') || mkdtempSync(join(tmpdir(), 'shoals-reader-')));
 mkdirSync(dir, { recursive: true });
 const t0 = performance.now();
-const meta = { schema: RECORD_SCHEMA, schedule: INPUT_SCHEDULE, features: FEATURE_NAMES, clockDays: READER_CLOCK_DAYS, hazardFloor: RULE_HAZARD_FLOOR, splits: {
+const meta = { schema: RECORD_SCHEMA, scenarios: WORLD_SCENARIOS, features: FEATURE_NAMES, layout: SAMPLE_LAYOUT, clockDays: READER_CLOCK_DAYS, hazardFloor: RULE_HAZARD_FLOOR, splits: {
     train: [1000001, 1008000], validation: [2000001, 2002000], test: 'base 1, never read by the fit',
-}, calibrationDays: Object.fromEntries([2,3,4,5].map(R=>[R,readerCalibrationDays(R)])), sampleMaskColumn:169, minCalibrationWorlds: 200, minCalibrationEvents: 5,
+}, calibrationDays: Object.fromEntries([2,3,4,5].map(R=>[R,readerCalibrationDays(R)])), sampleMaskColumn: SAMPLE_LAYOUT.mask, minCalibrationWorlds: 200, minCalibrationEvents: 5,
     lambdas: [1e-9, 1e-8, 1e-7, 1e-6, 1e-5], maxIterations: 2500 };
+const scenarioOf = (seed, lo) => (seed - lo) % 2 === 0 ? 'neutral' : 'engine';
 if (!reused) {
+    // 02a "Demonstrations" (The refit): half the worlds neutral, half engine,
+    // alternating by world index. Engine worlds come from the cache (priced by
+    // the reader in place when they were generated); their samples are read off
+    // the stored rows, so this schema's features need no new world.
+    meta.engineWorlds = engineKey();
     for (const [split, [lo, hi]] of Object.entries(meta.splits).filter(([key]) => key !== 'test')) {
+        const engine = [];
+        for (let seed = lo; seed <= hi; seed++) if (scenarioOf(seed, lo) === 'engine') engine.push(seed);
+        await ensureEngineWorlds(engine);
         const path = join(dir, `${split}.bin`); writeFileSync(path, '');
         let rows = 0, columns = 0;
         for (let seed = lo; seed <= hi; seed++) {
-            const scenario = (seed - lo) % 2 === 0 ? 'neutral' : 'markov';
-            const w = runReaderWorld(seed, scenario);
+            const scenario = scenarioOf(seed, lo);
+            const w = scenario === 'neutral' ? runReaderWorld(seed, scenario) : samplesFromRows(loadEngineWorld(seed));
             // 02a: masks distinguish grid, seed-offset, explicit role knots and
             // family diagnostics; coincident days share one public snapshot.
             const samples = [...new Map([...w.samples, ...w.diagnostics].map(s=>[s.day,s])).values()].sort((a,b)=>a.day-b.day);
@@ -81,12 +91,12 @@ if (['legible','full'].some(set => result.models.family?.[set]?.acts?.length !==
 const runMeta = JSON.parse(readFileSync(join(dir, 'meta.json'), 'utf8'));
 if (runMeta.schema !== RECORD_SCHEMA || JSON.stringify(runMeta.features) !== JSON.stringify(FEATURE_NAMES)) throw new Error('Stale fitting data: regenerate for the current schema');
 const fixed = (_key, v) => typeof v === 'number' ? Number(v.toPrecision(7)) : v;
-const provenance = 'tools/reader-fit.mjs; train 1000001–1008000; validation 2000001–2002000; no test data; single-thread deterministic L-BFGS-B hazards/softmax; dual grid/seed-offset hazard samples; training-only grid plus role-knot segmented hazard moment matching, one-sided scale-space interpolation, pooled prior';
+const provenance = 'tools/reader-fit.mjs; train 1000001–1008000; validation 2000001–2002000; neutral and engine worlds alternating; no test data; single-thread deterministic L-BFGS-B hazards/softmax; dual grid/seed-offset hazard samples; training-only grid plus role-knot segmented hazard moment matching, one-sided scale-space interpolation, pooled prior';
 const constants = JSON.parse(JSON.stringify({ schema: RECORD_SCHEMA, provenance,
-    schedule: { stream: INPUT_SCHEDULE.stream, ranges: INPUT_SCHEDULE.ranges, dailyMoveProbability: INPUT_SCHEDULE.dailyMoveProbability,
-        summary: 'Half neutral, half clamped symmetric Markov; all start at zero; straitTension(geo); timeout freezes tension/export, uses treatyStage 0 per checkResolution.' },
+    worlds: { scenarios: WORLD_SCENARIOS.scenarios, engineWorlds: runMeta.engineWorlds,
+        summary: 'Half neutral (no inputs), half engine (bystander headless Dynamic runs; the event engine moves the inputs), alternating by world index.' },
     bases: result.bases, models: result.models }, fixed));
-const report = { schema: RECORD_SCHEMA, provenance, schedule: INPUT_SCHEDULE, splits: runMeta.splits, ...result.report };
+const report = { schema: RECORD_SCHEMA, provenance, scenarios: WORLD_SCENARIOS, engineWorlds: runMeta.engineWorlds, splits: runMeta.splits, ...result.report };
 report.fitExecution = { regeneratedData: !reused, reusedFit: args.includes('--reuse-fit'), resumedCandidates: args.includes('--resume'), reusedHeads: !!option('--reuse-heads'),
     optimizerMode: result.report.provenanceMode ?? (result.report.reusedHeads ? 'explicit raw-head reuse' : 'raw heads fit from fixed initialization') };
 report.priorInformation = 'Clock/rung only, including the claim-state-pooled calibration stage; no claimed input or routing.';
@@ -138,7 +148,7 @@ report.nesting = 'Information contract: legible rung laws depend only on raw rul
 report.scenarios = {};
 const pooledEntries = [], pooledFamilyRows = [];
 let bestUpper = 0;
-for (const scenario of INPUT_SCHEDULE.scenarios) {
+for (const scenario of WORLD_SCENARIOS.scenarios) {
     console.log(`Validation metrics and challengers: ${scenario}`);
     const sub = samples.filter(s => s.scenario === scenario), entries = quarterEntries(sub, constants);
     const metrics = quarterMetrics(entries), challengers = challengerMetrics(entries);

@@ -21,7 +21,8 @@
 
    Worlds run the reader's training loop (tools/reader-data.mjs:
    advanceRace + stepControlRegime + stepTreaty + checkResolution
-   on the assumed input schedule), N per scenario. As for the
+   on the world's inputs), N per scenario: neutral, and engine (a
+   bystander run's input tape, tools/engine-worlds.mjs). As for the
    reader, the legible gates run on the scenario mixture and the
    full and pooled gates per scenario. Every series is the stopped
    process: once a world ends (resolution or the term), V is its
@@ -46,7 +47,8 @@ import {
 } from '../src/race/valuation.js';
 import { CLOSEOUT_TUNING, hcnTerminalMark, closeoutBook, closeoutUnitValue } from '../src/race/closeout.js';
 import { PRESETS, STOCKBOND_SPREAD_PCT } from '../src/config.js';
-import { inputSchedule } from './reader-data.mjs';
+import { WORLD_SCENARIOS, worldInputs, stepWorld } from './reader-data.mjs';
+import { ensureEngineWorlds } from './engine-worlds.mjs';
 
 // ---- CLI + assertion plumbing ------------------------------------------
 const argv = process.argv.slice(2);
@@ -217,7 +219,8 @@ const T = VALUATION_TUNING;
 }
 
 // ---- C/G/D. The ensemble -------------------------------------------------
-const SCENARIOS = ['neutral', 'markov'];
+const SCENARIOS = WORLD_SCENARIOS.scenarios;
+await ensureEngineWorlds([...Array.from({ length: N }, (_, i) => (BASE_SEED + i) >>> 0), ...Array.from({ length: 6 }, (_, i) => (BASE_SEED + 9100 + i) >>> 0)]);
 const t0 = Date.now();
 const gaps = [], day0 = [];
 const rows = [];       // every 21-day snapshot while live
@@ -228,7 +231,7 @@ const LEG = FEATURE_NAMES.family.legible.length;
 /** One world on the reader's loop (mirrors tools/reader-data.mjs runReaderWorld,
  *  with the inputs handed to stepBelief so B's record carries them). */
 function runWorld(seed, scenario, wi, perDay = null, feed = null) {
-    const race = createRaceState(seed), schedule = inputSchedule(seed, scenario);
+    const race = createRaceState(seed), schedule = worldInputs(seed, scenario);
     initConsensus(race); initBelief(race); initValuation(race);
     const V0 = lastValuation();
     let inputs = null, product = 1, endDay = null;
@@ -245,8 +248,7 @@ function runWorld(seed, scenario, wi, perDay = null, feed = null) {
     if (!perDay) take();
     for (let d = 0; d < HORIZON && !race.resolution; d++) {
         inputs = schedule();
-        advanceRace(race, { straitTension: inputs.straitTension, exportControlStage: inputs.exportControlStage });
-        stepControlRegime(race); stepTreaty(race, { treatyStage: inputs.treatyStage });
+        stepWorld(race, inputs);
         // The corruption probe feeds the same corrupted copy to the belief step and
         // to the valuation step, so a hidden read in either would show.
         const seen = feed ? feed(race) : race;
@@ -296,8 +298,8 @@ let corruptionOK = true, probeDays = 0;
 for (let i = 0; i < Math.min(N, 6); i++) {
     const seed = (BASE_SEED + 9100 + i) >>> 0;
     const clean = [], dirty = [];
-    runWorld(seed, i % 2 ? 'markov' : 'neutral', i, V => clean.push(V));
-    runWorld(seed, i % 2 ? 'markov' : 'neutral', i, V => dirty.push(V), race => { const c = copy(race); corruptLatent(c); return c; });
+    runWorld(seed, i % 2 ? 'engine' : 'neutral', i, V => clean.push(V));
+    runWorld(seed, i % 2 ? 'engine' : 'neutral', i, V => dirty.push(V), race => { const c = copy(race); corruptLatent(c); return c; });
     corruptionOK &&= clean.length === dirty.length && clean.every((v, k) => v === dirty[k]);
     probeDays += clean.length;
 }

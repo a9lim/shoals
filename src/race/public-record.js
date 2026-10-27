@@ -6,7 +6,7 @@
    =================================================== */
 import { buildPublicView } from './consensus.js';
 
-export const RECORD_SCHEMA = 15;
+export const RECORD_SCHEMA = 16;
 export const READER_CALIBRATION_DAYS = Object.freeze(Array.from({ length: 48 }, (_, j) => 21 * j));
 /** 02a: explicit role-change knots keep interpolation within one geometry. */
 export const readerCalibrationDays = R => [...new Set([...READER_CALIBRATION_DAYS, ({2:420,3:756,4:880,5:1000})[R]-63, ({2:420,3:756,4:880,5:1000})[R]])].sort((a,b)=>a-b);
@@ -36,9 +36,6 @@ export function publicSnapshot(race) {
 }
 
 export function createPublicRecord(race) { return createRecordFromSnapshot(publicSnapshot(race)); }
-// INTERPRETATION: the demonstration chain's rows (02a "Demonstrations") enter the
-// record here while RECORD_SCHEMA stays 15 and no feature reads them: the
-// features and the bump to schema 16 come with the refit (pass F).
 export function createRecordFromSnapshot(initial) {
     return { schema: RECORD_SCHEMA, initial: copy(initial), day: initial.day, snapshot: copy(initial),
         spawnDay: Object.fromEntries(LABS.map(id => [id, initial.labs[id].active ? initial.day : null])),
@@ -103,9 +100,17 @@ export function foldPublicRecordRow(rec, row) {
     for (const r of row.demonstrations) rec.demonstrations.push({ day, ...copy(r) });
     return rec;
 }
+let _rowTap = null;
+/** Observe every row stepPublicRecord folds, as `fn(rec, row)` (null removes it):
+ *  the engine worlds persist the rows (tools/engine-worlds.mjs). The row is the
+ *  one folded, never a copy rebuilt later. */
+export function tapRecordRows(fn) { _rowTap = fn; }
 export function stepPublicRecord(rec, race, inputs = {}) {
     if (race.day === rec.day) return rec;
-    return foldPublicRecordRow(rec, publicRecordRow(race, inputs));
+    const row = publicRecordRow(race, inputs);
+    foldPublicRecordRow(rec, row);
+    if (_rowTap) _rowTap(rec, row);
+    return rec;
 }
 
 const REPORT_KIND = { publication: 'demonstration', dispute: 'dispute', evaluation: 'evaluation', withdrawal: 'withdrawal' };
@@ -180,6 +185,16 @@ export function ruleSummary(rungs, day) {
     return out;
 }
 
+// 02a "Demonstrations" (Features): the labs that demonstrate, the rungs a
+// demonstration bears on, and a latest standing demonstration's states as
+// indicators. None is every indicator at zero with age 0, the way an absent
+// claim reads.
+// INTERPRETATION: four indicators with none implicit (the claims' convention),
+// not five; the withdrawal count is per lab, counting withdrawal reports (one per
+// flawed demonstration, its dependents riding on it).
+const DEMO_LABS = Object.freeze(['halcyon', 'polaris']);
+const DEMO_RUNGS = Object.freeze([2, 3, 4]);
+const DEMO_STATES = Object.freeze(['standing', 'disputed', 'upheld', 'narrowed']);
 const COMMON_NAMES = [
     'openRung', 'releasedRung', 'certifiedRung',
     ...LABS.flatMap(id => [`${id}.active`, `${id}.spawnAge`, `${id}.claimedRung`,
@@ -193,6 +208,8 @@ const COMMON_NAMES = [
     ...['private', 'supervised', 'mobilized', 'nationalized', 'classified'].map(r => `regime.${r}`),
     'regimeAge', 'treatyWindows', 'treatyWindowAge', 'treatyOutcome', 'treatyOutcomeAge',
     'straitTension', 'exportControlStage', 'treatyStage',
+    ...DEMO_LABS.flatMap(id => DEMO_RUNGS.flatMap(R => [...DEMO_STATES.map(st => `${id}.demo${R}.${st}`), `${id}.demo${R}.age`])),
+    ...DEMO_LABS.map(id => `${id}.demoWithdrawals`),
 ];
 const legibleNames = R => R === 'family'
     ? ['rule5.logH.quarter', 'rule5.logH.year', 'rule5.logH.term', 'rule5.logH.unconditional1000', ...LABS.map(id => `${id}.claimedRung`), 'clock']
@@ -225,6 +242,19 @@ function fullValues(rec) {
     a.push(age(day, rec.regimeDay), rec.treatyWindows.length, age(day, rec.treatyWindows.at(-1)),
         rec.treatyOutcomes.length ? (rec.treatyOutcomes.at(-1).implemented ? 1 : -1) : 0,
         age(day, rec.treatyOutcomes.at(-1)?.day), rec.inputs.straitTension, rec.inputs.exportControlStage, rec.inputs.treatyStage);
+    // The chain (02a "Demonstrations"): per lab and rung, the latest demonstration
+    // that hasn't been withdrawn, by its status today; then the withdrawals.
+    const reports = chainReports(rec), withdrawals = { halcyon: 0, polaris: 0 }, latest = {};
+    for (const rep of reports) {
+        if (rep.kind === 'withdrawal') withdrawals[rep.lab]++;
+        else if (rep.kind === 'demonstration' && rep.status !== 'withdrawn') latest[`${rep.lab}/${rep.rung}`] = rep;
+    }
+    for (const id of DEMO_LABS) for (const R of DEMO_RUNGS) {
+        const rep = latest[`${id}/${R}`];
+        for (const st of DEMO_STATES) a.push(+(rep?.status === st));
+        a.push(age(day, rep?.day));
+    }
+    for (const id of DEMO_LABS) a.push(count(withdrawals[id]));
     return a;
 }
 

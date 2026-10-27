@@ -2,7 +2,7 @@
    lists only; challenger feature selection sees its training half only. */
 import { evaluateReaderFeatures, lawQuarter, lawCDF, lawRawCDF } from '../src/race/reader.js';
 import { expandReaderFeatures } from '../src/race/public-record.js';
-import { sampleFeatures } from './reader-data.mjs';
+import { sampleFeatures, SAMPLE_LAYOUT } from './reader-data.mjs';
 import { createRng, deriveSeed } from '../src/race/rng.js';
 
 export const CHALLENGER_SPEC = Object.freeze({
@@ -229,7 +229,7 @@ export function trainingVariance(calibrationStage,R,sources) {
 
 /** 02a "The reader": all sampled days, all priced horizons. This is a
  * separate population from lock-day scoring/ECE; world bootstraps preserve
- * the dependence of all days and paired neutral/Markov trajectories. */
+ * the dependence of all days and paired neutral/engine trajectories. */
 export function calendarHorizonMetrics(entries, sets = ['legible', 'full'], intervals = true, trainingCalibration = null) {
     if (!trainingCalibration?.cells && !trainingCalibration?.routes) throw new Error('Calendar calibration requires its matched training targets');
     const result = {};
@@ -511,10 +511,11 @@ export function familyMetricsFromRows(rows, intervals = true, sets = ['legible',
     return report;
 }
 
-export function decodeSample(v) {
-    const mask = v[169];
-    if (!Number.isInteger(mask)) throw new Error('Reader sample mask missing; regenerate current-schema data');
-    return { grid: !!(mask & 1), offset: !!(mask & 2), calibration: !!(mask & (1 | 4)), diagnostic: !!(mask & 8), world: v[0], scenario: v[1] ? 'markov' : 'neutral', day: v[2], act: v[3],
+export function decodeSample(v, L = SAMPLE_LAYOUT) {
+    const mask = v[L.mask];
+    if (v.length !== L.columns || !Number.isInteger(mask)) throw new Error('Reader sample layout mismatch; regenerate current-schema data');
+    return { grid: !!(mask & 1), offset: !!(mask & 2), calibration: !!(mask & (1 | 4)), diagnostic: !!(mask & 8), world: v[0], scenario: v[1] ? 'engine' : 'neutral', day: v[2], act: v[3],
         regime: ['private', 'supervised', 'mobilized', 'nationalized', 'classified'][v[4]], targets: Array.from(v.slice(5, 9)), outcome: v[9],
-        legs: [0, 1, 2, 3].map(i => Array.from(v.slice(10 + i * 5, 15 + i * 5))), family: Array.from(v.slice(30, 38)), common: Array.from(v.slice(38, 153)), rules: [0, 1, 2, 3].map(i => Array.from(v.slice(153 + i * 4, 157 + i * 4))) };
+        legs: [0, 1, 2, 3].map(i => Array.from(v.slice(L.legs + i * 5, L.legs + 5 + i * 5))), family: Array.from(v.slice(L.family, L.common)),
+        common: Array.from(v.slice(L.common, L.rules)), rules: [0, 1, 2, 3].map(i => Array.from(v.slice(L.rules + i * 4, L.rules + 4 + i * 4))) };
 }

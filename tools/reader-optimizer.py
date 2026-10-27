@@ -1,4 +1,4 @@
-"""02a The reader, schema 15: deterministic exact integer-day penalized MLE.
+"""02a The reader, schema 16: deterministic exact integer-day penalized MLE.
 Training-quantile hinge bases, Hessian preconditioning, mandatory convergence.
 Only NumPy/SciPy offline; the game evaluates the same basis in public-record.js.
 """
@@ -16,19 +16,20 @@ stage = sys.argv[2] if len(sys.argv) > 2 else 'all'
 if stage != 'all':
     raise ValueError(f'Unknown reader fit stage {stage}')
 lambda_grid = [1e-9, 1e-8, 1e-7, 1e-6, 1e-5]
+L = meta['layout']   # the encoded sample's columns (tools/reader-data.mjs SAMPLE_LAYOUT)
 data = {k: np.fromfile(root / f'{k}.bin', dtype='<f8').reshape(meta[k]['rows'], meta[k]['columns']) for k in ['train', 'validation']}
 bins = [0, 21, 63, 126, 252, 504, 1000000]
 models = {str(r): {} for r in [2, 3, 4, 5, 'family']}
 bases = {}
-report = {'optimizer': [], 'heads': {}, 'basis': 'Schema 15: unchanged grid/offset raw hazard MLE; increment-guarded scale-space calibration with one-sided disappearing-segment limits and pooled prior.'}
+report = {'optimizer': [], 'heads': {}, 'basis': 'Schema 16: the full heads read the demonstration chain; unchanged grid/offset raw hazard MLE; increment-guarded scale-space calibration with one-sided disappearing-segment limits and pooled prior.'}
 report.update({'stage': stage, 'lambdaGrid': lambda_grid, 'candidateScores': {},
                'zeroLambda': 'If validation keeps selecting the descending grid through 1e-14, also fit zero. A rank-safe preconditioner changes coordinates only; no ridge is added to the objective.'})
 diagnostic_candidates = {}
 def raw_features(a, r, kind):
     if kind == 'prior':
         return np.column_stack([a[:, 2] / 1008, np.full(len(a), int(r))])
-    leg = a[:, 30:38] if r == 'family' else a[:, 10+(int(r)-2)*5:15+(int(r)-2)*5]
-    return np.column_stack([leg, a[:, 38:153]]) if kind == 'full' else leg.copy()
+    leg = a[:, L['family']:L['common']] if r == 'family' else a[:, L['legs']+(int(r)-2)*5:L['legs']+5+(int(r)-2)*5]
+    return np.column_stack([leg, a[:, L['common']:L['rules']]]) if kind == 'full' else leg.copy()
 
 def knots(v, positive=False):
     if positive:
@@ -352,7 +353,7 @@ for r in [2,3,4,5]:
     for kind in ['prior','legible','full']:
         head=models[str(r)][kind]
         if kind=='legible':
-            m=a[:,153+(r-2)*4];w=a[:,154+(r-2)*4]
+            m=a[:,L['rules']+(r-2)*4];w=a[:,L['rules']+1+(r-2)*4]
             raw=lambda end:np.maximum(FLOOR,np.logaddexp(0,(end-m)/w)-np.logaddexp(0,(a[:,2]-m)/w))
         else:
             if kind=='prior':hazards=raw_hazards(a,r,kind,head)

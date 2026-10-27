@@ -21,7 +21,8 @@ import { assertReaderSchema, readerLaw, readerFamily, lawQuarter, lawCDF, lawRaw
 import { RECORD_SCHEMA, READER_CLOCK_DAYS, readerCalibrationDays, RULE_HAZARD_FLOOR, expandReaderFeatures, createRecordFromSnapshot, foldPublicRecordRow, publicRecordRow, recordFeatures, createPublicRecord, stepPublicRecord, ruleSummary, ruleLogHazard } from '../src/race/public-record.js';
 import { createRaceState } from '../src/race/race-state.js';
 import { belief, initBelief } from '../src/race/belief.js';
-import { INPUT_SCHEDULE, runReaderWorld, sampleFeatures } from './reader-data.mjs';
+import { WORLD_SCENARIOS, runReaderWorld, sampleFeatures } from './reader-data.mjs';
+import { ensureEngineWorlds } from './engine-worlds.mjs';
 import { quarterEntries, quarterMetrics, challengerMetrics, familyMetrics, familyMetricsFromRows, deadlineMetrics, legibleHorizonMetrics, calendarHorizonMetrics, plantedDefectMetrics } from './reader-metrics.mjs';
 const fitReport = JSON.parse(readFileSync(new URL('./reader-fit-report.json', import.meta.url), 'utf8'));
 // 02a: ratified gates are fixed here; refits report validation suggestions separately.
@@ -39,6 +40,8 @@ for (let i = 0; i < args.length; i++) {
 }
 if (!Number.isInteger(N) || N < 1 || !Number.isInteger(base) || base < 0) throw new Error('N and seed must be nonnegative integers; N must be positive');
 const t0 = performance.now();
+// The engine scenario's worlds: bystander runs' tapes (tools/engine-worlds.mjs).
+await ensureEngineWorlds(Array.from({ length: Math.max(N, 94) }, (_, i) => base + i));
 let failures = 0;
 const checks = [], report = { N, base, schema: RECORD_SCHEMA, sections: readerOnly ? 'A-G' : 'A-K', scenarios: {} };
 report.bands = { phi: RATIFIED_PHI, challengerBound: RATIFIED_CHALLENGER_BOUND, suggestedPhi: fitReport.suggestedPhi, suggestedChallengerBound: fitReport.suggestedChallengerBound };
@@ -222,7 +225,7 @@ function corruptLatent(race) {
         'explicit release capability, theft true thief and detected-incident insider/occurDay sentinels; a spread row fails');
 }
 let replayOK = true, corruptionOK = true, idempotentOK = true, immutableOK = true, informationOK = true, priorClockOK = true, r5ClaimOK = true, count = 0;
-for (const scenario of INPUT_SCHEDULE.scenarios) {
+for (const scenario of WORLD_SCENARIOS.scenarios) {
     let replay = null;
     const hook = ({ race, rec, rule, inputs }) => {
         if (!replay) replay = createRecordFromSnapshot(rec.initial);
@@ -350,7 +353,7 @@ function reportFamily(scenario, set, head, gated) {
 }
 
 const pooledEntries = [], pooledFamilyRows = [];
-for (const scenario of INPUT_SCHEDULE.scenarios) {
+for (const scenario of WORLD_SCENARIOS.scenarios) {
     console.log(`Simulating ${N} ${scenario} worlds...`);
     const samples = [], boundaries = [];
     for (let i = 0; i < N; i++) {
@@ -390,7 +393,7 @@ report.pooled = { ...quarterMetrics(pooledEntries, true, ['legible']),
     family: familyMetricsFromRows(pooledFamilyRows, true, ['legible']), deadlines: deadlineMetrics(pooledEntries) };
 report.pooled.horizons = legibleHorizonMetrics(pooledEntries);
 report.pooled.calendar=calendarHorizonMetrics(pooledEntries,['legible'],true,fitReport.calibrationStage);
-report.pooling = 'Equal world counts per scenario; concatenate observations, cluster paired neutral/Markov trajectories by their shared world seed. Legible calibration pooled; scenario-specific legible metrics diagnostic only. Full calibration, learning floors and challengers remain per scenario.';
+report.pooling = 'Equal world counts per scenario; concatenate observations, cluster paired neutral/engine trajectories by their shared world seed. Legible calibration pooled; scenario-specific legible metrics diagnostic only. Full calibration, learning floors and challengers remain per scenario.';
 for(const R of [2,3,4,5]) { reportCalibration('pooled',R,'legible',report.pooled.rungs[R].legible,true); reportCalendar('pooled',R,'legible',report.pooled.calendar[R].legible,true); }
 reportFamily('pooled', 'legible', report.pooled.family.legible, true);
 console.log(`G pooled raw/calibrated contract deadlines ${JSON.stringify(report.pooled.deadlines)}`);
@@ -418,20 +421,19 @@ console.log(`Reader A-G: ${report.readerRuntimeSeconds.toFixed(2)} s`);
 // ==========================================================================
 if (!readerOnly) {
     const BB = await import('../src/race/belief.js');
-    const { advanceRace, stepControlRegime } = await import('../src/race/race-state.js');
-    const { stepTreaty } = await import('../src/race/treaty-track.js');
     const { checkResolution } = await import('../src/race/resolution.js');
-    const { inputSchedule } = await import('./reader-data.mjs');
+    const { worldInputs, stepWorld } = await import('./reader-data.mjs');
     const { loss } = await import('./reader-metrics.mjs');
     const VALIDATION = base === 2000001;
     // Validation values (seeds 2,000,001-2,002,000, N=2000 per scenario, reader
-    // schema 11), 2026-10-25; the gate is ±max(30%, 0.005 nats) of each (02a).
+    // schema 16, neutral and engine worlds), 2026-10-27; the gate is ±max(30%,
+    // 0.005 nats) of each (02a).
     // Opportunity is nats per run summed over the act's eligible rung-quarters;
     // perEvent is nats per eligible rung-quarter. Acts I / II; Act III holds too few
     // open rung-quarters for a band and is bounded absolutely (ACT3_OPPORTUNITY).
     const EDGE_BANDS = {
-        neutral: { opportunity: [0.71173, 0.18518], perEvent: [0.02304, 0.06134] },
-        markov: { opportunity: [0.71114, 0.17732], perEvent: [0.02301, 0.05855] },
+        neutral: { opportunity: [0.72016, 0.16039], perEvent: [0.02325, 0.05319] },
+        engine: { opportunity: [0.71963, 0.15941], perEvent: [0.02323, 0.05283] },
     };
     const ACT3_OPPORTUNITY = 0.02, CLOSE_FLOOR = 0.005, PRESET_SKILL = 0.05, PRESET_MEMO = 0.10;
     const H = 1008, Q = 63, ACTS = ['I', 'II', 'III'], MEMO = 0.55, MEMO_BY = 882;
@@ -442,10 +444,10 @@ if (!readerOnly) {
     const K = BB.forecastTuning.K_CRED;
     const phaseB = report.phaseB = { K, validation: VALIDATION, scenarios: {} };
     const t1 = performance.now();
-    for (const scenario of INPUT_SCHEDULE.scenarios) {
+    for (const scenario of WORLD_SCENARIOS.scenarios) {
         const rows = [], worlds = [], fallbacks = { 2: [], 3: [], 4: [], 5: [] };
         for (let i = 0; i < N; i++) {
-            const seed = base + i, race = createRaceState(seed), sched = inputSchedule(seed, scenario);
+            const seed = base + i, race = createRaceState(seed), sched = worldInputs(seed, scenario);
             BB.initBelief(race);
             const wrows = [];
             let inputs = null, converted = false;
@@ -468,8 +470,7 @@ if (!readerOnly) {
             let endDay = H;
             for (let d = 0; d < H && !race.resolution; d++) {
                 inputs = sched();
-                advanceRace(race, { straitTension: inputs.straitTension, exportControlStage: inputs.exportControlStage });
-                stepControlRegime(race); stepTreaty(race, { treatyStage: inputs.treatyStage });
+                stepWorld(race, inputs);
                 BB.stepBelief(race, inputs);
                 if (!converted && (race.controlRegime === 'nationalized' || race.controlRegime === 'classified')) {
                     converted = true;

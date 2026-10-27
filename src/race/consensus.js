@@ -110,8 +110,8 @@ export function disputeAdjudicator(regime) {
 //
 // `baseRate` is the public LISTING prior (02a "Consensus binaries"): the
 // population mean of `B`'s day-0 quote, re-derived at each refit of the reader.
-// Measured 2026-10-25 on the validation seeds 2,000,001-2,002,000 under reader
-// schema 11: R2 0.6995, R3 0.5811, R4 0.5205, R5 0.6275. Every validation world
+// Measured 2026-10-27 on the validation seeds 2,000,001-2,002,000 under reader
+// schema 16: R2 0.6996, R3 0.5747, R4 0.5184, R5 0.6292. Every validation world
 // opens with the released frontier at R1 (eta 0, the same legible features), so
 // the day-0 quote does not vary by world under the current kinematics. It lives
 // only here; the rule of thumb's seed priors are belief.js's RUNG_SEED.
@@ -147,9 +147,9 @@ function contractDefs() {
     });
     return [
         cert(0, 2, 420, 450, 0.700),
-        cert(1, 3, 756, 786, 0.581),
-        cert(2, 4, 880, 910, 0.521),
-        terminal(3, 5, 1000, 1008, 0.628),   // resolution territory -> terminal closeout, never NO-against-crossing
+        cert(1, 3, 756, 786, 0.575),
+        cert(2, 4, 880, 910, 0.518),
+        terminal(3, 5, 1000, 1008, 0.629),   // resolution territory -> terminal closeout, never NO-against-crossing
     ];
 }
 

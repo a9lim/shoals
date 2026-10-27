@@ -97,7 +97,10 @@ import {
 import { getTrait } from '../src/traits.js';
 import { ruleSummary } from '../src/race/public-record.js';
 import { checkResolution } from '../src/race/resolution.js';
-import { inputSchedule, runReaderWorld } from './reader-data.mjs';
+import { runReaderWorld, worldInputs, stepWorld } from './reader-data.mjs';
+import { ensureEngineWorlds, loadEngineWorld } from './engine-worlds.mjs';
+import { createRng, deriveSeed } from '../src/race/rng.js';
+import { straitTension } from '../src/race/strait.js';
 import { createHash } from 'node:crypto';
 import { readerLaw, lawCDF } from '../src/race/reader.js';
 import {
@@ -140,6 +143,12 @@ const clampP = (p) => Math.min(0.98, Math.max(0.02, p));
 function raceDay(race) {
     advanceRace(race); stepControlRegime(race); stepTreaty(race, {}); stepBelief(race);
 }
+/** The same on an engine world's inputs (tools/engine-worlds.mjs), and how many
+ *  days its run lasted. Odd worlds of section A and its probe are engine worlds. */
+function engineDay(race, inputs) { stepWorld(race, inputs); stepBelief(race, inputs); }
+const engineDays = (seed) => loadEngineWorld(seed).tape.length;
+await ensureEngineWorlds([...Array.from({ length: N }, (_, i) => (BASE_SEED + i) >>> 0).filter((_, i) => i % 2),
+    ...[1, 3, 5, 7].map(s => (BASE_SEED + 9100 + s) >>> 0)]);
 /** Step a synthetic race one quiet day at a time to `day`; `edits[d]` mutates the
  *  public state (and the day's ledger) on day d before belief steps. */
 function quietTo(race, day, edits = {}) {
@@ -192,10 +201,12 @@ let totalCauses = 0;
 {
     const PUBLIC_VIEW_KEYS = ['day', 'certifiedFrontierRung', 'releasedFrontierRung', 'claimedRung', 'releaseCount', 'lastReleaseDay', 'controlRegime'].sort().join(',');
     for (let i = 0; i < N; i++) {
-        const race = createRaceState((BASE_SEED + i) >>> 0);
+        const seed = (BASE_SEED + i) >>> 0, race = createRaceState(seed);
         initConsensus(race);
         initBelief(race);
-        for (let d = 0; d < HORIZON; d++) raceDay(race);
+        // Odd worlds are engine worlds: the bystander run's tape, to its resolution.
+        if (i % 2) for (let d = 0, n = engineDays(seed), sched = worldInputs(seed, 'engine'); d < n; d++) engineDay(race, sched());
+        else for (let d = 0; d < HORIZON; d++) raceDay(race);
         for (const c of beliefCauses()) {
             totalCauses++;
             if (c.id == null) { allCausesHaveId = false; causalityOK = false; }
@@ -251,9 +262,11 @@ let totalCauses = 0;
     const DAYS = [200, 420, 500, 756, 900, 1000];
     for (let s = 0; s < 8; s++) {
         for (const D of DAYS) {
-            const seed = (BASE_SEED + 9100 + s) >>> 0;
+            const seed = (BASE_SEED + 9100 + s) >>> 0, engine = s % 2 === 1;
+            if (engine && D > engineDays(seed)) continue;      // the engine world ended first
+            const schedA = engine ? worldInputs(seed, 'engine') : null, schedB = engine ? worldInputs(seed, 'engine') : null;
             const raceA = createRaceState(seed); initConsensus(raceA); initBelief(raceA);
-            for (let d = 0; d < D; d++) raceDay(raceA);
+            for (let d = 0; d < D; d++) engine ? engineDay(raceA, schedA()) : raceDay(raceA);
             const sigA = pooledSig(), ruleA = JSON.stringify(belief.rungs) + belief.alignment;
             const viewA = buildPublicView(raceA), cvA = buildComputePublicView(raceA, null);
             const contracts = consensus.contracts.map(c => ({ ...c }));
@@ -261,10 +274,11 @@ let totalCauses = 0;
             const ccA = JSON.stringify([0, 63, 126, 252].map(dte => computeCurveFromBelief(cvA, dte)));
 
             const raceB = createRaceState(seed); initConsensus(raceB); initBelief(raceB);
-            for (let d = 0; d < D - 1; d++) raceDay(raceB);
-            advanceRace(raceB); stepControlRegime(raceB); stepTreaty(raceB, {});
+            for (let d = 0; d < D - 1; d++) engine ? engineDay(raceB, schedB()) : raceDay(raceB);
+            const inB = engine ? schedB() : undefined;
+            if (engine) stepWorld(raceB, inB); else { advanceRace(raceB); stepControlRegime(raceB); stepTreaty(raceB, {}); }
             corruptLatent(raceB);
-            stepBelief(raceB);
+            stepBelief(raceB, inB);
             const sigB = pooledSig(), ruleB = JSON.stringify(belief.rungs) + belief.alignment;
             const viewB = buildPublicView(raceB), cvB = buildComputePublicView(raceB, null);
             const qB = JSON.stringify(contracts.map(c => binaryQuoteFromBelief(viewB, c)));
@@ -297,6 +311,27 @@ let totalCauses = 0;
 // agree. A procedure check on HEAD 43d677c's worlds
 // reproduced 1d36daa9... first. Demonstrations move no world and the rule
 // doesn't read them, so they leave it unchanged.
+// The tape is the retired assumed input schedule (tools/reader-data.mjs until
+// 2026-10-27; 02a "Demonstrations": the Markov scenario retires everywhere but
+// here), kept verbatim: strait tension, export-control and treaty stages each a
+// slow clamped symmetric walk on its own stream, drawn every day in both scenarios.
+function frozenTape(seed, scenario) {
+    const rng = createRng(deriveSeed(seed, 'reader-input-schedule-v1'));
+    const ranges = { chinaRelations: [-3, 3], tradeWarStage: [0, 4], exportControlStage: [0, 3], treatyStage: [0, 4] };
+    const move = { chinaRelations: 1 / 126, tradeWarStage: 1 / 252, exportControlStage: 1 / 252, treatyStage: 1 / 252 };
+    const state = { chinaRelations: 0, tradeWarStage: 0, exportControlStage: 0, treatyStage: 0 };
+    return () => {
+        for (const key of Object.keys(state)) {
+            const u = rng.next(), p = move[key];
+            if (scenario !== 'neutral' && u < p) {
+                const [lo, hi] = ranges[key];
+                state[key] = Math.max(lo, Math.min(hi, state[key] + (u < p / 2 ? -1 : 1)));
+            }
+        }
+        const geo = { chinaRelations: state.chinaRelations, tradeWarStage: state.tradeWarStage };
+        return { ...state, geo, straitTension: straitTension(geo) };
+    };
+}
 const RULE_TRAJECTORY_SHA256 = '642c5eba4823ff8052aae4e70aef6d99d4a916e0a3f03dc6a3183b1caab71a18';
 let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
 {
@@ -304,7 +339,7 @@ let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
     const h = createHash('sha256'), hr = createHash('sha256');
     for (let seed = 1; seed <= 32; seed++) {
         const scenario = seed % 2 ? 'markov' : 'neutral';
-        const race = createRaceState(seed), sched = inputSchedule(seed, scenario);
+        const race = createRaceState(seed), sched = frozenTape(seed, scenario);
         initBelief(race);
         for (let d = 0; d < HORIZON && !race.resolution; d++) {
             const inputs = sched();
@@ -314,7 +349,7 @@ let ruleHashOK = false, readerDataHashOK = false, ruleHashDays = 0;
             h.update(`${seed}:${race.day}:${state()}\n`); ruleHashDays++;
             if (checkResolution(race, inputs.geo)) break;
         }
-        runReaderWorld(seed, scenario, ({ race: r }) => { hr.update(`${seed}:${r.day}:${state()}\n`); });
+        runReaderWorld(seed, scenario, ({ race: r }) => { hr.update(`${seed}:${r.day}:${state()}\n`); }, frozenTape(seed, scenario));
     }
     ruleHashOK = h.digest('hex') === RULE_TRAJECTORY_SHA256;
     readerDataHashOK = hr.digest('hex') === RULE_TRAJECTORY_SHA256;
