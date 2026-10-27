@@ -73,6 +73,7 @@ export const INSIDER_EVENTS = [
             },
             {
                 label: 'Sit on it',
+                bystander: true,
                 desc: 'No trade, no story, no print. Discretion is a deposit in the only bank that matters here.',
                 playerFlag: 'sat_on_insider_tip',
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 10 }],

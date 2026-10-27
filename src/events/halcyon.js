@@ -55,6 +55,7 @@ export const HALCYON_EVENTS = [
             },
             {
                 label: 'Fade the hype',
+                bystander: true,
                 desc: 'A keynote is marketing with a stage. Until an auditor signs a rung, the quiet number is a rumor with production values.',
                 playerFlag: 'faded_frontier',
             },
@@ -162,6 +163,7 @@ export const HALCYON_EVENTS = [
             },
             {
                 label: 'Stay out of the boardroom',
+                bystander: true,
                 desc: 'You trade the company; you do not govern it. Whatever happens in that room will reach the tape soon enough, and the tape is your jurisdiction.',
                 playerFlag: 'stayed_out_halcyon_board',
             },
@@ -234,6 +236,7 @@ export const HALCYON_EVENTS = [
             },
             {
                 label: 'Let the tape explain it',
+                bystander: true,
                 desc: 'Say nothing. Positioning is a statement; annotation is a liability.',
                 playerFlag: 'silent_fixedpoint',
                 resultToast: 'The desk reads the story, then your book, and draws its own conclusions.',

@@ -26,6 +26,7 @@ const POLARIS_CHOICES = [
     },
     {
         label: 'Pass',
+        bystander: true,
         desc: 'The round fills without you. It always does.',
         resultToast: 'The round closes oversubscribed.',
     },
@@ -44,6 +45,7 @@ const HALCYON_CHOICES = [
     },
     {
         label: 'Pass',
+        bystander: true,
         desc: 'Someone else funds the run.',
         resultToast: 'The book covers three times over without you.',
     },
@@ -87,9 +89,11 @@ export function roundDispatch(round, offered) {
         magnitude: 'moderate',
         headline,
         context,
-        choices: choices.map((choice, i) => ({
+        // Pass subscribes nothing, so it carries no `round` (02a "The run,
+        // headless": a bystander choice carries no subscription).
+        choices: choices.map((choice, i) => choice.bystander ? { ...choice } : {
             ...choice,
-            round: { kind: round.kind, id: round.id, take: [1, 0.5, 0][i] },
-        })),
+            round: { kind: round.kind, id: round.id, take: [1, 0.5][i] },
+        }),
     };
 }

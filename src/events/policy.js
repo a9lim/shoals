@@ -49,6 +49,7 @@ export const POLICY_EVENTS = [
         choices: [
             {
                 label: 'Mark to the machinery',
+                bystander: true,
                 desc: 'Frozen books, live settlements, a successor adjudicator. Note what still pays and what merely still exists.',
             },
         ],
@@ -70,6 +71,7 @@ export const POLICY_EVENTS = [
         choices: [
             {
                 label: 'Read the terms',
+                bystander: true,
                 desc: 'The reference was frozen before the halt, the multiple sampled before you were born, run-wise. The matrix will do the rest when it runs.',
             },
         ],
@@ -92,6 +94,7 @@ export const POLICY_EVENTS = [
         choices: [
             {
                 label: 'Mark the fallback',
+                bystander: true,
                 desc: 'The contracts end fairly and blind, which is the design. What the world does next happens off-tape.',
             },
         ],
@@ -141,6 +144,7 @@ export const POLICY_EVENTS = [
             },
             {
                 label: 'Let it die in committee',
+                bystander: true,
                 desc: 'The lag is your edge, and the edge is the mandate you actually hold. Keep it.',
                 playerFlag: 'killed_evals_regime',
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: -3 }],
@@ -177,6 +181,7 @@ export const POLICY_EVENTS = [
             },
             {
                 label: 'Decline, politely',
+                bystander: true,
                 desc: 'The fund writes public letters. Treasury can read them like everyone else.',
                 playerFlag: 'declined_treasury',
                 resultToast: 'You declined. The voice was exactly as polite about that.',

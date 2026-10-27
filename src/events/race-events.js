@@ -188,6 +188,7 @@ export const RACE_EVENTS = [
             },
             {
                 label: 'Fade the panic',
+                bystander: true,
                 desc: 'The damage is {lag} days old — the tape is repricing stale information. Stay positioned for the overshoot.',
                 deltas: {},   // UNRATIFIED
                 followups: [{ id: 'incident_postmortem', mtth: 20 }],
@@ -207,7 +208,7 @@ export const RACE_EVENTS = [
         params: {},                                        // no permanent delta (03 incident-coupling rule)
         impulse: { mu: -0.08, xi: 0.06, lambda: 1.0 },     // decaying (P4): S4 -- every screen the same color
         choices: [
-            { label: 'Acknowledge', desc: 'There is no position for this. The desk watches like everyone else.' },
+            { label: 'Acknowledge', bystander: true, desc: 'There is no position for this. The desk watches like everyone else.' },
         ],
         followups: [{ id: 'incident_postmortem', mtth: 10, weight: 1 }],
     },
@@ -227,6 +228,7 @@ export const RACE_EVENTS = [
         choices: [
             {
                 label: 'Trade the campaign',
+                bystander: true,
                 desc: 'Someone\'s model moved the market\'s mind. Position for the unwind when the pattern breaks.',
                 deltas: {},   // UNRATIFIED
                 followups: [{ id: 'incident_postmortem', mtth: 18 }],
@@ -340,6 +342,7 @@ export const RACE_EVENTS = [
         choices: [
             {
                 label: 'Reprice the moat',
+                bystander: true,
                 desc: 'The lead was a wall; it is now a head start — and the tape just learned its assumptions have been stale for {lag} days.',
             },
         ],

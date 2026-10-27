@@ -33,6 +33,7 @@ export const POLARIS_EVENTS = [
         choices: [
             {
                 label: 'Note the new variable',
+                bystander: true,
                 desc: 'The board fight is not yours. The book now has two frontier trajectories to price, and one of them is deliberately slower.',
             },
             {
@@ -83,6 +84,7 @@ export const POLARIS_EVENTS = [
             },
             {
                 label: 'Not our mandate',
+                bystander: true,
                 desc: 'The desk trades the race; it does not run it. Sympathy is not a position.',
                 playerFlag: 'declined_polaris',
                 resultToast: 'They take it well, which is somehow worse.',

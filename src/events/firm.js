@@ -326,6 +326,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Argue your thesis',
+                bystander: true,
                 desc: 'Present your fundamental case. The position is based on public information.',
                 complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
@@ -387,6 +388,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Stand your ground',
+                bystander: true,
                 desc: 'The crowd is wrong. You\'ve done the work.',
                 complianceTier: 'defiant',
                 playerFlag: 'stood_ground_long',
@@ -429,6 +431,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Let them complain',
+                bystander: true,
                 desc: 'You like this strike. Their job is to make markets.',
                 complianceTier: 'defiant',
                 deltas: { xi: 0.01 },
@@ -480,6 +483,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Push back hard',
+                bystander: true,
                 desc: '"I\'m the one making money on this floor." Risky, but maybe they back off.',
                 factionShifts: [{ faction: 'firmStanding', value: -5 }],
                 complianceTier: 'defiant',
@@ -520,6 +524,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Work the position slowly',
+                bystander: true,
                 desc: 'Use TWAP-style execution. Accept worse fills for less market impact.',
                 complianceTier: 'partial',
                 playerFlag: 'worked_position_slowly',
@@ -580,6 +585,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Push back',
+                bystander: true,
                 desc: 'The position is sized appropriately for the thesis. You\'ll manage the risk.',
                 factionShifts: [{ faction: 'firmStanding', value: -3 }],
                 complianceTier: 'defiant',
@@ -625,6 +631,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'File the documentation',
+                bystander: true,
                 desc: 'Comply fully with the paperwork. Tedious but keeps your record clean.',
                 complianceTier: 'partial',
                 playerFlag: 'filed_fomc_docs',
@@ -657,6 +664,7 @@ export const FIRM_EVENTS = [
         choices: [
             {
                 label: 'Hang up',
+                bystander: true,
                 desc: 'You don\'t trade on tips from salesmen.',
                 playerFlag: 'declined_analyst_color',
                 resultToast: 'You stay clean. The salesman moves on.',
@@ -708,6 +716,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Request a risk review',
+                bystander: true,
                 desc: 'Ask the desk head to review your exposure. Show you\'re managing this responsibly.',
                 deltas: {},
                 playerFlag: 'hedged_short_with_calls',
@@ -752,6 +761,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Present a recovery plan',
+                bystander: true,
                 desc: 'Show them the path back. Reduced risk, tighter stops, disciplined execution.',
                 complianceTier: 'partial',
                 deltas: { theta: -0.005 },
@@ -801,6 +811,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Stay quiet',
+                bystander: true,
                 desc: 'Don\'t feed the outrage cycle. It\'ll blow over.',
                 deltas: { xi: 0.005 },
                 playerFlag: 'stayed_quiet_recession',
@@ -856,6 +867,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Ask for mentorship',
+                bystander: true,
                 desc: '"I could use guidance. Can you pair me with a senior PM?"',
                 complianceTier: 'partial',
                 deltas: { theta: -0.003 },
@@ -894,6 +906,7 @@ export const FIRM_EVENTS = [
         choices: [
             {
                 label: 'Cooperate fully',
+                bystander: true,
                 desc: 'Open your books. Show them everything. Transparency is your friend.',
                 factionShifts: [
                     { faction: 'firmStanding', value: 2 },
@@ -956,6 +969,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Ignore it',
+                bystander: true,
                 desc: 'You\'re building something here. Not interested in mercenary moves.',
                 deltas: {},
                 playerFlag: 'ignored_headhunter',
@@ -981,6 +995,7 @@ export const FIRM_EVENTS = [
         choices: [
             {
                 label: 'Same playbook, more discipline',
+                bystander: true,
                 desc: 'The strategy was right. The execution needed work.',
                 deltas: { theta: -0.003 },
                 playerFlag: 'comeback_disciplined',
@@ -1020,6 +1035,7 @@ export const FIRM_EVENTS = [
         choices: [
             {
                 label: 'Stay hungry',
+                bystander: true,
                 desc: 'This is just the beginning. Keep the edge.',
                 deltas: {},
                 playerFlag: 'first_milestone_hungry',
@@ -1068,6 +1084,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Accept the requirement',
+                bystander: true,
                 desc: 'File the paperwork. It\'s annoying but reasonable.',
                 complianceTier: 'partial',
                 playerFlag: 'accepted_bond_docs',
@@ -1102,6 +1119,7 @@ export const FIRM_EVENTS = [
             },
             {
                 label: 'Hedge the answer',
+                bystander: true,
                 desc: 'Give him the risk-managed version. Keep the thesis yours, the blame contained, and the firm exactly where it is.',
                 playerFlag: 'hedged_the_case',
                 resultToast: '"Sensible," he says, in the tone the word deserves. The door closes politely.',
@@ -1119,6 +1137,7 @@ export const FIRM_EVENTS = [
         choices: [
             {
                 label: 'Take the mandate',
+                bystander: true,
                 desc: 'The amplifier is on. Everything you believe now trades at firm scale — including the mistakes.',
                 playerFlag: 'firm_converted',
                 resultToast: 'The morning meeting runs long. Nobody calls the thesis yours anymore, which is how you know it won.',
