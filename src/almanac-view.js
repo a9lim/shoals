@@ -1,6 +1,5 @@
 /* ===================================================
-   src/almanac-view.js -- The almanac on the Meridian page
-   (02a "The evening", "The almanac"): the runs, the
+   src/almanac-view.js -- The almanac on the Meridian page: the runs, the
    cumulative score beside the reader-copier's, the
    reliability of the player's stated quarter probabilities,
    and the families seen beside the neutral-input baseline.

@@ -1,6 +1,6 @@
 /* ===================================================
    src/race/valuation.js -- HCN's race-implied level
-   (02a "The valuation layer").
+.
 
    A survival-conditioned expected terminal multiple,
    pooled the way `B` is from the two readers' family
@@ -24,7 +24,7 @@
 import { familyHeads } from './belief.js';
 import { CLOSEOUT_TUNING } from './closeout.js';
 
-// 02a "The valuation layer": only the gap clamp. Mutable for headless sweeps.
+// Only the gap clamp. Mutable for headless sweeps.
 export const VALUATION_TUNING = {
     ratioMin: 0.75,
     ratioMax: 1.30,
@@ -47,7 +47,7 @@ export function valuationFromFamily(p) {
     return num / (1 - p[2]);
 }
 
-/** The pooled V from the two heads and eta (02a: a pool of the readers'
+/** The pooled V from the two heads and eta (a pool of the readers'
  *  survival-conditioned expectations, not of their family probabilities). */
 export function pooledValuation(heads) {
     return (1 - heads.eta) * valuationFromFamily(heads.legible) + heads.eta * valuationFromFamily(heads.full);

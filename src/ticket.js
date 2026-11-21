@@ -24,7 +24,7 @@
    the HCN move is given; variance follows Heston's mean
    reversion with a leverage shock; each newly certified
    rung lifts the long-run rate by the capex channel's
-   0.005 (02a); Consensus reprices off belief B evaluated
+   0.005; Consensus reprices off belief B evaluated
    on a copy of the public record at the horizon, with the
    row's certification added, or on the quiet row each
    lab's routine releases at its trailing cadence
@@ -32,7 +32,7 @@
    the public curve with the new certified rung. Hidden
    state is never read.
 
-   The flatten (02a "The evening") loads a closing leg
+   The flatten loads a closing leg
    for every position that can trade, each reduce-only
    and bound to its position's id and strategy name, at
    size one; the rest are named under the ticket. It
@@ -56,7 +56,7 @@ import { getVxhcnImpact } from './price-impact.js';
 const TY = TRADING_DAYS_PER_YEAR;
 const MOVES = Array.from({ length: 41 }, (_, i) => Math.round((-0.4 + 0.02 * i) * 100) / 100);
 const COLS = [5, 10, 15, 20, 25, 30, 35];        // the grid's moves, as indices into MOVES (-30% .. +30%)
-const CAPEX_B = 0.005;                            // 02a "Rates: the capex channel", per rung rise
+const CAPEX_B = 0.005;                            // the capex channel's step on `b`, per rung rise
 const STRATEGY_TYPES = new Set(['stock', 'bond', 'vxhcnfuture', 'call', 'put']);
 const MARKET_ONLY = new Set(['binary', 'computefuture']);
 const DASH = [[], [6, 3], [1.5, 2.5]];
@@ -206,7 +206,7 @@ export function resetTicket() {
 export function ticketLegCount() { return _st.legs.length; }
 
 /**
- * Load the flatten (02a "The evening"): `legs` close every position that can
+ * Load the flatten: `legs` close every position that can
  * trade, each { posId, strategyName, type, qty (the closing signed quantity),
  * strike, expiryDay, key }; `off` names the positions left off. Reduce-only legs
  * are bound to their positions, so the size resets to one and the order to
@@ -572,7 +572,7 @@ function _renderCost() {
 }
 
 /**
- * The flatten's readout (02a "The evening"): its estimated cost (the spread at
+ * The flatten's readout: its estimated cost (the spread at
  * the current ladder multiple, plus impact) apart from the cash it releases,
  * returned short collateral included, from a non-mutating estimate; and, on a
  * line of its own, the positions left off the ticket.

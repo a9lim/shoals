@@ -1,6 +1,6 @@
 /* ===================================================
    src/events/rounds.js -- Primary-market dispatches
-   (02a "Private rounds and primary offerings").
+.
 
    Authored copy from the ratified rounds prose sheet.
    Called at show time, when the allocation cap is known;
@@ -89,8 +89,7 @@ export function roundDispatch(round, offered) {
         magnitude: 'moderate',
         headline,
         context,
-        // Pass subscribes nothing, so it carries no `round` (02a "The run,
-        // headless": a bystander choice carries no subscription).
+        // Pass subscribes nothing, so it carries no `round` (a bystander choice carries no subscription).
         choices: choices.map((choice, i) => choice.bystander ? { ...choice } : {
             ...choice,
             round: { kind: round.kind, id: round.id, take: [1, 0.5][i] },

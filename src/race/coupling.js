@@ -2,7 +2,7 @@
    src/race/coupling.js -- The player cost-of-capital channel
    (overhaul phase 6, endings round 2).
 
-   03's transmission honesty made mechanical: an ordinary
+   transmission honesty made mechanical: an ordinary
    secondary fill moves NOTHING. The race feels the player's
    capital only through a bounded, LAGGED cost-of-capital
    channel driven by PERSISTENT aggregate valuation -- heavy,
@@ -18,7 +18,7 @@
    book and passed in. Output: a bounded fractional multiplier
    on Halcyon capability velocity, hard-clipped both signs
    (long -> marginal acceleration; sustained short -> marginal
-   slowdown, 03's stance table). The multiplier enters race
+   slowdown, stance table). The multiplier enters race
    dynamics ONLY as the orchestrator-passed `playerCoupling`
    input to advanceRace (the straitTension precedent), which
    routes it through the single deterministicDrift source --
@@ -26,7 +26,7 @@
 
    Headless MC passes no positioning -> ema stays 0 -> the
    multiplier is 0 -> the P6-1 world-side calibration stands
-   bit-identical (harness-probed).
+   bit-identical.
 
    Singleton mirroring belief / consensus. DOM-free.
    =================================================== */
@@ -65,7 +65,7 @@ export function stepCoupling(positioning, primary = []) {
     const raw = secondary + primary.reduce((sum, p) => sum + p.input, 0);
     const input = clamp(raw, -1, 1);
     coupling.ema = coupling.ema * (1 - alpha) + input * alpha;
-    // 02a primary offerings: attribute the SAME clipped input and EMA, rather
+    // Primary offerings: attribute the SAME clipped input and EMA, rather
     // than ledgering an extra dC on top of the already-integrated channel.
     const scale = raw ? input / raw : 1;
     for (const [id, ema] of _primaryEma) _primaryEma.set(id, ema * (1 - alpha));

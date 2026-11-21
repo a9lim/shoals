@@ -29,7 +29,7 @@ import { INSIDER_EVENTS } from './insider.js';
 // P7-3: the room (the endgame branch point). Category 'room' is Poisson-excluded
 // and latch-fired by main.js's _checkRoom -- merged here for getEventById.
 import { ROOM_EVENTS } from './room.js';
-// Reality-beats round (02a "Rates: the capex channel"): the capex channel. Category
+// Reality-beats round: the capex channel. Category
 // 'rates' is Poisson-excluded and fired from the race bridge on the released-
 // frontier rung RISE edge -- merged here for getEventById + chain validation.
 import { RATES_EVENTS } from './rates.js';
@@ -97,7 +97,7 @@ for (const ev of ALL_EVENTS) {
     }
 }
 
-// -- The bystander (02a "The run, headless", "Headless policies") --
+// -- The bystander --
 // A headless run answers every dispatch with its bystander choice, the answer of
 // a desk that takes no position: pass on financing, decline a discretionary
 // intervention, say nothing. Exactly one choice per dispatch carries

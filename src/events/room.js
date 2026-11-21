@@ -2,14 +2,14 @@
    src/events/room.js -- The room (P7-3, 2026-07-24):
    the endgame branch point.
 
-   04: "One decision event, Act III ... when the leader lab
+   "One decision event, Act III ... when the leader lab
    reaches the final scaling decision, WHETHER the player is
    present -- and what weight their voice carries -- is a
    pure function of accumulated standing." The room is
    influence, not authorship. You bought a seat, not the
    steering wheel; hidden state still resolves the world.
 
-   MACHINERY (02a "Act III", the room):
+   MACHINERY (the room):
    - LATCH-FIRED, never Poisson. main.js's `_checkRoom` fires
      it once per run off the race-side pure predicate
      (`roomTriggerReady`: leader `C_internal >= R5 - 0.15`),
@@ -33,7 +33,7 @@
      clamp, ledgered under this event id. At full voice this
      is the loudest row the complicity ledger will ever
      carry, by design.
-   - PER-LEADER PRESENTATION (02a "Act III"): the fired
+   - PER-LEADER PRESENTATION: the fired
      meta carries `leaderLab` (from `roomTrigger` -- the same
      race-side helper the predicate comes from, never a
      recompute), and BOTH the headline and the context are
@@ -62,16 +62,16 @@
    This is the game's climax; the coordinator writes every word.
    =================================================== */
 
-/** Minimum satisfied criteria for a seat (02a: >= 2 of six). */
+/** Minimum satisfied criteria for a seat (>= 2 of six). */
 export const ROOM_MIN_CRITERIA = 2;
 /** Full voice = all six criteria; the advice scale is voice/ROOM_MAX_VOICE. */
 export const ROOM_MAX_VOICE = 6;
-/** Faction thresholds for criteria 2 and 3 (02a). Criterion 1 is belief.js's own
+/** Faction thresholds for criteria 2 and 3. Criterion 1 is belief.js's own
  *  memo gate (credibility > 0.55) -- read through `canSendMemos()`, never
  *  re-derived here; criterion 4 is main.js's firm-conversion latch. */
 export const ROOM_GATE = { safetyNetworkTrust: 45, labRelations: 55 };
 /** playerChoices flags criteria 5 and 6 read. Exported so the treasury-backchannel
- *  beat and this gate can be asserted to name the SAME flag (harness N). */
+ *  beat and this gate can be asserted to name the SAME flag. */
 export const ROOM_FLAG_CRITERIA = {
     advice: ['briefed_fixedpoint', 'backed_halcyon_restraint'],   // either one satisfies criterion 5
     treasury: 'treasury_backchannel',                            // criterion 6
@@ -83,7 +83,7 @@ export const ROOM_EVENT_ID = 'the_room';
  *  chokepoint on EVERY path (the seat is the beat); `declined` rides the
  *  say-nothing choice's own `playerFlag`. */
 export const ROOM_FLAGS = { seat: 'sat_in_the_room', declined: 'room_declined' };
-/** The two presentation sides the pools are keyed by (02a "Act III"). */
+/** The two presentation sides the pools are keyed by. */
 export const ROOM_LEADER_SIDES = ['home', 'rival'];
 /** Labs whose lead makes it the RIVAL room. The explicit set is the small one; a
  *  Polaris lead is still the HOME room (Polaris is the Halcyon schism -- an
@@ -134,7 +134,7 @@ export const ROOM_EVENTS = [
                 label: 'Advise speed',
                 desc: 'Tell the room to go. Whatever margin is worth, second is worth less.',
                 _roomVerb: 'speed',
-                // Full-voice magnitude (02a): S[halcyon] -0.12. Scaled by
+                // Full-voice magnitude: S[halcyon] -0.12. Scaled by
                 // voice/ROOM_MAX_VOICE in roomChoices before it is ever fired.
                 raceEffects: [{ dial: 'S', lab: 'halcyon', amount: -0.12 }],
                 resultToast: 'You advised speed. The room heard you.',
@@ -150,7 +150,7 @@ export const ROOM_EVENTS = [
                 label: 'Advise the deal',
                 desc: 'Tell the room to take the deal while there is a deal to take.',
                 _roomVerb: 'deal',
-                // Present ONLY while the summit window is live (02a); roomChoices
+                // Present ONLY while the summit window is live; roomChoices
                 // filters on this at fire time.
                 _roomNeedsSummit: true,
                 raceEffects: [
@@ -173,7 +173,7 @@ export const ROOM_EVENTS = [
     },
 ];
 
-// ---- Pure gate + voice helpers (harness-gated; main.js calls these) --------
+// ---- Pure gate + voice helpers (main.js calls these) --------
 
 /**
  * Voice weight = the number of satisfied criteria. `criteria` is the six-boolean

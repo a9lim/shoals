@@ -6,7 +6,7 @@
 
    The race layer's streams are seeded from the run seed by
    name (deriveSeed); the rest of the run draws per slot
-   through keyedRng (02a "The run, headless"). randomSeed()
+   through keyedRng. randomSeed()
    at a new run is the one ambient draw.
 
    The mulberry32 core is the codebase's canonical PRNG
@@ -171,7 +171,7 @@ function _hashKey(s) {
 }
 
 /**
- * A fresh stream for one slot (02a "The run, headless"): hashed from the run
+ * A fresh stream for one slot: hashed from the run
  * seed, the stream's name and the slot's keys, in order. A draw is addressed by
  * its semantic identity (the day and substep of a price step, an event's id and
  * occurrence) rather than by its place in a shared sequence, so adding or

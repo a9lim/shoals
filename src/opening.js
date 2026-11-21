@@ -1,5 +1,5 @@
 /* =====================================================
-   opening.js -- The opening hand (02a "The evening").
+   opening.js -- The opening hand.
 
    A Dynamic run starts on an inherited desk instead of
    cash: the book of a portfolio manager who has left
@@ -35,7 +35,7 @@ import { consensus, BINARY_NOTIONAL } from './race/consensus.js';
 // `expiry` is a listing position on the chassis grid (0 is the nearest listed
 // expiry, relative day 63; -1 the farthest); a binary names its rung's
 // certification contract. The obligation's `amount` is a fraction of E0 and its
-// `dueDay` a run-relative day (02a "Dates").
+// `dueDay` a run-relative day.
 
 /** The hands by name, for the almanac's runs. */
 export const HAND_NAMES = Object.freeze({ catalyst: 'The catalyst', insurance: 'The insurance', illiquid: 'The illiquid', wall: 'The wall' });

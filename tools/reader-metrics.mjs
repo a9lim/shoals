@@ -1,4 +1,4 @@
-/* 02a "The reader": shared fit-validation/test metrics. Explicit head
+/* Shared fit-validation/test metrics. Explicit head
    lists only; challenger feature selection sees its training half only. */
 import { evaluateReaderFeatures, lawQuarter, lawCDF, lawRawCDF } from '../src/race/reader.js';
 import { expandReaderFeatures } from '../src/race/public-record.js';
@@ -39,7 +39,7 @@ export function bootstrapWorldStats(rows, value, seed = 40, repeats = 200) {
 export const bootstrapWorld = (...args) => bootstrapWorldStats(...args).interval;
 export const READER_DEADLINES = Object.freeze({ 2: 420, 3: 756, 4: 880, 5: 1000 });
 
-/** 02a calibration: ECE includes all ten fixed-width deciles, including
+/** Calibration: ECE includes all ten fixed-width deciles, including
  * small cells. Resample worlds and recompute the absolute bin sums. */
 function bootstrapWorldECE(rows, set, seed, repeats = 200) {
     const groups = new Map();
@@ -85,7 +85,7 @@ export function quarterEntries(samples, constants, sets = ['prior', 'legible', '
     return entries;
 }
 
-/** 02a contract-deadline diagnostic; never a gate or a test-time fit trigger.
+/** The contract-deadline diagnostic; never a gate or a test-time fit trigger.
  * Open rungs, live contracts, lock days only. Errors are clustered by world. */
 export function deadlineMetrics(entries, intervals = true, sets = ['prior', 'legible', 'full']) {
     const result = {};
@@ -109,7 +109,7 @@ export function deadlineMetrics(entries, intervals = true, sets = ['prior', 'leg
     return result;
 }
 
-/** 02a legible-horizon diagnostic. Deadline aggregates include only live
+/** The legible-horizon diagnostic. Deadline aggregates include only live
  * contracts. Support includes every open-rung lock row; no new gates. */
 export function legibleHorizonMetrics(entries, intervals = true) {
     const result = {};
@@ -132,7 +132,7 @@ export function legibleHorizonMetrics(entries, intervals = true) {
     return result;
 }
 
-/** 02a calendar noise carries the finite training cells used by the stage.
+/** Calendar noise carries the finite training cells used by the stage.
  * One training snapshot per world/day makes each cell's Bernoulli cluster SE
  * sqrt(p(1-p)/(n-1)). Held scales follow their recorded matched source. */
 const trainingLookup = new WeakMap();
@@ -227,7 +227,7 @@ export function trainingVariance(calibrationStage,R,sources) {
     return Math.max(0,variance);
 }
 
-/** 02a "The reader": all sampled days, all priced horizons. This is a
+/** All sampled days, all priced horizons. This is a
  * separate population from lock-day scoring/ECE; world bootstraps preserve
  * the dependence of all days and paired neutral/engine trajectories. */
 export function calendarHorizonMetrics(entries, sets = ['legible', 'full'], intervals = true, trainingCalibration = null) {
@@ -350,10 +350,10 @@ export function quarterMetrics(entries, intervals = true, sets = ['prior', 'legi
                 return { [key === 'claim' ? 'claimed' : key]: value, n: sub.length, predicted, observed, bias, ...stats,
                     band, eligible, passed: !eligible || Math.abs(bias) <= band, ratio: Math.abs(bias) / band };
             });
-            // 02a: per lock day, max(0.03, 3 SE). Some 200 day cells are checked,
+            // Per lock day, max(0.03, 3 SE). Some 200 day cells are checked,
             // and at 2 SE about one in twenty would fail by chance.
             const days = groupMetrics('day', [...new Set(rows.map(e => e.day))].sort((a, b) => a - b), 200, 0.03, 3, 1000 + R * 1100);
-            // 02a: claim state within max(0.02, two world-bootstrap SE).
+            // Claim state within max(0.02, two world-bootstrap SE).
             const claimStates = groupMetrics('claim', [0, 1], 1, 0.02, 2, 6000 + R * 10);
             for (const cell of days.filter(d => !d.passed)) cell.claimBreakdown = [0, 1].map(claimed => {
                 const sub = rows.filter(e => e.day === cell.day && e.claim === claimed);
@@ -458,7 +458,7 @@ export function challengerMetrics(entries, intervals = true) {
     }));
 }
 
-/** 02a challenger calibration: fixed, public-coordinate defects. The
+/** Challenger calibration: fixed, public-coordinate defects. The
  * challenger is fit on one world half and measured on the other in both
  * directions. Prefix worlds bound this diagnostic's cost without selecting
  * by labels, probabilities or observed success. */

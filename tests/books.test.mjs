@@ -1,4 +1,4 @@
-// The Consensus binaries and the Cambria compute futures (09-market-integrity):
+// The Consensus binaries and the Cambria compute futures:
 // settlement exactly once against independent truth, the regime split and the
 // precedence ladder, and money conserved through every lifecycle. A wrong payout
 // is a number on the book that looks like any other.

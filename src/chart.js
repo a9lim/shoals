@@ -120,7 +120,7 @@ export class ChartRenderer {
        resetTransients()
        Clear every PER-RUN transient display field: the
        live-candle lerp animation and the P7-1 one-frame
-       wrong print (02a "Act III"). Called by
+       wrong print. Called by
        `_resetCore` -- a pending repaint generated while
        the strategy view was up is never consumed by
        draw(), so without this it could survive a

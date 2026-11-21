@@ -2,7 +2,7 @@
    src/race/strait.js -- The Taiwan-strait generator
    (overhaul phase 5a): gray-zone incidents and the
    blockade tail, the race's physical single point of
-   failure (02-race-model.md; 02a "The strait").
+   failure.
 
    Cambria's fabs sit in Hsinchu, a hundred miles from the
    coast Beijing drills off of. Gray-zone incidents are
@@ -13,7 +13,7 @@
    force-majeure through the existing curve, adding heat,
    and opening the mobilization gate.
 
-   TWO STRAITS, TWO FLAGS (02a): this generator drives ONLY
+   TWO STRAITS, TWO FLAGS: this generator drives ONLY
    the Taiwan-blockade race-layer flag (mirrored to
    `geopolitical.taiwanBlockade` by main.js). It never
    touches Hormuz.
@@ -22,7 +22,7 @@
    calibration harness. Draws ONLY from `race.streams.strait`
    (its own named substream via deriveSeed(seed,'strait')),
    so it perturbs no other subsystem's trajectory for a given
-   seed. It DOES have race-level effects (02a mandates them):
+   seed. It DOES have race-level effects (by design):
    a blockade adds heat and opens the mobilization gate -- the
    heat term is a REVERSIBLE overlay (`heat.strait`, cleared
    when the blockade lifts), applied AFTER the caller's
@@ -30,9 +30,9 @@
    option-a convention shared with commitRelease/commitTheft).
 
    The 3% baseline / 12-15% hot-desperate blockade incidence
-   is a CALIBRATION TARGET (02a), harness-asserted; the
+   is a CALIBRATION TARGET; the
    blockade DURATION model (Exp(45d) clamped [20,120]) is
-   RATIFIED in 02a's "The strait" block. Gray-zone detections and
+   RATIFIED in "The strait" block. Gray-zone detections and
    blockade start/end are RECORDED in the ledger; the race
    bridge fires their narrative.
    =================================================== */
@@ -50,15 +50,15 @@ function poisson(rng, lambda) {
     return k - 1;
 }
 
-// ---- Gray-zone constants (02a: ~Poisson(1/90d)·(1+heat)·tension) -----------
+// ---- Gray-zone constants (~Poisson(1/90d)·(1+heat)·tension) -----------
 const GRAY_MEAN = 90;   // per-day gray-zone rate = (1/90)·(1+heat)·tension
 
-// ---- Blockade constants (02a target: ~3% baseline -> 12-15% hot/desperate) --
-// The blockade hazard FORM is ratified in 02a's "The strait" block:
+// ---- Blockade constants (target: ~3% baseline -> 12-15% hot/desperate) --
+// The blockade hazard FORM is ratified in "The strait" block:
 //   h_block/day = BASE · (1 + heat) · (TENSION_FLOOR + TENSION_W·tension)
 //                       · (DESP_FLOOR + DESP_W·desperation)
-// where `desperation` is the SHARED strategic-desperation quantity (02a "The strait"
-// amendment; strategicDesperation in capability.js) -- max(velocity deficit,
+// where `desperation` is the SHARED strategic-desperation quantity
+// (strategicDesperation in capability.js) -- max(velocity deficit,
 // post-ignition runaway), replacing rev-1's raw internal gap (which the fast-
 // follower bounded near the release lag, so it stopped meaning desperation).
 // STRAIT_TUNING.blockadeBase recalibrates against the UNCHANGED incidence band
@@ -70,10 +70,10 @@ const BLOCKADE_TENSION_W = 2.05;   // tension leverage (calm 0.5 -> tense 2.55, 
 const BLOCKADE_DESP_FLOOR = 0.4;
 const BLOCKADE_DESP_W = 1.4;
 
-// Heat the blockade adds while active (02a: "heat +0.20"). Reversible overlay.
+// Heat the blockade adds while active ("heat +0.20"). Reversible overlay.
 export const BLOCKADE_HEAT = 0.20;
 
-// Blockade duration (RATIFIED, 02a "The strait"): Exp(mean 45d) clamped
+// Blockade duration (RATIFIED): Exp(mean 45d) clamped
 // [20, 120]. Blockades END -- the flag, the heat overlay, and the compute
 // force-majeure all lift when the duration elapses.
 const BLOCKADE_DURATION_MEAN = 45;
@@ -81,7 +81,7 @@ const BLOCKADE_DURATION_MIN = 20;
 const BLOCKADE_DURATION_MAX = 120;
 
 /** Public strait tension in [0,1] from the China proxies. FACTORED here as the
- *  single shared source (02a: "factor that helper to one shared source") --
+ *  single shared source ("factor that helper to one shared source") --
  *  compute-market.js re-exports it via this module so the compute curve and the
  *  blockade hazard read tension identically. Reads ONLY public geopolitical
  *  facts (chinaRelations, tradeWarStage), never hidden race truth. A null `geo`
@@ -154,7 +154,7 @@ export function stepStrait(race, day, endDay, heat, tension) {
                 BLOCKADE_DURATION_MIN, BLOCKADE_DURATION_MAX));
             race.taiwanBlockade = true;
             race.heat.strait = BLOCKADE_HEAT;     // takes effect next tick (post pre-tick snapshot)
-            race.mobilizationGateOpen = true;     // 02a: a blockade opens the mobilization gate
+            race.mobilizationGateOpen = true;     // a blockade opens the mobilization gate
             race.straitBlockade = { active: true, startDay: endDay, endDay: endDay + dur };
             blockadeStart = { id: `strait_block_${endDay}`, day: endDay, duration: dur, tension };
         }

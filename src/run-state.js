@@ -1,6 +1,6 @@
 /* ===================================================
    src/run-state.js -- The run's state and the sink it
-   reports through (02a "The run, headless").
+   reports through.
 
    One run exists at a time in a page or a process: `run`
    holds that run's own state (the engines, the latches,
@@ -119,7 +119,7 @@ export function portfolioEquity() {
 }
 
 /**
- * An actionable development the player did not make by hand (02a "Pacing"): a
+ * An actionable development the player did not make by hand: a
  * resting order filling, a standing order trading, the player's own deferred
  * order completing under the ladder, exercise or assignment at expiry, a held
  * contract settling, a forced sale, a margin liquidation, or an obligation's

@@ -43,7 +43,7 @@ export function cacheDOMElements($) {
     $.playBtn     = document.getElementById('play-btn');
     $.speedBtn    = document.getElementById('speed-btn');
     $.stepBtn     = document.getElementById('step-btn');
-    $.skipBtn     = document.getElementById('skip-btn');       // to the next edition worth reading (02a "The evening")
+    $.skipBtn     = document.getElementById('skip-btn');       // to the next edition worth reading
     $.bookFlatten = document.getElementById('book-flatten');   // loads the flatten into the ticket
     $.book        = document.getElementById('book');
     $.defaultPositions  = document.getElementById('default-positions');
@@ -51,7 +51,7 @@ export function cacheDOMElements($) {
     $.strategySection   = document.getElementById('book-strategies');
     $.pendingOrders     = document.getElementById('pending-orders');
     $.ordersSection     = document.getElementById('book-orders');
-    $.obligationList    = document.getElementById('obligation-list');   // the unpaid obligations (02a "The evening")
+    $.obligationList    = document.getElementById('obligation-list');   // the unpaid obligations
     $.obligationsSection = document.getElementById('book-obligations');
     $.cashDisplay       = document.getElementById('cash-display');
     $.portfolioValue    = document.getElementById('portfolio-value');
@@ -336,7 +336,7 @@ export function updateStandings($, world, factions, getFactionDescriptor) {
     _renderRows($.standingsFactions, _FACTION_IDS.map(id => [_FACTION_LABELS[id] || id, getFactionDescriptor(id)]));
 }
 
-/** The forecast record (02a, the posterior's scoring): skill in nats over the
+/** The forecast record (the posterior's scoring): skill in nats over the
  *  quarters scored, and credibility as a whole percent. Dynamic only. */
 function _renderRecord(container) {
     if (!container) return;
@@ -362,7 +362,7 @@ function _renderRecord(container) {
         + `<td class="${q.delta > 0.005 ? 'pnl-up' : q.delta < -0.005 ? 'pnl-down' : ''}">${fmtSigned(q.delta, 2)}</td></tr>`).join('');
 }
 
-/** The handover (02a "The evening"): the predecessor's memo, kept on the
+/** The handover: the predecessor's memo, kept on the
  *  Meridian page for the run, and where they went. Hidden without a hand. */
 export function renderHandover(fixture) {
     const sec = document.getElementById('handover-section');

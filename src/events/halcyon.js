@@ -12,7 +12,7 @@
    pool; guards key on `world.ai.frontierRung` (the public
    act proxy) -- never latent race state.
 
-   04's seeding rule governs the whole file: Act I is not
+   seeding rule governs the whole file: Act I is not
    quiet, it's UNHEARD. Every beat here is audible to a
    player who is listening and invisible to one who isn't.
 
@@ -156,7 +156,7 @@ export const HALCYON_EVENTS = [
                 desc: 'Quietly. A letter, a lunch, a proxy conversation where your voice arrives before you do. Restraint bought is margin banked — and margin is a practice, not a possession.',
                 // P6-2 raceEffect: activist restraint buys a small S[halcyon] (the
                 // American margin is a practice -- it interacts with the burn taper).
-                // Magnitude ratified in 02a.
+                // Magnitude ratified.
                 raceEffects: [{ dial: 'S', lab: 'halcyon', amount: 0.05 }],
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 2 }],
                 playerFlag: 'backed_halcyon_restraint',
@@ -171,7 +171,7 @@ export const HALCYON_EVENTS = [
     },
 
     // ---- The voluntary pause (Act II/III; release-as-choice, seen from the tape) --
-    // Reality-beats round (02a "Control regime and content plumbing"). Flag-gated Poisson draw, fires once
+    // Reality-beats round. Flag-gated Poisson draw, fires once
     // (`world.ai.halcyonPaused`, the fixedpointPublic pattern). No mechanics --
     // the pause does not touch the race, and that it does not is the beat.
     {
@@ -196,7 +196,7 @@ export const HALCYON_EVENTS = [
         impulse: { mu: 0.02, xi: -0.005 },   // decaying (P4): the cadence resumes; the tape exhales
     },
 
-    // ---- The index (post-leak texture; reality-beats round, 02a "Control regime and content plumbing") --
+    // ---- The index (post-leak texture; reality-beats round) --
     // The word belongs to the world, so the lab publishes a number for it: a
     // self-scored automation index -- a rung claim with a decimal point.
     // Consensus declines to list it: the claim/certification split in one beat.

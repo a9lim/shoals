@@ -3,7 +3,7 @@
    for the Shoals trading simulator.
    =================================================== */
 
-// -- The rules a journal replays under (02a "The run, headless") --
+// -- The rules a journal replays under --
 // Bump on any change that alters what a journal replays to: a saved run under
 // another version is retired, never replayed.
 export const RULES_VERSION = 1;
@@ -15,7 +15,7 @@ export const QUARTERLY_CYCLE = 63; // trading days per quarter
 export const HISTORY_CAPACITY = 252;
 export const BINOMIAL_STEPS = 128;
 export const SPEED_OPTIONS = [0.125, 0.25, 0.5, 1, 2];
-// To the next edition worth reading (02a "The evening", "Pacing"): a skip plays at
+// To the next edition worth reading: a skip plays at
 // four times the fastest speed setting, which it never changes, and one of its
 // stops is equity net of obligations moving by this fraction of the previous
 // close's equity, or more.
@@ -33,7 +33,7 @@ export const EXPIRY_COUNT = 8;      // number of active expiry dates
 export const INITIAL_CAPITAL = 10000;
 export const MAINTENANCE_MARGIN = 0.25;
 export const VXHCN_MAINTENANCE_MARGIN = 0.30; // higher for VX futures (vol-of-vol risk)
-// Ratified (02a "Compute futures"): compute-future margins mirror the VXHCN-future
+// Ratified: compute-future margins mirror the VXHCN-future
 // convention (Reg-T initial for shorts); maintenance a touch higher than VXHCN
 // for the strait tail-jump risk. COMPUTE_SPREAD_VOL feeds the stock/bond spread
 // model in _fillPrice (compute futures have no vol of their own; illiquid ->
@@ -42,10 +42,9 @@ export const COMPUTE_MAINTENANCE_MARGIN = 0.35;
 export const COMPUTE_SPREAD_VOL = 3.0;
 export const REG_T_MARGIN = 0.50;
 export const SHORT_OPTION_MARGIN_PCT = 0.20;
-// The forced sale that meets an obligation the desk's cash cannot (02a "The
-// evening"): a machinery close at this multiple of the ordinary spread, plus the
-// ordinary impact. Replaces the roadmap's "at the ladder's cost", which is free in
-// Act I, where every fixture's obligation falls.
+// The forced sale that meets an obligation the desk's cash cannot: a machinery close at this multiple of the ordinary spread, plus the
+// ordinary impact. Not "at the ladder's cost", which is free in Act I, where every
+// fixture's obligation falls.
 export const FORCED_SALE_SPREAD_MULT = 3;
 
 // -- Bid/ask spread model --

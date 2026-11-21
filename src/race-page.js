@@ -15,7 +15,7 @@
    conditioned on today). The self-graded Fixedpoint Index
    sits apart, unlisted.
 
-   Your forecast (02a, the posterior and its standing
+   Your forecast (the posterior and its standing
    policy) is edited here and drawn over Consensus in ink,
    on the rungs it carries; a rung that follows the market
    shows only Consensus. On each open rung the bead is your
@@ -23,11 +23,11 @@
    loosen), and the square on the term's-end gauge is the
    chance the rung lands this term at all. An edit carries
    a followed rung; Delete follows the market again. The
-   keys follow 02a. Consensus's spindle and yours share one
+   keys are the editor's. Consensus's spindle and yours share one
    scale per rung, so a narrower or less likely forecast
    reads as one. The desk snapshots the policy each quarter.
 
-   THE INTEGRITY RULE (09 "Information hygiene", as in
+   THE INTEGRITY RULE (as in
    race/consensus.js): during play this page reads only
    public records -- release dates and claimed rungs,
    certifications, belief B, the listed contracts. The
@@ -59,7 +59,7 @@ let _pub = null, _hid = null;
 const _st = {
     ctx: null, visible: false, revealed: false, ended: false, reveal0: -1e9, raf: 0, w: 0, h: 0, dpr: 1, cap: null, canvas: null, c: null, reduced: false,
     // The forecast editor: the selected rung, a drag, the draft's copy the drag
-    // edits (02a "The run, headless": committed on release), the handles drawn
+    // edits (committed on release), the handles drawn
     // last frame, and main.js's hooks.
     sel: 2, drag: null, edit: null, handles: [], hover: null, hooks: {},
 };
@@ -75,7 +75,7 @@ function _commit(state) {
     _st.hooks.onCommit(state);
 }
 
-// Editor steps (UNRATIFIED feel numbers, 02a gives only the keys): ←/→ move a
+// Editor steps (unratified feel numbers): ←/→ move a
 // median 5 days, Shift 21 (ratified); ↑/↓ scale the width by 10%; a vertical drag
 // scales it by e per 90 px, up tighter. The plateau: PageUp/PageDown move the
 // term-end height 0.05, Shift 0.01; a drag follows the gauge.
@@ -103,8 +103,7 @@ export function initRacePage(ctx, hooks = {}) {
     new ResizeObserver(() => { if (_size()) drawRace(); }).observe(_st.canvas.parentElement);
     const btn = document.getElementById('race-reveal');
     btn.addEventListener('click', () => revealRace(!_st.revealed));
-    // The desk snapshots the standing policy each quarter (02a "The standing
-    // policy"): nothing is locked by hand, so the old Lock control stays hidden.
+    // The desk snapshots the standing policy each quarter: nothing is locked by hand, so the old Lock control stays hidden.
     const lock = document.getElementById('race-lock');
     if (lock) lock.hidden = true;
     // Follow the market on every rung.
@@ -375,8 +374,7 @@ export function drawRace() {
         for (const R of [2, 3, 4, 5]) {
             const law = _law(R, today);
             if (!law) continue;
-            // Ink only where the player has stated something (02a "The standing
-            // policy"): a followed rung's effective curve is B's, so it shows only B.
+            // Ink only where the player has stated something: a followed rung's effective curve is B's, so it shows only B.
             const mine = draft && draft[R] && pol[R] === 'carry' ? _law(R, today, draft[R]) : null;
             const y = Y(R), amp = narrow ? 10 : 15;
             let mx = 0;
@@ -548,7 +546,7 @@ export function drawRace() {
         _shape(c, L.shape, X(r.day), Y(v), r.seed ? 3.4 : 4.3, ink[L.ink], pal.canvas);
     }
 
-    // Demonstrations (02a "Demonstrations"), from the public record: hollow, in the
+    // Demonstrations, from the public record: hollow, in the
     // lab's lane at the rung they bear on. Dashed while disputed, a dot once upheld,
     // short of the rung once narrowed, struck through once withdrawn.
     const rec = belief.active ? belief.record : null;
@@ -627,7 +625,7 @@ function _caption(frontier) {
 }
 
 // ---------------------------------------------------------------------------
-// The forecast editor (02a, the posterior's editor)
+// The forecast editor (the posterior's editor)
 // ---------------------------------------------------------------------------
 
 /** The draft is editable while the race runs and nothing has been revealed. */
@@ -686,7 +684,7 @@ function _wireEditor() {
                 // The first move carries a followed rung (its copy clamped between its
                 // carried neighbours), and the drag runs from that copy. Across moves the
                 // median, up and down the width, each only once the pointer has moved
-                // that way: a width drag moves no neighbour (02a "The standing policy").
+                // that way: a width drag moves no neighbour.
                 if (!dr.carried) {
                     dr.carried = true;
                     _st.edit = _carryFirst(_st.edit, dr.R);
@@ -724,10 +722,10 @@ function _wireEditor() {
 }
 
 /**
- * The editor's keys (02a): ←/→ move the selected median 5 days (Shift: 21),
+ * The editor's keys: ←/→ move the selected median 5 days (Shift: 21),
  * ↑ tightens and ↓ loosens its width, Page Up/Down raise and lower the chance it
  * lands this term (Shift: finer); any of them carries a followed rung, and Delete
- * or Backspace sets it back to follow the market (02a "The standing policy").
+ * or Backspace sets it back to follow the market.
  * Tab and Shift+Tab step through the open rungs
  * like the thumbs of a multi-thumb slider, letting focus leave past either end;
  * Home and End choose the first and last.
@@ -796,7 +794,7 @@ function _table() {
         const law = race && belief.active ? _law(R, t0) : null;
         const med = (l) => l ? (l.median != null ? String(Math.round(l.median)) : 'not this term') : cert ? 'certified' : '—';
         // Locked: the latest lock per rung, conditioned on today like the market's
-        // beside it. A rung the lock read as followed is the market's (02a).
+        // beside it. A rung the lock read as followed is the market's.
         const lock = race && belief.active ? latestLock() : null;
         const locked = !lock ? '—' : lock.classes[R] === 'followed' && !cert ? 'Market' : med(_law(R, t0, lock.curves[R]));
         // The standing policy as the canvas reads it: a followed rung, the market's day.
@@ -822,7 +820,7 @@ function _table() {
         li.append(d, `${L.name}${r.spawn ? ' spins out with ' : ' ships '}${L.model}${r.rung >= 1 ? `, claiming R${r.rung}` : ''}`);
         log.appendChild(li);
     }
-    // The chain's reports (02a "Demonstrations"), marked new since the latest snapshot.
+    // The chain's reports, marked new since the latest snapshot.
     const rec = race && belief.active ? belief.record : null;
     renderReports(rec, rec ? rec.day : 0, rec ? (latestLock()?.day ?? null) : null);
 }

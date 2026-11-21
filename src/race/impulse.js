@@ -2,8 +2,8 @@
    src/race/impulse.js -- Decaying event-impulse overlay
    for the race->market coupling (overhaul phase 4).
 
-   THE PROBLEM this replaces (03 "Incident coupling rule",
-   ruled 2026-07-23): the detected-incident + release +
+   THE PROBLEM this replaces
+   (ruled 2026-07-23): the detected-incident + release +
    certification stream is high-volume by design (~80-160
    fired events/run). Permanent additive `sim` parameter
    deltas (the prototype's convention) walk every parameter
@@ -33,8 +33,8 @@
    Pure / DOM-free -- headless-importable (tests/belief.test.mjs
    asserts no permanent param drift over a full run). Mirrors price-impact.js conventions.
 
-   UNRATIFIED (02a records "impact ... magnitudes as rev 1"
-   but rev 1's numbers are not transcribed): the impulse
+   UNRATIFIED (the rev-1 impact magnitudes were never
+   transcribed): the impulse
    half-life and the per-event impulse magnitudes are taken
    from the race-events.js `// P4 coupling reference:` sign
    intents; listed in the phase-4 report for ratification.

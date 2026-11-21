@@ -5,7 +5,7 @@
    strait tail premium (overhaul phase 3b, the second new
    instrument class after Consensus binaries).
 
-   The instrument (03-market-mechanics):
+   The instrument:
      - A public COMPUTE-PRICE INDEX driven ONLY by public
        state: compute-demand proxies (frontier release
        counts + certified rungs from the public view), a
@@ -19,11 +19,10 @@
        curve carries a persistent invasion-risk premium that
        responds to public tension; a Taiwan blockade (the
        world-state `geo.taiwanBlockade` flag -- NOT Hormuz's
-       `straitClosed`; 02a "The strait") applies
-       the 09 force-majeure adjustment (far curve +40-80%, per
-       02a) -- "blockade scares print here first."
+       `straitClosed`) applies
+       the force-majeure adjustment (far curve +40-80%) -- "blockade scares print here first."
 
-   Regime lifecycle (09 "Lifecycle", compute-futures row):
+   Regime lifecycle (compute-futures row):
      precedence  decree conversion (mobilized)
                ⊃ force-majeure adjustment (blockade)
                ⊃ ordinary settlement.
@@ -37,12 +36,12 @@
        entryBasis); shorts owe symmetrically. The committee
        chooses only among formulas enumerated at listing
        (DECREE_FORMULAS) -- pre-bound per contract, so the
-       closeout is computable from public info (09 invariant
+       closeout is computable from public info (fairness invariant
        3). Wired through the canonical setControlRegime path
        via freezeComputeMarket (mirrors freezeConsensus) --
        never a second regime path.
 
-   THE INTEGRITY RULE (09 "Information hygiene"): the pricer
+   THE INTEGRITY RULE: the pricer
    receives ONLY buildComputePublicView(race, geo) -- discrete
    public rung claims / certifications / release counts, the
    clock, and the PUBLIC geopolitical facts (strait tension /
@@ -50,7 +49,7 @@
    The corruption probe scrambles every hidden field and
    asserts the whole curve is bit-identical.
 
-   The nationalization reference (09 "protected"): a rolling
+   The nationalization reference: a rolling
    20-session median of the HCN exchange settlement mark, plus
    a conversion multiple U[0.60,1.15] PRE-SAMPLED once at race
    creation from deriveSeed(seed,'nationalization') (reloads
@@ -79,16 +78,16 @@ const median = (arr) => {
 
 /** Contract multiplier ($ per index point). RATIFIED as 1: the futures price IS
  *  the index level, mirroring the VXHCN-future convention (direct settlement,
- *  Reg-T shorts). With multiplier 1 the 09 decree closeout
+ *  Reg-T shorts). With multiplier 1 the decree closeout
  *  signedQty × multiplier × (decreePrice − entryBasis) equals the realized P&L. */
 export const COMPUTE_MULTIPLIER = 1;
 
 /** Quarterly maturity grid (trading days) + how many list at once (rolling). */
 const QUARTER = 63;        // QUARTERLY_CYCLE -- quarter length in trading days
-const LADDER_SIZE = 4;     // maturities listed at a time (03: "3-4 listed at a time, rolling")
+const LADDER_SIZE = 4;     // maturities listed at a time ("3-4 listed at a time, rolling")
 const HORIZON = 1008;      // race clock end (no maturity past the term)
 
-// P4-swappable placeholder (02a "Compute futures"): the CURVE STRUCTURE is ratified
+// P4-swappable placeholder: the CURVE STRUCTURE is ratified
 // -- demand uplift (releases + certified rungs + trend), scramble backwardation,
 // and a pure-tail standing strait premium -- but its MAGNITUDES are deliberately
 // left as placeholders (same stance as the Consensus binary quotes); this whole
@@ -104,25 +103,25 @@ const STRAIT_TAIL_BASE = 0.06;    // standing far-curve invasion-risk premium (c
 const STRAIT_TAIL_TENSION = 0.10; // additional standing premium per unit public tension
 const TAIL_TAU = 120;             // days: the tail premium saturates within the listed ladder
 
-// RATIFIED (02a "The strait"): a blockade lifts the FAR compute curve +40-80%. The
+// RATIFIED: a blockade lifts the FAR compute curve +40-80%. The
 // tail-premium magnitude under blockade lands in this band (position within it
 // scaled by public tension).
 const BLOCKADE_FAR_LO = 0.40;
 const BLOCKADE_FAR_HI = 0.80;
-// Ratified (02a "Compute futures", settlement-during-blockade rationale): a realized
+// Ratified (settlement-during-blockade rationale): a realized
 // blockade is a supply shock that also lifts the NEAR curve (so a contract
 // settling DURING a blockade carries the force-majeure adjustment, not just the
 // far-dated marks). The near end gets this fraction of the far premium; the
 // standing (pre-blockade) invasion-RISK premium is a pure tail (0 at spot).
 const BLOCKADE_NEAR_FRAC = 0.5;
 
-/** Enumerated decree-price formulas (09: "the committee chooses only among
+/** Enumerated decree-price formulas ("the committee chooses only among
  *  formulas enumerated at listing"). Each contract binds one at listing, so the
  *  decree closeout is computable from public info (fairness invariant 3). */
 export const DECREE_FORMULAS = ['last-valid-mark', 'listing-anchor'];
 
 // Which control regimes freeze compute-futures trading + arm decree conversion
-// (09 succession -- same set as Consensus).
+// (succession: the same set as Consensus).
 const FREEZE_REGIMES = new Set(['mobilized', 'nationalized', 'classified']);
 // Which regimes are the nationalization trigger for the HCN reference freeze.
 const NATIONALIZE_REGIMES = new Set(['nationalized', 'classified']);
@@ -132,12 +131,12 @@ export function isComputeFreezeRegime(regime) {
     return FREEZE_REGIMES.has(regime);
 }
 
-// ---- Nationalization reference (09 "protected"; seed-persisted) ----------
+// ---- Nationalization reference (seed-persisted) ----------
 
 const NAT_WINDOW = 20;     // sessions in the reference median window
 const NAT_LAG = 5;         // window ends 5 sessions before the trigger
 const NAT_KEEP = NAT_WINDOW + NAT_LAG + 8;   // rolling buffer depth (a little slack)
-const NAT_MULT_LO = 0.60;  // conversion multiple U[0.60, 1.15] (09, RATIFIED)
+const NAT_MULT_LO = 0.60;  // conversion multiple U[0.60, 1.15]
 const NAT_MULT_HI = 1.15;
 
 // ---- Singleton state -----------------------------------------------------
@@ -161,7 +160,7 @@ export const computeMarket = {
     _state: {},
 };
 
-// P4-swappable placeholder (02a "Compute futures"): a per-contract half-spread for
+// P4-swappable placeholder: a per-contract half-spread for
 // the displayed curve quote; compute futures are illiquid, so wider than
 // stock/bond. This is a price spread on the curve (the fill spread is the
 // stock/bond model keyed off COMPUTE_SPREAD_VOL in _fillPrice).
@@ -170,7 +169,7 @@ const COMPUTE_HALF_SPREAD_PCT = 0.004;   // 0.4% each side (0.8% round-trip)
 // ---- The public view (integrity boundary) --------------------------------
 
 // Public tension scalar in [0,1] from the China proxies is FACTORED into
-// strait.js as the single shared source (02a: "factor that helper to one shared
+// strait.js as the single shared source ("factor that helper to one shared
 // source"), so the compute curve and the blockade hazard read tension
 // identically. Imported as `straitTension` (was the local `tensionFromGeo`).
 
@@ -179,11 +178,11 @@ const COMPUTE_HALF_SPREAD_PCT = 0.004;   // 0.4% each side (0.8% round-trip)
  * discrete public demand proxies (frontier release count + highest certified
  * rung), the clock, the control regime, and the PUBLIC Taiwan-strait state
  * (blockade flag + a tension scalar). NO continuous capability of any track --
- * C is LATENT (02-race-model). The pricer never receives `race`; it receives this
- * object, so the integrity rule holds by construction (09 "Information hygiene").
+ * C is LATENT. The pricer never receives `race`; it receives this
+ * object, so the integrity rule holds by construction.
  *
- * TWO STRAITS, TWO FLAGS (02a): the compute market's chokepoint is TAIWAN (the
- * Hsinchu fabs, 03), so the blockade reads ONLY `geo.taiwanBlockade`. The
+ * TWO STRAITS, TWO FLAGS: the compute market's chokepoint is TAIWAN (the
+ * Hsinchu fabs), so the blockade reads ONLY `geo.taiwanBlockade`. The
  * surviving Gulf arc's `geo.straitClosed` is the Strait of HORMUZ (oil), a
  * different chokepoint -- it must never move the chip curve.
  */
@@ -217,7 +216,7 @@ let _priceSource = placeholderCurve;
 /**
  * Inject a different curve source. In phase 4, belief.js calls this with a
  * function `(view, dte) => indexPrice` that reads the market belief `B`. `B` is
- * built from public evidence (09), and the source is still handed only the
+ * built from public evidence, and the source is still handed only the
  * public `view`, so swapping it in preserves the integrity rule.
  */
 export function setComputePriceSource(fn) {
@@ -231,10 +230,10 @@ export function setComputePriceSource(fn) {
  *   spot     = BASE × (1 + demand uplift)   [releases + certified rungs + trend]
  *   backwardation tilt (near richer during scramble) decays with maturity
  *   strait tail tilt (FAR end premium) grows with maturity; blockade lifts it
- *     into the RATIFIED [0.40, 0.80] band (02a force-majeure adjustment).
+ *     into the RATIFIED [0.40, 0.80] band (the force-majeure adjustment).
  * `dte` is the maturity in trading days. Reads only the public view; the
  * structure is ratified, the non-blockade magnitudes are P4-swappable
- * placeholders (02a "Compute futures").
+ * placeholders.
  */
 export function placeholderCurve(view, dte) {
     const demandUplift = K_RELEASE * view.releaseCount
@@ -248,7 +247,7 @@ export function placeholderCurve(view, dte) {
     const backwardationTilt = scramble * (1 - Math.exp(-dte / SCRAMBLE_TAU));
 
     // Strait premium. Without a blockade, the far end carries a pure invasion-RISK
-    // premium (0 at spot, growing with maturity). A realized blockade (09 force-
+    // premium (0 at spot, growing with maturity). A realized blockade (force
     // majeure) lifts the far curve into the RATIFIED [0.40, 0.80] band AND lifts
     // the near/settlement end by BLOCKADE_NEAR_FRAC of it, so a contract settling
     // during a blockade carries the adjustment.
@@ -276,7 +275,7 @@ function ladderDays(day) {
 }
 
 /** Ensure every window contract for `day` exists in _state (listing binds the
- *  decree formula -- 09: chosen among the enumerated set AT listing). */
+ *  decree formula -- chosen among the enumerated set AT listing). */
 function ensureListed(day) {
     for (const settleDay of ladderDays(day)) {
         if (computeMarket._state[settleDay]) continue;
@@ -300,7 +299,7 @@ function resolveDecreePrice(st) {
         case 'listing-anchor': return COMPUTE_INDEX_BASE;
         case 'last-valid-mark':
         default:
-            // 09 halted-leg risk-mark: the last valid executable mark before the
+            // The halted-leg risk-mark: the last valid executable mark before the
             // decree; the listing anchor only if the contract was never quoted.
             return st.lastMark != null ? st.lastMark : COMPUTE_INDEX_BASE;
     }
@@ -356,7 +355,7 @@ export function deactivateComputeMarket() {
  * Freeze compute-futures trading and arm decree conversion. Idempotent. Called
  * ONLY from setControlRegime (race-state.js) when the regime reaches a freeze
  * regime -- the canonical control-regime mutation path (mirrors freezeConsensus).
- * Snapshots each open contract's decree price (09 halted-leg risk-mark) ONCE so
+ * Snapshots each open contract's decree price (the halted-leg risk-mark) ONCE so
  * the conversion is fixed at the freeze. When the regime is the nationalization
  * trigger, also freezes the HCN nationalization reference (median × multiple) and
  * ledgers it. Settlement of the converted book is a separate step in
@@ -380,8 +379,8 @@ export function freezeComputeMarket(race, regime) {
 /**
  * Feed the current HCN exchange settlement mark into the rolling reference
  * window. Call once per completed day with the AUTHORITATIVE process mark (never
- * an impact-adjusted / player-touched price -- 09 excludes temporary and player
- * impact by construction). No-op once frozen (the window stops mattering).
+ * an impact-adjusted / player-touched price -- temporary and player
+ * impact are excluded by construction). No-op once frozen (the window stops mattering).
  */
 export function stepNationalizationRef(race, hcnMark) {
     const ref = race && race.nationalizationRef;
@@ -393,7 +392,7 @@ export function stepNationalizationRef(race, hcnMark) {
 /**
  * Freeze the compensation reference at the nationalization trigger: the median
  * exchange settlement mark over the 20 sessions ENDING 5 sessions before the
- * trigger (09 "protected"), times the pre-sampled multiple. Idempotent (first
+ * trigger, times the pre-sampled multiple. Idempotent (first
  * freeze wins). Returns the frozen ledger record (or the existing one).
  */
 export function freezeNationalizationReference(race, triggerDay) {
@@ -431,7 +430,7 @@ export function getNationalizationReference(race) {
  * FREEZE IS TERMINAL (findings 2 + 3): while `computeMarket.frozen`, no new
  * contract is listed (the universe is frozen at the regime transition), and every
  * unsettled contract's quote is HELD at its captured decree / last-valid mark --
- * the live price source is never called and `lastMark` never moves (09 halted-mark
+ * the live price source is never called and `lastMark` never moves (the halted-mark
  * invariant; the P4 seam inherits a book that stays frozen).
  */
 export function refreshComputeQuotes(race, geo) {
@@ -512,12 +511,12 @@ export function isComputeTradeable(key) {
  * mark the book. Called right after advanceRace, so `race.day` is the endDay.
  * `geo` is the public geopolitical projection.
  *
- * Precedence (09 "Lifecycle"):
+ * Precedence:
  *   1. Decree regime (mobilized/nationalized/classified) -> DECREE CONVERSION of
  *      every open contract at its bound decree price (frozen at freezeComputeMarket).
  *   2/3. Otherwise ORDINARY settlement of every contract whose maturity has
  *      arrived, at the current index. A Taiwan blockade (geo.taiwanBlockade) is
- *      folded into that index by the curve (02a force-majeure adjustment), so a
+ *      folded into that index by the curve (the force-majeure adjustment), so a
  *      blockade settlement is ordinary settlement at the adjusted index, tagged
  *      FORCE_MAJEURE for the ledger. Hormuz (geo.straitClosed) is NOT read here.
  *
@@ -569,7 +568,7 @@ export function computeFutureSettlements(race, geo) {
  * (day >= settleDay) contracts; a held contract whose maturity is AFTER an early
  * player-terminal / private-supervised resolution never matures there -- this
  * closes it out. Precedence: decree (freeze regime) -> the captured decree price;
- * else the last-valid public index mark (09 last-valid-before-cutoff; the compute
+ * else the last-valid public index mark (last-valid-before-cutoff; the compute
  * index is public, impact never touches it), blockade-flagged when the Taiwan
  * strait is closed. RULING FLAGGED (coordinator): a non-decree held contract
  * settles at its last-valid index mark (`kind: 'TERMINAL'`) rather than being

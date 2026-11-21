@@ -235,7 +235,7 @@ export function recordOptionTrade(type, qty, sigma, logSK, dte, strike, expiryDa
 /**
  * The impact fill costs a sequence of trades would pay, accruing across them as
  * they would on execution, read from the pools and never written to them (the
- * flatten's estimate, 02a "The evening"). The formulas are the record functions'.
+ * flatten's estimate). The formulas are the record functions'.
  * Each trade is { type, qty (signed), vol } plus { logSK, dte, strike, expiryDay }
  * for an option; `vol` is what _fillPrice hands its record call (sigmaR for a bond,
  * xi for a VXHCN future, sigma otherwise). Compute futures and binaries carry no
@@ -296,7 +296,7 @@ export function rehedgeMM(positions) {
 }
 
 /**
- * Seat the MM's hedge at the takeover book's (02a "The evening"), recording no
+ * Seat the MM's hedge at the takeover book's, recording no
  * volume: the predecessor's history enters nothing, and only later changes in
  * delta count as flow.
  */
@@ -412,7 +412,7 @@ export function selectImpactToast(grossRatio, instrument, day) {
         else return null;
     }
     _lastToastDay = day;
-    // A presentation stream (02a "The run, headless"): the line's pick is keyed
+    // A presentation stream: the line's pick is keyed
     // by day alone and feeds nothing but the toast.
     return pool[keyedRng(0, 'present.impactToast', day).int(pool.length)];
 }

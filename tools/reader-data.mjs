@@ -1,4 +1,4 @@
-/* 02a "The reader": shared deterministic simulation/sampling contract for
+/* Shared deterministic simulation/sampling contract for
    the offline fit and the harnesses. Never imported by the game. */
 import { createRaceState, advanceRace, stepControlRegime } from '../src/race/race-state.js';
 import { checkResolution, HORIZON } from '../src/race/resolution.js';
@@ -8,7 +8,7 @@ import { initBelief, stepBelief, belief } from '../src/race/belief.js';
 import { createPublicRecord, createRecordFromSnapshot, foldPublicRecordRow, stepPublicRecord, recordFeatures, ruleSummary, FEATURE_NAMES } from '../src/race/public-record.js';
 import { engineInputs } from './engine-worlds.mjs';
 
-/** 02a "Demonstrations" (The refit): the worlds' input scenarios. The assumed
+/** The refit: the worlds' input scenarios. The assumed
  *  Markov schedule is retired. */
 export const WORLD_SCENARIOS = Object.freeze({
     scenarios: ['neutral', 'engine'],
@@ -27,8 +27,8 @@ export function worldInputs(seed, scenario) {
     if (scenario !== 'neutral') throw new Error(`Unknown world scenario ${scenario}`);
     return () => ({ straitTension: 0, exportControlStage: 0, treatyStage: 0, playerCoupling: 0, exo: null, geo: NEUTRAL_GEO });
 }
-/** One completed day of the race on a world's inputs, in the run's order
- *  (02a "The run, headless"): advanceRace, the regime ratchet, the treaty track. */
+/** One completed day of the race on a world's inputs, in the run's order:
+ *  advanceRace, the regime ratchet, the treaty track. */
 export function stepWorld(race, inputs) {
     advanceRace(race, { straitTension: inputs.straitTension, playerCoupling: inputs.playerCoupling, exportControlStage: inputs.exportControlStage });
     stepControlRegime(race, inputs.exo || undefined);
@@ -51,7 +51,7 @@ export function sampleFeatures(s, R, set) {
     return Float64Array.from(set === 'full' ? [...leg, ...s.common] : leg);
 }
 
-/** 02a: a world's sampling. Grid and seed-offset 21-day snapshots, explicit
+/** A world's sampling. Grid and seed-offset 21-day snapshots, explicit
  *  role-change knots, diagnostic days and each act boundary; coincident series
  *  share one snapshot. A snapshot taken on the day the world resolves is
  *  dropped (no extrapolation, no labels conditioned on surviving a quarter).
@@ -83,7 +83,7 @@ const capTargets = (targets, T5) => [...targets, T5 <= 1260 ? T5 : Infinity].map
  *  inputs (engine-worlds.mjs replays a stored tape to check it). */
 export function runReaderWorld(seed, scenario = 'neutral', hook = null, source = null) {
     const race = createRaceState(seed), rec = createPublicRecord(race), inputsOf = source || worldInputs(seed, scenario);
-    // 02a reader fit consumes the heuristic only. The public initializer's
+    // The reader fit consumes the heuristic only. The public initializer's
     // capability-free form seeds that rule without phase-B pricing/player
     // projection; the complete race is still passed to stepBelief below.
     initBelief({ seed: race.seed, day: race.day });
@@ -127,7 +127,7 @@ export function samplesFromRows(world, scenario = 'engine') {
     return { ...sampler.finish(world.outcome.targets.map(t => t ?? Infinity), world.outcome.family), rec };
 }
 
-/** 02a: the encoded sample's columns, derived from the feature names so the
+/** The encoded sample's columns, derived from the feature names so the
  *  optimizer and the metrics never hard-code a schema's width. */
 const COMMON = FEATURE_NAMES[2].full.length - 5;
 export const SAMPLE_LAYOUT = Object.freeze({ legs: 10, family: 30, common: 38, commonCount: COMMON, rules: 38 + COMMON, mask: 38 + COMMON + 16, columns: 38 + COMMON + 17 });

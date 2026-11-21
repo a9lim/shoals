@@ -3,7 +3,7 @@
    (overhaul phase 6, endings round 3): what the book is
    worth when the desk's story ends.
 
-   09 "Claims maturing past day 1008" is a ROW-CONSTRAINT
+   The closeout is a ROW-CONSTRAINT
    CONTRACT: family x controlRegime x instrument, each cell
    giving a valuation timestamp, its public inputs, the
    recovery convention, and (for the fizzle) a seeded path.
@@ -11,7 +11,7 @@
    PURE, DOM-free valuation surface. It never mutates the
    portfolio; the orchestrator (main.js) applies the cash,
    routing binaries through applyBinarySettlementRows and
-   compute futures through settleComputeFutures (09: those
+   compute futures through settleComputeFutures (those
    instruments keep their own terminal settlement paths --
    integrate, don't duplicate).
 
@@ -32,10 +32,10 @@
    harness gates is stronger and basis-free: TERMINAL
    pre-closeout equity at authoritative marks (cash + signed
    MTM + every short's reserved) == post-closeout cash. No
-   fictional fills; never cost-basis-dependent (09 inv 4).
+   fictional fills; never cost-basis-dependent.
 
-   CLOSEOUT_TUNING mirrors 02a "Terminal closeout and overlays".
-   With 02a's valuation layer, HCN reconciles realized over
+   CLOSEOUT_TUNING holds the cell magnitudes.
+   With valuation layer, HCN reconciles realized over
    expected: spot * family multiple / last applied valuation.
    Conversion regimes retain their frozen reference.
    =================================================== */
@@ -46,7 +46,7 @@ import { vasicekBondPrice } from '../pricing.js';
 import { TRADING_DAYS_PER_YEAR } from '../config.js';
 import { privateTerminalMultiple } from './rounds.js';
 
-// ---- Family-mark magnitudes (02a "Terminal closeout and overlays") --------
+// ---- Family-mark magnitudes --------
 // Mutable so a headless calibration sweep can retune without a code edit.
 export const CLOSEOUT_TUNING = {
     meltUpWon: 1.60,        // family 1 (won with margin): the wonders arrive, growth prints
@@ -61,16 +61,16 @@ export const CLOSEOUT_TUNING = {
 // Family ids (mirror resolution.js): 1 won-margin, 2 knife-edge, 3 misaligned,
 // 4 china-first, 5 the-Deal, 6 fizzle.
 const DOOM_FAMILIES = new Set([3, 4]);
-// Regimes at which HCN converts to compensation claims (09 nationalization cell).
+// Regimes at which HCN converts to compensation claims (the nationalization cell).
 const CONVERSION_REGIMES = new Set(['nationalized', 'classified']);
 
 /**
- * The terminal HCN per-share mark for a resolved world. LITERAL 09 cells first:
+ * The terminal HCN per-share mark for a resolved world. LITERAL cells first:
  * at a conversion regime with a frozen nationalization reference, HCN converts
  * 1:1 to a compensation claim at `reference` (= median x pre-sampled multiple --
  * NEVER the compute contract's own multiplier; the two never mix). Otherwise the
  * family sets the realized multiple of the last authoritative process price
- * `spot`, divided by the last applied valuation when supplied (02a):
+ * `spot`, divided by the last applied valuation when supplied:
  *   won-margin -> melt-up; ambiguous dawn -> quieter melt-up; Deal -> boring;
  *   misaligned/china -> waterfall recovery; fizzle -> seeded unwind path.
  * The fizzle path draws from a NEW named substream (deriveSeed(seed,'closeout')) --
@@ -98,7 +98,7 @@ export function hcnTerminalMark(family, regime, race, spot, valuation) {
         return { mark: spot, converted: true, cell: 'hcn:conversion-unavailable' };
     }
     const T = CLOSEOUT_TUNING;
-    // 02a "The valuation layer": spot already embeds the market expectation.
+    // Spot already embeds the market expectation.
     // Reconcile realized over expected; absent V_T preserves non-valuation callers.
     const expected = valuation ?? 1;
     switch (family) {
@@ -110,7 +110,7 @@ export function hcnTerminalMark(family, regime, race, spot, valuation) {
         case 6: {
             // Fizzle terminal mark: centre fizzleFloor, +- fizzleSpread from the
             // isolated 'closeout' substream (fresh per closeout; never race.streams).
-            // 02a: one seeded terminal draw compresses the 18-month unwind path.
+            // One seeded terminal draw compresses the 18-month unwind path.
             const u = createRng(deriveSeed(race.seed, 'closeout')).uniform(-1, 1);
             const mult = T.fizzleFloor + u * T.fizzleSpread;
             return { mark: spot * mult / expected, converted: false, cell: 'hcn:fizzle-unwind' };
@@ -120,7 +120,7 @@ export function hcnTerminalMark(family, regime, race, spot, valuation) {
 }
 
 /**
- * Corporate-action adjustment hook (09: adjustments apply BEFORE intrinsic).
+ * Corporate-action adjustment hook (adjustments apply BEFORE intrinsic).
  * Identity today -- a split / special-dividend strike adjustment slots here without
  * touching the intrinsic formula. Kept explicit so the ordering (adjust, then
  * intrinsic) is a named seam rather than an omission.
@@ -136,7 +136,7 @@ export function adjustedStrike(pos, _ctx) {
  * finalizeComputeTerminal); this matrix values the instruments WITHOUT a terminal
  * settlement path of their own: HCN stock, HCN options, VXHCN futures, bonds.
  *
- * The marks in `ctx` MUST be impact-free AUTHORITATIVE marks (09: settlement never
+ * The marks in `ctx` MUST be impact-free AUTHORITATIVE marks (settlement never
  * consumes the impact overlay or the player's CRR tree). The orchestrator passes
  * spot = sim.S (the authoritative process price impact never touches), varianceIndex
  * = the last-valid VXHCN spot (Heston spot, impact-free), and `ctx.bond` = the Vasicek
@@ -150,11 +150,11 @@ export function adjustedStrike(pos, _ctx) {
 export function closeoutUnitValue(pos, ctx) {
     switch (pos.type) {
         case 'privatestake':
-            // 02a closeout cell 10: a claim on Polaris, never an HCN process mark.
+            // Closeout cell 10: a claim on Polaris, never an HCN process mark.
             return Math.max(0, ctx.privateMark * privateTerminalMultiple(ctx.resolution, ctx.regime));
         case 'stock':
             // HCN shares -> terminal HCN mark (family mark, or conversion reference).
-            // RULING FLAGGED (coordinator): 09 models nationalized shares as signed
+            // RULING FLAGGED: the design models nationalized shares as signed
             // COMPENSATION CLAIMS; this cash-settles them at the reference for the
             // epilogue (a claim held to redemption == cash at reference).
             return Math.max(0, ctx.hcnMark);
@@ -162,8 +162,8 @@ export function closeoutUnitValue(pos, ctx) {
         case 'put': {
             // Declared accelerated termination: cash at INTRINSIC vs the terminal HCN
             // mark; time value extinguished. Corporate-action adjustment applies BEFORE
-            // intrinsic (09) -- `adjustedStrike` is the hook (identity today; a split /
-            // special-dividend adjustment slots here). RULING FLAGGED (coordinator): 09
+            // intrinsic -- `adjustedStrike` is the hook (identity today; a split /
+            // special-dividend adjustment slots here). RULING FLAGGED: the design
             // specifies accelerated intrinsic for NATIONALIZATION; this applies it to
             // every terminal family (all options settle at intrinsic vs the family HCN
             // mark), which is the natural terminal valuation but broader than the literal
@@ -173,13 +173,13 @@ export function closeoutUnitValue(pos, ctx) {
         }
         case 'vxhcnfuture':
             // Settle to the exchange variance index -- last valid observation before
-            // the cutoff (09); never reconstructed from abandoned Heston state.
+            // the cutoff; never reconstructed from abandoned Heston state.
             return Math.max(0, ctx.varianceIndex);
         case 'bond': {
-            // Bonds never halt (02a "Terminal closeout and overlays"): a non-doom terminal marks the bond at
+            // Bonds never halt: a non-doom terminal marks the bond at
             // its last LIVE MTM -- the impact-free Vasicek price (par-at-the-world's-end
             // is only true when the world actually ends). Default ONLY inside doom
-            // families (09), at a recovery fraction of FACE.
+            // families, at a recovery fraction of FACE.
             if (DOOM_FAMILIES.has(ctx.family)) return Math.max(0, ctx.bond.face * CLOSEOUT_TUNING.bondDoomRecovery);
             const dte = pos.expiryDay != null
                 ? Math.max((pos.expiryDay - ctx.bond.day) / TRADING_DAYS_PER_YEAR, 0) : 0;

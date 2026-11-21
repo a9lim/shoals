@@ -1,6 +1,5 @@
 /* =====================================================
-   src/run.js -- A run's transitions (02a "The run,
-   headless"): opening a day, a substep, the close (the
+   src/run.js -- A run's transitions: opening a day, a substep, the close (the
    race block in its documented order), the dispatch
    queue as a state machine, the terminal path, a new run
    and the commands. DOM-free: main.js keeps rendering,
@@ -121,7 +120,7 @@ function _stepRaceMarkets(capexWaves) {
             price: halcyonOfferPrice(sim.S),
         } });
     }
-    // Pi is the R5 contract's quote: B's probability of R5 by day 1000 (02a rounds).
+    // Pi is the R5 contract's quote: B's probability of R5 by day 1000.
     const pi = binaryProb(5, 1000);
     for (const round of stepRounds(run.race, pi)) _queuePopup({ category: 'rounds', _roundOffer: round });
 }
@@ -269,7 +268,7 @@ export function substep() {
 function _stepAct3() {
     const x = stepAct3Driver(frontierRung(), regime());
     run.sink.machine(x);
-    // The lane opens on the same public driver (02a: at released R4 the
+    // The lane opens on the same public driver (at released R4 the
     // discretionary pass moves to substep granularity).
     run.engine.setSubstepLane(frontierRung() >= SUBSTEP_LANE_RUNG);
 }
@@ -356,7 +355,7 @@ function _closeTradingDay() {
 }
 
 /**
- * The POPUP BARRIER (02a "Act III"): true while a decision is on screen or
+ * The POPUP BARRIER: true while a decision is on screen or
  * still waiting. While it holds, `_closeTradingDay` / `_onDayComplete` may NOT run
  * on ANY path (frame / tick / step) -- the day stays open, overlays installed,
  * until the player has answered. Without it a substep-lane arrival at substep 15
@@ -365,10 +364,8 @@ function _closeTradingDay() {
  *
  * Two halves, both required: the dispatch awaiting an answer (`run.current`,
  * shifted off the queue when it was shown), and an event still QUEUED waiting
- * its turn behind it. The barrier reads the run's state, never the DOM (02a "The
- * run, headless"). A pending terminal epilogue bars the close outright --
- * nothing ticks after the latch. Nothing holds a day for the forecast (02a "The
- * standing policy").
+ * its turn behind it. The barrier reads the run's state, never the DOM. A pending terminal epilogue bars the close outright --
+ * nothing ticks after the latch. Nothing holds a day for the forecast.
  */
 export function barrier() {
     return run.queue.length > 0 || !!run.pendingEpilogue || !!run.current;
@@ -392,7 +389,7 @@ export function tryClose() {
 
 /**
  * Close a day whose substeps finished while the barrier held, SYNCHRONOUSLY from
- * the drain (02a "Act III"): the player never presses play to collect a day
+ * the drain: the player never presses play to collect a day
  * the world already finished. Called from the popup-dismissal callback, after its
  * own `_processPopupQueue` has had the chance to show the next queued beat.
  *
@@ -410,7 +407,7 @@ function _closeCompletedDayIfPending() {
 }
 
 /**
- * Terminal partial-day ABORT (02a "Act III"). A terminal entered mid-day --
+ * Terminal partial-day ABORT. A terminal entered mid-day --
  * an intraday compliance choice, a rogue-trading latch off a substep-lane popup --
  * unwinds the day's overlays LIFO (same discipline as `_closeTradingDay`'s
  * restore), re-syncs to baseline, and marks the day closed WITHOUT running
@@ -459,7 +456,7 @@ function _onSubstepTick() {
  * THE popup-queue chokepoint (P7-2). Every beat that could reach the player goes
  * through here, so a standing order that INTERCEPTS a decision can do it before
  * the beat is ever queued: an intercepted tip never holds a day open (the popup
- * BARRIER reads this queue -- 02a "Act III") and never flashes on screen.
+ * BARRIER reads this queue) and never flashes on screen.
  * Because interception happens at INSERTION, the barrier's state is untouched and
  * `_closeCompletedDayIfPending` keeps working exactly as before -- an interception
  * cannot leave a completed day stranded, since the queue never grew.
@@ -521,7 +518,7 @@ function _interceptByStandingOrder(event) {
  * one is up. With the queue empty, a pending last edition goes to the shell
  * (P6-3: the terminal epilogue renders ONLY after the resolution-day beat has
  * drained -- the treaty superevent showed as an event; now the desk closes over
- * the player), with the almanac's record (02a "The evening": the last edition of
+ * the player), with the almanac's record (the last edition of
  * a Dynamic run, natural resolution and ejection alike, appends it once).
  */
 function _processPopupQueue() {
@@ -555,7 +552,7 @@ function _processPopupQueue() {
 }
 
 /**
- * The answer to the dispatch that is up (a command: 02a "The run, headless"). It
+ * The answer to the dispatch that is up (a command). It
  * names the dispatch by its occurrence id, and fails loudly if another is up.
  * Then the next queued dispatch shows (this chains the resolution-day beats and,
  * when the queue empties, hands over any pending last edition; a game-over choice
@@ -828,7 +825,7 @@ function _applyPopupChoice(event, choice) {
         haptic('heavy');
     }
     // Rogue trading / margin-deficit game over: the announcement popup is the
-    // BEAT; what follows is the SHARED terminal machinery (02a "Resolution"),
+    // BEAT; what follows is the SHARED terminal machinery,
     // NOT a preset reset -- latch -> extrapolate -> closeout -> epilogue, with the
     // involvement split deciding the overlay like any other resignation.
     if (event._gameOverAction) {
@@ -899,7 +896,7 @@ function _showComplianceTermination() {
 /**
  * Fire the DURABLE terminal game-over for a player-terminal state (P6-1 ruling):
  * the desk ends, the world extrapolates to a resolution (if it had not resolved
- * already), the book closes out against that resolution through the 09 matrix, and
+ * already), the book closes out against that resolution through the closeout matrix, and
  * the endings engine renders the epilogue. Idempotent (the run.gameOver latch guards
  * re-entry). Ledger-freeze-before-marking is guaranteed: the freeze fires inside
  * checkResolution (mid-run / timeout) or resolveNow (early ejection) BEFORE any
@@ -907,7 +904,7 @@ function _showComplianceTermination() {
  */
 function _triggerGameOver(endingId) {
     if (run.gameOver) return;
-    // 0. The band stops mid-note (P7-1 terminal latch, 02a "Act III"): immediately
+    // 0. The band stops mid-note (P7-1 terminal latch): immediately
     //    after the idempotency guard, BEFORE the game-over latch, the play mutation,
     //    the UI update, and the resolution-day beat. The desk goes quiet; the hum
     //    and the machines do not notice. Dynamic modes only -- Classic never enters
@@ -915,7 +912,7 @@ function _triggerGameOver(endingId) {
     if (run.race) run.sink.silence();
     run.gameOver = true;
     run.sink.gameOver();   // the shell ends a skip, stops the clock, locks its controls
-    // 0b. Partial-day abort (02a "Act III"): a terminal reached MID-DAY -- an
+    // 0b. Partial-day abort: a terminal reached MID-DAY -- an
     //     intraday compliance choice, a rogue latch off a substep-lane popup --
     //     unwinds the day's overlays and closes the day WITHOUT running
     //     _onDayComplete. The world does not tick after the latch, and the closeout
@@ -930,7 +927,7 @@ function _triggerGameOver(endingId) {
     freezeStandingOrders();
     portfolio.restricted = true;
 
-    // TERMINAL QUEUE DISCIPLINE (02a "Resolution"): the world's resolution supersedes the day's
+    // TERMINAL QUEUE DISCIPLINE: the world's resolution supersedes the day's
     // ordinary news. FILTER the popup queue -- BEFORE closeout / epilogue generation --
     // to terminal-safe beats only: today exactly category 'summit' (treaty_holds /
     // treaty_resolution, effect-free acknowledgments by construction). DISCARD every
@@ -950,13 +947,13 @@ function _triggerGameOver(endingId) {
         const geo = run.engine ? run.engine.world.geopolitical : null;
         const deskDay = relDay();                        // the desk's last day: the race clock may already be extrapolated
         // A desk that ends before the world does closes the demonstrations first, so
-        // the extrapolation draws none (02a "Demonstrations": the record ends where
+        // the extrapolation draws none (the record ends where
         // the run did).
         closeDemonstrations(run.race);
         resolution = resolveNow(run.race, geo);          // existing record, or extrapolate + latch (freezeLedger first)
-        // The outstanding quarter (02a "Scoring"): the unscored lock is scored once,
+        // The outstanding quarter: the unscored lock is scored once,
         // against its original end date and the completed trajectory; the
-        // reader-copier's beside it (02a "The almanac").
+        // reader-copier's beside it.
         scoreOutstandingQuarter(run.race);
         scoreCopierOutstanding(run.race);
         closeout = _runTerminalCloseout(resolution, geo);
@@ -974,7 +971,7 @@ function _triggerGameOver(endingId) {
     }
 
     // 4. Epilogue (structure + numbers here; sentences are coordinator slots). DEFERRED
-    //    behind the popup queue (02a "Resolution"): any resolution-day beat already
+    //    behind the popup queue: any resolution-day beat already
     //    queued -- the treaty superevent above all -- shows as an EVENT first; the
     //    epilogue renders only once the queue has drained (see _processPopupQueue).
     run.pendingEpilogue = generateEnding(endingId, {
@@ -987,7 +984,7 @@ function _triggerGameOver(endingId) {
 }
 
 /**
- * Run the 09 terminal closeout for the whole book against the resolved world.
+ * Run the terminal closeout for the whole book against the resolved world.
  * Consensus + compute settle through their STATEFUL idempotent finalizers (cash,
  * exactly-once); HCN stock / options / VXHCN futures / bonds settle
  * through the pure closeout matrix at IMPACT-FREE authoritative marks. Returns the
@@ -1001,12 +998,12 @@ function _runTerminalCloseout(resolution, geo) {
     const cSettle = finalizeComputeTerminal(run.race, geo);
     const compute = cSettle.length ? settleComputeFutures(cSettle, run.race) : [];
     for (let i = 0; i < compute.length; i++) develop('settlement');   // as the daily pass counts them
-    // HCN stock / options / VXHCN / bonds: impact-free authoritative marks (09 -- the
+    // HCN stock / options / VXHCN / bonds: impact-free authoritative marks (the
     // impact overlay and the CRR tree never touch settlement). sim.S is the
     // authoritative process price; market.vxhcn is the last-valid VXHCN spot (Heston,
     // impact-free -- the formal validity-history/realized-var-fallback observation
     // record is a market-integrity seam, FLAGGED); bonds carry their last live MTM via
-    // the impact-free Vasicek price (02a "Terminal closeout and overlays" -- non-doom families mark at MTM,
+    // the impact-free Vasicek price (non-doom families mark at MTM,
     // doom recovers on face inside closeout.js).
     const book = closeoutBook(portfolio.positions, resolution, run.race, {
         spot: sim.S, valuation: lastValuation(), privatePrice: lastPolarisRound()?.price,
@@ -1015,7 +1012,7 @@ function _runTerminalCloseout(resolution, geo) {
     });
     applyCloseoutRows(book.rows);   // credit cash + remove positions by id (preserves borrow accrual)
     // Every unpaid obligation is paid out of the closeout's cash, so terminal equity
-    // (the scorecard's cash) is net of it (02a "The evening").
+    // (the scorecard's cash) is net of it.
     const obligations = payObligationsAtCloseout();
     // All nine cells reach the scorecard: the matrix book + the two finalizer P&L sets.
     return { rows: book.rows, ctx: book.ctx, totalCash: book.totalCash, totalPnl: book.totalPnl, binary, compute, obligations };
@@ -1029,7 +1026,7 @@ function _runTerminalCloseout(resolution, geo) {
  * INVERTS (conventional books underperform an AGI-loaded benchmark). Modest,
  * bounded firmStanding pressure -- UNRATIFIED gap thresholds.
  */
-/** The firm-conversion throughline (04; content round 8): the CIO deciding out
+/** The firm-conversion throughline (content round 8): the CIO deciding out
  *  loud how much crazy the evidence now licenses. Checked quarterly on lock days
  *  AFTER stepFirmBelief: the grudging memo fires once when the credibility gate
  *  opens and F has begun to wake; the conversion verdict fires once when F
@@ -1043,7 +1040,7 @@ function _checkFirmConversion() {
         _fireRaceShell('firm_conversion_memo');
     } else if (run.firmMemoFired && !run.firmVerdictFired && canSendMemos()) {
         // Hedging the memo doesn't stop the firm -- being right converts it
-        // regardless (04) -- but it costs the attribution: the verdict needs a
+        // regardless -- but it costs the attribution: the verdict needs a
         // deeper F when the CIO got the risk-managed version (75 vs 85, ruled
         // at the content gate). The firm gets there on its own arithmetic, later.
         const gate = run.playerChoices.made_the_case ? 75 : 85;
@@ -1054,7 +1051,7 @@ function _checkFirmConversion() {
     }
 }
 /**
- * THE ROOM (P7-3; 02a "Act III", the room) -- the endgame
+ * THE ROOM (P7-3) -- the endgame
  * branch point, evaluated as a day-complete LATCH on a race-side PURE predicate
  * (`roomTriggerReady`: the leader lab's internal track within 0.15 of R5). The
  * conversion-latch precedent: the orchestrator owns the latch, the model owns the
@@ -1084,7 +1081,7 @@ function _checkRoom() {
     if (run.race.resolution) return;              // strictly pre-terminal
     const trigger = roomTrigger(run.race);
     if (!trigger.ready) return;                    // the leader is not at the decision yet
-    // The six criteria (02a). Criterion 1 is belief.js's OWN memo gate
+    // The six criteria. Criterion 1 is belief.js's OWN memo gate
     // (credibility > 0.55) -- read through canSendMemos, never re-derived here.
     const criteria = [
         canSendMemos(),
@@ -1119,14 +1116,14 @@ function _checkRoom() {
 
 function _runScrutiny() {
     if (!run.race) return;
-    // A followed R4 states nothing (02a "What follows states nothing"): no stated
+    // A followed R4 states nothing: no stated
     // posterior on the recursion rung, no belief gap to scrutinize this quarter.
     const pilled = playerPilled();                 // null, or the locked posterior on R4
     const gap = scrutinyGap(run.race, pilled);    // player - F, null when pilled is
     if (gap == null || Math.abs(gap) <= 20) return;   // not stated, or not divergent -> no scrutiny
     const lastRev = run.quarterlyReviews[run.quarterlyReviews.length - 1];
     const vs = lastRev ? lastRev.vsBenchmark : 0;
-    // Two-sided by rule (02a "Belief, η, and the firm"): the committee grudgingly respects P&L --
+    // Two-sided by rule: the committee grudgingly respects P&L --
     // +3 divergent & outperforming, -3 divergent & underperforming.
     const delta = vs > 0 ? 3 : vs < 0 ? -3 : 0;
     if (delta !== 0) shiftFaction('firmStanding', delta);
@@ -1142,7 +1139,7 @@ function _runScrutiny() {
     }
 }
 
-/** A quarter's close is one line in the Brief (02a "The standing policy"): when
+/** A quarter's close is one line in the Brief: when
  *  the quarter just scored had a carried rung, the lock day's edition carries one
  *  desk item on the wire with the quarter's increment and the record. A quarter
  *  whose every rung was followed scored exactly 0 and prints nothing. */
@@ -1159,7 +1156,7 @@ function _quarterCloseLine(scored) {
 }
 
 
-/** A desk item on the wire (02a "The evening"): minor, category desk. Off the
+/** A desk item on the wire: minor, category desk. Off the
  *  front page it also arrives as a toast, as the day's events do (the shell's). */
 function _postDeskItem(headline) {
     if (!run.engine) return;
@@ -1171,7 +1168,7 @@ function _postDeskItem(headline) {
 const _capFirst = (s) => s.charAt(0).toUpperCase() + s.slice(1);
 
 /**
- * The obligations' close (02a "The evening"). An obligation due today is paid from
+ * The obligations' close. An obligation due today is paid from
  * cash, or, when cash is short, the shortfall is raised by the forced sale (which
  * costs firmStanding 8) and any remainder goes on the margin loan. Five sessions
  * ahead, a desk whose cash would not cover it gets a notice and pauses: not a
@@ -1256,7 +1253,7 @@ function _marginCallDispatch(margin) {
                 desc: 'Dump everything at market. Stop the bleeding.',
                 playerFlag: 'margin_liquidated',
                 // INTERPRETATION: the bystander's answer is the full forced
-                // liquidation (02a "Headless policies": a specified forced-liquidation response).
+                // liquidation (a specified forced-liquidation response).
                 bystander: true,
                 // No static resultToast -- the _marginAction handler reports the
                 // TRUE outcome (n closed, m frozen) via _applyRestriction.
@@ -1275,7 +1272,7 @@ function _marginCallDispatch(margin) {
 function _onDayComplete() {
     if (run.gameOver) return;   // P6-3: the desk is closed; no further day processing after the terminal closeout
 
-    // The quarterly snapshot (02a "Locks"): at the start of the close that ends a
+    // The quarterly snapshot: at the start of the close that ends a
     // lock day's edition, before any other close bookkeeping and before the race
     // steps, while race.day and belief.day still equal the lock day. The desk
     // snapshots the standing policy without asking, and the reader-copier beside
@@ -1395,14 +1392,14 @@ function _onDayComplete() {
     // (phase 3a) read the ledger it produces.
     // The race advances every day, even after it has terminally resolved (P6): the
     // resolution latch does NOT freeze the race -- freezing it left race-instrument
-    // contracts unsettled past their deadlines (02a "Resolution"). The
+    // contracts unsettled past their deadlines. The
     // interim instead clears the ledger + bars new trades at the latch (below).
     if (run.race) {
         // P6-2 cost-of-capital coupling: fold today's net persistent HCN positioning
         // into the EMA and pass the bounded velocity multiplier as an ORCHESTRATOR
         // input (the straitTension precedent) -- never a mutation export. The channel
         // routes through deterministicDrift, so the plateau detector sees it too.
-        // POST-RESOLUTION the channel is INERT (02a "Player influence and the ledger"): once the race has
+        // POST-RESOLUTION the channel is INERT: once the race has
         // latched, the player moves nothing that counts -- pass no coupling (unfed =>
         // zero drift term, zero C row), matching the frozen ledger. The race still
         // advances for instrument settlement; that is settlement mechanics, not a
@@ -1416,7 +1413,7 @@ function _onDayComplete() {
         // STORED on the race so the plateau detector and any extrapolation price the
         // same drift the kinematics did.
         // The day's public world inputs: the race steps on them, and the public
-        // record (stepBelief, below) logs the same values (02a "The reader").
+        // record (stepBelief, below) logs the same values.
         const _raceInputs = { straitTension: _straitTension(), exportControlStage: _exportControlStage() };
         mark('advanceRace');
         advanceRace(run.race, {
@@ -1451,7 +1448,7 @@ function _onDayComplete() {
         // Live-day public rung snapshot -- taken here, BEFORE checkResolution's
         // extrapolation can move it (see the declaration above).
         _liveRung = buildPublicView(run.race).releasedFrontierRung;
-        // Event base-rate scaling (overhaul phase 5a; 04 engine note 1): the
+        // Event base-rate scaling (overhaul phase 5a): the
         // discretionary Poisson cadence scales with the PUBLIC released frontier
         // rung (1.0 at R1 = Act-I match, rising late-game). Set before maybeFire.
         mark('setBaseRateScale');
@@ -1521,12 +1518,11 @@ function _onDayComplete() {
         // The quarter's close + firm belief F + the belief-gap scrutiny loop
         // (overhaul phase 4). Lock days are the fixed quarterly grid 0/63/126...
         // (race clock). The lock itself is the snapshot at the top of the NEXT
-        // close (02a "Locks"), so F, scrutiny and the conversion read the closing
+        // close, so F, scrutiny and the conversion read the closing
         // quarter's lock here.
         if (isLockDay(run.race.day) && run.race.day !== run.lastForecastLockDay) {
             run.lastForecastLockDay = run.race.day;   // race.day >= 1 here
-            // Score the quarter that just closed under the lock that opened it (02a
-            // "Scoring"), the reader-copier's beside it, before F reads credibility
+            // Score the quarter that just closed under the lock that opened it, the reader-copier's beside it, before F reads credibility
             // -- so the firm, the memo gate and the close line all see this
             // quarter's result.
             mark('scoreQuarter');
@@ -1536,7 +1532,7 @@ function _onDayComplete() {
             stepFirmBelief(run.race);   // F wakes toward B; converts on the player's track record
             // P6-2 F-channel ledger (advice line): stepFirmBelief exposes the applied
             // movement's decomposition -- ledger ONLY the PLAYER conversion term
-            // (race.lastFConvert), never the autonomous B-wake (02a "Player influence and the ledger": the
+            // (race.lastFConvert), never the autonomous B-wake (the
             // ledger charges the player for persuasion, not for the world waking on its
             // own). Gated on the player having stated a forecast (the advice channel is
             // silent otherwise); zero-dropped like every channel. F is 0-100; /100 keeps
@@ -1551,7 +1547,7 @@ function _onDayComplete() {
         // tick's settlement/belief have applied. On the resolving tick, checkResolution
         // latches (freezeLedger -> mark -> clear lastTransitions, preserving the treaty
         // -outcome stamp for the bridge pass below) and bars new race-instrument trades.
-        // Freezing and playing on to term-end is ruled out (02a "Resolution"):
+        // Freezing and playing on to term-end is ruled out:
         // letting the sim run past resolution mutated settlements the closeout
         // should have fixed at resolution time. Instead this tick completes its bridge
         // pass + popup drain (the treaty superevent reaches the player), then the
@@ -1681,7 +1677,7 @@ function _onDayComplete() {
             _triggerGameOver(endingId);
             return;
         }
-        // NATURAL world resolution ends the desk's story too (02a "Resolution": the
+        // NATURAL world resolution ends the desk's story too (the
         // post-resolution interim is SUPERSEDED -- letting the sim run past
         // resolution mutated settlements the closeout should have fixed at
         // resolution time). The resolving tick already completed the race pipeline
@@ -1720,7 +1716,7 @@ function _onDayComplete() {
 
     if (grossRatio > 0.75) shiftFaction('regulatoryExposure', 1);
 
-    // Obligations (02a "The evening"): one due on day d is settled at the close that
+    // Obligations: one due on day d is settled at the close that
     // turns day d - 1 into day d -- this close -- after expiry, the race block's
     // settlements and the terminal check (a close that ended the run returned above,
     // and its closeout paid what was unpaid), immediately before the rogue-trading
@@ -1751,7 +1747,7 @@ function _onDayComplete() {
 }
 
 /**
- * The opening hand (02a "The evening"): a Dynamic run starts on an inherited desk,
+ * The opening hand: a Dynamic run starts on an inherited desk,
  * drawn from the race's seed by the hand's own stream and taken over at day 0's
  * opening marks. Called at Dynamic boot once belief, valuation, compute and
  * Consensus are quoting, so every mark exists. The predecessor's two archived
@@ -1760,7 +1756,7 @@ function _onDayComplete() {
  */
 function _dealOpeningHand() {
     const fixture = dealOpeningHand(run.race.seed, run.expiryMgr.update(sim.day).map(e => e.day));
-    // INTERPRETATION: 02a gives the memo and the reports no magnitude; they post as
+    // INTERPRETATION: the memo and the reports have no ratified magnitude; they post as
     // minor, like the desk's other wire items, and the archived ones mark no news
     // day on the tape (main.js _updateWire).
     for (const r of fixture.reports) {
@@ -1778,7 +1774,7 @@ export function isDynamicPreset(index) { return index >= 5; }
 
 /**
  * Initialize every module singleton the run touches, for a run on `seed` under
- * `preset` (02a "The run, headless": rounds, valuation, belief, the portfolio,
+ * `preset` (rounds, valuation, belief, the portfolio,
  * factions, traits, regulations, lobbying, impact, Act III, the bridge's and the
  * room's rotations among them), so a run never depends on the process's history.
  */
@@ -1813,7 +1809,7 @@ function _resetRun(preset, seed) {
     resetRounds();
     // The bridge's per-run latches (variant rotation, the tip throttle, the capex
     // latch) and the room's per-leader rotation: pure module state, cleared for
-    // Classic too (02a reality-beats ruling 2), so same-seed playback never
+    // Classic too, so same-seed playback never
     // depends on process history.
     resetRaceBridge();
     resetRoomRotation();
@@ -1835,8 +1831,7 @@ function _resetRun(preset, seed) {
 /**
  * Begin a new run: `seed` is its run seed (the shell draws it with randomSeed(),
  * the one ambient draw; a headless run names it), `preset` its mode. In Dynamic
- * the run seed is the race's, and `hand` deals the inherited desk (02a "The
- * evening"; the bystander starts on cash). The journal starts empty.
+ * the run seed is the race's, and `hand` deals the inherited desk (the bystander starts on cash). The journal starts empty.
  */
 export function newRun({ preset, seed, hand = true }) {
     _resetRun(preset, seed);
@@ -1878,7 +1873,7 @@ export function newRun({ preset, seed, hand = true }) {
 }
 
 // ---------------------------------------------------------------------------
-// Commands and the journal (02a "Commands")
+// Commands and the journal
 // ---------------------------------------------------------------------------
 
 /** Where the run stands: the day, and how many of its substeps have run (0
@@ -1893,8 +1888,7 @@ export function journalHeader() {
 }
 
 /**
- * The one entry point for everything the player does that changes state (02a
- * "Commands"). The command is journaled with its position, in order, before it
+ * The one entry point for everything the player does that changes state. The command is journaled with its position, in order, before it
  * applies; the journal records commands, never outcomes. Admission (cash,
  * cooldowns, gates) is checked here, inside the run. Kinds:
  *   trade      { order }            a resolved ticket send (legs, a strategy, the flatten)

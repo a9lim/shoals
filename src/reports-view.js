@@ -1,6 +1,6 @@
 /* ===================================================
    src/reports-view.js -- The chain's reports on the Race
-   page (02a "Demonstrations", "The chain's reports").
+   page.
 
    One row per demonstration, newest first: its lab and
    rung, the day it was published, and what has happened

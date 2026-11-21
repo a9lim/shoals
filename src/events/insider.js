@@ -1,7 +1,7 @@
 /* ===================================================
    src/events/insider.js -- The insider channel
    (overhaul phase 5; prose landed content round 7) --
-   tips.js successor, elevated to the game's moral core (04).
+   tips.js successor, elevated to the game's moral core.
 
    A safety-researcher source network grown through standing
    (factions.safetyNetworkTrust). The FEED is live: the race
@@ -59,7 +59,7 @@ export const INSIDER_EVENTS = [
                     { faction: 'mediaTrust', value: 10 },
                     { faction: 'safetyNetworkTrust', value: -8 },   // burning a source strains the network
                 ],
-                // LEAK COUPLING (evidence machinery round, 02a): the declarative field
+                // LEAK COUPLING (evidence machinery round): the declarative field
                 // main.js's raceEffects chokepoint reads, resolving the popup's
                 // `_tipIncidentId`. Two effects, one route, one gate (the same
                 // frozen/inactive gate as raceEffects -- inert post-latch and in
@@ -92,8 +92,8 @@ export const INSIDER_EVENTS = [
         // later, or never -- the quiet-tape ambiguity is the design. What is
         // certain either way is the residue: the positioning window exists in
         // the records whether or not the news ever does. The TRADE verb gets NO
-        // race coupling (ruled at the content gate and re-ratified in 02a's
-        // evidence-machinery block: the edge is the fact and its timing on the
+        // race coupling (ruled at the content gate and re-ratified with the
+        // evidence machinery: the edge is the fact and its timing on the
         // chassis) -- only the LEAK verb is mechanical. This beat is the part
         // that is true in every world.
         headline: 'Two weeks on, the thing you know is still not news — maybe it never files, maybe the candle comes next month and your book reads as prophecy. What exists either way is the window: a stretch of positioning, timestamped, that answers to nothing public. Compliance flags it without knowing what it is looking at and files the flag in the folder such flags accumulate in. Folders like that have a way of becoming exhibits, later, all at once.',

@@ -24,7 +24,7 @@
    the chain is the published one (Act III may hold it).
 
    The Consensus panel also draws the player's draft
-   posterior over B (02a, the posterior) read-only: one
+   posterior over B (the posterior) read-only: one
    solid curve per open rung with a bead at its median.
    The draft is edited on the Race page (race-page.js).
    ===================================================== */
@@ -364,7 +364,7 @@ export function marketsDayClose(newsHead) {
 
 /** The ghost on show (the snapshot from the close before the latest news), for
  *  the save: display state the live page computed, carried so a resumed run
- *  shows the curves it showed (02a "Save and resume"). */
+ *  shows the curves it showed. */
 export function marketsGhost() { return _st.ghost; }
 
 /** A resumed run's curves: today's snapshot, the saved ghost beside it, at rest. */
@@ -515,7 +515,7 @@ function _draw(p) {
     }
 
     const cons = spec.key === 'cons', ind = pal.inks.indigo;
-    // The player's draft (02a, the posterior), read live from belief.js: edited on
+    // The player's draft (the posterior), read live from belief.js: edited on
     // the Race page, drawn here over B read-only, on the rungs where it differs.
     const draft = cons && s.consensus && belief.active ? draftCurves() : null;
     const tNow = draft ? s.consensus.raceDay : 0;

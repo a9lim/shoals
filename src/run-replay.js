@@ -1,6 +1,5 @@
 /* ===================================================
-   src/run-replay.js -- The run, headless (02a "The run,
-   headless"): the clock without a page, replay of a
+   src/run-replay.js -- The run, headless: the clock without a page, replay of a
    journal to an endpoint, headless runs under a policy,
    and the digest the replay gates compare. DOM-free; the
    page's resume, the tests and the fit's worlds use it.
@@ -80,7 +79,7 @@ export function replayTo(journal, end = null) {
     if (end) advanceTo(end);
 }
 
-/** The bystander (02a "Headless policies"): the desk that takes no position. It
+/** The bystander: the desk that takes no position. It
  *  sends no commands, starts on cash, and answers every dispatch with the choice
  *  flagged `bystander: true`; a dispatch without one is an error. */
 export const BYSTANDER = Object.freeze({
@@ -104,7 +103,7 @@ function _answerUp(policy) {
 }
 
 /**
- * A run with no page (02a "Headless policies"). `policy` supplies commands by
+ * A run with no page. `policy` supplies commands by
  * position (`commands(pos, run)` returns a list, called at every rest point: after
  * each substep and between days) and an answer per dispatch (`answer(event, run)`
  * returns a choice index). The run stops when its last edition is handed over,
@@ -143,7 +142,7 @@ export function record() {
 }
 
 // ---------------------------------------------------------------------------
-// The digest (02a "Gates": determinism)
+// The digest (determinism)
 // ---------------------------------------------------------------------------
 
 /** Keep (or stop keeping) a digest at every close. */

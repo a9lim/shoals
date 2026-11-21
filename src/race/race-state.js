@@ -22,11 +22,9 @@
    bypasses them. The baseline release policy and any
    phase-2 replacement both go through commitRelease.
 
-   Dynamics constants are transcribed from
-   docs/design/02a-tuning.md; the proliferation-
+   Dynamics constants are the design's; the proliferation-
    floor / release-cooldown triple in RACE_TUNING is the
-   one block 02a grants code-phase tuning freedom, now
-   written back into 02a verbatim. Pure / DOM-free.
+   one block with code-phase tuning freedom. Pure / DOM-free.
    =================================================== */
 
 import { createRng, randomSeed, deriveSeed } from './rng.js';
@@ -54,7 +52,7 @@ export { CONTROL_REGIMES, REGIME_RANK };
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-// ---- Dial constants (02a) ------------------------------------------------
+// ---- Dial constants ------------------------------------------------
 
 // dS/dt = 0.0009*culture*(1 - 0.8*heat) - 0.0012*racingPace
 const S_ACCUM = 0.0009;       // culture-driven accumulation coefficient
@@ -62,32 +60,31 @@ const S_HEAT_SUPPRESS = 0.8;  // heat suppresses accumulation
 const S_BURN = 0.0012;        // racing burns margin
 const RACING_PACE_BASE = 0.30;
 
-// S0 per lab (02a). Polaris' S0 (0.70) is set at spawn, not init.
+// S0 per lab. Polaris' S0 (0.70) is set at spawn, not init.
 const S0 = { halcyon: 0.50, tianxia: 0.15, polaris: 0.70, open: 0 };
 
 const THEFT_S_FREEZE_DAYS = 90;   // post-theft: S accumulation zeroes race-wide 90d
 
 // heat = transient + irreversibleFloor(proliferation + theft); only transient
-// cools. theft adds +0.04/success to the permanent floor (02a).
+// cools. theft adds +0.04/success to the permanent floor.
 const HEAT_TRANSIENT0 = 0.15;
 const HEAT_FLOOR0 = 0;
 const THEFT_FLOOR_IMPULSE = 0.04;
 
-const F0 = 15;   // firm belief F in [0,100] starts 15 (02a)
+const F0 = 15;   // firm belief F in [0,100] starts 15
 
 /**
  * Code-phase tuning triple for the proliferation ratchet + release cadence
- * (the one block 02a grants tuning freedom). 02a's original
+ * (the one block with tuning freedom). original
  * `min(0.05*tianxiaReleases, 0.35)` with no cooldown drove Tianxia to the cap
  * in ~95% of runs -- violating the knife-edge "ratchets bind sometimes, never
- * always" constraint. These values (now written into 02a verbatim) put the
+ * always" constraint. These values put the
  * proliferation floor at its cap in ~47% of runs -- a strict minority, inside
- * the 35-55% acceptance band. The object is mutable so the harness can sweep it.
+ * the 35-55% acceptance band. The object is mutable for sweeps.
  */
 export const RACE_TUNING = {
     // Trading days a lab waits after a release, drawn per release from
-    // U(30, 60) whole days (mean 45, ~9 weeks) on streams.releaseJitter (02a
-    // "Demonstrations", release jitter): the jitter breaks the early lockstep.
+    // U(30, 60) whole days (mean 45, ~9 weeks) on streams.releaseJitter: the jitter breaks the early lockstep.
     // U(35, 55) left the Act I claim excess at +30% against the ruling's 25%.
     releaseCooldownMin: 30,
     releaseCooldownMax: 60,
@@ -96,10 +93,10 @@ export const RACE_TUNING = {
 };
 
 /**
- * Outcome-table retune levers (02a "Capability kinematics" / "Safety margin, heat, theft"). Sanctioned
+ * Outcome-table retune levers. Sanctioned
  * knobs that shape the terminal distribution WITHOUT touching the stance (tau,
  * required, leadAdj, the mapping gates). Exported mutable so the joint sweep can
- * drive it (mirrors RACE_TUNING); final values are recorded back into 02a.
+ * drive it (mirrors RACE_TUNING); final values live here.
  *   - a_c/a_p/L_pace : dynamic per-lab racingPace f(knife-edge proximity, heat
  *     pressure). racingPace = clamp(0.30 + (a_c*closeness + a_p*pressure)*(1-culture),0,1),
  *     closeness = clamp(1 - lead/L_pace, 0, 1) on the SIGNED lead (C[open] in the
@@ -111,13 +108,13 @@ export const RACE_TUNING = {
  *   - S0_tianxia : Tianxia initial safety (bought, not grown -- culture stays 0.15).
  */
 /**
- * Outcome-table retune levers (02a "Capability kinematics" / "Safety margin, heat, theft"). The
+ * Outcome-table retune levers. The
  * withdrawn released-follower + S0-range package could not reach family-4 (P6-1b
  * finding); the ratified set produces family-4 leads from a sampled Tianxia
  * velocity (leg A, in sampler.js) + domestic regulatory drag under supervised
  * (leg B), preserves the margin by flooring Tianxia's S at its purchased base
  * (leg C), and fixes the |d|-tail with a burn taper (all labs, leg 6). Exported
- * mutable so the joint sweep can drive it. Final values recorded in 02a.
+ * mutable so the joint sweep can drive it. Final values live here.
  *   - a_c/a_p/L_pace : dynamic per-lab racingPace (lever 1; feeds dS burn only).
  *   - k_f            : fast-follower GAP-BOUNDER (small; composes with leg A).
  *   - delta_sup      : domestic drift drag under a supervised regime (leg B).
@@ -141,7 +138,7 @@ const MOBILIZED_PLUS = new Set(['mobilized', 'nationalized', 'classified']);
 const MOBILIZED_DOMESTIC_PACE_FLOOR = 0.7;
 
 /**
- * Dynamic per-lab racingPace (02a "Safety margin, heat, theft"), deterministic. The recorded
+ * Dynamic per-lab racingPace, deterministic. The recorded
  * `f(knife-edge proximity, appetite pressure)` made concrete:
  *   lead      = C_int[lab] - max(C_int[rivals], C[open])         (signed)
  *   closeness = clamp(1 - lead/L_pace, 0, 1)
@@ -170,14 +167,14 @@ function racingPaceFor(cap, id, culture, heat, regime) {
 }
 
 // ---- The room (P7-3): the endgame branch-point predicate -----------------
-// 02a Act III "The room": trigger = leader lab `C_internal >= R5_threshold - 0.15`
+// The room: trigger = leader lab `C_internal >= R5_threshold - 0.15`
 // at day-complete. The predicate lives HERE (race-side, pure) so main.js's
 // day-complete latch never pokes latents itself -- the _checkFirmConversion
 // precedent, where the orchestrator owns the latch and the model owns the fact.
 
 /** Rung R5 (takeoff) in capability units. */
 export const ROOM_RUNG = 5;
-/** Margin below R5 at which the leader's final scaling decision is live (02a). */
+/** Margin below R5 at which the leader's final scaling decision is live. */
 export const ROOM_MARGIN = 0.15;
 /** The trigger level itself (4.85). */
 export const ROOM_TRIGGER_C = ROOM_RUNG - ROOM_MARGIN;
@@ -188,7 +185,7 @@ export const ROOM_TRIGGER_C = ROOM_RUNG - ROOM_MARGIN;
 const ROOM_LAB_ORDER = ['halcyon', 'tianxia', 'polaris'];
 
 /**
- * THE room helper (02a "Act III"): one traversal, both facts.
+ * THE room helper: one traversal, both facts.
  *   { ready, leaderLab }
  * `ready` is the trigger predicate -- has the leading ACTIVE lab's INTERNAL
  * track come within ROOM_MARGIN of R5? `leaderLab` is WHO leads (null if no lab
@@ -251,7 +248,7 @@ export function freshTransitions() {
         // track; occurrence stays in `thefts` and stays silent). Rows carry the
         // SAMPLED public attribution, never the record's true one.
         theftDisclosures: [],
-        // 02a "Demonstrations": the chain's public rows this tick, in phase
+        // The chain's public rows this tick, in phase
         // order (withdrawal, evaluation, dispute, publication). No hidden truth.
         demonstrations: [],
         regimeChange: null,   // { from, to } on a forward controlRegime move this tick
@@ -302,7 +299,7 @@ export function resetRaceState(race, seed) {
         // substream (convention 5) -- so adding it perturbs no existing
         // trajectory for the same seed (race C/S/heat stay bit-identical).
         theftDisclosure: createRng(deriveSeed(seed, 'theftDisclosure')),
-        // 02a "Demonstrations": the per-release cooldown draw and the
+        // The per-release cooldown draw and the
         // demonstration chain each get their own stream, so neither perturbs
         // another stream's draws.
         releaseJitter: createRng(deriveSeed(seed, 'releaseJitter')),
@@ -344,7 +341,7 @@ export function resetRaceState(race, seed) {
     race.latentThefts = freshTheftQueue();      // two-track theft queue (commit -> disclose | rumor forever)
     race.theftDisclosureEnabled = true;         // MC toggle for the on/off bit-identity arm; always true in-game
 
-    // ---- 02a "Demonstrations": the chain's hidden list (truth stays here) --
+    // ---- Demonstrations: the chain's hidden list (truth stays here) --
     race.demonstrations = freshDemonstrationState();
     race.demonstrationsEnabled = true;          // MC toggle for the on/off bit-identity arm; always true in-game
     // Orchestrator-passed export-control stage (world.ai.exportControlStage 0..3),
@@ -357,9 +354,8 @@ export function resetRaceState(race, seed) {
     race.controlRegime = 'private';   // ratchet driven by control-regime.js (phase 5a)
     // Treaty arc (phase 5a skeleton, EXTENDED at P6 by treaty-track.js): the latent
     // gate lives in the sampler (hidden.chinaTrue.dealPossible); this object is the
-    // race-side gauntlet state the headless treaty track advances (02a treaty
-    // sub-gates: talks -> initiation -> farce survival -> summit-week window). The
-    // gauntlet is VIABILITY-BLIND (02a "Resolution"): the three gates
+    // race-side gauntlet state the headless treaty track advances (sub-gates: talks -> initiation -> farce survival -> summit-week window). The
+    // gauntlet is VIABILITY-BLIND: the three gates
     // are drawn for ALL runs and gate window OPENING; dealPossible gates only the
     // holds outcome after a clean summit. `summitOpen` is the window flag main.js
     // mirrors to world.ai.summitLive (the seam the treaty_window event fires on).
@@ -386,7 +382,7 @@ export function resetRaceState(race, seed) {
     // no-op. All later rounds + the epilogue consume this record's stored axes;
     // nothing re-derives the outcome. (Shape in resolution.js.)
     race.resolution = null;
-    // Sustained-plateau streak (P6 fix, 02a "Capability kinematics"): consecutive
+    // Sustained-plateau streak (P6 fix): consecutive
     // days the leader's shock-free drift has been below threshold; confirmation
     // needs it >= 180 (sustained) AND day >= 700 (resolution.js).
     race.plateauStreak = 0;
@@ -409,7 +405,7 @@ export function resetRaceState(race, seed) {
  * if the cooldown blocks it or there is no gap). The baseline policy and any
  * phase-2 policy call this rather than moving C_released directly.
  *
- * Release jitter (02a "Demonstrations"): each release draws the cooldown that
+ * Release jitter: each release draws the cooldown that
  * follows it, a whole number of days uniform on [30, 60], from
  * streams.releaseJitter. A lab's first release has no prior one to wait on
  * (`lastReleaseDay` is -Infinity), so it keeps its timing and no release
@@ -471,7 +467,7 @@ export function commitTheft(race, fromId, toId, epsilon, endDay, attribution = '
     // Freeze the 90 daily safety updates AFTER this theft. advanceRace captures
     // accumFrozen before committing the theft, so the theft tick's own
     // accumulation (which precedes the end-boundary theft) is applied, and the
-    // next 90 updates are frozen -- exactly 90d per 02a.
+    // next 90 updates are frozen -- exactly 90d.
     race.sAccumFreezeUntil = endDay + THEFT_S_FREEZE_DAYS;
     race.heat.floor = computeFloor(race);
     const record = { from: fromId, to: toId, epsilon, attribution, day: endDay };
@@ -486,7 +482,7 @@ export function commitTheft(race, fromId, toId, epsilon, endDay, attribution = '
 }
 
 /**
- * Neutral baseline release policy (02a appetite rule): a lab releases when
+ * Neutral baseline release policy (the appetite rule): a lab releases when
  * C_internal - C_released exceeds its appetite (adjusted +0.1 when heat > 0.55,
  * -0.1 when trailing the frontier by > 0.25 rung). The cooldown is enforced by
  * commitRelease, not here. Phase 2 replaces this with the player-facing decision
@@ -524,7 +520,7 @@ function baselineReleasePolicy(race, endDay, heat) {
  * equal-or-forward moves are honored (private -> supervised -> mobilized ->
  * nationalized/classified); a backward move is ignored (never unfreezes).
  * Reaching a freeze regime (mobilized/nationalized/classified) SYNCHRONOUSLY
- * freezes the Consensus classes (09: trading halts the moment the impossibility
+ * freezes the Consensus classes (trading halts the moment the impossibility
  * becomes public; fallback settlement of nationalized/classified is a separate
  * step in computeBinarySettlements). No-ops on an unknown or backward regime.
  * @returns {boolean} true if the regime was applied.
@@ -648,7 +644,7 @@ export function advanceRace(race, inputs = {}) {
     const certRes = stepCertification(cap, endDay);
     tr.certifications.push(...certRes.certifications);
 
-    // 4b. Demonstrations (02a "Demonstrations"), at the close after the day's
+    // 4b. Demonstrations, at the close after the day's
     //     releases and certifications. Draw ONLY from streams.demonstrations and
     //     read C_int, the released rungs and Polaris's nominal round days; they
     //     move no capability, heat, S, schedule or hazard, so the race core is

@@ -25,7 +25,7 @@ export class Simulation {
        reset(presetIndex, seed)
        Load preset parameters and initialise state.
        `seed` is the run seed: every substep draws from
-       its own keyed slot (02a "The run, headless").
+       its own keyed slot.
     ----------------------------------------------- */
     reset(presetIndex = DEFAULT_PRESET, seed = 0) {
         const p = PRESETS[presetIndex];
@@ -110,7 +110,7 @@ export class Simulation {
 
         // This substep's own slot: keyed by day and substep (the backfill by bar
         // and substep), so no draw, and no spare normal, crosses from one slot
-        // into the next (02a "The run, headless").
+        // into the next.
         this._rng = keyedRng(this.seed, this._stream, this.day, this._substepIndex);
         this._spareValid = false;
 

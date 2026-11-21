@@ -1,4 +1,4 @@
-"""02a The reader, schema 16: deterministic exact integer-day penalized MLE.
+"""The reader, schema 16: deterministic exact integer-day penalized MLE.
 Training-quantile hinge bases, Hessian preconditioning, mandatory convergence.
 Only NumPy/SciPy offline; the game evaluates the same basis in public-record.js.
 """
@@ -245,7 +245,7 @@ def integrated(h, delta):
     e = np.column_stack([np.maximum(0, np.minimum(delta, bins[k+1])-bins[k]) for k in range(6)])
     return np.sum(h*e, axis=1)
 
-# 02a: the fresh path never reads a fit checkpoint or candidate cache unless
+# The fresh path never reads a fit checkpoint or candidate cache unless
 # explicitly resumed. Reuse is a separate, data-verified reproducibility path.
 if '--reuse-heads' in sys.argv:
     previous=Path(sys.argv[sys.argv.index('--reuse-heads')+1]);old_meta=json.loads((previous/'meta.json').read_text())
@@ -286,7 +286,7 @@ else:
             fitted=select_head('family',kind,lambda lam,warm:fit_family(a,v,kind,lam,warm),f'act{act}');fitted.pop('features');head['acts'].append(fitted)
         models['family'][kind]=head;checkpoint()
 
-# 02a: prior raw hazards and calibration see clock/rung only. No claim flag.
+# Prior raw hazards and calibration see clock/rung only. No claim flag.
 for r in [2,3,4,5]:
     prior=models[str(r)]['prior'];d=len(names(r,'prior'))
     if len(prior['mean'])!=d or any(len(w)!=d+1 for w in prior['weights']):raise ValueError('Prior feature dimensions changed')
@@ -336,7 +336,7 @@ for r in [2,3,4,5]:
     support=1260 if r==5 else 1008;DAYS=meta['calibrationDays'][str(r)]
     a=data['train'];a=a[np.isin(a[:,2],DAYS)&(a[:,r+3]>a[:,2])]
     claims=raw_features(a,r,'legible')[:,4].astype(int)
-    # 02a combined training/test noise: preserve covariance when fallback or
+    # Combined training/test noise: preserve covariance when fallback or
     # interpolated targets reuse worlds. One observation per training world at
     # each day makes these world-clustered target-mean influence vectors exact.
     worlds=np.unique(a[:,0]);world_index=np.searchsorted(worlds,a[:,0]);cov_keys=[];influences=[]
@@ -420,7 +420,7 @@ for r in [2,3,4,5]:
                         value=nodes[source]['sigma'] if source is not None else 0.
                         report['calibrationStage']['fallbacks'].append({'rung':r,'set':kind,'state':group,'day':day,'segment':name,'reason':'inactiveOrCoincidentBoundary','source':list(source) if source is not None else 'identityNoValidSource','sigma':value})
                     sigma[name].append(value)
-            # 02a: a vanishing segment has independently held endpoint values
+            # A vanishing segment has independently held endpoint values
             # on either side. In particular middle vanishes at D_R-63; borrowing
             # its post-crossing scale as the left limit blended distinct roles.
             limits=[]

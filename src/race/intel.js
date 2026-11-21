@@ -2,7 +2,7 @@
    src/race/intel.js -- chinaTrue intelligence reads
    (P7-3, 2026-07-24).
 
-   04's "China posterior as tradeable as the timeline",
+   "China posterior as tradeable as the timeline",
    made mechanical: the hidden per-run Tianxia velocity
    multiplier (sampler.js, `hidden.chinaTrue.velocity`) is
    BUCKETED into three qualitative reads -- behind /
@@ -13,7 +13,7 @@
    reported as faster, and vice versa. Assessments are
    wrong at the edges, not backwards.
 
-   THREE binding disciplines (02a "Act III"):
+   THREE binding disciplines:
 
    1. NARRATIVE-ONLY. An intel read folds no `B`, mutates
       no race dial, and bakes in no faction shift. The
@@ -28,7 +28,7 @@
       `createRng(deriveSeed(seed, 'intel'))`, the
       closeout / nationalization precedent -- so race
       trajectories are BIT-IDENTICAL whether intel beats
-      fire or not (harness-asserted). THE DRAW CONTRACT
+      fire or not. THE DRAW CONTRACT
       (ruling 11, tightened at the sol gate): while the
       channel is ACTIVE, every call takes EXACTLY TWO draws
       -- taken BEFORE the hidden truth is validated, so an
@@ -47,14 +47,14 @@
 
 import { createRng, deriveSeed } from './rng.js';
 
-// ---- Buckets (02a: bucket the velocity at 0.90 / 1.10) --------------------
+// ---- Buckets (bucket the velocity at 0.90 / 1.10) --------------------
 // The sampled velocity range is [0.75, 1.325] (VELOCITY_TUNING), so all three
 // buckets carry real mass. Edges belong to the UPPER bucket (v >= 0.90 reads
 // matched; v >= 1.10 reads faster).
 export const INTEL_LO = 0.90;
 export const INTEL_HI = 1.10;
 export const INTEL_BUCKETS = ['behind', 'matched', 'faster'];
-/** Probability an intel beat reports the TRUE bucket (02a). */
+/** Probability an intel beat reports the TRUE bucket. */
 export const INTEL_TRUTH_PROB = 0.7;
 
 /** Bucket a velocity multiplier. Pure; null for a non-finite input. */

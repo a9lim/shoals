@@ -1,6 +1,6 @@
 /* ===================================================
    src/race/rounds.js -- Private rounds and primary capital
-   (02a "Private rounds and primary offerings", 2026-10-24).
+   (2026-10-24).
 
    Polaris has a public round mark, not a price process.
    Its schedule observes the walkout ledger and draws from
@@ -19,7 +19,7 @@ import { createRng, deriveSeed } from './rng.js';
 import { buildPublicView } from './consensus.js';
 import { raceChannelsLive } from './ledger.js';
 
-// 02a "Private rounds and primary offerings". Mutable for headless sweeps.
+// Private rounds and primary offerings. Mutable for headless sweeps.
 export const ROUNDS_TUNING = {
     foundingDelay: 21,
     foundingPrice: 1.00,
@@ -55,7 +55,7 @@ let _last = null, _lastPi = null, _series = 0;
 const _primary = new Map();
 
 /**
- * Polaris's NOMINAL round schedule (02a "Demonstrations"): the founding round
+ * Polaris's NOMINAL round schedule: the founding round
  * `foundingDelay` days after the public spawn day, then each next round
  * `spacing` ± `spacingJitter` days after the last, drawn in order from the
  * `rounds` substream. One function of the seed and the spawn day, kept apart

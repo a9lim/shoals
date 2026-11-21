@@ -1,6 +1,5 @@
 /* ===================================================
-   src/run-desk.js -- The desk's trade entry points
-   (02a "The run, headless"): the ticket's sends, resting
+   src/run-desk.js -- The desk's trade entry points: the ticket's sends, resting
    orders, closes and unwinds, exercise, the flatten, the
    Act III latency ladder's deferred fills, and standing
    orders. DOM-free; run.js's commands call these, and
@@ -171,7 +170,7 @@ function _executeDeferred(entry) {
     }
 }
 
-/** One flatten leg at the desk (02a "The flatten"): reduce-only, capped at what
+/** One flatten leg at the desk: reduce-only, capped at what
  *  its position still holds, skipped when the position reversed sign. Shared by
  *  the immediate path and the deferred executor; an HCN leg records its impact
  *  like any ticket's stock leg. */
@@ -374,7 +373,7 @@ export function sendTicket(order) {
     run.sink.book();
 }
 
-/** Close a position (the book's row). P7-1 ladder (02a "Act III"): a PLAYER exit
+/** Close a position (the book's row). P7-1 ladder: a PLAYER exit
  *  takes the same lag as an entry -- exits are not faster than entries in a
  *  market made of machines. Machinery-initiated closes (expiry, margin trims,
  *  popup trades, terminal liquidation) never route through here. */
@@ -413,7 +412,7 @@ export function cancelByHand(id) {
 /** The chassis trade context every standing-order execution fills against. No
  *  `spreadMult` and no act3 queue anywhere below: standing executions are
  *  MACHINERY -- zero ladder lag, the pre-P7 fill, at the trigger substep's price
- *  (02a: precommitments are the fast path, and that IS the mechanic). */
+ *  (precommitments are the fast path, and that IS the mechanic). */
 function _standingCtx() {
     return { sim, S: sim.S, vol: market.sigma, r: sim.r, day: sim.day, q: sim.q };
 }

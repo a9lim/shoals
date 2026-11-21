@@ -1,5 +1,5 @@
 /* ===================================================
-   Pure fitted reader. 02a "The reader": raw-rule legible laws,
+   Pure fitted reader: raw-rule legible laws,
    piecewise-exponential full/prior laws, and per-act family heads.
    Every rung law ends in one segmented calibration stage with 21-day
    and role-change knots, scale-space interpolation, and a pooled prior.
@@ -28,7 +28,7 @@ export function assertReaderSchema(constants = READER_CONSTANTS) {
                 || m.weights.some(w => w.length !== head.features.length + 1) || (set === 'full' && m.calibration))) throw new Error(`Invalid reader sub-model ${R}/${set}`);
     }
 }
-/** 02a nested segments: keep geometric identities as boundaries cross.
+/** Nested segments: keep geometric identities as boundaries cross.
  * Early ends at min(quarter, live deadline), middle at their maximum.
  * After the deadline only middle (through quarter) and tail remain.
  * Zero-width segments disappear without changing the remaining scales. */
@@ -53,7 +53,7 @@ function stageBoundaries(head, R, day, state) {
     const knots = c.knots;
     let j = 0; while (j + 1 < knots.length && day >= knots[j + 1]) j++;
     const k = Math.min(j + 1, knots.length - 1), u = k === j ? 0 : Math.max(0, (day - knots[j]) / (knots[k] - knots[j]));
-    // 02a: zero-width role segments have independent endpoint limits.
+    // Zero-width role segments have independent endpoint limits.
     const sigma = (index, side, name) => m.limits.find(l => l.day === knots[index] && l.segment === name)?.[side]?.sigma ?? m.sigma[name][index];
     return Object.freeze(calibrationHorizons(R,day).map(h => {
         const left = day === knots[j] ? m.sigma[h.name][j] : sigma(j,'right',h.name);
@@ -93,7 +93,7 @@ function cumulativeHazard(law, t, D) {
     for (let k = 0; k < 6; k++) H += law.hazards[k] * Math.max(0, Math.min(s, HAZARD_BINS[k + 1]) - HAZARD_BINS[k]);
     return H;
 }
-/** 02a: one calibration stage on disjoint raw-hazard increments. */
+/** One calibration stage on disjoint raw-hazard increments. */
 export function lawCDF(law, t, D) {
     if (!law || D <= t) return 0;
     const end = Math.max(t, Math.min(Math.floor(D), law.support));

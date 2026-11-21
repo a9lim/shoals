@@ -7,7 +7,7 @@
    event copy observe only noisy projections of these.
 
    Numbers are transcribed verbatim from the per-run
-   sampler table in docs/design/02a-tuning.md.
+   per-run sampler table of the design.
    Pure / DOM-free -- headless-importable for MC.
    =================================================== */
 
@@ -15,18 +15,18 @@ import { createRng, randomSeed, deriveSeed } from './rng.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-// chinaTrue.velocity tuning (02a "Per-run sampler"): a per-run hidden multiplier on
+// chinaTrue.velocity tuning: a per-run hidden multiplier on
 // Tianxia's deterministic capability drift, drawn from its OWN named substream
 // (deriveSeed(seed,'chinaVelocity')) so it never reorders the existing sampler
 // sequence -- same-seed stability under extension. Exported mutable for the sweep.
-// Final swept values below (02a "chinaTrue.velocity" row is exact; the fat upper
+// Final swept values below (the chinaTrue.velocity row is exact; the fat upper
 // TAIL, not a raised median, is what produces family-4 in-horizon).
 export const VELOCITY_TUNING = { median: 0.95, sigma: 0.37, lo: 0.75, hi: 1.325 };
 
 /**
  * Sample the per-run hidden configuration from `seed`.
  *
- * 02a per-run sampler table (rev 2):
+ * The per-run sampler table (rev 2):
  *   tau (alignTractability)  Beta(2,3)                      mean 0.40
  *   takeoffSharpness         Beta(3,2) -> [0.5, 3.0];       sharpnessNorm = (s-0.5)/2.5
  *   scalingElasticity        mixture: 12% U[0.25,0.6]
@@ -51,7 +51,7 @@ export function sampleHiddenState(seed) {
 
     // takeoffSharpness ~ Beta(3, 2) mapped to [0.5, 3.0]; mass toward fast.
     const takeoffSharpness = 0.5 + rng.beta(3, 2) * 2.5;
-    // Normalized form used by the resolution `required` term (02a).
+    // Normalized form used by the resolution `required` term.
     const sharpnessNorm = (takeoffSharpness - 0.5) / 2.5;
 
     // scalingElasticity mixture: a real 12% fizzle tail by construction.
@@ -76,16 +76,15 @@ export function sampleHiddenState(seed) {
     };
 
     // Per-lab safety culture. Tianxia fixed low (anti-safety by construction).
-    // Halcyon clamp [0.1, 0.9] per the sampler table; Polaris clamp [0, 1]
-    // (02a "Capability kinematics").
+    // Halcyon clamp [0.1, 0.9] per the sampler table; Polaris clamp [0, 1].
     const labCulture = {
         halcyon: clamp(rng.normal(0.5, 0.2), 0.1, 0.9),
         polaris: clamp(rng.normal(0.8, 0.1), 0, 1),
         tianxia: 0.15,
     };
 
-    // Polaris spawn day ~ round(N(400, 25)) clamped [300, 500] (02a
-    // Polaris-defaults block). Calibration-neutral -- Halcyon leads regardless.
+    // Polaris spawn day ~ round(N(400, 25)) clamped [300, 500].
+    // Calibration-neutral -- Halcyon leads regardless.
     const polarisSpawnDay = Math.round(clamp(rng.normal(400, 25), 300, 500));
 
     return {

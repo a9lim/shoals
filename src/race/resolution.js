@@ -2,9 +2,7 @@
    src/race/resolution.js -- Terminal-state selection for
    the hidden AI-race (overhaul phase 6, endings round 1).
 
-   ONE precedence ladder, checked continuously (02 "Resolution";
-   02a "Resolution"),
-   exclusive, in order:
+   ONE precedence ladder, checked continuously, exclusive, in order:
      1. S4 incident            -> family 3 (resolved in place)
      2. implemented treaty     -> family 5 (the Deal)
      3. confirmed plateau      -> family 6 (the fizzle)
@@ -16,13 +14,13 @@
    crossing entity, technical alignment result, political control,
    treaty state) and stores them on `race.resolution`. The FAMILY
    is presentation, derived from the axes by the exclusive mapping
-   (05: "families are presentation, not state"). Later rounds and
+   ("families are presentation, not state"). Later rounds and
    the epilogue consume the stored axes and NEVER re-derive them.
 
    Once-per-run: `race.resolution` latches on the first fire, and a
    re-invocation is a no-op. The arithmetic (margin, lead, leadAdj,
    required, the exclusive mapping) is transcribed VERBATIM from
-   02a -- constants and predicate structure copied literally.
+   constants and predicate structure copied literally.
 
    Pure / DOM-free -- headless-importable.
    =================================================== */
@@ -36,11 +34,11 @@ import { freezeLedger } from './ledger.js';
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-// ---- Horizon + extrapolation (02 / 05 timeout ruling) --------------------
-export const HORIZON = 1008;          // game days 0..1008 (02a)
+// ---- Horizon + extrapolation (the timeout ruling) --------------------
+export const HORIZON = 1008;          // game days 0..1008
 export const EXTRAP_CAP = 2520;       // hard cap on forward extrapolation days ("a decade of no ignition IS the fizzle")
 
-// ---- Plateau confirmation (02a "Capability kinematics") ---------------------
+// ---- Plateau confirmation ---------------------
 // Confirmation requires ALL of: recursion never ignited (q < 0.01 / E <= 0.60),
 // R5 never crossed, day >= 700, and the SHOCK-FREE leader drift (deterministicDrift,
 // the full retuned ODE drift without the daily shock) < 2e-4/day SUSTAINED over the trailing
@@ -49,12 +47,12 @@ export const EXTRAP_CAP = 2520;       // hard cap on forward extrapolation days 
 // the drift threshold from the start (a stall is indistinguishable from being
 // early except in hindsight). By construction most family-6 mass arrives via
 // timeout extrapolation; in-horizon confirmations are the late, saturating tail.
-const IGNITE_Q_FLOOR = 0.01;          // q < 0.01 => recursion never ignited (02a)
-const PLATEAU_DRIFT_THRESHOLD = 0.0002;   // 02a: leader growth < 0.0002/day
-const PLATEAU_MIN_DAY = 700;          // no in-horizon confirmation before day 700 (02a)
-const PLATEAU_SUSTAIN_DAYS = 180;     // drift below threshold sustained this many trading days (02a)
+const IGNITE_Q_FLOOR = 0.01;          // q < 0.01 => recursion never ignited
+const PLATEAU_DRIFT_THRESHOLD = 0.0002;   // leader growth < 0.0002/day
+const PLATEAU_MIN_DAY = 700;          // no in-horizon confirmation before day 700
+const PLATEAU_SUSTAIN_DAYS = 180;     // drift below threshold sustained this many trading days
 
-// ---- Resolution arithmetic (02a -- VERBATIM) -----------------------------
+// ---- Resolution arithmetic (VERBATIM) -----------------------------
 //   margin   = S[leader] + leadAdj(lead)
 //   lead     = C_int[leader] - max(C_int[others], C[open])
 //   leadAdj  = -0.15*(1 - lead/0.10)          lead < 0.10
@@ -70,18 +68,18 @@ const REQ_BASE = 0.22;
 const REQ_TAU_W = 0.35;
 const REQ_SHARP_W = 0.08;
 
-// Exclusive terminal mapping thresholds (02a):
+// Exclusive terminal mapping thresholds:
 const FAIL_MARGIN = 0.15;   // technical failure: margin <= required - 0.15  (d <= -0.15)
 const FAMILY1_LEAD = 0.25;  // family 1 requires lead >= 0.25 (no knife-edge vindication)
 
-// Bounded influence (02a "Player influence and the ledger"): d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|).
+// Bounded influence: d_eff = d_W + clip(d_P, -(3/7)|d_W|, +(3/7)|d_W|).
 // ROUND 2 wires the player complicity-ledger delta d_P; until then d_P = 0 => d_eff = d_W.
 const PLAYER_CLIP_FRAC = 3 / 7;
 
 const LABS = ['halcyon', 'tianxia', 'polaris'];
 const ENTITIES = ['halcyon', 'tianxia', 'polaris', 'open'];
 
-/** leadAdj piecewise-continuous (02a, verbatim). Continuous at 0.10 and 0.25. */
+/** leadAdj piecewise-continuous. Continuous at 0.10 and 0.25. */
 function leadAdj(lead) {
     if (lead < LEAD_LO) return -LEAD_ADJ_NEG * (1 - lead / LEAD_LO);
     if (lead <= LEAD_HI) return 0;
@@ -126,7 +124,7 @@ function firstR5Crosser(cap) {
 }
 
 /**
- * Settle the orthogonal axes from sampled + current state (05: settle axes first,
+ * Settle the orthogonal axes from sampled + current state (settle axes first,
  * family is presentation). Computes leader / lead / margin / required / d_eff,
  * the R5 crosser, the technical alignment result, political control, the family-4
  * control disposition, and the sampled shadows the epilogue discloses.
@@ -143,7 +141,7 @@ function computeAxes(race) {
     const required = REQ_BASE + REQ_TAU_W * (1 - race.hidden.tau) + REQ_SHARP_W * race.hidden.sharpnessNorm;
     const d = margin - required;   // the ACTUAL threshold distance (world + player)
 
-    // ---- Bounded influence (02a, VERBATIM): d_eff = d_W + clip(d_P, -(3/7)|d_W|,
+    // ---- Bounded influence (VERBATIM): d_eff = d_W + clip(d_P, -(3/7)|d_W|,
     //      +(3/7)|d_W|). Decompose the player's attributable margin delta d_P:
     //   S-channel: cumulative player-added S to the LEADER's lab (raceEffects).
     //   C-channel: the leadAdj change from the player's cumulative dC to Halcyon
@@ -165,13 +163,13 @@ function computeAxes(race) {
 
     const crossingEntity = firstR5Crosser(cap);
 
-    // Technical alignment result (05 axis) from d_eff vs the failure boundary.
+    // Technical alignment result (an axis) from d_eff vs the failure boundary.
     let alignmentResult;
     if (dEff <= -FAIL_MARGIN) alignmentResult = 'failure';
     else if (dEff > 0) alignmentResult = 'holds';
     else alignmentResult = 'marginal';
 
-    // Family-4 control disposition (05 sub-axes), keyed on the R5 crosser:
+    // Family-4 control disposition (sub-axes), keyed on the R5 crosser:
     //   open crosser        -> proliferation (nobody won -- the weights did)
     //   Tianxia crosser     -> aligned-to-Beijing when alignment holds/marginal;
     //                          a Tianxia FAILURE renders as family 3 with subtitles.
@@ -200,7 +198,7 @@ function computeAxes(race) {
         politicalControl: race.controlRegime,
         heat: heatValue(race.heat),
         treatyImplemented: race.treaty.implemented,
-        // Sampled shadows (05: "show the sampled variables, or at least their
+        // Sampled shadows ("show the sampled variables, or at least their
         // shadows") -- the epilogue discloses how narrow the world actually was.
         tau: h.tau,
         sharpnessNorm: h.sharpnessNorm,
@@ -235,7 +233,7 @@ function makeRecord(race, family, terminalCause, extrapolated, axes, overrides =
 }
 
 /**
- * Confirmed-plateau test (02a "Capability kinematics"). Called once per completed day (evaluateLadder
+ * Confirmed-plateau test. Called once per completed day (evaluateLadder
  * runs once per day, live and extrapolated), so it maintains the sustained-drift
  * streak here: the leader's shock-free drift below threshold increments the streak,
  * above it resets. Confirmation = never-ignited (q < 0.01) AND R5 never crossed AND
@@ -250,7 +248,7 @@ function plateauConfirmed(race) {
     // and false-latches plateaus. The player-coupling omission was the P6-2 P0 gate
     // find (same class as the P6-1b re-gate labExpectedDrift bug): if sustained capital
     // is the only thing holding Halcyon's drift above threshold, the race has NOT
-    // plateaued (02a "Player influence and the ledger"). `race.playerCoupling` is 0 on the unfed/headless
+    // plateaued. `race.playerCoupling` is 0 on the unfed/headless
     // path, so deterministicDrift's Halcyon guard is falsy and this stays bit-identical.
     // The regime feeds leg B; RETUNE feeds legs B/2; playerCoupling feeds the Halcyon leg.
     const leader = frontierLeaderLab(cap);
@@ -274,7 +272,7 @@ function plateauConfirmed(race) {
     return race.plateauStreak >= PLATEAU_SUSTAIN_DAYS;                // sustained 180 trading days
 }
 
-/** The R5-crossing race outcome (02a step 4, exclusive mapping). */
+/** The R5-crossing race outcome (ladder step 4, exclusive mapping). */
 function raceOutcomeRecord(race, extrapolated) {
     const ax = computeAxes(race);
     let family;
@@ -329,7 +327,7 @@ function evaluateLadder(race, extrapolated) {
 }
 
 /**
- * Timeout extrapolation (02 / 05 ruling): a run still racing at day 1008 gets no
+ * Timeout extrapolation: a run still racing at day 1008 gets no
  * seventh family. Continue the EXISTING race streams headless (no events, market,
  * or player -- advanceRace + the treaty gauntlet only) until the ladder fires,
  * hard-capped at +EXTRAP_CAP days; at the cap, a decade of no ignition IS the
@@ -349,7 +347,7 @@ function extrapolate(race, geo) {
     // here and re-passed every extrapolated tick -- advanceRace normalizes an absent
     // stage to 0, so re-passing is what keeps the captured value in force. 0 headless.
     const exportStage = race.exportControlStage || 0;
-    // ABSOLUTE cap (02a "Resolution"): the world continues to a FIXED endpoint
+    // ABSOLUTE cap: the world continues to a FIXED endpoint
     // (HORIZON + EXTRAP_CAP), never a decade past whenever the DESK happened to leave.
     // For the timeout path startDay == HORIZON, so this is byte-identical to the old
     // `startDay + EXTRAP_CAP` loop (the no-player calibration is unchanged); for an
@@ -359,7 +357,7 @@ function extrapolate(race, geo) {
     const capDay = HORIZON + EXTRAP_CAP;
     while (race.day < capDay) {
         advanceRace(race, { straitTension: tension, exportControlStage: exportStage });
-        // Neutral-signal control-regime stepping (02a "Resolution"): the
+        // Neutral-signal control-regime stepping: the
         // political-control axis reads the EXTRAPOLATED world, not the day the
         // desk's story ended. "Neutral" == no exogenous pushes (exo {}); the
         // endogenous ratchet carries it, exactly as headless / the harness.
@@ -403,7 +401,7 @@ export function checkResolution(race, geo = null) {
 }
 
 /**
- * The terminal latch (09): seal the complicity ledger BEFORE any terminal marking --
+ * The terminal latch: seal the complicity ledger BEFORE any terminal marking --
  * the record is final at the moment the world resolves; the P6-3 closeout may change
  * the wealth score but can never create/erase/launder a channel. Then mark
  * race.resolution and clear the per-tick ledger (no stale-ledger bridge replay),

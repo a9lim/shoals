@@ -1,6 +1,5 @@
 /* ===================================================
-   src/counters.js -- The interruption counters (02a "The
-   evening", "Interruption counters"): development-only
+   src/counters.js -- The interruption counters: development-only
    tallies a9 reads from the console in play-tests
    (`shoalsCounts()`, installed by main.js) and nothing
    ever shows.

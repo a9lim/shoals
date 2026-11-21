@@ -1,4 +1,4 @@
-// The run, headless (02a "The run, headless"): a run is its seed, its journal and
+// The run, headless: a run is its seed, its journal and
 // its rules version. Determinism, isolation between runs, the save's round trip
 // and resume are invisible in play until a player's save resumes somewhere else.
 import { test } from 'node:test';

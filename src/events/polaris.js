@@ -4,7 +4,7 @@
 
    A scaling decision goes the wrong way; the walkout is a
    superevent; the founding sets up the fund-as-actor wager
-   (04). Polaris as conscience, competitor, and compute-
+. Polaris as conscience, competitor, and compute-
    starved supplicant -- and, in some worlds, the margin-
    carrier that matters at resolution.
 
@@ -73,7 +73,7 @@ export const POLARIS_EVENTS = [
                 factionShifts: [{ faction: 'safetyNetworkTrust', value: 2 }],
                 // P6-2 raceEffect: backing the careful racer buys Polaris runway (S).
                 // Applies only where Polaris is active; contributes to d_P only in the
-                // (rare) Polaris-leader worlds. Magnitude proposed; swept/ratified in 02a.
+                // (rare) Polaris-leader worlds. Magnitude proposed, then swept and ratified.
                 raceEffects: [{ dial: 'S', lab: 'polaris', amount: 0.06 }],
                 playerFlag: 'backed_polaris_interest',
                 resultToast: 'The follow-up deck arrives that night. The last slide is just their eval curve against the frontier’s, unlabeled.',

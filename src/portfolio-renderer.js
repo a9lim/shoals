@@ -337,7 +337,7 @@ export function updatePortfolioDisplay($, portfolio, currentPrice, vol, rate, da
     if ($.ordersSection) $.ordersSection.hidden = portfolio.orders.length === 0;
     _diffOrderRows($.pendingOrders, portfolio.orders, day);
 
-    // Unpaid obligations (02a "The evening"): label, due edition, amount.
+    // Unpaid obligations: label, due edition, amount.
     if ($.obligationsSection) $.obligationsSection.hidden = portfolio.obligations.length === 0;
     if ($.obligationList) _renderObligations($.obligationList, portfolio.obligations);
 }

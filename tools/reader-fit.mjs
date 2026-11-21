@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 /* ===================================================
-   02a "The reader": deterministic offline fit.
+   deterministic offline fit.
    A. World-split natural trajectories and public-only features
    B. Exact integer-day interval likelihood, L2, validation selection
    C. Validation bands, learning floor and residual challengers
@@ -36,7 +36,7 @@ const meta = { schema: RECORD_SCHEMA, scenarios: WORLD_SCENARIOS, features: FEAT
     lambdas: [1e-9, 1e-8, 1e-7, 1e-6, 1e-5], maxIterations: 2500 };
 const scenarioOf = (seed, lo) => (seed - lo) % 2 === 0 ? 'neutral' : 'engine';
 if (!reused) {
-    // 02a "Demonstrations" (The refit): half the worlds neutral, half engine,
+    // The refit: half the worlds neutral, half engine,
     // alternating by world index. Engine worlds come from the cache (priced by
     // the reader in place when they were generated); their samples are read off
     // the stored rows, so this schema's features need no new world.
@@ -50,7 +50,7 @@ if (!reused) {
         for (let seed = lo; seed <= hi; seed++) {
             const scenario = scenarioOf(seed, lo);
             const w = scenario === 'neutral' ? runReaderWorld(seed, scenario) : samplesFromRows(loadEngineWorld(seed));
-            // 02a: masks distinguish grid, seed-offset, explicit role knots and
+            // Masks distinguish grid, seed-offset, explicit role knots and
             // family diagnostics; coincident days share one public snapshot.
             const samples = [...new Map([...w.samples, ...w.diagnostics].map(s=>[s.day,s])).values()].sort((a,b)=>a.day-b.day);
             const vals = samples.flatMap(encodeSample); columns = encodeSample(samples[0]).length;
@@ -205,7 +205,7 @@ console.log(`Compact fit report: ${Buffer.byteLength(JSON.stringify(compact))+1}
 console.log(`Validation report: tools/reader-fit-report.json; ECE bound=${report.eceBound}; suggested phi=${report.suggestedPhi}; suggested challenger bound=${report.suggestedChallengerBound}; runtime constants=${report.constantsBytes} bytes`);
 console.log(`Fit completed in ${((performance.now() - t0) / 1000).toFixed(2)} s. Data retained at ${dir} for byte-reproduction.`);
 
-/** 02a: the tracked report is the harness contract; full diagnostics stay
+/** The tracked report is the fit's compact record; full diagnostics stay
  * beside it in the ignored detail file. Shared targets and sparse covariance
  * retain exact world-noise calculations without repeating head-level cells. */
 function compactFitReport(detail) {

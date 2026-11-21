@@ -1,4 +1,4 @@
-// The desk's own accounting (02a "The evening", "Private rounds and primary
+// The desk's own accounting ("Private rounds and primary
 // offerings"): the inherited hand, its obligations and the forced sale, the
 // flatten's reduce-only legs, and private stakes. Each is a cash path where an
 // error moves equity by an amount that looks plausible.

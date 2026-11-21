@@ -3,7 +3,7 @@
    evidence-beat generator for the hidden AI-race state
    machine (overhaul phase 2).
 
-   Two-track everywhere (02-race-model.md): an incident
+   Two-track everywhere: an incident
    *occurs* on the latent track (silent -- physical/hidden
    damage only) and the world *detects* it later, or never.
    The market moves on detection; the occurrence->detection
@@ -11,11 +11,10 @@
    beats are the alignment-side twin, riding the SAME
    latent-queue machinery: found (occurred) vs published.
 
-   Constants are transcribed from docs/design/02a-tuning.md
-   (rev 2, "Incidents (two-track) and evidence"). Where 02a
+   Constants are the design's (rev 2). Where the design
    is silent on a shape or a rate the choice is marked
    `// UNRATIFIED:` and listed in the phase-2 report for the
-   orchestrator to ratify into 02a or overrule.
+   orchestrator to ratify or overrule.
 
    Module boundary: DOM-free, headless-importable for MC.
    Draws ONLY from `race.streams.incidents` (the subsystem's
@@ -40,7 +39,7 @@ function sigmoid(x) {
 /**
  * Knuth Poisson sampler off a [0,1) stream. Λ_world is capped at 0.30, so the
  * daily count is almost always 0 or 1 and the loop is cheap; kept exact rather
- * than approximated by a Bernoulli so the "Poisson daily" wording in 02a holds.
+ * than approximated by a Bernoulli so the "Poisson daily" wording holds.
  */
 function poisson(rng, lambda) {
     if (lambda <= 0) return 0;
@@ -50,7 +49,7 @@ function poisson(rng, lambda) {
     return k - 1;
 }
 
-// ---- Occurrence constants (02a) ------------------------------------------
+// ---- Occurrence constants ------------------------------------------
 
 // w_i = exp(0.7·(C_int,i − 2)) · (1 − S_i) · (0.5 + heat) · surface_i
 // Λ_world = min(0.30, 0.07 · Σ w_i)   (Poisson daily; source ∝ w_i)
@@ -61,13 +60,13 @@ const OCC_CINT_REF = 2;
 const OCC_HEAT_BASE = 0.5;
 const SURFACE = { halcyon: 1.0, tianxia: 1.3, open: 1.6, polaris: 0.4 };   // S_open = 0
 
-// ---- Severity constants (02a) --------------------------------------------
+// ---- Severity constants --------------------------------------------
 
 // Base slice at mid-margin, S0..S3; drawn (renormalized) only in the non-S4
 // branch. rng.categorical normalizes internally, so no explicit /Σ is needed.
 const SEV_BASE = [0.55, 0.25, 0.15, 0.045];
 
-// S4 is budgeted SEPARATELY as a gated late-tail event (02a) -- never the
+// S4 is budgeted SEPARATELY as a gated late-tail event -- never the
 // generic ladder slice:
 //   p4 = min(0.005, 0.0004 · ((1−S)/0.5)² · (heat/0.5)² · σ((C_int − 4)/0.25))
 const P4_CAP = 0.005;
@@ -77,31 +76,31 @@ const P4_HEAT_REF = 0.5;
 const P4_CINT_MID = 4;
 const P4_CINT_WIDTH = 0.25;
 
-// Persuasion class joins the ladder past R3 (02-race-model.md incident-class
-// list; 02a "persuasion ... unlocks at C_int ≥ R3").
+// Persuasion class joins the ladder past R3 (the incident-class
+// list).
 const PERSUASION_RUNG = 3;
-// Persuasion takes a 0.20 share of the class draw once unlocked (02a, ratified
+// Persuasion takes a 0.20 share of the class draw once unlocked (ratified
 // 2026-07-23). Severity 4 is NEVER persuasion -- the absolute S4 self-disclosure
-// rule dominates every reclassification (02a); enforced at assignment below.
+// rule dominates every reclassification; enforced at assignment below.
 const PERSUASION_SHARE = 0.20;
 
-// ---- Detection constants (02a) -------------------------------------------
+// ---- Detection constants -------------------------------------------
 
 // Eventual-detection probability and mean lag (Exp) per severity S0..S4 --
-// full ladder in 02a: S0 0.70/Exp(10d), S1 0.78/Exp(8d),
+// full ladder: S0 0.70/Exp(10d), S1 0.78/Exp(8d),
 // S2 0.86/Exp(6d), S3 0.94/Exp(3d), S4 1.00/immediate (self-disclosing).
 const DET_PROB = [0.70, 0.78, 0.86, 0.94, 1.00];
 const DET_LAG_MEAN = [10, 8, 6, 3, 0];             // Exp mean, days; S4 = 0 (immediate)
 
-// Persuasion detection (02a): 0.40 eventual, Exp(90d) lag.
+// Persuasion detection: 0.40 eventual, Exp(90d) lag.
 const PERSUASION_DET_PROB = 0.40;
 const PERSUASION_DET_LAG_MEAN = 90;
 
-// Reporting regime (02a): detection prob -> min(1, p + 0.12); lags halved.
+// Reporting regime: detection prob -> min(1, p + 0.12); lags halved.
 const REPORTING_P_BONUS = 0.12;
 const REPORTING_LAG_MULT = 0.5;
 
-// ---- Concealment vs. detection (02a "Incidents") --
+// ---- Concealment vs. detection --
 // Both sides of detection are automated, and they license different models:
 //
 //   defend  = 1 + K * (C_rel,frontier - 3)+     (defenders license the released frontier)
@@ -116,7 +115,7 @@ const REPORTING_LAG_MULT = 0.5;
 // SOONER and leaves the K=0 arm consuming the extra future draws. Either way
 // `streams.incidents` re-phases from the first affected record's detection
 // onward and downstream realizations legitimately differ -- the leak-coupling
-// precedent (02a "Incidents"). What IS identical: the
+// precedent. What IS identical: the
 // occurrence/detection ledgers and the RNG position through the first affected
 // record's CREATION day (the latent record itself differs immediately, in
 // lagMult and meanLag), and everything before any R3 crossing (plumbing P).
@@ -131,7 +130,7 @@ const REPORTING_LAG_MULT = 0.5;
 // Open-weights is single-track (C_int = C_rel = C[open]) against
 // a frontier-released defender, so misuse gets EASIER to see late: no lab to hide it.
 // `detectionQuality` stays the separate, lobbyable WORLD dial -- two dials, never
-// conflated. Exported mutable for harness sweeps (the THEFT_TUNING / RACE_TUNING
+// conflated. Exported mutable for sweeps (the THEFT_TUNING / RACE_TUNING
 // pattern); incidents.js keeps its own object rather than importing race-state.js,
 // which imports THIS module (a cycle).
 export const INCIDENT_TUNING = { CONCEAL_K: 1.0 };
@@ -167,17 +166,17 @@ export function lagMultiplier(cRelFrontier, cIntSource) {
 }
 
 // Insider tip: one Bernoulli(0.3) at occurrence for every incident NOT detected
-// in its occurrence tick (02a, ratified 2026-07-23) -- "undetected" is the
+// in its occurrence tick (ratified 2026-07-23) -- "undetected" is the
 // occurrence-tick sense, independent of eventual public detectability. Standing-
 // gating of whether the tip reaches the player is later-phase.
 export const INSIDER_TIP_PROB = 0.30;
-// CLASSIFICATION BLACKOUT (P7-3, 02a): under `controlRegime === 'classified'` the
+// CLASSIFICATION BLACKOUT (P7-3): under `controlRegime === 'classified'` the
 // insider channel is the only feed left, and it thickens -- Bernoulli 0.3 -> 0.5.
 // The rate is regime-dependent at ROLL time (never retroactive: a tip already
 // decided is not re-rolled when the statute lands). The draw is taken from the
 // SAME position in the same substream either way, so the draw COUNT is identical
 // under both regimes and a non-classified run is bit-identical to the pre-round
-// build (harness-asserted).
+// build.
 export const INSIDER_TIP_PROB_CLASSIFIED = 0.50;
 
 /** Occurrence-tick insider-tip probability for the CURRENT regime. */
@@ -185,17 +184,17 @@ function insiderTipProb(race) {
     return race.controlRegime === 'classified' ? INSIDER_TIP_PROB_CLASSIFIED : INSIDER_TIP_PROB;
 }
 
-// ---- Evidence constants (02a) --------------------------------------------
+// ---- Evidence constants --------------------------------------------
 
 const EVIDENCE_LAB_MEAN = 40;              // per alignment-carrying lab ~Exp(40d)
 const LR_CLIP = 3;                         // per-beat LR clipped to [1/3, 3]
 const LOG_LR_CLIP = Math.log(LR_CLIP);
 const EVIDENCE_LOGODDS_CLAMP = Math.log(19);   // cumulative log-odds clamp -> posterior ceiling 0.95
 const LEAK_PROB = 0.25;                    // unpublished beats leak at 0.25
-// Alignment-carrying labs = Halcyon and Polaris (02a, ratified 2026-07-23:
+// Alignment-carrying labs = Halcyon and Polaris (ratified 2026-07-23:
 // Tianxia is anti-safety by construction and produces no alignment evidence,
 // only capability signals). Measured cadence ~40 found / ~28 published per run;
-// the ±log19 accumulator clamp is the stance and holds at any count (02a).
+// the ±log19 accumulator clamp is the stance and holds at any count.
 const ALIGNMENT_LABS = ['halcyon', 'polaris'];
 
 // ---- Occurrence + detection ----------------------------------------------
@@ -240,7 +239,7 @@ export function stepIncidents(race, day, endDay, heat) {
     // 1. Daily detection over prior undetected, detectable incidents. An Exp
     //    mean-lag maps to a memoryless daily hazard 1/meanLag; the modifiable
     //    detectionQuality multiplier scales it (later phases let players/factions
-    //    lobby it). Per-day prob = 1 − exp(−hazard), matching 02a's substep rule.
+    //    lobby it). Per-day prob = 1 − exp(−hazard), matching substep rule.
     for (const inc of race.latentIncidents) {
         if (inc.detected || !inc.detectable || inc.meanLag <= 0) continue;
         const hazard = q / inc.meanLag;
@@ -284,7 +283,7 @@ export function stepIncidents(race, day, endDay, heat) {
 
         // Class: misuse (open) / accident (frontier); persuasion past R3 -- but
         // NEVER for severity 4 (the absolute S4 self-disclosure rule dominates
-        // every reclassification, 02a). The persuasion roll is still drawn once
+        // every reclassification). The persuasion roll is still drawn once
         // per eligible source (RNG-stable) and gated on severity only at assignment.
         let cls = baseClass(src.id);
         if (src.C >= PERSUASION_RUNG && rng.next() < PERSUASION_SHARE && severity < 4) cls = 'persuasion';
@@ -303,13 +302,13 @@ export function stepIncidents(race, day, endDay, heat) {
         const detectable = rng.next() < pDet;
         const immediate = detectable && meanLag <= 0;   // S4 self-discloses in its occurrence tick
 
-        // Occurrence (silent) physical effect: deferred ENTIRELY (02a).
-        // The field stays null until a 02a revision ratifies a magnitude -- no
+        // Occurrence (silent) physical effect: deferred ENTIRELY.
+        // The field stays null until a revision ratifies a magnitude -- no
         // invented truth-valued numbers in state, even inert; applying one would
         // also double-count the calibrated S path.
         const sBurn = null;
         // Insider tip: one Bernoulli for every incident NOT detected in its
-        // occurrence tick (02a) -- independent of eventual public detectability;
+        // occurrence tick -- independent of eventual public detectability;
         // the occurrence->disclosure window is the tip's whole point. The rate is
         // 0.3, or 0.5 under a classified regime (the channel is the only feed left).
         const insiderTip = !immediate && (rng.next() < tipProb);
@@ -361,8 +360,8 @@ function _detSummary(inc) {
 }
 
 /**
- * Activate the mandatory incident-reporting regime, RETROACTIVELY ONCE (02a,
- * ratified 2026-07-23): sets the regime flag so future incidents detect under the
+ * Activate the mandatory incident-reporting regime, RETROACTIVELY ONCE
+ * (ratified 2026-07-23): sets the regime flag so future incidents detect under the
  * improved parameters (min(1, p+0.12), lags halved), AND re-rolls the pending
  * (still-latent) incidents' detectability and remaining lag under those improved
  * parameters -- the disclosure wave when a reporting mandate lands is deliberate.
@@ -404,8 +403,7 @@ export function applyReportingRegime(race) {
 // ---- Player leak: forced detection (evidence machinery round) --------------
 
 /** Remaining mean lag a LEAKED incident detects on: a memoryless hazard 1/4 per
- *  day from the leak day. "The story forces the filing inside a week, usually"
- *  (02a "Incidents"). */
+ *  day from the leak day. "The story forces the filing inside a week, usually". */
 export const LEAK_FORCED_MEAN_LAG = 4;
 
 /**
@@ -414,7 +412,7 @@ export const LEAK_FORCED_MEAN_LAG = 4;
  * `_tipIncidentId`). Two mutations on the leaked incident's latent record:
  *   - `detectable = true` UNCONDITIONALLY -- the never-detected tail is
  *     overridden BY DESIGN. Guaranteeing the world finds out is what the verb
- *     is FOR (02a); a leak that might vanish is not a leak.
+ *     is FOR; a leak that might vanish is not a leak.
  *   - remaining `meanLag` set to 4 days -- as a FLOOR on the hazard, so an
  *     already-faster clock is kept (memoryless, so this is a hazard change from
  *     the leak day forward, not a rewritten history). See the inline note.
@@ -423,7 +421,7 @@ export const LEAK_FORCED_MEAN_LAG = 4;
  * DETERMINISTIC: draws from NO substream itself. It DOES perturb downstream
  * realizations, though: making an incident detectable adds a hazard draw per
  * day to the detection pass, advancing `streams.incidents` relative to the
- * unleaked counterfactual (02a ruling: legitimate -- the no-player run is the
+ * unleaked counterfactual (ruled legitimate: the no-player run is the
  * bit-identity invariant, and a leak changing the world's realization is the
  * verb working). Physical race dials are untouched either way. Returns the
  * detection-relevant summary { id, source, severity, cls, forced, alreadyDetected }
@@ -441,7 +439,7 @@ export function forceLeakDetection(race, incidentId) {
     let forced = false;
     if (!alreadyDetected) {
         inc.detectable = true;
-        // 02a says "set to 4". Read as a FLOOR on the hazard, never a ceiling: an
+        // The design says "set to 4". Read as a FLOOR on the hazard, never a ceiling: an
         // incident already on a faster clock (an S3 at 3d, anything under the
         // reporting regime's halved lags) must not be SLOWED by being leaked. A
         // non-positive stored lag (the immediate class) would be skipped forever by
@@ -486,7 +484,7 @@ export function stepEvidence(race, day, endDay) {
         if (!lab || !lab.active) continue;
         if (rng.next() >= 1 - Math.exp(-1 / EVIDENCE_LAB_MEAN)) continue;   // no beat today
 
-        // Direction correlates with τ but never identifies it (02a, ratified
+        // Direction correlates with τ but never identifies it (ratified
         // 2026-07-23): |log LR| ~ U(0, log 3), sign ~ Bernoulli(τ) ("kind worlds
         // read kind"), clipped to [1/3, 3].
         const favorable = rng.next() < tau;

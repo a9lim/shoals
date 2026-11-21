@@ -2,8 +2,7 @@
    src/act3.js -- The Act III systemic layer (overhaul
    phase 7, slice 1).
 
-   ONE public driver, smoothed, two projections (02a
-   "Act III"): `x` is the
+   ONE public driver, smoothed, two projections: `x` is the
    machine parameter -- how much of the world runs at
    machine tempo -- and `d = max(0, (x - 0.5)/0.5)` is the
    presentation degradation it projects. Everything here
@@ -16,19 +15,19 @@
      1. audio -- main.js calls setMachineIntensity(x) once
         per day-complete (the band stops being a band),
      2. the manual latency ladder -- `orderLatency` + the
-        deferred-fill queue (04's agency migration: the
+        deferred-fill queue (agency migration: the
         desk's hands get slower while precommitments stay
         the fast path),
      3. presentation degradation -- the display latches:
         chain-quote holds, VXHCN publication staleness, the
         transient candle repaint, sparkline frame skips.
 
-   PRESENTATION PACING, NOT RACE STATE (02a): `x` lives here
+   PRESENTATION PACING, NOT RACE STATE: `x` lives here
    and never feeds a price, a mark, a settlement, or a
    belief. The degradation latches are DISPLAY-side by
    construction -- `unitPrice`, margin, expiry, and every
-   settlement path read the true computed values (09:
-   settle on truth, display the failure). The chain snapshot
+   settlement path read the true computed values
+   (settle on truth, display the failure). The chain snapshot
    below is a COPY for exactly that reason (chain.js returns
    a shared mutable singleton; holding the reference would
    hold nothing).
@@ -42,7 +41,7 @@
    Mutable module singleton reset by `resetAct3()` from
    `_resetCore` -- mirrors price-impact.js / impulse.js.
 
-   RATIFIED (02a): the driver SHAPE (one public driver,
+   RATIFIED: the driver SHAPE (one public driver,
    smoothed at 0.15/day, targets 0 / 0.6 / 1.0 by released
    rung with a mobilized+ bump, two projections) and the
    LADDER SHAPE (0/1/3/6 substeps, spread x1.25 / x1.5).
@@ -58,11 +57,11 @@ import { createRng, deriveSeed } from './race/rng.js';
 // The degradation's OWN stream. Presentation randomness must never perturb the
 // shared Math.random the price path and the event engine draw from -- the display
 // failing is not allowed to move the market. Fixed seed: the flicker pattern is
-// deterministic (harness-checkable) and, at p ~ 0.04, imperceptibly repetitive.
+// deterministic (checkable) and, at p ~ 0.04, imperceptibly repetitive.
 const _DISPLAY_SEED = deriveSeed(0x5f3a91c7, 'act3-display');
 let _rng = createRng(_DISPLAY_SEED);
 
-/** Act III magnitudes. Shape ratified (02a); every `feel` entry is the
+/** Act III magnitudes. Shape ratified; every `feel` entry is the
  *  coordinator's to tune at the wiring review. */
 export const ACT3_TUNING = {
     // -- Driver (ratified shape) --
@@ -110,8 +109,8 @@ export function isMobilizedPlus(controlRegime) {
  * The driver's TARGET from public state alone: 0 through R3 released, 0.6 at R4,
  * 1.0 at R5, +regimeBump (capped at 1) once the regime is mobilized or beyond.
  * The bump is additive to whatever the rung target is -- a mobilized state before
- * R4 tints the room without reaching the degradation knee (INTERPRETATION of 02a's
- * "+0.1 (capped) under mobilized+"; flagged for the coordinator). Pure.
+ * R4 tints the room without reaching the degradation knee (an interpretation of
+ * "+0.1 (capped) under mobilized+"). Pure.
  */
 export function act3Target(frontierRung, controlRegime) {
     const rung = frontierRung || 0;
@@ -212,7 +211,7 @@ export function dueOrders() {
 /** Number of orders still working. */
 export function workingOrderCount() { return _deferred.length; }
 
-/** The working orders, read-only (the run's digest, 02a "The run, headless"). */
+/** The working orders, read-only (the run's digest). */
 export function workingOrders() { return _deferred; }
 
 /** Drop every working order (desk lock: terminal latch, restriction, reset). */
@@ -387,7 +386,7 @@ export function resetAct3() {
     _substepClock = 0;
     _rng = createRng(_DISPLAY_SEED);
     _deferred.length = 0;
-    _nextTicket = 1;            // queue state is fully run-scoped (02a "Act III")
+    _nextTicket = 1;            // queue state is fully run-scoped
     _chainSnapValid = false;
     _chainPrintClock = -1;
     _pubSpot = null; _pubV = null; _pubClock = -1; _pubStale = false;

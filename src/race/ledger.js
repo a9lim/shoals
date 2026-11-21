@@ -2,13 +2,13 @@
    src/race/ledger.js -- The complicity ledger (overhaul
    phase 6, endings round 2): what the player's capital DID.
 
-   05's complicity accounting. An append-only record of the
+   complicity accounting. An append-only record of the
    player's attributable contributions to the five dials --
    `{day, channel: C|S|heat|B|F|treaty, source, amount, note}`
    -- surfaced fully only at the end (P6-3's epilogue). Two
    binding principles from the brief:
 
-   - CHANNELS, NOT FILLS (03): an ordinary secondary fill
+   - CHANNELS, NOT FILLS: an ordinary secondary fill
      moves nothing and is NEVER a ledger row. Only the three
      real channels write: primary/choice raceEffects (S/heat),
      governance/advice acts (F, treaty), and the integrated
@@ -21,7 +21,7 @@
      corrupt the audit.
 
    `freezeLedger()` is called at the checkResolution latch
-   (resolution.js) BEFORE any terminal marking (09): the
+   (resolution.js) BEFORE any terminal marking: the
    complicity record is sealed at the moment the world
    resolves, so nothing the closeout does can rewrite it.
 
@@ -49,12 +49,12 @@ export function resetLedger() { ledger.entries = []; ledger.frozen = false; ledg
 /** Classic / no-race: ledger inert. */
 export function deactivateLedger() { ledger.entries = []; ledger.frozen = false; ledger.active = false; }
 
-/** Seal the ledger at the resolution latch (09) -- before terminal marking. After
+/** Seal the ledger at the resolution latch -- before terminal marking. After
  *  this, appendLedger is a no-op; the complicity record is final. */
 export function freezeLedger() { ledger.frozen = true; }
 
 /**
- * THE player->race mutation gate (02a "Player influence and the ledger"), exported so every player
+ * THE player->race mutation gate, exported so every player
  * channel shares ONE predicate rather than re-deriving it. False in Classic /
  * no-race (inactive) and after the terminal latch (frozen): a player act past
  * either boundary does nothing MECHANICAL -- narrative still fires, by design.
@@ -117,11 +117,11 @@ export function ledgerComputeEquiv(cAmount) {
  */
 export function applyRaceEffects(race, effects, source, day) {
     if (!race || !Array.isArray(effects)) return [];
-    // Freeze is a MUTATION gate, not merely an append gate (02a "Player influence and the ledger"):
+    // Freeze is a MUTATION gate, not merely an append gate:
     // post-resolution (frozen) and in Classic / no-race (inactive), player channels
     // are INERT -- check BEFORE touching any dial. Mutating S/heat/playerS and only
     // then dropping the row would leave a race mutation with no ledger record, which
-    // is exactly the corruption 09's freeze exists to prevent. Full no-op here.
+    // is exactly the corruption freeze exists to prevent. Full no-op here.
     if (!raceChannelsLive()) return [];
     const applied = [];
     for (const eff of effects) {

@@ -1,6 +1,5 @@
 /* ===================================================
-   src/pacing.js -- To the next edition worth reading
-   (02a "The evening", "Pacing"): the skip's stop
+   src/pacing.js -- To the next edition worth reading: the skip's stop
    classifier. main.js runs the skip itself (the clock
    at SKIP_DAYS_PER_SEC, the dispatch that stops it at
    once, the latch fed by the development sites); what
@@ -31,7 +30,7 @@
 import { BOOK_MOVE_STOP } from './config.js';
 
 /** Every cause a skip records (`countPause('skip:' + cause)`), the dispatch first,
- *  then the close's stops in 02a's order. */
+ *  then the close's stops in order. */
 export const SKIP_CAUSES = ['dispatch', 'extra', 'wire', 'development', 'notice', 'quarter', 'book', 'expiry'];
 
 /** Equity net of obligations moved by BOOK_MOVE_STOP of the previous close's
@@ -44,7 +43,7 @@ export function bookMoved(equityPrev, equity) {
  * The close opens a held option's last trading day: an option expiring on chassis
  * day E is processed at the close that turns E - 1 into E, so the edition E - 1 is
  * the last that can trade it.
- * INTERPRETATION: 02a's "the close of the last trading day before a held option
+ * INTERPRETATION: "the close of the last trading day before a held option
  * expires" is read as the close after which the edition on screen is that last
  * trading day. Its literal close is the expiry itself, which the development stop
  * already takes; the stop exists so a skip never carries the desk past its last
@@ -67,7 +66,7 @@ export function majorSince(log, mark) {
     return false;
 }
 
-/** The close's stop, or null: the first of 02a's stops the summary carries. */
+/** The close's stop, or null: the first of stops the summary carries. */
 export function closeStop(s) {
     if (s.extra) return 'extra';
     if (s.majorWire) return 'wire';

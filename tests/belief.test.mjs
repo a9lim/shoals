@@ -1,5 +1,5 @@
 // Market belief B, the player's posterior and its scoring, the reader's laws and
-// the event-impulse overlay (02a "Belief, η, and the firm", "The reader"). Every
+// the event-impulse overlay. Every
 // number here reaches a price or a score, and none of it is visible as wrong.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
@@ -31,7 +31,7 @@ const SUPPORT = { 2: 1008, 3: 1008, 4: 1008, 5: 1260 };
 const sig = (x) => 1 / (1 + Math.exp(-x));
 const clampP = (p) => Math.min(0.98, Math.max(0.02, p));
 const close = (a, b, tol = 1e-12) => Math.abs(a - b) < tol;
-// The naive forms (02a), against the module's log-space ones.
+// The naive forms, against the module's log-space ones.
 const S = (m, w, q, x) => 1 - (1 - q) * sig((x - m) / w);
 const naiveP = (m, w, q, t0, t1) => 1 - S(m, w, q, t1) / S(m, w, q, t0);
 const naiveD = (pP, pM, o) => (o ? Math.log(pP / pM) : Math.log((1 - pP) / (1 - pM)));
@@ -211,7 +211,7 @@ test('every reader head is a law: masses and atom sum to one, the CDF monotone a
     assert.ok(close(lawAtom(raw), Math.exp(-H(1260))));
 });
 
-// 02a "The valuation layer": V = (1 - eta)·V_legible + eta·V_full, each V_x the
+// V = (1 - eta)·V_legible + eta·V_full, each V_x the
 // survival-conditioned expected family mark under reader x's family head.
 test('V is the pooled survival-conditioned expected mark, and family 3 gets no weight', () => {
     const m = familyMarks();

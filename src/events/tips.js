@@ -45,7 +45,7 @@ export const INSIDER_TIPS = [
 const _usedTips = new Set();
 
 /** The tip a scheduling choice passes on, drawn from the tip's own slot (`rng`:
- *  the `tips` stream, 02a "The run, headless"). */
+ *  the `tips` stream). */
 export function pickTip(rng) {
     const available = INSIDER_TIPS.filter(t => !_usedTips.has(t.hint));
     const pool = available.length > 0 ? available : INSIDER_TIPS;

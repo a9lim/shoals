@@ -6,20 +6,19 @@
    live window, and -- SECRETLY -- whether Beijing would ever
    deal.
 
-   04's treaty arc + 02a's sub-gates. Verification talks
+   treaty arc + sub-gates. Verification talks
    surface, initiate, survive (or die of) a farce gauntlet,
    and reach one live Act-III window whose success is gated
    on nobody having a bad incident during summit week. The
-   Deal is the rarest ending (02a: ~4% overall).
+   Deal is the rarest ending (~4% overall).
 
-   LEAK-FREE BY CONSTRUCTION (02a "Resolution"): window
+   LEAK-FREE BY CONSTRUCTION: window
    OPENING is INDEPENDENT of hidden.chinaTrue.dealPossible.
    Non-deal worlds traverse the SAME viability-blind gauntlet
    pacing and open doomed windows at the same rate; dealPossible
    gates ONLY the holds outcome AFTER a clean summit week, never
    the opening. So P(dealPossible | window) = the 0.15 prior --
-   the summit convening is never a tell (04/09's information
-   boundary). At most ONE summit window per run.
+   the summit convening is never a tell. At most ONE summit window per run.
 
    Module boundary: DOM-free, headless-importable for the
    endings MC harness. Draws ONLY from `race.streams.treaty`,
@@ -51,7 +50,7 @@ export const TREATY_STAGE = {
     RESOLVED: 5,      // implemented (Deal) or failed -- terminal
 };
 
-// ---- Gate probabilities (02a treaty sub-gates -- VERBATIM) ---------------
+// ---- Gate probabilities (treaty sub-gates) ---------------
 // "discovery 0.65 · initiation 0.85 · farce-gauntlet survival 0.65 ·
 //  summit-week-no-incident 0.75 ~= 0.27 completion given eligible" -> Deal
 // ~= 4%. The first three are Bernoulli gates drawn for ALL runs (viability-
@@ -67,14 +66,14 @@ export const P_FARCE = 0.65;
 const TALKS_MIN_DAY = 120;    // talks can begin from the mid-run (or earlier via public groundwork)
 const TALKS_HAZARD = 1 / 150; // per-day hazard once eligible (mean talks-start ~day 270; clears the gauntlet before R5)
 const INIT_HAZARD = 1 / 40;   // initiation resolves ~40d after talks begin
-const FARCE_HAZARD = 1 / 60;  // farce resolves over ~60d (02a "farce resolution over ~60d")
+const FARCE_HAZARD = 1 / 60;  // farce resolves over ~60d
 const WINDOW_MIN_DAY = 700;   // the window is the late-run band (~R3/Act III)
 
-// ---- Summit-week incident gate (02a target ~0.75 pass) -------------------
+// ---- Summit-week incident gate (target ~0.75 pass) -------------------
 // The window stays open SUMMIT_WINDOW trading days ("summit week"); the attempt
 // fails if a detected incident at/above SUMMIT_INCIDENT_SEVERITY fires while it
-// is open. SUMMIT_WINDOW is tuned so the measured pass rate lands ~0.75 (02a is
-// the calibration target for this gate, not a Bernoulli). Reads the detection
+// is open. SUMMIT_WINDOW is tuned so the measured pass rate lands ~0.75 (a
+// calibration target for this gate, not a Bernoulli). Reads the detection
 // ledger, never state-diffs, draws NOTHING from streams.treaty.
 const SUMMIT_WINDOW = 8;   // measured pass ~0.75 at the day-700 window band (incident-driven, not a draw)
 const SUMMIT_INCIDENT_SEVERITY = 2;   // "a bad incident" = alarming (exfiltration-class) or worse
@@ -160,13 +159,13 @@ export function stepTreaty(race, inputs = {}) {
                 t.windowEndDay = day + SUMMIT_WINDOW;
                 // Stamp the window-open transition on the ledger so race-bridge.js
                 // fires treaty_window: the window is a race-model DECISION, and
-                // model decisions fire from the ledger, never Poisson (02a "Resolution").
+                // model decisions fire from the ledger, never Poisson.
                 if (race.lastTransitions) race.lastTransitions.treatyWindowOpen = { day };
             }
             break;
         }
         case TREATY_STAGE.WINDOW_OPEN: {
-            // Summit-week-no-incident (02a ~0.75): fails on a detected incident
+            // Summit-week-no-incident (~0.75): fails on a detected incident
             // at/above the severity threshold while the window is open.
             const detected = (race.lastTransitions && race.lastTransitions.incidents)
                 ? race.lastTransitions.incidents.detected : [];
@@ -186,7 +185,7 @@ export function stepTreaty(race, inputs = {}) {
                 else t.failed = true;                     // doomed window (secretly unviable)
                 t.stage = TREATY_STAGE.RESOLVED;
                 // The window OUTCOME is a race-model decision, so the model fires the
-                // news of it (02a re-gate ruling, one level below the window itself):
+                // news of it (one level below the window itself):
                 // treaty_holds on the Deal, treaty_resolution on the failure/doom.
                 _stampOutcome(race, t.implemented);
             }

@@ -1,7 +1,6 @@
 #!/usr/bin/env node
 /* ===================================================
-   tools/engine-worlds.mjs -- the engine worlds (02a
-   "Demonstrations", The refit; "The run, headless",
+   tools/engine-worlds.mjs -- the engine worlds (The refit; "The run, headless",
    Headless policies). One world is a bystander's headless
    Dynamic run on src/run-replay.js: no inherited desk, every
    dispatch answered by its bystander choice, the event

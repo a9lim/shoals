@@ -1,4 +1,4 @@
-// The terminal (02a "Resolution", "Terminal closeout and overlays"; 05-endings):
+// The terminal:
 // the closeout conserves equity in every cell, the books' finalizers settle once,
 // the desk's presence never changes the world's outcome, and the player's
 // influence on it is bounded and stops at the latch.
@@ -153,7 +153,7 @@ test('a seed resolves to the same record, extrapolation included, and the resolu
     assert.equal(JSON.stringify(race.resolution), before);
 });
 
-// 02a bounded influence: d_eff = d_W + clip(d_P, ±(3/7)|d_W|).
+// Bounded influence: d_eff = d_W + clip(d_P, ±(3/7)|d_W|).
 test('the player\'s influence on the outcome is clipped to 3/7 of the world\'s distance', () => {
     let bound = 0;
     for (const seed of [1, 2, 3, 4, 5, 6, 7, 8]) {

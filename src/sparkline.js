@@ -1,6 +1,6 @@
 // Sparklines: a ring-buffer history and a polyline drawn on a small canvas (the
 // book's value against holding HCN). Moved here from shared/ when each sim took its own
-// small charts (docs/sim-overhaul/PLAN.md).
+// small charts.
 
 /**
  * Create a ring-buffer history for sparkline data.

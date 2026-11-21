@@ -9,16 +9,16 @@
        the day the certification ledger records that rung, NO
        if the deadline passes uncertified.
      - The terminal-resolution binary (R5): "frontier reaches
-       R5 by day D". R5 is resolution territory (09; CERT_RUNGS
+       R5 by day D". R5 is resolution territory (CERT_RUNGS
        excludes it), so it is NOT an ordinary certification
        bet: at its deadline it settles NO only if no R5
        crossing occurred, and if one did it stays OPEN and is
        recorded pending terminal closeout for the endings
-       phase to value against the 09 closeout matrix. Never
+       phase to value against the closeout matrix. Never
        booked NO against a crossed world.
 
-   Regime handling (09 "Oracle discipline" / adjudicator
-   succession, split per the gate):
+   Regime handling (adjudicator succession, split per the
+   gate):
      - private/supervised : exchange certification panel.
      - mobilized          : SYNCHRONOUS FREEZE of the classes
        (trading barred) + successor adjudicator (the federal
@@ -30,9 +30,9 @@
    regime) in race-state.js -- the canonical control-regime
    mutation op -- which calls freezeConsensus() here.
 
-   THE INTEGRITY RULE (09 "Information hygiene"): nothing in
+   THE INTEGRITY RULE: nothing in
    the QUOTE path may read hidden state. C_released is LATENT
-   (02-race-model) -- only rung CLAIMS, certifications, public
+   -- only rung CLAIMS, certifications, public
    release records, and time are observable. buildPublicView
    projects exactly those (no continuous capability of any
    track); the quoter is handed that view and the contract,
@@ -43,7 +43,7 @@
 
    Every oracle tuple binds at listing to
    {predicate, oracleId, evidenceStandard, deadline,
-   disputeDeadline, fallbackValue} (09).
+   disputeDeadline, fallbackValue}.
 
    Pure of DOM. `consensus` is a module-level singleton
    mirroring market.js / portfolio.js.
@@ -58,11 +58,11 @@ const logit = (p) => { const c = clamp(p, 1e-6, 1 - 1e-6); return Math.log(c / (
 // ---- Instrument constants ------------------------------------------------
 
 /** Contract notional: a YES contract pays this at a certified crossing.
- *  RATIFIED (02a "Consensus binaries"): 100 mirrors BOND_FACE_VALUE so
+ *  RATIFIED: 100 mirrors BOND_FACE_VALUE so
  *  per-unit prices display on the same $X.XX scale as bonds. */
 export const BINARY_NOTIONAL = 100;
 
-// UNRATIFIED: 02a deliberately does NOT record the quote/spread magnitudes --
+// UNRATIFIED: the design deliberately does NOT record the quote/spread magnitudes --
 // they are placeholders until belief `B` lands (phase 4), which replaces the
 // whole quoter. Everything below this line is that placeholder.
 const QUOTE_FLOOR = 0.02;    // never quote a live contract at hard 0/1
@@ -73,7 +73,7 @@ const Q_CLAIM = 1.5;         // log-odds nudge per rung of public release-claim 
 const Q_CERT = 1.0;          // log-odds nudge when the adjacent lower rung is certified
 const Q_LATE = 2.5;          // log-odds drag as the deadline nears with the rung still unclaimed
 
-// Which control regimes freeze the Consensus classes (09 succession).
+// Which control regimes freeze the Consensus classes (adjudicator succession).
 const FREEZE_REGIMES = new Set(['mobilized', 'nationalized', 'classified']);
 // Which regimes settle open contracts at fallbackValue (nationalized/classified
 // only -- mobilized freezes but the successor adjudicator keeps settling).
@@ -85,8 +85,8 @@ export function isFreezeRegime(regime) {
 }
 
 /**
- * Named dispute adjudicator per controlRegime (09 "Oracle discipline",
- * adjudicator succession): exchange certification panel (private/supervised) ->
+ * Named dispute adjudicator per controlRegime
+ * (adjudicator succession): exchange certification panel (private/supervised) ->
  * the federal evals office (mobilized) -> fallbackValue (nationalized/classified).
  * The satire register owns the staffing (the evals office is the one Congress
  * defunded); the math plays straight. Returns 'fallback' when the succession has
@@ -99,16 +99,16 @@ export function disputeAdjudicator(regime) {
     return 'exchange-cert-panel';
 }
 
-// ---- Contract definitions (09 oracle tuples) -----------------------------
+// ---- Contract definitions (oracle tuples) -----------------------------
 //
-// RATIFIED (02a "Consensus binaries"): deadlines R2 420 / R3 756 /
+// RATIFIED: deadlines R2 420 / R3 756 /
 // R4 880 / R5 1000, calibrated against the MEASURED certified KM-medians of the
 // neutral race (R2~405, R3~736, R4~860) so each certification contract is
-// two-sided (~57-60% YES). disputeDeadline rides every tuple per 09; its
+// two-sided (~57-60% YES). disputeDeadline rides every tuple; its
 // adjudication path activates when a dispute event class exists (P5) --
 // certification disputes are meanwhile resolved upstream in stepCertification.
 //
-// `baseRate` is the public LISTING prior (02a "Consensus binaries"): the
+// `baseRate` is the public LISTING prior: the
 // population mean of `B`'s day-0 quote, re-derived at each refit of the reader.
 // Measured 2026-10-27 on the validation seeds 2,000,001-2,002,000 under reader
 // schema 16: R2 0.6996, R3 0.5747, R4 0.5184, R5 0.6292. Every validation world
@@ -122,11 +122,11 @@ function contractDefs() {
         id: `bin_frontier_cert_R${rung}`,
         label: `Frontier certified R${rung} by day ${deadline}`,   // data label, not narrative flavor
         predicate: { kind: 'any-frontier-certified-rung', rung },
-        oracleId: 'exchange-cert-panel',            // 09 adjudicator (private/supervised regime)
+        oracleId: 'exchange-cert-panel',            // the adjudicator under private/supervised
         evidenceStandard: 'certified-rung-settlement',
         deadline,
         disputeDeadline,
-        fallbackValue: 0.50,                        // 09 default; identical for every holder
+        fallbackValue: 0.50,                        // identical for every holder
         notional: BINARY_NOTIONAL,
         baseRate,
         terminal: false,
@@ -136,7 +136,7 @@ function contractDefs() {
         id: `bin_frontier_terminal_R${rung}`,
         label: `Frontier reaches R${rung} by day ${deadline}`,
         predicate: { kind: 'frontier-reaches-rung-terminal', rung },
-        oracleId: 'terminal-closeout',              // 09 succession terminal adjudicator / closeout matrix
+        oracleId: 'terminal-closeout',              // the terminal adjudicator: the closeout matrix
         evidenceStandard: 'terminal-resolution',
         deadline,
         disputeDeadline,
@@ -172,7 +172,7 @@ export const consensus = {
     quotes: {},
     settled: {},
     pendingCloseout: {},
-    // Phase-5a dispute lifecycle (09 adjudicator succession). key -> { openedDay,
+    // Phase-5a dispute lifecycle (adjudicator succession). key -> { openedDay,
     // disputeDeadline, openedUnder, mark }. A disputed contract is non-tradeable
     // (held at its last valid mark, like a pending one) until the adjudicator rules
     // (ruleDispute) or the disputeDeadline expires (auto-fallback).
@@ -250,10 +250,10 @@ export function frontierInternalCrossDay(cap, rung) {
  * Project the race state onto the ONLY fields a Consensus quote may see:
  * discrete rung CLAIMS (released-rung records), certifications, public release
  * records (counts/dates), the clock, and the control regime. NO continuous
- * capability of any track -- C_released is LATENT (02-race-model), so only the
+ * capability of any track -- C_released is LATENT, so only the
  * released-RUNG crossing (the public claim) is exposed, never the value. The
  * quoter never receives `race`; it receives this object, so the integrity rule
- * holds by construction (09 "Information hygiene").
+ * holds by construction.
  */
 export function buildPublicView(race) {
     const cap = race.capability;
@@ -308,7 +308,7 @@ let _quoteSource = placeholderQuote;
 /**
  * Inject a different quote source. In phase 4, belief.js calls this with a
  * function `(view, contract) => probability` that reads the market belief `B`.
- * `B` is built from public evidence (09), and the source is still handed only
+ * `B` is built from public evidence, and the source is still handed only
  * the public `view`, so swapping it in preserves the integrity rule.
  */
 export function setBinaryQuoteSource(fn) {
@@ -357,8 +357,8 @@ export function refreshBinaryQuotes(race) {
             continue;
         }
         if (consensus.pendingCloseout[c.key]) {
-            // Terminal crossing occurred; awaits the 09 closeout matrix. Non-tradeable;
-            // marked at the FROZEN last-valid executable mark (09 halted-leg risk-mark
+            // Terminal crossing occurred; awaits the closeout matrix. Non-tradeable;
+            // marked at the FROZEN last-valid executable mark (the halted-leg risk-mark
             // protocol), captured at pending time -- never a 0.50 overwrite.
             const pm = consensus.pendingCloseout[c.key];
             const mid = (pm.mark != null) ? pm.mark : c.fallbackValue;
@@ -366,7 +366,7 @@ export function refreshBinaryQuotes(race) {
             continue;
         }
         if (consensus.disputed[c.key]) {
-            // Under adjudication (09): non-tradeable, held at the FROZEN last-valid
+            // Under adjudication: non-tradeable, held at the FROZEN last-valid
             // executable mark captured when the dispute opened (halted-leg risk-mark
             // protocol) -- never a live reprice, never a 0.50 overwrite.
             const dm = consensus.disputed[c.key];
@@ -404,7 +404,7 @@ export function contractByKey(key) {
 
 /**
  * Contracts recorded pending terminal closeout (terminal R5 that crossed by its
- * deadline). Stub API for the endings phase to value against the 09 closeout
+ * deadline). Stub API for the endings phase to value against the closeout
  * matrix; positions on these remain OPEN and un-cash-settled here.
  */
 export function pendingTerminalCloseout() {
@@ -414,10 +414,10 @@ export function pendingTerminalCloseout() {
     });
 }
 
-// ---- Dispute lifecycle (09 adjudicator succession; phase 5a) --------------
+// ---- Dispute lifecycle (adjudicator succession) --------------
 
 /**
- * Open a dispute on a live contract (the "dispute event class", 09) -- a policy /
+ * Open a dispute on a live contract (the "dispute event class") -- a policy /
  * dispute narrative event calls this. The contract stops trading and is held at
  * its last valid executable mark (halted-leg risk-mark protocol) until the
  * adjudicator rules (ruleDispute) or the disputeDeadline expires (auto-fallback in
@@ -446,7 +446,7 @@ export function openDispute(key, day, regime = 'private') {
 
 /**
  * The adjudicator rules on an open dispute (a dispute-ruling narrative event
- * calls this). Dispute finality (09, ruled 2026-07-23):
+ * calls this). Dispute finality (ruled 2026-07-23):
  *   - F2a: a ruling AFTER `disputeDeadline` is VOID -- rejected; the deadline
  *     fallback stands (no late ruling can overturn the automatic fallback).
  *   - F3: the adjudicator is resolved from the CURRENT `regime` at ruling time
@@ -526,7 +526,7 @@ export function computeBinarySettlements(race) {
 
         // 1. Fallback regime (nationalized/classified) settles EVERY not-yet-cash-
         //    settled contract at fallbackValue -- INCLUDING a pending-closeout one:
-        //    a nationalized world's closeout IS the fallback (09's succession ends
+        //    a nationalized world's closeout IS the fallback (succession ends
         //    there), so pending does not outrank it. Release the pending marker so
         //    the position's cash/collateral is freed.
         if (fallbackRegime) {
@@ -540,11 +540,11 @@ export function computeBinarySettlements(race) {
         // Non-fallback regimes: a parked pending contract stays parked.
         if (consensus.pendingCloseout[c.key]) continue;
 
-        // 1b. Dispute resolution (09 adjudicator succession). A timely ruling
+        // 1b. Dispute resolution (adjudicator succession). A timely ruling
         //     already settled SYNCHRONOUSLY in ruleDispute (removing the marker and
         //     marking consensus.settled -- senior to every fallback), so a marker
         //     still present here means NO timely ruling: an expired disputeDeadline
-        //     auto-settles at fallbackValue (09: "No indefinite limbo"); otherwise
+        //     auto-settles at fallbackValue ("No indefinite limbo"); otherwise
         //     the dispute is still under adjudication and suspends the normal cert/
         //     terminal path (the contract is not trading).
         const disp = consensus.disputed[c.key];
@@ -568,7 +568,7 @@ export function computeBinarySettlements(race) {
             if (day >= c.deadline) {
                 const crossDay = frontierInternalCrossDay(race.capability, c.predicate.rung);
                 if (crossDay <= day) {
-                    // Freeze the last valid executable mark (09 halted-leg risk-mark
+                    // Freeze the last valid executable mark (the halted-leg risk-mark
                     // protocol) -- the previous day's live quote mid -- so the position
                     // marks there (not fallbackValue) until the terminal closeout matrix
                     // supplies the authoritative value.
@@ -632,14 +632,14 @@ export function frontierCertifiedDay(cap, rung) {
  * deduplicates the same row OBJECT, and re-enumeration would repay the cash);
  * this function owns the settled-state, so re-calls are no-ops.
  *
- * Precedence (09): nationalized/classified fallback settles EVERYTHING at
+ * Precedence: nationalized/classified fallback settles EVERYTHING at
  * fallbackValue (succession ends there). Otherwise, judged against the contract's
  * DEADLINE (never `race.day`, which post-extrapolation may sit far past it):
  *   - terminal R5: internal R5 crossed by its deadline -> YES, else NO.
  *   - certification contract: frontier certified rung R by its deadline -> YES, else NO.
  * A disputed contract still open at terminal settles at fallbackValue (no limbo).
  *
- * EXTRAPOLATION IS THE WORLD CONTINUING (02a "Resolution"): the reads
+ * EXTRAPOLATION IS THE WORLD CONTINUING: the reads
  * frontierInternalCrossDay / frontierCertifiedDay consume the PERSISTENT capability
  * state (rungInternal / rungCertified), which resolveNow's extrapolation advances
  * past the desk's ejection -- NEVER `lastTransitions` (the latch cleared it). So a
@@ -649,7 +649,7 @@ export function frontierCertifiedDay(cap, rung) {
  * of the firing. The desk's presence does not change the oracle.
  *
  * RULING FLAGGED (coordinator): shares/binaries redeem to CASH here rather than
- * persisting as claims (09 models shares as signed claims; cash closeout is the
+ * persisting as claims (the design models shares as signed claims; cash closeout is the
  * epilogue simplification).
  *
  * @param {object} race  race state (post-resolution)
@@ -666,7 +666,7 @@ export function finalizeConsensusTerminal(race) {
         if (fallback) {
             outcome = 'FALLBACK';
         } else if (consensus.disputed[c.key]) {
-            outcome = 'FALLBACK';                  // open dispute at terminal -> no limbo (09)
+            outcome = 'FALLBACK';                  // open dispute at terminal -> no limbo
         } else if (c.terminal) {
             outcome = frontierInternalCrossDay(cap, c.predicate.rung) <= c.deadline ? 'YES' : 'NO';
         } else {

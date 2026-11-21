@@ -28,7 +28,7 @@
    machinery -- a dangling followupOnly would trip the
    index validator today.
 
-   MARKET COUPLING (03/P4): shells and arc events carry
+   MARKET COUPLING: shells and arc events carry
    `impulse` (a DECAYING overlay), never permanent `params`
    deltas on the race stream. The one PERMANENT mutation
    here is world-state: the backlash followup ratchets
@@ -48,7 +48,7 @@ export const CHINA_EVENTS = [
             'Twelve aircraft cross the median line during a "routine" drill, which is four more than routine. The pattern is the message: this can be done on any Tuesday. Cambria paper prints the message a half-day before the wires carry it.',
             'A subsea cable east of the island drops, and the repair ship is denied transit for thirty hours over a paperwork technicality that has never previously existed. The cable carries no fab traffic. The denial carries the point.',
         ],
-        params: {},                    // no permanent delta (03 incident-coupling rule)
+        params: {},                    // no permanent delta (the incident-coupling rule)
         impulse: { xi: 0.006 },        // decaying (P4): a hair of tail premium, no direction
     },
     {
@@ -59,7 +59,7 @@ export const CHINA_EVENTS = [
         magnitude: 'major',
         headline: 'BLOCKADE. Beijing announces a "customs enforcement zone" enclosing the water off Hsinchu, effective on publication. No shots, no invasion, no timetable — just hulls where the shipping lanes were, and every accelerator on Earth’s forward supply on the wrong side of them. The Pentagon calls it "a development we are monitoring." The compute curve had finished monitoring it by 9:40.',
         context: 'Force majeure is no longer a clause at the back of the compute contracts; it is the front page. The fabs are intact, humming, and unreachable — the distinction between destroyed capacity and stranded capacity is worth exactly the term structure. The desk marks, and waits, and learns what everyone else holding the far curve learns: there is no hedge for geography.',
-        params: {},                    // no permanent delta (03 incident-coupling rule)
+        params: {},                    // no permanent delta (the incident-coupling rule)
         impulse: { mu: -0.05, xi: 0.05, lambda: 0.8 },   // decaying (P4): compute crunch hits HCN, vol/jump up
         choices: [
             {
@@ -75,7 +75,7 @@ export const CHINA_EVENTS = [
         category: 'strait',
         magnitude: 'moderate',
         headline: 'The enforcement zone is rescinded as quietly as it was declared — a notice to mariners, no speech. Ships move within hours; the near curve exhales; insurance does not. The far tail keeps a standing premium it did not carry before, because the market has now seen the thing it used to merely price, and they are not the same input.',
-        params: {},                    // no permanent delta (03 incident-coupling rule)
+        params: {},                    // no permanent delta (the incident-coupling rule)
         impulse: { mu: 0.02, xi: -0.02 },   // decaying (P4): relief rally, tail bleeds
     },
     {
@@ -102,8 +102,8 @@ export const CHINA_EVENTS = [
             {
                 // Desc is INTENT language by ruling (content gate): the
                 // exportControlStage -> Tianxia-velocity race coupling is the
-                // evidence-machinery round's to build (02a will ratify the
-                // dampener); until then the rule's bite is political, and the
+                // evidence-machinery round's to build (the dampener is
+                // unratified); until then the rule's bite is political, and the
                 // prose promises exactly that much.
                 label: 'Back the controls',
                 desc: 'Weigh in for the tighter rule — aimed squarely at Tianxia’s compute, and read in Beijing as anything but economics.',
@@ -111,7 +111,7 @@ export const CHINA_EVENTS = [
                 // P6-2 raceEffect: visible containment RAISES heat (the race reads it
                 // as escalation). The exportControlStage -> Tianxia-VELOCITY dampener
                 // stays DEFERRED to the evidence round -- heat only here. Magnitude
-                // proposed; swept/ratified in 02a.
+                // proposed, then swept and ratified.
                 raceEffects: [{ dial: 'heat', amount: 0.04 }],
                 factionShifts: [
                     { faction: 'federalistSupport', value: 2 },
@@ -141,7 +141,7 @@ export const CHINA_EVENTS = [
             world.geopolitical.tradeWarStage = Math.min(4, world.geopolitical.tradeWarStage + 1);
             world.geopolitical.chinaRelations = Math.max(-3, world.geopolitical.chinaRelations - 1);
         },
-        params: {},              // no permanent delta on the race stream (03 incident-coupling rule)
+        params: {},              // no permanent delta on the race stream (the incident-coupling rule)
         impulse: { mu: -0.01, xi: 0.01 },   // decaying (P4): a step of trade war, and the tail thickens a hair
     },
 
@@ -177,7 +177,7 @@ export const CHINA_EVENTS = [
     },
 
     // ---- chinaTrue INTEL beats (P7-3; prose landed 2026-07-24) -----------------
-    // 04's "China posterior as tradeable as the timeline". Each of these shells
+    // "China posterior as tradeable as the timeline". Each of these shells
     // declares `intel: true`: at fire time the canonical `_fireEvent` path resolves
     // ONE read from src/race/intel.js -- the hidden Tianxia velocity bucketed
     // behind / matched / faster, reported truthfully with p = 0.7 and otherwise
@@ -185,7 +185,7 @@ export const CHINA_EVENTS = [
     // pool. The reliability draw comes from intel.js's own module stream, OUTSIDE
     // race.streams, so these beats cannot perturb the race.
     //
-    // NARRATIVE-ONLY by rule (02a): no `impulse`, no `params`, no raceEffects, no
+    // NARRATIVE-ONLY by rule: no `impulse`, no `params`, no raceEffects, no
     // factionShifts -- the read is information, and what the player does with it is
     // the trade. The velocity number itself is NEVER rendered; only the bucket, and
     // only through these pools. An assessment is not a fact: two beats in one run

@@ -1,8 +1,8 @@
 /* ===================================================
    src/events/rates.js -- The capex channel (reality-beats
-   round, 02a "Rates: the capex channel").
+   round).
 
-   03's Act-II sentence -- "AI capex distorts the long end"
+   Act-II sentence -- "AI capex distorts the long end"
    -- given its mechanism: each RISE of the public released-
    frontier rung fires ONE `rates_capex_wave` (R1->R2 ...
    R4->R5, <= 4 per run) carrying a PERMANENT additive delta to
@@ -13,14 +13,14 @@
 
    Rates move WITH the race for a reason that is NOT the race:
    duration supply, not discount rate. The implied-timeline
-   dashboard never reads rates (03), so this moves `r` without
+   dashboard never reads rates, so this moves `r` without
    moving `B` -- a rate rise that is mundane, legible, and
    mistakable for the market waking up.
 
    VOLUME RULE: this is a LOW-volume pool (<= 4 fires/run), so
-   the prototype's additive-delta convention applies. The 03
+   the prototype's additive-delta convention applies. The
    incident-coupling rule (impulse-only) binds the HIGH-volume
-   race stream and does NOT bind this shell -- recorded in 02a
+   race stream and does NOT bind this shell -- recorded in the design
    so nobody "fixes" it into an impulse. It is not a race shell.
 
    Category 'rates' is Poisson-EXCLUDED (events.js) -- fired
@@ -50,7 +50,7 @@ export const RATES_EVENTS = [
             // R4 -> R5: the last step; the edge is almost gone.
             'The last step. The curve has repriced four times on four release ladders, each time for the same mundane reason — somebody had to finance the compute — and each time a strategist wrote that the market was "finally taking AI seriously." It was taking duration supply seriously. The distinction is the desk\'s whole edge and it is, this morning, almost gone: the long end is where the race is being paid for, and nowhere on it is the race being priced.',
         ],
-        // PERMANENT additive delta -- ratified 02a "Rates: the capex channel". Clamped
+        // PERMANENT additive delta -- ratified (the capex channel). Clamped
         // to PARAM_RANGES by the standard params path like every Fed step. No
         // `impulse`: the permanent step IS the market effect; an impulse on top
         // would double-count it.

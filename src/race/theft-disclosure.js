@@ -20,7 +20,7 @@
        espionage 0.55 / insider 0.30 / the model itself
        0.15 -- INDEPENDENT of the record's true
        `attribution` field. Public post-mortems rarely
-       settle it; the dispute is the story (02a).
+       settle it; the dispute is the story.
 
    Disclosure is NARRATIVE + BELIEF only. It never touches
    C, S, heat, safety or the capability sub-state, and it
@@ -30,18 +30,18 @@
    asserted). `race.theftDisclosureEnabled` is the MC
    toggle for the off-arm; always true in game.
 
-   Constants transcribed from docs/design/02a-tuning.md
-   § "Evidence machinery (pre-P7 ratifications, 2026-07-24)".
+   Constants are the design's (the evidence-machinery
+   ratifications).
    Pure / DOM-free -- headless-importable for MC.
    =================================================== */
 
-// ---- Constants (02a "Incidents") -----------------------------
+// ---- Constants -----------------------------
 
 /** Eventual-disclosure probability, decided once at commit. */
 export const DISCLOSE_PROB = 0.75;
 /** Exp mean lag, days, from the theft day (memoryless daily hazard 1/40). */
 export const DISCLOSE_MEAN_LAG = 40;
-/** PUBLIC attribution categories and their sampling weights (02a). Independent
+/** PUBLIC attribution categories and their sampling weights. Independent
  *  of the record's TRUE attribution -- the dispute is the story. */
 export const PUBLIC_ATTRIBUTIONS = ['espionage', 'insider', 'model'];
 export const PUBLIC_ATTRIBUTION_WEIGHTS = [0.55, 0.30, 0.15];

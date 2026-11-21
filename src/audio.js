@@ -33,7 +33,7 @@
    still a day, it just contains more. `glitchAudio` is
    the failing terminal made audible; `silenceDesk()` is
    the terminal latch — the band cuts mid-note, the hum
-   and the ticks persist. Valence unsigned by design (03).
+   and the ticks persist. Valence unsigned by design.
 
    Dispatches ring the wire bell; a superevent rings the
    flash (five bells) and plays a short cue built from the

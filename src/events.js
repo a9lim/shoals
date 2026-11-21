@@ -67,30 +67,30 @@ const _PULSE_CATEGORIES = new Set([
     // never called. It is also NOT terminal-safe (endings.js): its effects require
     // a live world, so the terminal queue filter discards it.
     'room',
-    // 'rates' (02a "Rates: the capex channel"): the capex channel is
+    // 'rates': the capex channel is
     // bridge-fired on the released-frontier rung RISE edge (<= 4 fires/run), never
     // Poisson -- a capex wave with no rung behind it is a rate move with no
     // issuance behind it. Excluded by DESIGN, not dormancy.
     'rates', 'rounds',
 ]);
 
-// -- Event base-rate scaling (04 engine note 1; overhaul phase 5a) -------
+// -- Event base-rate scaling (overhaul phase 5a) -------
 // The event engine's Poisson base rate scales with PUBLIC world state -- the
-// RELEASED frontier rung, the SAME public quantity `eta` reads (02a; latent C is
+// RELEASED frontier rung, the SAME public quantity `eta` reads (latent C is
 // never touched). Early game (R1) the multiplier is EXACTLY 1, so Act I is
 // bit-identical to the current constant-rate cadence (no regression); late game
 // it rises toward BASE_RATE_MAX_MULT as capability compounds, compressing the
-// discretionary event cadence per 04's tempo principle (ratified, 02a "Control regime and content plumbing").
+// discretionary event cadence per the act-tempo principle (ratified).
 //
-// The substep LANE (04 engine note 2) landed in P7-1 and rides this SAME driver:
+// The substep LANE landed in P7-1 and rides this SAME driver:
 // past released R4 the day stops being the atomic narrative unit -- see
 // `setSubstepLane` below. The day-level accept/cooldown arithmetic here is
-// unchanged by the lane (that invariance is the harness contract).
-// RATIFIED (02a "Control regime and content plumbing"): the ceiling and the linear-in-released-rung shape.
+// unchanged by the lane (that invariance is by construction).
+// RATIFIED: the ceiling and the linear-in-released-rung shape.
 export const BASE_RATE_MAX_MULT = 2.5;   // late-game (R5) event-cadence ceiling
 
 /** Released frontier rung at which the discretionary pass moves to substep
- *  granularity (02a "Act III"). */
+ *  granularity. */
 export const SUBSTEP_LANE_RUNG = 4;
 
 /** Day-level base-rate multiplier from the public released frontier rung (1..5).
@@ -116,8 +116,7 @@ function _hashId(s) {
 
 // -- EventEngine --------------------------------------------------------
 export class EventEngine {
-    /** @param {number} seed  the run seed: every draw is a keyed slot of it
-     *  (02a "The run, headless"). */
+    /** @param {number} seed  the run seed: every draw is a keyed slot of it. */
     constructor(seed = 0) {
         this.seed = seed >>> 0;
         this._occ = {};                 // event id -> times fired this run (the draws' occurrence key)
@@ -260,7 +259,7 @@ export class EventEngine {
 
         // 3/4. The DISCRETIONARY pass: cooldown, accept roll, draw, cooldown set.
         //      Identical arithmetic whether or not the substep lane is live -- that
-        //      rate invariance is the P7-1 harness contract.
+        //      rate invariance holds by construction.
         const event = this._discretionaryDraw(sim);
         if (!event) return empty;
 
@@ -489,8 +488,7 @@ export class EventEngine {
                 if (ev.trigger(sim, this.world, this._playerCtx)) {
                     this._triggerCooldowns[ev.id] = day;
                     // Each firing is its own occurrence, on the counter _fireEvent
-                    // keeps, so a repeated trigger draws from a fresh slot (02a
-                    // "The run, headless").
+                    // keeps, so a repeated trigger draws from a fresh slot.
                     const occ = this._occ[ev.id] = (this._occ[ev.id] || 0) + 1;
                     triggered.push({ ...ev, _fireOcc: occ });
                 }
@@ -522,7 +520,7 @@ export class EventEngine {
     }
 
     /** A firing's followups. The chain's id is the parent's id, day and
-     *  occurrence (02a "The run, headless"); each followup's delay is its own slot.
+     *  occurrence; each followup's delay is its own slot.
      *  INTERPRETATION: the id is `${id}@${day}#${occurrence}`, so two firings of one
      *  event no longer share a chain (they did when the id alone named it). */
     _scheduleFollowups(event, day, depth, occ) {
@@ -904,7 +902,7 @@ export class EventEngine {
     // -- Public followup scheduling ---------------------------------------
 
     /** A choice's followup. `keys` name the slot of its delay: the event's id
-     *  and occurrence, the choice, the followup's index (02a "The run, headless"). */
+     *  and occurrence, the choice, the followup's index. */
     scheduleFollowup(followup, fromDay, keys) {
         const id = typeof followup === 'string' ? followup : followup.id;
         const mtth = typeof followup === 'object' ? (followup.mtth ?? 20) : 20;

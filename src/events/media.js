@@ -294,7 +294,7 @@ export const MEDIA_EVENTS = [
     },
 
     // ===================================================================
-    //  THE GHOSTWRITTEN WORLD (04; prose landed content round 8)
+    //  THE GHOSTWRITTEN WORLD (prose landed content round 8)
     //  AI in the discourse, not just the market. Comedy at rung 3;
     //  the straight register's first warning at rung 4. Past a rung the
     //  REAL version is the persuasion-class incident ladder (incidents.js)

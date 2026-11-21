@@ -1,6 +1,5 @@
 /* ===================================================
-   src/race/demonstrations.js -- Demonstrations (02a
-   "Demonstrations", ratified 2026-10-27): a frontier lab
+   src/race/demonstrations.js -- Demonstrations (ratified 2026-10-27): a frontier lab
    publishes what its unreleased model did, a third
    disclosure mode beside a release and a leak.
 
@@ -23,7 +22,7 @@
 
 import { polarisRoundDays } from './rounds.js';
 
-// 02a "Demonstrations". Mutable for headless sweeps (the levers are lambda0,
+// Mutable for headless sweeps (the levers are lambda0,
 // then the evaluation lag).
 export const DEMO_TUNING = {
     lambda0: 1 / 60,      // hazard per lab per trading day
@@ -83,7 +82,7 @@ function nextId(state, prefix) {
 }
 
 /**
- * Cancel everything pending when the world resolves (02a: every pending dispute
+ * Cancel everything pending when the world resolves (every pending dispute
  * and evaluation is cancelled, and the record ends where the run did). Writes no
  * row. Idempotent. stepDemonstrations calls it itself once the race has resolved
  * or the tick is past the live horizon; the orchestrator calls it before a
@@ -165,7 +164,7 @@ function eligible(state, labId, k) {
 }
 
 /**
- * One close of the demonstration chain (02a "Demonstrations", order): withdrawals
+ * One close of the demonstration chain (order): withdrawals
  * (cascading through citations), then evaluations, then disputes, then new
  * publications. Called by advanceRace after the day's releases and
  * certifications, with the tick's ledger (`tr`, for Polaris's spawn), the tick's

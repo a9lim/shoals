@@ -1,5 +1,5 @@
 /* ===================================================
-   Public record and head-specific features. 02a "The reader".
+   Public record and head-specific features (docs/DESIGN.md, "Belief and the reader").
    No latent queues, evidence, continuous capability or RNG reads.
    A daily public projection is also the replay contract: persist these
    rows and the initial projection, never a serialized race object.
@@ -8,7 +8,7 @@ import { buildPublicView } from './consensus.js';
 
 export const RECORD_SCHEMA = 16;
 export const READER_CALIBRATION_DAYS = Object.freeze(Array.from({ length: 48 }, (_, j) => 21 * j));
-/** 02a: explicit role-change knots keep interpolation within one geometry. */
+/** Explicit role-change knots keep interpolation within one geometry. */
 export const readerCalibrationDays = R => [...new Set([...READER_CALIBRATION_DAYS, ({2:420,3:756,4:880,5:1000})[R]-63, ({2:420,3:756,4:880,5:1000})[R]])].sort((a,b)=>a-b);
 export const RULE_HAZARD_FLOOR = 1e-8;
 export const READER_CLOCK_DAYS = Object.freeze(Array.from({ length: 15 }, (_, j) => 63 * (j + 1)));
@@ -44,7 +44,7 @@ export function createRecordFromSnapshot(initial) {
         inputs: { straitTension: 0, exportControlStage: 0, treatyStage: 0 } };
 }
 
-/** 02a "Demonstrations": one chain row, whitelisted by kind. Publication rows are
+/** One chain row, whitelisted by kind. Publication rows are
  *  immutable; each later event is its own dated row. No truth, no schedule. */
 function demonstrationRow(r) {
     const base = { kind: r.kind, id: r.id, lab: r.lab, rung: r.rung };
@@ -116,7 +116,7 @@ export function stepPublicRecord(rec, race, inputs = {}) {
 const REPORT_KIND = { publication: 'demonstration', dispute: 'dispute', evaluation: 'evaluation', withdrawal: 'withdrawal' };
 
 /**
- * The chain's reports (02a "Demonstrations"), read from the record's rows alone,
+ * The chain's reports, read from the record's rows alone,
  * as of `asOf` (default: the record's day). One report per row, in row order:
  *   { id, kind: 'demonstration'|'dispute'|'evaluation'|'withdrawal', lab, rung,
  *     day,            this report's publication day
@@ -185,7 +185,7 @@ export function ruleSummary(rungs, day) {
     return out;
 }
 
-// 02a "Demonstrations" (Features): the labs that demonstrate, the rungs a
+// Demonstration features: the labs that demonstrate, the rungs a
 // demonstration bears on, and a latest standing demonstration's states as
 // indicators. None is every indicator at zero with age 0, the way an absent
 // claim reads.
@@ -242,7 +242,7 @@ function fullValues(rec) {
     a.push(age(day, rec.regimeDay), rec.treatyWindows.length, age(day, rec.treatyWindows.at(-1)),
         rec.treatyOutcomes.length ? (rec.treatyOutcomes.at(-1).implemented ? 1 : -1) : 0,
         age(day, rec.treatyOutcomes.at(-1)?.day), rec.inputs.straitTension, rec.inputs.exportControlStage, rec.inputs.treatyStage);
-    // The chain (02a "Demonstrations"): per lab and rung, the latest demonstration
+    // The chain: per lab and rung, the latest demonstration
     // that hasn't been withdrawn, by its status today; then the withdrawals.
     const reports = chainReports(rec), withdrawals = { halcyon: 0, polaris: 0 }, latest = {};
     for (const rep of reports) {
@@ -272,7 +272,7 @@ export function recordFeatures(rec, set, rule, R) {
     return Float64Array.from(set === 'legible' ? legible : [...legible, ...fullValues(rec)]);
 }
 
-/** 02a reader basis: legible rungs carry the rule state for rescaling;
+/** The reader basis: legible rungs carry the rule state for rescaling;
  * full/prior keep their fitted log-hazard/quantile basis and lock-day clocks.
  * R5 routes on R4 claim state. Family bases nest literally; rung information
  * comes from the same rule, but their model bases are no longer nested.

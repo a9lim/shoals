@@ -77,7 +77,7 @@ let camera;
 let chainSkeleton = [];
 let playing = false;
 let _resumeAfterDispatch = false;   // the desk was running when a dispatch paused it; resume once they are all answered
-// To the next edition worth reading (02a "The evening", "Pacing").
+// To the next edition worth reading.
 let _skipping = false;          // a skip is running: the clock plays at SKIP_DAYS_PER_SEC
 const _skipLatch = new Set();   // the stops latched since the skip began, taken at the close
 let _skipLogMark = null;        // the newest wire entry when the skip began or the last close ended
@@ -93,7 +93,7 @@ let _capFront = null;          // the tape's live caption setter (shared/colopho
 let _epilogueReopen = null;    // reopens the last edition after a visit to the race page
 let _replaying = false;        // a save is replaying: the sink rebuilds display history and nothing else
 let _runEnded = false;         // the last edition has shown: the save is cleared and stays cleared
-const SAVE_KEY = 'shoals-run'; // the run's save in browser storage (02a "Save and resume")
+const SAVE_KEY = 'shoals-run'; // the run's save in browser storage
 
 // ---------------------------------------------------------------------------
 // Micro-helpers — eliminate repeated typeof guards & duplicated blocks
@@ -107,7 +107,7 @@ function _haptic(pattern) {
 }
 
 // ---------------------------------------------------------------------------
-// The run's sink (02a "The run, headless"): what the run tells the page
+// The run's sink: what the run tells the page
 // ---------------------------------------------------------------------------
 
 /**
@@ -261,7 +261,7 @@ function _onNotice() {
 }
 
 // ---------------------------------------------------------------------------
-// Pacing: to the next edition worth reading (02a "The evening")
+// Pacing: to the next edition worth reading
 // ---------------------------------------------------------------------------
 
 /** The clock's rate in days a second: the skip's while one runs, otherwise the
@@ -272,7 +272,7 @@ function _daysPerSec() { return _skipping ? SKIP_DAYS_PER_SEC : SPEED_OPTIONS[sp
 function _worthReading(cause) { if (_skipping) _skipLatch.add(cause); }
 
 /**
- * An actionable development the player did not make by hand (02a "Pacing"): the
+ * An actionable development the player did not make by hand: the
  * run counts it (run-state.js develop) and the skip latches it through this one
  * hook.
  * INTERPRETATION: the latch is fed only while a skip runs, so what happened
@@ -325,7 +325,7 @@ function _syncSkipBtn() {
 }
 
 /**
- * The end of every close (02a "Pacing"): a skip in progress stops at the first
+ * The end of every close: a skip in progress stops at the first
  * of the close's stops (src/pacing.js), and this close's equity is the next
  * one's baseline for the book move.
  * INTERPRETATION: the run's first close measures from its starting equity (the
@@ -354,7 +354,7 @@ function _skipClose() {
 }
 
 // ---------------------------------------------------------------------------
-// The flatten (02a "The evening")
+// The flatten
 // ---------------------------------------------------------------------------
 
 /** A position the flatten can close: not a private stake, not a frozen,
@@ -572,7 +572,7 @@ function init() {
     _syncSkipBtn();
 
     // 10. Wire custom events from ui.js position rows
-    //     Each is a command (02a "Commands"): the run journals and applies it.
+    //     Each is a command: the run journals and applies it.
     document.addEventListener('shoals:closePosition', (e) => {
         const id = e.detail && e.detail.id;
         if (id != null) runCommand({ kind: 'close', id });
@@ -763,7 +763,7 @@ function init() {
 
     // 18. The saved run replays to its endpoint now that every page can take its
     //     display history; the desk opens paused there, with any unanswered
-    //     dispatch back on screen (02a "Save and resume"). A save that does not
+    //     dispatch back on screen. A save that does not
     //     replay is discarded and a new run begins; a new run's save replaces it.
     if (_saved && _resume(_saved)) {
         playing = false;
@@ -784,9 +784,9 @@ function init() {
     }
 
     // 19. Debug console API — use window._debug in the browser console. The
-    //     interruption counters (02a "Interruption counters") read as shoalsCounts().
+    //     interruption counters read as shoalsCounts().
     window.shoalsCounts = () => counts();
-    // The run's record and the live-equivalence check (02a "Gates"): the journal
+    // The run's record and the live-equivalence check: the journal
     // with its header, endpoint and digest trail, and a replay of it in a module
     // worker (its own module instances) compared close by close.
     window.shoalsJournal = () => JSON.parse(JSON.stringify(record()));
@@ -954,7 +954,7 @@ function frame(now) {
             }
             // All sub-steps done — close the day (overlays removed) then run
             // day-complete bookkeeping against baseline params. UNLESS the popup
-            // barrier holds (02a "Act III"): a decision on screen or waiting
+            // barrier holds: a decision on screen or waiting
             // keeps the day OPEN (run.js tryClose drains it first, so a beat still
             // queued reaches the player and the day is never stranded).
             if (sim.dayComplete) tryClose();
@@ -1024,8 +1024,7 @@ function _updateLobbyPills() {
 
 /**
  * Show the dispatch the run has up (run.js keeps the queue). A dispatch stops a
- * skip at once, mid-day if that is when it opens, and the stop stays paused (02a
- * "Pacing"); otherwise a running desk resumes once every dispatch is answered.
+ * skip at once, mid-day if that is when it opens, and the stop stays paused; otherwise a running desk resumes once every dispatch is answered.
  * The answer is a command naming the dispatch by its occurrence id.
  */
 function _showDispatch(event) {
@@ -1057,7 +1056,7 @@ function _showDispatch(event) {
 }
 
 /** The last edition: the epilogue, the almanac's record appended once (never by
- *  a replay), and the save cleared after it (02a "Save and resume"). */
+ *  a replay), and the save cleared after it. */
 function _onLastEdition(pages, record) {
     _showEpilogue(pages, true);   // terminal: no "keep playing"
     if (_replaying) return;
@@ -1067,7 +1066,7 @@ function _onLastEdition(pages, record) {
 }
 
 // ---------------------------------------------------------------------------
-// Save and resume (02a "Save and resume")
+// Save and resume
 // ---------------------------------------------------------------------------
 
 /** Write the save between days (each close, after its dispatches; each command
@@ -1300,7 +1299,7 @@ function togglePlay() {
 }
 
 /**
- * The in-day clock origin for a resume (02a "Act III"). `frame()` derives an
+ * The in-day clock origin for a resume. `frame()` derives an
  * ABSOLUTE in-day `targetSteps` from `lastTickTime`, so resuming a partially-run
  * day from a bare `performance.now()` would make the desk wait out every substep
  * the day had already traded -- after a lane popup at substep 15, about fifteen
@@ -1336,7 +1335,7 @@ function step() {
     }
 
     // If all substeps done, close the day (overlays removed) then bookkeeping --
-    // unless the popup barrier holds (02a "Act III").
+    // unless the popup barrier holds.
     if (sim.dayComplete) tryClose();
 
     dirty = true;

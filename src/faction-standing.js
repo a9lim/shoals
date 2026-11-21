@@ -10,12 +10,12 @@ const FACTION_DEFAULTS = {
     farmerLaborSupport: 30,
     mediaTrust: 40,
     fedRelations: 40,
-    // Roster v2 (02a "Control regime and content plumbing"). safetyNetworkTrust: standing with the
-    // safety-researcher source network -- the insider channel's moral core (04),
+    // Roster v2. safetyNetworkTrust: standing with the
+    // safety-researcher source network -- the insider channel's moral core,
     // grown through discreet handling; starts low (unearned). labRelations: the
     // player's/firm's relationship with the frontier labs (Halcyon board access,
     // Polaris backing, invitations to the room) -- SCALAR for now (per-lab is a
-    // later refinement; UNRATIFIED). Both feed "the room" endgame access (04).
+    // later refinement; UNRATIFIED). Both feed "the room" endgame access.
     safetyNetworkTrust: 20,
     labRelations: 30,
 };

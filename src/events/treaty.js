@@ -16,7 +16,7 @@
    gated on `world.ai.summitLive`, which NOTHING sets today
    -- it is the one declared seam for the Act-III summit
    machinery (P6/P7), which owns the standing check, the
-   dealPossible discovery roll (race.streams.treaty, 02a),
+   dealPossible discovery roll (race.streams.treaty),
    and summit-week incident gating. The HOLDS branch of the
    resolution also lands with that machinery (its prose is
    the coordinator's then, like all prose); today's
@@ -70,7 +70,7 @@ export const TREATY_EVENTS = [
             },
         ],
     },
-    // ---- The pacing letter (reality-beats round, 02a "Control regime and content plumbing") -------------
+    // ---- The pacing letter (reality-beats round) -------------
     // The racers ask Washington for the tools to stop LATER. oneShot on TWO
     // guards -- treatyStage (itself Poisson-timed by talks_farce) and released
     // R3 -- so the pre-pass cannot cluster it onto the R3 week. No mechanics:

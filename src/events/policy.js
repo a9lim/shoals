@@ -11,7 +11,7 @@
      shells are the NARRATIVE around it.
    - dispute_* : fired by main.js on the Consensus dispute
      lifecycle (openDispute / ruleDispute / deadline
-     fallback; adjudicator succession per 09).
+     fallback; adjudicator succession).
 
    POISSON-LIVE ('policy' left the exclusion, round 5):
    - reporting_regime_enacted : the Whitfield-bill lever;
@@ -23,7 +23,7 @@
      belongs to the 'ghostwritten' arc, not here.
 
    All prose token-free; shells carry decaying `impulse`,
-   never permanent `params` (03 incident-coupling rule).
+   never permanent `params` (the incident-coupling rule).
    =================================================== */
 
 export const POLICY_EVENTS = [
@@ -154,7 +154,7 @@ export const POLICY_EVENTS = [
     },
 
     // ---- Treasury backchannel (P7-3: fund-as-actor) -----
-    // 02a "Act III", the fund-as-actor wager. Gated on the fund being
+    // The fund-as-actor wager. Gated on the fund being
     // LIVE -- `world.ai.fundLive`, the read-only mirror of main.js's monotone latch
     // over belief.js's OWN gate predicate `canActAsFund` (credibility > 0.65 AND
     // F > 60). The gate is never recomputed here: this `when` reads the mirror, the
@@ -189,7 +189,7 @@ export const POLICY_EVENTS = [
         ],
     },
 
-    // ---- The ban bill (reality-beats round, 02a "Control regime and content plumbing") -----------------
+    // ---- The ban bill (reality-beats round) -----------------
     // oneShot at released R4 BY INTENT: the beat is the coincidence -- the bill
     // lands the morning of the keynote that declares the era, because the R4
     // release headline IS that keynote (the pre-pass fires it the first day the

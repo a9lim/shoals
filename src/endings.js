@@ -58,7 +58,7 @@ function _num(n, d = 3) { return (Number.isFinite(n) ? n : 0).toFixed(d); }
 // -- Equity helper ------------------------------------------------------------
 
 function _computeEquity(portfolio, sim) {
-    let equity = portfolio.cash - unpaidObligations(portfolio);   // net of what the desk owes (02a "The evening")
+    let equity = portfolio.cash - unpaidObligations(portfolio);   // net of what the desk owes
     for (const pos of portfolio.positions) {
         equity += computePositionValue(pos, sim.S, Math.sqrt(sim.v), sim.r, sim.day, sim.q);
         if (pos._reservedMargin) equity += pos._reservedMargin;
@@ -106,7 +106,7 @@ const OVERLAY_NAMES = {
     bystander: 'Bystander',
 };
 
-// Terminal queue discipline (02a "Resolution"): once terminal closeout starts, only
+// Terminal queue discipline: once terminal closeout starts, only
 // terminal-SAFE beats survive in the popup queue -- category 'summit'
 // (treaty_holds / treaty_resolution) and 'catastrophe' (incident_catastrophe, the
 // S4 that resolves its own run): effect-free acknowledgments by construction.
@@ -127,7 +127,7 @@ export function isTerminalSafeBeat(popup) {
 const OVERLAY_THRESH = { C: 0.02, S: 0.03, F: 0.05, treaty: 1, dP: 0.03 };
 
 /**
- * Determine the personal overlay (05: margin_called / convicted / whistleblower_exile
+ * Determine the personal overlay (margin_called / convicted / whistleblower_exile
  * / gray_eminence / bystander). PROPOSAL (reported, tone-free): the three ruin states
  * map to their namesake overlay; the survive-or-quiet-exit states (term_ends /
  * forced_resignation / firm_collapse) split on INVOLVEMENT, judged on what the frozen
@@ -174,7 +174,7 @@ export function determineOverlay(endingId, totals = {}, dP = 0, converted = fals
 // per (family x overlay), all thirty cells distinct; pages 4 (The Desk) and 5
 // (The Ledger) family-toned at '*'. Page-5 framings are written to stay true
 // under an EMPTY ledger (the bystander composes through the rows themselves --
-// a receipt with a blank line IS the polite decline). Tone per 05: straight
+// a receipt with a blank line IS the polite decline). Tone: straight
 // everywhere, satire retains jurisdiction ONLY in the fizzle; the prose never
 // classifies -- the stat tables beneath it are the oracle's, and the oracle
 // may be cold. Family-3 page-3 cells keep the spine's no-narrator register
@@ -447,7 +447,7 @@ function _pageDesk(family, overlay, closeout, sim, portfolio) {
 function _pageLedger(family, overlay, ctx, factionState, traitIds) {
     let body = slot(family, overlay, 5);
 
-    // The complicity STATEMENT (05): the player's cumulative attributable channels,
+    // The complicity STATEMENT: the player's cumulative attributable channels,
     // rendered against the world outcome. Numbers + labels are structural (mine);
     // the sentence framing them is the slot above.
     const t = ctx.totals || {};
@@ -474,7 +474,7 @@ function _pageLedger(family, overlay, ctx, factionState, traitIds) {
 function _financialScorecard(sim, portfolio, closeout) {
     if (!sim || !portfolio) return '';
     // Post-closeout equity is cash: the closeout converted every valued position and
-    // paid every unpaid obligation out of it (02a "The evening"). Fall back to the
+    // paid every unpaid obligation out of it. Fall back to the
     // mark-to-market equity, net of obligations, when the closeout is absent (Classic).
     const equity = closeout ? portfolio.cash : _computeEquity(portfolio, sim);
     const totalPnl = equity - INITIAL_CAPITAL;

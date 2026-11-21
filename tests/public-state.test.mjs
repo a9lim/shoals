@@ -1,4 +1,4 @@
-// Public state only (AGENTS.md conventions; 09 "Information hygiene"): no hidden
+// Public state only (AGENTS.md conventions): no hidden
 // capability, latent or τ reaches a price, and the public record is the data
 // contract the reader is fit and evaluated on. A leak would make the market
 // prescient without anything on screen looking wrong.
@@ -144,7 +144,7 @@ test('the public record: its rows ignore hidden state, and folding them rebuilds
     assert.ok(days >= 5);
 });
 
-// 02a "Demonstrations": every report replays from the public rows, and hidden
+// Every report replays from the public rows, and hidden
 // truth corrupted after publication changes nothing published by then.
 test('the chain\'s reports replay from the public rows and ignore hidden truth corrupted after publication', () => {
     let reports = 0;

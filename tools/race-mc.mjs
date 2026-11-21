@@ -1,8 +1,8 @@
 /* ===================================================
    tools/race-mc.mjs -- the race's stance, reported (not a
    gate): N seeds of the hidden race over the 1008-day
-   horizon on neutral inputs, against 02a's tuning targets,
-   and the terminal families beside 02a's target outcome
+   horizon on neutral inputs, against tuning targets,
+   and the terminal families beside target outcome
    distribution (the tuning contract).
 
    The crossing statistic is the UNCONDITIONAL first-
@@ -29,7 +29,7 @@ for (let i = 0; i < argv.length; i++) {
 }
 const HORIZON = 1008;
 const ENTITIES = ['halcyon', 'tianxia', 'polaris', 'open'];
-// 02a "The race": frontier internal-crossing medians, each within ±10% or ±25 days,
+// Frontier internal-crossing medians, each within ±10% or ±25 days,
 // and the fizzle (elasticity ≤ 0.60) share in 9–15%.
 const TARGETS = { 2: 230, 3: 644, 4: 800, 5: 911 };
 
@@ -80,4 +80,4 @@ for (let i = 0; i < N; i++) {
     fam[race.resolution.family]++;
     if (race.resolution.extrapolated) extrapolated++;
 }
-console.log(`\n  families (compare 02a "Target outcome distribution"): ${[1, 2, 3, 4, 5, 6].map(f => `${f} ${pct(fam[f] / N)}`).join(', ')}; extrapolated ${pct(extrapolated / N)}`);
+console.log(`\n  families (compare DESIGN.md "Targets"): ${[1, 2, 3, 4, 5, 6].map(f => `${f} ${pct(fam[f] / N)}`).join(', ')}; extrapolated ${pct(extrapolated / N)}`);

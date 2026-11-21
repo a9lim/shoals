@@ -1,6 +1,5 @@
 /* ===================================================
-   src/almanac.js -- The almanac (02a "The evening", "The
-   almanac"): one record per Dynamic run, appended when
+   src/almanac.js -- The almanac: one record per Dynamic run, appended when
    its last edition is shown (natural resolution and
    ejection alike), kept in browser storage under
    `shoals-almanac`, versioned, the latest 200.
@@ -23,10 +22,9 @@ export const ALMANAC_VERSION = 1;
 export const ALMANAC_KEEP = 200;
 
 /** The neutral-input baseline the families seen are set beside: the target
- *  outcome distribution's band centres, in percent (02a "Target outcome
- *  distribution (the tuning contract)"). It is the distribution of headless
+ *  outcome distribution's band centres, in percent. It is the distribution of headless
  *  runs with no player inputs, labelled as that, not a forecast for a run played
- *  from an inherited book (02a "The opening hand": no refit). */
+ *  from an inherited book (no refit). */
 export const NEUTRAL_BASELINE = Object.freeze({ 1: 14, 2: 21, 3: 32, 4: 14, 5: 5, 6: 14 });
 
 /** One scored record (forecastRecord / copierRecord) in the almanac's shape. */

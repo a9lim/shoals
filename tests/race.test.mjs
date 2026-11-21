@@ -1,4 +1,4 @@
-// The hidden race's own invariants (02-race-model, 02a "Demonstrations"): rules
+// The hidden race's own invariants: rules
 // that hold by design but show in play only in rare worlds.
 import { test } from 'node:test';
 import assert from 'node:assert/strict';

@@ -211,7 +211,7 @@ export function renderWire(log, origin, tape) {
         if (e.magnitude === 'major') li.className = 'major';
         const d = document.createElement('span');
         d.className = 'b-day';
-        // The predecessor's archived reports predate the term (02a "The evening").
+        // The predecessor's archived reports predate the term.
         d.textContent = e.archive ? 'Archive' : 'Ed. ' + editionOf(e.day - origin);
         const k = document.createElement('span');
         k.className = 'b-kick';

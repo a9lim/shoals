@@ -2,13 +2,13 @@
    src/standing-orders.js -- The delegation layer
    (overhaul phase 7, slice 2).
 
-   04's standing orders, made mechanical: MENU-AUTHORED
+   standing orders, made mechanical: MENU-AUTHORED
    precommitments, never free-form. The player arms rules
    while the world is still slow enough to think in, and Act
    III executes them -- "takeoff is felt as your own agency
    migrating into machinery you configured earlier".
 
-   Six rules (02a "Act III", standing orders):
+   Six rules (standing orders):
      (a) severity_cut    S>=3 DETECTION -> cut gross 50%
      (b) blockade_halve  blockade ONSET -> halve HCN stock
      (c) bonds_first     margin util > 80% -> bonds liquidate
@@ -23,7 +23,7 @@
      (f) delta_flatten   |HCN move vs day open| > 8% at any
                          substep -> flatten net delta to +-20
 
-   BINDING CONVENTIONS (02a "Act III", standing orders):
+   BINDING CONVENTIONS (standing orders):
    1. Standing executions are MACHINERY: every trade below
       omits `spreadMult` (the exact pre-P7 fill) and NEVER
       touches the P7-1 latency queue -- precommitments are the
@@ -68,7 +68,7 @@ import {
 } from './portfolio.js';
 import { getBinaryQuote } from './race/consensus.js';
 
-/** Fixed v1 parameters. Arming is the player's only choice (02a). */
+/** Fixed v1 parameters. Arming is the player's only choice. */
 export const STANDING_TUNING = {
     unlockRung:      3,      // released frontier rung that reveals the panel
     lockRung:        5,      // released frontier rung that freezes the armed set
@@ -265,7 +265,7 @@ function _live() {
 
 /** Flatten one position whole, through the machinery close path (binaries route
  *  to `executeBinaryTrade`; a frozen contract refuses and is reported, never
- *  force-filled -- 09). */
+ *  force-filled. */
 function _flatten(pos, ctx) {
     return closePosition(ctx.sim, pos.id, ctx.S, ctx.vol, ctx.r, ctx.day, ctx.q);
 }
@@ -382,7 +382,7 @@ export function runDayBoundaryRules(ctx) {
                 if (pos.type !== 'binary' || pos.qty <= 0) continue;
                 const q = getBinaryQuote(pos.strike);
                 // ITM for a milestone binary = the public quote is above even
-                // (INTERPRETATION of 02a's "ITM long binaries"; flagged for the
+                // (INTERPRETATION of "ITM long binaries"; flagged for the
                 // coordinator -- the alternative read is "in profit vs entry").
                 if (!q || !(q.mid > STANDING_TUNING.itmThreshold)) continue;
                 if (_flatten(pos, ctx)) { legs++; units += pos.qty; } else refused++;

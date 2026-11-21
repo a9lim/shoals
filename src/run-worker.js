@@ -1,6 +1,6 @@
 /* ===================================================
    src/run-worker.js -- The live-equivalence check's
-   module worker (02a "Gates": live equivalence). It has
+   module worker (live equivalence). It has
    its own module instances, so it replays the page's
    journal on a run of its own and returns the digest
    trail for main.js's shoalsReplayCheck() to compare

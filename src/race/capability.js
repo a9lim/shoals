@@ -9,8 +9,8 @@
    `open` -- the diffuse open-ecosystem track, single-
    track by construction (release IS its mode of being).
 
-   All kinematics constants are transcribed verbatim from
-   docs/design/02a-tuning.md.
+   Kinematics constants are the design's (docs/DESIGN.md,
+   "The race").
    Pure / DOM-free -- headless-importable for MC.
 
    Module boundary (Codex review round 2): this module
@@ -35,12 +35,12 @@
 
 const clamp = (x, lo, hi) => Math.max(lo, Math.min(hi, x));
 
-// ---- Model constants (02a) -----------------------------------------------
+// ---- Model constants -----------------------------------------------
 
 /** Rung ladder: R1 = 1 ... R5 = 5, capability measured in rung units. */
 export const RUNGS = [1, 2, 3, 4, 5];
 
-// Capability clamps (02a: C in [0.3, 5.5], C[open] >= 0.3). Exported because
+// Capability clamps (C in [0.3, 5.5], C[open] >= 0.3). Exported because
 // the release/theft commits in race-state.js reuse them.
 export const C_MIN = 0.3;
 export const C_MAX = 5.5;
@@ -64,26 +64,26 @@ const APPETITE = { halcyon: 0.25, tianxia: 0.15, polaris: 0.45 };
 export const RELEASE_PULL = 0.85;   // release pulls C_released up 85% of the gap
 export const OPEN_LAG = 0.15;       // C[open] trails Tianxia's released weights by 0.15
 
-// Certification lags on released-rung crossing (02a). R1/R5 uncertified here
+// Certification lags on released-rung crossing. R1/R5 uncertified here
 // (R1 trivial; R5 is resolution territory). Certification is NESTED: settling a
 // rung settles all unresolved lower rungs the same day (see stepCertification).
 export const CERT_RUNGS = [2, 3, 4];
 const CERT_R3_DISPUTE_PROB = 0.4;   // R3: 40% disputed, adds U(20,40)d
 
-// Theft (02a). Victim-security success probabilities, indexed by SL 1..4.
+// Theft. Victim-security success probabilities, indexed by SL 1..4.
 export const SL_SUCCESS = [null, 0.70, 0.45, 0.18, 0.04];
 // THEFT_TUNING.base recalibrated (P6-1b re-gate) against the recorded benchmark
 // E[successes] ~= 0.6 (SL2, no upgrade, heat ~0.3) under the NEW shared-desperation
 // distribution. Exported mutable so the joint sweep can drive it (mirrors RACE_TUNING).
 export const THEFT_TUNING = { base: 0.0015 };   // recalibrated: E[successes]~0.60 (rev1 0.0011 gave 0.44 under new desperation)
 const THEFT_GAP_FLOOR = 0.10;    // 0.10 floor keeps parity-state espionage alive
-const THEFT_DESP_W = 1.4;        // 02a "Safety margin, heat, theft": clamp(0.10 + 1.4*desperation, 0, 1.5)
+const THEFT_DESP_W = 1.4;        // clamp(0.10 + 1.4*desperation, 0, 1.5)
 const THEFT_CLAMP_HI = 1.5;
 const THEFT_FAIL_COOLDOWN = 60;  // failed attempts cool down 60d
 const EPSILON_LO = 0.15;         // integration-lag epsilon ~ U(0.15, 0.35)
 const EPSILON_HI = 0.35;
 
-// ---- Shared strategic-desperation quantity (02a "Safety margin, heat, theft") --------
+// ---- Shared strategic-desperation quantity --------
 // vDeficit = clamp((1.05 - velocity)/0.30, 0, 1)  (Beijing's program genuinely
 //            slower -- their own hidden state)
 // runaway  = clamp((C_int[frontier] - C_int[tianxia] - 0.25)/0.60, 0, 1)  (the
@@ -100,7 +100,7 @@ const DESP_V_SCALE = 0.30;
 const DESP_FOLLOW_FLOOR = 0.25;   // ~= Halcyon release appetite; distillation floor
 const DESP_RUNAWAY_SCALE = 0.60;
 
-// ---- Export controls -> Tianxia compute dampener (02a "Capability kinematics") --
+// ---- Export controls -> Tianxia compute dampener --
 // Tianxia's ANNUAL compute growth factor by `world.ai.exportControlStage` 0..3
 // (the 0.8-1.6x range reserved at the P6-1b lever block; baseline 1.30 is stage
 // 0, so an absent/undefined stage is BIT-IDENTICAL to the pre-round build):
@@ -108,7 +108,7 @@ const DESP_RUNAWAY_SCALE = 0.60;
 // embargo sends it below 1 (clusters age out faster than gray-market
 // replacement). The dampener binds the COMPUTE leg ONLY -- the fast-follower
 // distillation term k_f is untouched, because controls bind chips and never
-// weights already released (03's satire line is the mechanism, verbatim), and
+// weights already released (satire line is the mechanism, verbatim), and
 // `cap.velocity` still multiplies the now-slower drift (controls slow even a
 // faster-than-believed Tianxia; they never reverse distillation).
 export const EXPORT_CONTROL_GROWTH = [1.30, 1.20, 1.06, 0.90];
@@ -199,8 +199,8 @@ function makeLab(id, C_internal, C_released, compute0, computeGrowth, talent, se
         rungCertified: freshRungs(),   // settled certification day (Consensus, phase 3)
         releaseCount: 0,
         lastReleaseDay: -Infinity,     // release-cooldown bookkeeping
-        // The cooldown drawn at this lab's last release (02a "Demonstrations",
-        // release jitter). 0 before the first: the first release keeps its timing.
+        // The cooldown drawn at this lab's last release
+        // (release jitter). 0 before the first: the first release keeps its timing.
         releaseCooldown: 0,
     };
 }
@@ -208,7 +208,7 @@ function makeLab(id, C_internal, C_released, compute0, computeGrowth, talent, se
 /**
  * Build the capability sub-state from a sampled hidden config.
  *
- * Starts (02a):
+ * Starts:
  *   C_int[halcyon] = 1.75, C_rel[halcyon] = 1.55
  *   C_int[tianxia] = 1.75 - position, C_rel[tianxia] = C_int - 0.1 (ships all)
  *   C[open]        = C_rel[tianxia] - 0.15
@@ -216,7 +216,7 @@ function makeLab(id, C_internal, C_released, compute0, computeGrowth, talent, se
  *
  * Compute curves: Halcyon 1.0 doubling yearly; Tianxia 0.75 growing 1.3x/yr
  * (export-control-dependent 0.8-1.6x -- baseline 1.3, event modulation later-
- * phase); Polaris 0.25 doubling yearly (02a "Capability kinematics").
+ * phase); Polaris 0.25 doubling yearly.
  */
 export function createCapabilityState(hidden) {
     const position = hidden.chinaTrue.position;
@@ -282,7 +282,7 @@ function frontierReleasedNonTianxia(cap) {
 }
 
 /**
- * Advance C_internal one day for every active lab, per the 02a ODE:
+ * Advance C_internal one day for every active lab, per the kinematics ODE:
  *
  *   q      = smoothstep(0.60, 0.75, E)                         (constant per run)
  *   mu_b   = g0 * compute(t)^0.5 * talent^0.3 * E
@@ -343,13 +343,13 @@ export function stepCapability(cap, day, endDay, inputs, rng) {
 }
 
 /**
- * Deterministic (shock-free) daily drift dC_int/dt for one lab -- the 02a ODE
+ * Deterministic (shock-free) daily drift dC_int/dt for one lab -- the kinematics ODE
  * WITH every phase-6 retune modifier (velocity leg A, drag leg B, follower leg 2)
  * but WITHOUT the `0.004·N(0,1)` shock term. THE ONE deterministic-drift source
  * (P6-1b re-gate P0 fix): stepCapability's Euler step and the resolution ladder's
  * plateau-confirmation test BOTH read it, so the plateau detector can never read a
  * pre-retune estimate again (the bug: omitting the modifiers under-read the
- * velocity-boosted / follower-boosted leader and false-latched plateaus). 02a rules
+ * velocity-boosted / follower-boosted leader and false-latched plateaus). The design rules
  * the raw trailing-120d endpoint difference OUT (noise-dominated), so the shock-free
  * expected drift is the plateau signal. `opts` carries the modifier inputs
  * { regime, deltaSup, followerKf, playerCoupling, exportControlStage }; absent/zero
@@ -383,7 +383,7 @@ export function deterministicDrift(cap, lab, day, opts = {}) {
     }
     // P6-2 player cost-of-capital coupling: the ORCHESTRATOR-PASSED bounded
     // multiplier on HALCYON's velocity (long persistent HCN positioning -> marginal
-    // acceleration; sustained short -> marginal slowdown, 03's stance table). Routed
+    // acceleration; sustained short -> marginal slowdown, stance table). Routed
     // through THIS single drift source so the plateau detector sees it too (never a
     // second drift path). Inert (0) headless -> the P6-1 world-side calibration stands.
     if (lab.id === 'halcyon' && opts.playerCoupling) drift *= (1 + opts.playerCoupling);
@@ -393,7 +393,7 @@ export function deterministicDrift(cap, lab, day, opts = {}) {
 // ---- Certification (state + timers; Consensus settlement is phase 3) ------
 
 /**
- * Schedule a certification for a released-rung crossing, sampling the 02a lag:
+ * Schedule a certification for a released-rung crossing, sampling the lag:
  *   R2 ~ Exp(25d);  R3 ~ Exp(60d) + 40% disputed (+U(20,40)d);  R4 ~ Exp(20d).
  * R1/R5 are not certified here. `rng` is the certification substream.
  */
@@ -409,7 +409,7 @@ export function scheduleCertification(cap, labId, rung, fromDay, rng) {
 
 /**
  * Settle certifications whose due day has arrived. Certification is NESTED
- * (02a, ruled 2026-07-23): settling rung r for a lab settles all its unresolved
+ * (ruled 2026-07-23): settling rung r for a lab settles all its unresolved
  * lower rungs the same day and cancels their pending timers -- a certified R4
  * entails a certified R3, so no R4-before-R3 inversions can occur. The ledger
  * records implied-vs-direct settlement: { lab, rung, direct } (direct true for
@@ -460,7 +460,7 @@ export function stepCertification(cap, endDay) {
 
 /**
  * Daily theft-hazard *decision* for the primary dyad -- thief = Tianxia,
- * victim = the leading domestic lab. Per 02a:
+ * victim = the leading domestic lab:
  *
  *   hazard/day = 0.0011 * clamp(0.10 + gap/0.75, 0, 1.5) * (1 + heat)
  *
@@ -484,7 +484,7 @@ export function rollTheftDecision(cap, heat, day, rng) {
         ? 'polaris' : 'halcyon';
     const victim = cap.labs[victimId];
 
-    // Attempt hazard (02a "Safety margin, heat, theft"): the raw victim-thief gap term is replaced by
+    // Attempt hazard: the raw victim-thief gap term is replaced by
     // the shared strategic-desperation quantity (the fast-follower made the raw gap
     // meaningless). 0.0011*clamp(0.10 + 1.4*desperation, 0, 1.5)*(1+heat).
     const desperation = strategicDesperation(cap);

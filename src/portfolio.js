@@ -51,7 +51,7 @@ export const portfolio = {
     peakValue:        INITIAL_CAPITAL, // max equity seen
     maxDrawdown:      0, // max (1 - equity/peak) seen
     restricted:       false, // account trading restriction (forced liquidation left un-flattenable legs)
-    obligations:      [], // unpaid { kind, label, amount, dueDay } (02a "The evening"); paid ones are removed
+    obligations:      [], // unpaid { kind, label, amount, dueDay }; paid ones are removed
 };
 
 // Auto-increment counters (not exported — internal)
@@ -98,7 +98,7 @@ export function cancelAllOrders() {
     return n;
 }
 
-/** Cash-funded primary allocations (02a "Private rounds and primary offerings").
+/** Cash-funded primary allocations.
  *  These are issuer fills: no bid/ask, secondary impact, or margin debit. */
 export function allocatePrivateStake(round, allocation, currentDay = market.day) {
     if (portfolio.restricted || !round || !(round.price > 0) || !Number.isFinite(round.price)
@@ -387,7 +387,7 @@ function _maintenanceForShort(type, absQty, currentPrice, currentVol, currentRat
  *                                   included so prospective equity matches the
  *                                   canonical portfolioValue (which counts every
  *                                   position's _reservedMargin). Passed for
- *                                   compute futures (09/3a canonical-equity rule);
+ *                                   compute futures (the canonical-equity rule);
  *                                   0 preserves the existing behavior for other
  *                                   short types.
  * @returns {boolean} true if the trade is safe
@@ -443,7 +443,7 @@ const TIME_BOUND_TYPES = new Set(['call', 'put', 'bond', 'vxhcnfuture']);
 
 /**
  * True when a time-bound instrument's expiry has already been settled, or is being
- * settled at today's boundary (02a "Act III"). `processExpiry` matches the
+ * settled at today's boundary. `processExpiry` matches the
  * boundary day EXACTLY, so a position opened at or past its own expiry would never
  * expire -- it would sit in the book, permanently live, forever.
  *
@@ -489,7 +489,7 @@ export function executeMarketOrder(
     // Compute-future lifecycle gate: only an active/listed/open/unfrozen/unsettled
     // contract is tradeable (rejects fabricated + settled keys and a frozen book).
     if (type === 'computefuture' && !isComputeTradeable(strike)) return null;
-    // Expiry re-checked at EXECUTION (02a "Act III"), centrally and BEFORE the
+    // Expiry re-checked at EXECUTION, centrally and BEFORE the
     // trade is counted: a time-bound contract at or past its own expiry day can
     // never be opened, because the expiry pass would never match it again.
     if (isExpiredForTrading(type, expiryDay, currentDay)) return null;
@@ -625,8 +625,7 @@ export function executeMarketOrder(
         } else if (type === 'computefuture' && Math.sign(oldQty) === Math.sign(signedQty)) {
             // Same-direction extend: compute futures carry a volume-weighted-average
             // entry basis so settlement cash AND reported P&L derive from the same
-            // basis -- money conserves under multi-fill by construction (09 compute
-            // row). Flips are re-stamped above; partial reduces keep their basis;
+            // basis -- money conserves under multi-fill by construction. Flips are re-stamped above; partial reduces keep their basis;
             // closes are removed. This basis rule is scoped to compute futures --
             // the chassis convention for other position types is unchanged.
             existing.entryPrice = (existing.entryPrice * Math.abs(oldQty) + fill * Math.abs(signedQty)) / Math.abs(newQty);
@@ -858,14 +857,14 @@ export function checkPendingOrders(sim, currentPrice, currentVol, currentRate, c
  * Cash is credited/debited accordingly.
  * qty > 0 = long position, qty < 0 = short position.
  *
- * `spreadMult` (P7-1 latency ladder, 02a "Act III") widens the exit spread for a
+ * `spreadMult` (P7-1 latency ladder) widens the exit spread for a
  * PLAYER-initiated close, exactly as it widens an entry -- exits are not faster
  * or cheaper than entries in a market made of machines. Omitted / 1 is an exact
  * no-op, which is what every MACHINERY caller passes (processExpiry,
  * liquidateAll, margin trims, popup trades): the ladder binds the player's hand,
  * never the machinery's.
  *
- * `qty` (the flatten's reduce-only cap, 02a "The evening") closes that many units
+ * `qty` (the flatten's reduce-only cap) closes that many units
  * of it instead, returning the same fraction of a short's collateral; omitted, or
  * at least the holding, closes all of it.
  *
@@ -891,7 +890,7 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
 
     // A frozen/settled compute future cannot be flattened (mobilized decree
     // conversion / halted book) -- reported as stuck by liquidateAll, never a
-    // fictional fill (09). It clears when the decree conversion settles it.
+    // fictional fill. It clears when the decree conversion settles it.
     if (pos.type === 'computefuture' && (computeMarket.frozen || computeMarket.settled[pos.strike])) {
         return false;
     }
@@ -926,7 +925,7 @@ export function closePosition(sim, positionId, currentPrice, currentVol, current
 }
 
 // ---------------------------------------------------------------------------
-// The flatten's reduce-only legs (02a "The evening")
+// The flatten's reduce-only legs
 // ---------------------------------------------------------------------------
 
 /** A reduce-only leg's position, capped quantity and status: the position by id,
@@ -1300,7 +1299,7 @@ export function processExpiry(sim, expiryDay, currentPrice, currentDay, currentV
 // ---------------------------------------------------------------------------
 
 /**
- * The unpaid obligations' total (02a "The evening"): a liability from the
+ * The unpaid obligations' total: a liability from the
  * takeover. The ONE helper every actual and prospective equity calculation nets
  * out (portfolioValue, collateralEquity, checkMargin, short-order admission, the
  * initial-margin debit check through collateralEquity, the private-stake headroom
@@ -1330,7 +1329,7 @@ export function portfolioValue(currentPrice, currentVol, currentRate, currentDay
 }
 
 /** Equity eligible to collateralize borrowing. Private marks remain in total
- *  NAV, but have zero lending value (02a private-stake contract). */
+ *  NAV, but have zero lending value (the private-stake contract). */
 export function collateralEquity(currentPrice, currentVol, currentRate, currentDay, q) {
     let total = portfolio.cash - unpaidObligations();
     for (const pos of portfolio.positions) {
@@ -1468,7 +1467,7 @@ export function liquidationSequence(typeFirst) {
  * Close all open positions at current market prices. Iterates by descending
  * index so a position that CANNOT be flattened (e.g. a frozen/pending binary)
  * is reported rather than force-filled or spun on forever. Never a fictional
- * fill (09).
+ * fill.
  *
  * `typeFirst` (optional) is the P7-2 standing liquidation PREFERENCE -- an array
  * of position types to flatten before anything else (main.js passes
@@ -1597,7 +1596,7 @@ export function aggregateGreeks(currentPrice, currentVol, currentRate, currentDa
 // unitPrice('binary', ...) = quote mid x notional. Shorts are FULLY
 // COLLATERALIZED: _reservedMargin holds the whole notional (premium sequestered
 // inside it), so max loss = notional - premium and a short can never lose more
-// than its collateral (09 "Binary shorts are fully collateralized"). No greeks,
+// than its collateral. No greeks,
 // no impact overlay, no borrow. Binaries carry no maintenance requirement
 // beyond that collateral (see checkMargin / marginRequirement guards) and are
 // settled event-driven by settleBinaries -- processExpiry skips them.
@@ -1724,7 +1723,7 @@ export function executeBinaryTrade(key, side, qty, spreadMult) {
  * consensus.js (computeBinarySettlements). Each settlement carries a
  * quote-independent `payoutPerUnit` (dollars): notional for YES, 0 for NO,
  * fallbackValue x notional for impossibility -- identical for every holder,
- * never dependent on cost basis (09 invariant 4). Long YES receives the payout;
+ * never dependent on cost basis. Long YES receives the payout;
  * a fully-collateralized short returns its reserved collateral and pays the
  * payout to the YES side. Settled positions are removed. Returns per-position
  * result rows { key, label, outcome, qty, payout, pnl } for UI toasts.
@@ -1768,7 +1767,7 @@ export function settleBinaries(settlements) {
  *   2. CASH via settleBinaries (PENDING_CLOSEOUT markers, payoutPerUnit null, carry
  *      no cash and stay open).
  * Settlement does not score credibility: the player's posterior is scored each
- * quarter against `B` (belief.js scoreQuarter; 02a "Belief, η, and the firm").
+ * quarter against `B` (belief.js scoreQuarter).
  * Narrative (toasts / dispute shells) is layered by the caller (main.js) off the
  * returned `{ fresh, cashResults }`. DOM-free / headless.
  *
@@ -1801,13 +1800,13 @@ export function applyBinarySettlementRows(rows) {
 // by the settlement price: a long receives settlePrice x |qty|; a short returns
 // its Reg-T collateral and pays settlePrice x |qty|. The realized P&L therefore
 // equals signedQty × COMPUTE_MULTIPLIER × (settlePrice − entryBasis) with shorts
-// symmetric -- the exact 09 decree-closeout formula when settlePrice is the
+// symmetric -- the exact decree-closeout formula when settlePrice is the
 // decree price (COMPUTE_MULTIPLIER is 1, folded into the direct settlement).
 //
 // entryBasis NETTING NOTE: compute futures DEVIATE from the chassis first-entry
 // convention -- `entryPrice` is maintained as the volume-weighted average fill
 // price on same-direction extends (re-stamped on a flip past zero, kept on
-// partial reduces). Ruled phase 3b, recorded in 09: formula-priced closeout pays
+// partial reduces). Ruled phase 3b, recorded: formula-priced closeout pays
 // off entryBasis directly, so only a VWAP basis conserves cash under multi-fill.
 // Stock / bond / VXHCN-future keep first-entry basis -- they close through
 // market fills, where cash conserves regardless of the display basis.
@@ -1817,7 +1816,7 @@ export function applyBinarySettlementRows(rows) {
  * from compute-market.js (computeFutureSettlements). Each settlement carries a
  * quote-independent `settlePrice` (index points): the maturity index for
  * ORDINARY / FORCE_MAJEURE, the decree price for DECREE -- identical for every
- * holder, never dependent on cost basis (09 invariant 4). Settled positions are
+ * holder, never dependent on cost basis. Settled positions are
  * removed. Returns per-position result rows { key, kind, qty, settlePrice, pnl }.
  */
 /**
@@ -1833,7 +1832,7 @@ export function applyCloseoutRows(rows) {
         const i = portfolio.positions.findIndex(p => p.id === r.id);
         if (i < 0) continue;
         const pos = portfolio.positions[i];
-        if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;   // preserve accrued borrow (09 carry-through)
+        if (pos.borrowCost) portfolio.closedBorrowCost += pos.borrowCost;   // preserve accrued borrow
         portfolio.cash += r.cashChange;
         portfolio.positions.splice(i, 1);
         applied.push(r);
@@ -1869,7 +1868,7 @@ export function settleComputeFutures(settlements, race) {
 }
 
 // ---------------------------------------------------------------------------
-// The opening hand and its obligations (02a "The evening")
+// The opening hand and its obligations
 // ---------------------------------------------------------------------------
 //
 // A Dynamic run starts on an inherited book. The takeover seats each position at
@@ -1934,7 +1933,7 @@ export function forcedSaleQuote(pos, currentPrice, currentVol, currentRate, curr
     if (pos.type === 'binary') {
         const quote = getBinaryQuote(pos.strike);
         if (!quote) return 0;
-        // 02a's forced-sale quote carries the regulation multiplier for every
+        // Forced-sale quote carries the regulation multiplier for every
         // instrument, Consensus included, though an ordinary binary trade applies none;
         // the forced close fills at this quote.
         const sMult = getRegulationEffect('spreadMult', 1) * FORCED_SALE_SPREAD_MULT;

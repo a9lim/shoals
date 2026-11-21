@@ -126,7 +126,7 @@ export function getAvailableActions(day, cash) {
 }
 
 /** Take one action on `day`. `rng` is the action's own slot (the `lobby`
- *  stream keyed by the action and day, 02a "The run, headless"). The caller
+ *  stream keyed by the action and day). The caller
  *  admits it first (getAvailableActions: the gate, the cost, the cooldown). */
 export function executeLobbyAction(actionId, day, world, rng) {
     const action = LOBBY_ACTIONS.find(a => a.id === actionId);

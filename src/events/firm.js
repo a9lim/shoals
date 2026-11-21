@@ -1094,7 +1094,7 @@ export const FIRM_EVENTS = [
     },
 
     // ===================================================================
-    //  FIRM CONVERSION (04; prose landed content round 8)
+    //  FIRM CONVERSION (prose landed content round 8)
     //  The CIO arc: Act I the skeptic + the scrutiny loop (quarterly-
     //  review machinery); Act II the grudging memo; Act III conversion.
     //  The game's most persistent human throughline. Fired by main.js's

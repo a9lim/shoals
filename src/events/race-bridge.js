@@ -27,7 +27,7 @@
                       victim -> superevent, otherwise the ordinary shell
      capex         -> ONE rates_capex_wave per RISE of the public released-
                       frontier rung (a public-state latch, not a ledger row)
-     demonstrations-> one item per chain row (02a "Demonstrations"): publication,
+     demonstrations-> one item per chain row: publication,
                       scope dispute, evaluation, withdrawal
      evidence      -> NOT bridged this slice (generated + laddered in the race
                       state; surfaced through belief / the insider channel later)
@@ -35,7 +35,7 @@
    DOM-free. The bridge selects a shell, attaches `raceMeta`
    (the data the real prose draws on), and fires it for its
    headline/popup. MARKET COUPLING (phase 4): each shell's
-   permanent `params` stays `{}` (03 incident-coupling rule --
+   permanent `params` stays `{}` (the incident-coupling rule:
    the stream is too high-volume for permanent additive deltas),
    and the coupling now rides `ev.impulse`, seeded into the
    DECAYING event-impulse overlay (src/race/impulse.js) scaled
@@ -50,7 +50,7 @@ import { buildPublicView } from '../race/consensus.js';
 import { marketEfficiency } from '../race/belief.js';
 
 // Act-II alpha decay: as market efficiency `eta` rises with the RELEASED
-// frontier (02a ruling), a fraction of each race event's move was already
+// frontier (ruled), a fraction of each race event's move was already
 // PRE-PRICED off its legible precursor (a rung claim precedes its certification;
 // the release ladder gaps the market before the headline). The headline residual
 // the player can still catch shrinks by eta*PREPRICE_FRAC -- edges thin, exactly
@@ -238,15 +238,14 @@ function bridgeReleases(tr, emit) {
     }
 }
 
-// ---- Capex channel (02a "Rates: the capex channel") -----------
-// 03's "AI capex distorts the long end", given its mechanism: every RISE of the
+// ---- Capex channel -----------
+// "AI capex distorts the long end", given its mechanism: every RISE of the
 // PUBLIC released-frontier rung fires ONE `rates_capex_wave` carrying a PERMANENT
 // additive delta to the Vasicek long-run rate. Labs and hyperscalers raise AFTER
 // a demo, so the wave follows the release and `r` mean-reverts toward the new `b`
 // over the following weeks.
 //
-// This is a LATCH, not a ledger read (the `_checkFirmConversion` precedent 02a
-// cites): a released-rung crossing in `tr` does not imply the FRONTIER max rose
+// This is a LATCH, not a ledger read (the `_checkFirmConversion` precedent): a released-rung crossing in `tr` does not imply the FRONTIER max rose
 // (a trailing lab crossing R2 under a released-R3 frontier moves nothing), and
 // the frontier max is exactly what the design keys on. The latch reads the same
 // public quantity `eta` and the base-rate scale read -- `releasedFrontierRung`
@@ -272,7 +271,7 @@ let _lastCapexRung = null;
 function bridgeCapex(emit, race, liveRung) {   // reads no ledger row: this edge is public state
     const rung = (liveRung == null) ? buildPublicView(race).releasedFrontierRung : liveRung;
     // Seed without firing on the first call of a run. `resetRaceBridge()` (now
-    // UNCONDITIONAL in main.js's _resetCore -- 02a "Rates: the capex channel") is the
+    // UNCONDITIONAL in main.js's _resetCore) is the
     // ONE path that clears the latch between runs; no self-healing branch here.
     // (A stale latch ABOVE the rung would fire nothing -- the step loop is empty
     // on a decrease -- and the trailing assignment tracks it down, so there are
@@ -299,7 +298,7 @@ function bridgeCertifications(tr, emit) {
     }
 }
 
-// ---- Demonstrations (02a "Demonstrations") --------------------------------
+// ---- Demonstrations --------------------------------
 // One wire item per public row of the chain, in the step's order (withdrawals,
 // evaluations, disputes, publications). The rows carry no truth; the bridge reads
 // nothing else of the chain. Halcyon's first publication, while the Fixedpoint
@@ -326,7 +325,7 @@ function bridgeDemonstrations(tr, emit, world) {
 
 // ---- Incidents (DETECTED only; occurrence stays silent) ------------------
 
-// CLASSIFICATION BLACKOUT (P7-3, 02a): under `controlRegime === 'classified'` the
+// CLASSIFICATION BLACKOUT (P7-3): under `controlRegime === 'classified'` the
 // PUBLIC detection shells are not fired at all -- a classified-brief shell fires
 // instead (impulses ABSENT, so the bridge's impulse dispatch never runs for them,
 // and `B` suppresses the matching fold in stepBelief). Severity 4 is the one
@@ -339,7 +338,7 @@ function bridgeIncidents(tr, emit, race) {
         const meta = { source: det.source, severity: det.severity, cls: det.cls, lag: det.lag };
         let id;
         // Severity DOMINATES class: an S4 always routes catastrophe, whatever the
-        // class label -- the absolute S4 self-disclosure rule (02a). (The generator
+        // class label -- the absolute S4 self-disclosure rule. (The generator
         // also never produces a persuasion S4; this is the belt to that suspenders.)
         if (det.severity >= 4) id = 'incident_catastrophe';
         else if (blackout) id = (det.severity === 3) ? 'incident_brief_classified_grave' : 'incident_brief_classified';
@@ -392,7 +391,7 @@ function bridgeRegime(tr, emit) {
 // person, not a feed, and scarcity IS the texture (~5-8 tips/run). The tip
 // tells the player an incident EXISTS before the world learns it -- the trade
 // verb's edge is positioning ahead of the detection beat the machinery will
-// fire anyway. Gate/throttle numbers recorded in 02a "Incidents".
+// fire anyway. Gate/throttle numbers recorded.
 // `_tipIncidentId` (+ raceMeta.severity) is the LEAK verb's handle: the evidence
 // machinery round's `raceLeak` choice field reads it at the main.js chokepoint to
 // force detection (incidents.js) and fold `B` early (belief.js). The severity
