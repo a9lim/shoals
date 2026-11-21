@@ -14,7 +14,7 @@ export const WORLD_SCENARIOS = Object.freeze({
     scenarios: ['neutral', 'engine'],
     training: '4000 neutral + 4000 engine, alternating by world index; validation and test report each separately',
     neutral: 'no strait tension, export-control stage 0, treaty stage 0, no coupling; timeout extrapolation at zero tension',
-    engine: 'a bystander headless Dynamic run (02a "Headless policies"; tools/engine-worlds.mjs): the event engine moves the world inputs, priced by the reader in place when the world was generated; the race replays from the run\'s input tape',
+    engine: 'a bystander headless Dynamic run (tools/engine-worlds.mjs): the event engine moves the world inputs, priced by the reader in place when the world was generated; the race replays from the run\'s input tape',
 });
 
 const NEUTRAL_GEO = Object.freeze({ chinaRelations: 0, tradeWarStage: 0 });
