@@ -22,8 +22,8 @@
    named substream) -- never from capability / theft /
    certification streams -- so capability and theft
    trajectories stay bit-identical whether incidents are
-   enabled or not (verified by the substream-isolation check
-   in tools/race-mc.mjs). This module reads C / S / heat and
+   enabled or not (by construction: incidents draw from their
+   own substream). This module reads C / S / heat and
    APPENDS to the latent queues + the per-tick ledger; it
    never mutates C, heat, safety, or the capability sub-state
    -- occurrence's physical effects are RECORDED as fields,

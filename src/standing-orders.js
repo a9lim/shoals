@@ -56,8 +56,7 @@
    6. Parameters are FIXED in v1 -- arming is the choice.
 
    DOM-free (portfolio + Consensus quotes only), so
-   tools/plumbing-test.mjs section M drives the whole engine
-   headless. Mutable module singleton, reset by
+   the whole engine runs headless. Mutable module singleton, reset by
    `resetStandingOrders()` -- mirrors act3.js / price-impact.js.
    Draws NO randomness: standing orders are deterministic
    consequences of public state, so Classic (never evaluated at

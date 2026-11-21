@@ -26,8 +26,7 @@
    REGIME_RANK / CONTROL_REGIMES live here (not race-state.js)
    so both modules share them without a cycle.
 
-   Pure / DOM-free -- headless-importable so the reachability
-   + monotonicity harness (tools/plumbing-test.mjs) drives it.
+   Pure / DOM-free -- headless-importable.
 
    RATIFIED (02a "Content plumbing (phase-5a ratifications,
    2026-07-23)"): the full disjunctive transition predicates in

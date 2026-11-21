@@ -5,8 +5,7 @@
 
 // -- The rules a journal replays under (02a "The run, headless") --
 // Bump on any change that alters what a journal replays to: a saved run under
-// another version is retired, never replayed, and run-test's fixture trail is
-// re-derived (`node tools/run-test.mjs --rebaseline`).
+// another version is retired, never replayed.
 export const RULES_VERSION = 1;
 
 // -- Simulation timing --

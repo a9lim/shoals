@@ -3,7 +3,7 @@
    headless"): the clock without a page, replay of a
    journal to an endpoint, headless runs under a policy,
    and the digest the replay gates compare. DOM-free; the
-   page's resume, run-test and the fit's worlds use it.
+   page's resume, the tests and the fit's worlds use it.
    =================================================== */
 
 import { DEFAULT_PRESET } from './config.js';

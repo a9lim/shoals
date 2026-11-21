@@ -31,7 +31,7 @@ the parent site by absolute path. From a checkout of
 
 ## How it's built
 
-The app is vanilla HTML, CSS, and JavaScript ES modules with no bundler. Charts are Canvas 2D and the music is Web Audio synthesis. `main.js` orchestrates the simulation, pricing, portfolio, and UI modules in `src/`. The hidden race model and its markets live in `src/race/` and are DOM-free, so ten headless Node harnesses in `tools/` can drive them. Design documents are in `docs/design/`, and the queue of unbuilt work is `docs/ROADMAP.md`. [AGENTS.md](AGENTS.md) has the detailed map.
+The app is vanilla HTML, CSS, and JavaScript ES modules with no bundler. Charts are Canvas 2D and the music is Web Audio synthesis. `main.js` orchestrates the simulation, pricing, portfolio, and UI modules in `src/`. The hidden race model and its markets live in `src/race/` and are DOM-free, so the Node test suite in `tests/` drives them headless. Design documents are in `docs/design/`, and the queue of unbuilt work is `docs/ROADMAP.md`. [AGENTS.md](AGENTS.md) has the detailed map.
 
 ## License
 

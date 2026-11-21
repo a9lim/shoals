@@ -18,7 +18,8 @@ How a round runs:
 1. Ratify the design into 02a.
 2. Implement. Implementers flag interpretation calls rather than
    improvise.
-3. Run the ten harnesses at default N.
+3. Run the suite (`node --test 'tests/*.test.mjs'`). A new mechanism adds a
+   test only where its failure would be silent (AGENTS.md, "Test policy").
 4. Get an independent Codex review of the round before committing.
 
 Player-facing prose and the score are authored, and a9 ratifies them.
@@ -55,7 +56,7 @@ The three pillars become three verbs, plus a closing honesty:
 The core loop under all four, in Codex's words from the 2026-10-27 review:
 **form a view, accept exposure, revise under consequence.** The forecast
 score is one receipt for that loop, not the loop itself. Every round on the
-main line answers to a player-facing test as well as its harness gates:
+main line answers to a player-facing test as well as its tests:
 after one quarter, can a player name the evidence they used, the exposure
 they chose, and what remains unresolved? The sentence the next releases
 should make possible, also Codex's: "I kept that position because of that
@@ -160,16 +161,14 @@ proposals; the sections below carry its caveats.
   How many runs it takes is an empirical question: σ₀ sums marginal
   variances without cross-rung covariance (*checked*), so it is not the
   spread of whole-run scores.
-- **The forecast costs the most attention, and arrives first.** Sixteen
-  of a run's 48 dispatches were forecast locks in a9's 2026-10-25 play.
-  The day-0 lock is queued at boot (*checked*), so a new player is asked
-  for a timeline about unfamiliar rungs before reading a single edition:
-  an assessment before a hypothesis.
+- **The forecast cost the most attention, and arrived first** (sixteen
+  of a run's 48 dispatches in a9's 2026-10-25 play, the first at boot).
+  Section 1 made it a standing policy with no dispatch.
 - **Agency arrives at the end of an evening.** At the default speed of
   half a day a second, day 1008 is 33.6 minutes of uninterrupted
   simulation (*checked*). 02a's calibration target has the ideal
   reader-copier clearing the memo gate by day 882, about 29 minutes in.
-  There is no save (*checked*), so an interrupted evening loses the run.
+  (Save and resume landed with section 3.)
 - **The book holds a bet, and nothing reads it.** 00's one line, "the
   money is how you find out what you actually believe", has no mechanic.
   The forecast editor asks what you believe; the book bets something;
@@ -178,24 +177,20 @@ proposals; the sections below carry its caveats.
   domains (curves per domain, a grid, per-domain contracts, a refit)
   ahead of the decision chain that its second section said must come
   before widening the simulation.
-- **Several specified gates need whole runs that can't be played
-  headless.** Interruption metrics, matched-policy runs, policy effects
-  across held-out seeds and journal replay all play whole runs under a
-  scripted player. `main.js` is the orchestrator and is DOM-coupled; the
-  harnesses rebuild its pieces instead (`tools/endings-test.mjs` says so,
-  *checked*).
-- **Early releases cluster on a learnable calendar.** Releases are
-  phase-locked across worlds in Act I (section 10), which a returning
-  player can learn. That is a replay problem as well as the reader's.
+- **Several specified gates need whole runs played headless** under a
+  scripted player (interruption metrics, matched-policy runs, policy
+  effects across held-out seeds). Section 3's first cut made the run
+  headless.
+- **Early releases clustered on a learnable calendar** across worlds in
+  Act I. The release jitter (round one of section 2) spreads every release
+  after a lab's first.
 - **The back half drifted into clearing machinery** whose payoff a player
   wouldn't feel in a short act. Most of it moves to the backlog (section
   12), taken when a feature needs it.
-- **Two corrections.** The wire kept twenty log entries against the
-  forty the Brief asked for (`MAX_EVENT_LOG`, *checked*); it now keeps
-  forty under the lead. The firm's verdict is not inert: it is one of the
-  room's six seat criteria and makes the personal overlay gray eminence
-  (*checked*). What's missing is any change to how the desk operates,
-  which its prose promises.
+- **The firm's verdict is not inert:** it is one of the room's six seat
+  criteria and makes the personal overlay gray eminence (*checked*).
+  What's missing is any change to how the desk operates, which its prose
+  promises (section 2, "The firm responds").
 
 ### Rulings (2026-10-27)
 
@@ -237,8 +232,6 @@ Rulings are in 02a ("The evening", and "The standing policy" under
 
 Carried forward from this section:
 
-- **Save and resume** come from section 3: a run is its seed and its
-  journal.
 - **Later obligations** become Act III's affirmative objective in section
   6, and **follow the reader** and **follow my book** join the policy in
   sections 6 and 4.
@@ -409,8 +402,8 @@ threshold, so the terminal clip goes in the same round.
   does not make them sovereign.
 - **Recalibrate the knife-edge gates on effective outcomes:** the share of
   close worlds a maximal player can turn, inside a ratified band. The
-  `endings-test` coverage gate (≥ 40% of runs within reach) measures raw
-  `d_P` and misses the clip. The no-player distribution stays unchanged;
+  current coverage target (02a: a maximal player's reachable |d_P| covers
+  at least 40% of runs' |d_W|) measures raw `d_P` and misses the clip. The no-player distribution stays unchanged;
   report how purposeful policies move the distribution rather than forcing
   every policy back into it.
 - **Gates:**
@@ -487,8 +480,6 @@ it buys next:
   Replay is exact within one JavaScript engine only (Node and Chrome
   round some `Math` functions differently in the last place), so worlds
   shared across browsers would need portable math.
-- The remaining harnesses that rebuild pieces of `main.js` move to the
-  run module when they next change.
 
 ## 4. What the book bets
 
@@ -704,8 +695,8 @@ cheapest to verify. An internal model can produce research mathematics at
 volume, machine-checked, long before anyone can certify "autonomous
 researcher" in AI R&D, the domain that drives recursion.
 
-- **One hidden scalar per lab stays.** The kinematics, their calibration
-  and the bit-identity harnesses are untouched. A domain is a way a rung
+- **One hidden scalar per lab stays.** The kinematics and their
+  calibration are untouched. A domain is a way a rung
   becomes *visible*, not a separate capability.
 - **Each domain certifies on its own clock**, drawn from a `domains`
   substream outside `race.streams`:
@@ -727,8 +718,8 @@ researcher" in AI R&D, the domain that drives recursion.
 - **The edge:** the loud domain leads the quiet one by a lag that is real
   but not fixed. A certified R3 in mathematics is evidence about AI
   research, not its settlement.
-- **Gates:** the reader is refit and its gates rerun; the edge bands and
-  `K_CRED` are re-derived on validation worlds; the edge with domains is
+- **Gates:** the reader is refit; `K_CRED` and the listing base rates
+  are re-derived on validation worlds; the edge with domains is
   measured against the edge without them.
 - **Separate decision, later:** whether domain capability feeds hazards,
   for example cyber capability raising theft and incident rates. That
@@ -846,12 +837,6 @@ risk faster than the player can reconsider it (section 6's delegation).
 
 ## 10. The race's missing machinery
 
-- **Releases are phase-locked across worlds early.** Release policy is a
-  threshold on near-deterministic drift, so Act I releases cluster on a
-  learnable calendar. Measured in the 2026-10-25 round over day mod 63:
-  releases run ±20% by week, and claims run 65% above average in days
-  42–48. A per-lab jitter on appetite, or a release-review lag, would
-  desynchronize them. Take it in section 2's refit, measured on its own.
 - **Security levels**, SL1–SL4 per lab, with costs, research friction and
   observable tells (badge policies, a paper drought, the air-gap
   complaint). Theft success keys off the victim's level. Today every lab
@@ -949,7 +934,7 @@ feature or a found defect needs it. Halt settlement stays with halts
   terminal hazards, and from mobilized onward the declared
   nationalization band. The CRR trees become display and scenario tooling
   only. Corrupting tree inputs would then change displayed analytics and
-  nothing economic, which becomes a harness invariant.
+  nothing economic, which becomes a tested invariant.
 - **Carry through delisting.** Borrow fees and manufactured dividends
   accrue to the legal conversion timestamp and then stop, with a stated
   record-date rule for dividends.
@@ -1004,11 +989,13 @@ Code-side seams the current-only docs no longer cover:
 - `main.js` clears the retired LLM mode's `shoals_llm_key` and
   `shoals_llm_model` storage on every boot. Drop it once enough time has
   passed.
-- Stale code comments that cite retired names or deleted docs.
+- Stale code comments that cite retired names or deleted docs, among
+  them 02a sections that no longer exist: "The edge, gated", "farce
+  resolution over ~60d" and "factor that helper to one shared source".
 
 ## 15. Feel, from a9's play-test
 
-- The first thirty minutes, once section 1 lands: the opening hand,
+- The first thirty minutes, now that section 1 has landed: the opening hand,
   whether the forecast policy is found without being explained, and
   whether the pacing control makes Act I's quiet weeks feel chosen.
 - The posterior: whether `K_CRED` 1.35 feels generous or stingy to a

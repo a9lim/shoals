@@ -73,7 +73,7 @@ fallbackValue}`.
   late); and the adjudicator is **resolved from the current regime at
   ruling/settlement time**, not snapshotted at dispute-open — succession
   applies to disputes already in flight. The lifecycle is exercised by
-  the harness; no event opens a dispute, so in play certification
+  the tests; no event opens a dispute, so in play certification
   disputes resolve upstream as a disputed-lag draw.
 - **The R5 contract settles on terminal resolution, never mid-run
   certification:** no auditor certifies takeoff — a world that would is
@@ -162,7 +162,7 @@ the rule of thumb's state, and every mutation of that state records a
 causal evidence ID pointing at a public in-game event. Quotes, the
 valuation layer and round prices are functions of `B` and the public
 view, so they move only when the record does or the clock turns. The
-reader is fit offline and only evaluated in play, and a harness rebuilds
+reader is fit offline and only evaluated in play, and the tests rebuild
 the record from the logged public projection alone. No price may read
 `C_internal`, undetected incidents, or the event queue: a market that
 front-runs latent truth is a hidden tax, and it is barred. Hidden state
@@ -195,9 +195,10 @@ financing/governance channels.
 
 ## Fairness invariants
 
-The harnesses assert 3, 4, 5's settlement half, and the
-information-hygiene invariant (quotes, valuations, round prices and
-settlements unchanged under corrupted hidden state).
+The tests (`tests/books.test.mjs`, `tests/public-state.test.mjs`) assert
+3, 4, 5's settlement half, and the information-hygiene invariant (quotes,
+valuations, round prices and settlements unchanged under corrupted hidden
+state).
 
 1. No hidden execution tax: every fill at a freshly-refreshed
    executable quote, or explicit failure.

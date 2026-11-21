@@ -87,7 +87,7 @@ export const run = {
     digests: [],             // per-close digests, when `digesting`
     digesting: false,
     digestFn: null,          // run-replay.js's digest, installed when a trail is kept
-    trace: null,             // the close's order trace (run-test), or null
+    trace: null,             // the close's order trace (debugging), or null
     sink: NULL_SINK,
 };
 

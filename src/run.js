@@ -2000,7 +2000,7 @@ export function debugPopup(event) {
     _processPopupQueue();
 }
 
-/** The harnesses' handle on single transitions (opening-test, rounds-test): the
+/** The tests' handle on single transitions (tests/desk.test.mjs): the
  *  close's gap, a choice's consequence, the obligations' close, the restriction.
  *  Nothing in the page calls these; the run calls them in its own order. */
 export const runInternals = Object.freeze({

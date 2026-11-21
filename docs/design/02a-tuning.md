@@ -9,7 +9,7 @@ curve's), and the section says so where it applies. The **target outcome
 distribution** at the bottom is the tuning contract, and the
 **knife-edge principle** is its guardrail.
 
-The tuning objects are exported mutable for harness sweeps only:
+The tuning objects are exported mutable for sweeps only:
 
 | Object | File |
 |---|---|
@@ -27,18 +27,19 @@ The tuning objects are exported mutable for harness sweeps only:
 | `ACT3_TUNING` | `src/act3.js` |
 | `STANDING_TUNING` | `src/standing-orders.js` |
 
-A number called a **gate** is asserted by a harness at its default N. A
-number called a **diagnostic** is printed but not asserted, and it moves
-with retunes. On 2026-10-27 the harnesses were slimmed (a9: the reader is
-close enough, and the map fits the territory). They now assert structural
-invariants (settlement, conservation, the terminal path, public state
-only, determinism and resume) and loose headlines on the game's stance
-(the family table, liveness, the knife-edge ceilings, the crossing
-medians, the reader and V calibrated in the large, `B`'s edge and its
-close). Measurement-grade bands, calibration grids, challengers and
-bit-identity between configurations are no longer asserted: where a
-section below still calls one a gate, read it as a design target, and
-each harness's header lists what it does assert.
+A number called a **gate** was asserted by a harness at its default N, and
+a **diagnostic** was printed but not asserted; both move with retunes. On
+2026-10-27 the harnesses were slimmed (a9: the reader is close enough, and
+the map fits the territory), and on 2026-11-20 they were retired for a
+minimal suite (`node --test 'tests/*.test.mjs'`) that keeps a check only
+where a failure would be silent: settlement exactly once, conservation,
+the terminal path, public state only, determinism, replay and resume, and
+analytic oracles such as the score's properness and V's formula. No band
+below is asserted any more: read every gate as a design target. The
+harness names below (`endings-test`, `reader-test`, …) are those of the
+retired harnesses; `tools/race-mc.mjs` still reports the race's stance
+(the crossing medians, the fizzle tail, the family shares) without gating
+it.
 
 Units: trading days (game = days 0–1008, 16 substeps/day); capability in
 rung units (R1 = 1 … R5 = 5); `S`, `heat`, τ, culture, pace in [0, 1].
@@ -438,9 +439,9 @@ bond display scale). Listed contracts, each an oracle tuple per
 | Contract | Deadline | Dispute deadline | Listing base rate | Settles on |
 |---|---|---|---|---|
 | R2 | 420 | 450 | 0.70 | certification |
-| R3 | 756 | 786 | 0.62 | certification |
-| R4 | 880 | 910 | 0.60 | certification |
-| R5 | 1000 | 1008 | 0.70 | terminal resolution only |
+| R3 | 756 | 786 | 0.575 | certification |
+| R4 | 880 | 910 | 0.518 | certification |
+| R5 | 1000 | 1008 | 0.629 | terminal resolution only |
 
 Deadlines are calibrated against the measured *certified* KM medians so
 each certifiable contract is genuinely two-sided. The listing base rate

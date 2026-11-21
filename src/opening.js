@@ -13,7 +13,7 @@
 
    DOM-free: main.js deals the hand at boot and posts the
    memo and the archived reports to the wire; the
-   harness (tools/opening-test.mjs) drives it headless.
+   tests (tests/desk.test.mjs) drive it headless.
    ===================================================== */
 
 import { INITIAL_CAPITAL, STRIKE_INTERVAL } from './config.js';

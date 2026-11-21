@@ -30,9 +30,8 @@
    level impact overlay (which is a read-time overlay on the
    price, orthogonal to these dynamics-param overlays).
 
-   Pure / DOM-free -- headless-importable for the P4 harness
-   (belief-test.mjs asserts no permanent param drift over a
-   full run). Mirrors price-impact.js conventions.
+   Pure / DOM-free -- headless-importable (tests/belief.test.mjs
+   asserts no permanent param drift over a full run). Mirrors price-impact.js conventions.
 
    UNRATIFIED (02a records "impact ... magnitudes as rev 1"
    but rev 1's numbers are not transcribed): the impulse

@@ -24,7 +24,7 @@
    required, the exclusive mapping) is transcribed VERBATIM from
    02a -- constants and predicate structure copied literally.
 
-   Pure / DOM-free -- headless-importable for tools/endings-test.mjs.
+   Pure / DOM-free -- headless-importable.
    =================================================== */
 
 import { advanceRace, stepControlRegime, heatValue, freshTransitions, RETUNE } from './race-state.js';

@@ -38,7 +38,7 @@
    and no RNG is drawn -- the whole surface is dead code.
 
    DOM-free (a leaf apart from the regime rank + the shared
-   PRNG) so tools/plumbing-test.mjs drives it headless.
+   PRNG) so it runs headless.
    Mutable module singleton reset by `resetAct3()` from
    `_resetCore` -- mirrors price-impact.js / impulse.js.
 

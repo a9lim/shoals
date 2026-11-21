@@ -131,8 +131,7 @@ const PROJECTION_STEP = 21;
 const SCORED_RUNGS = [2, 3, 4];       // RATIFIED: R5 is never scored -- nothing certifies it
 const SCORE_P_MIN = 0.02, SCORE_P_MAX = 0.98;   // RATIFIED clamp on each quarter's crossing probability
 // credibility = tanh(S_P / K_CRED). K_CRED = 1.35 (02a), set by
-// `node tools/forecast-test.mjs 2000 --calibrate` on the validation seeds
-// 2,000,001+: the largest K at which the reader-copier clears the memo gate by
+// calibration on the validation seeds 2,000,001+: the largest K at which the reader-copier clears the memo gate by
 // day 882 in half of worlds with two standard errors to spare. Re-derived under
 // reader schema 16 on neutral and engine worlds (2026-10-27): 1.35 again (54.6%
 // at 1.30, 51.4% at 1.40; the "earlier" preset 2.9% at 1.30). It was 1.8
@@ -1358,8 +1357,8 @@ export function latestLock() {
 /**
  * The reader-copier's snapshot on `day` (02a "The almanac"): for every ladder
  * rung open at the lock, the full reader's quarter probability beside `B`'s, both
- * clamped like the player's -- the pairs forecast-test scores for its
- * reader-copier. It reads only the public record. The same lock-day guards as
+ * clamped like the player's -- the pairs tests/belief.test.mjs recomputes for
+ * its reader-copier. It reads only the public record. The same lock-day guards as
  * lockForecast; a repeat call returns the day's record.
  */
 export function copierLock(day) {
