@@ -2,7 +2,7 @@
 name: Shoals
 title: Shoals — Trading the AI Race
 description: Trade stock, bonds, VXHCN volatility futures, American options, and AI-milestone binaries through the last years of the race — stochastic pricing, a hidden capability model, and six ways it ends.
-updated: 2026-10-27
+updated: 2026-11-25
 ---
 
 # Shoals — Trading the AI Race

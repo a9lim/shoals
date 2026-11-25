@@ -91,6 +91,7 @@ export function createWorldState() {
             proofDisputed:      false,       // wonder_proof_disputed fired (the claimed proof, contested)
             fixedpointIndex:    false,       // halcyon_fixedpoint_index fired (the self-scored index)
             fixedpointCatalogue: false,      // demo_fixedpoint_catalogue fired (the codename's first public meaning)
+            karrasRecalled:     false,       // cambria_karras_out fired (the chokepoint's chief, out and back)
         },
     };
 }

@@ -29,6 +29,30 @@ export { PARAM_RANGES } from './events/index.js';
 const MAX_LOG = MAX_EVENT_LOG;
 const MAX_CHAIN_DEPTH = MAX_FOLLOWUP_DEPTH;
 
+// -- The midterm -----------------------------------------------------------
+// Thresholds on the midterm score (approval plus its adjustments plus U(-5, 5)),
+// set on bystander runs to the postwar base rate: the president's party loses
+// the House in about four midterms of five, both chambers in about three of ten,
+// and gains in both about one in fourteen. A president at 50 loses the House.
+const MIDTERM_GAIN = 56, MIDTERM_HOLD = 52.5, MIDTERM_LOSS_BOTH = 44.5;
+// Federalist seats are continuous in the score within each result's band
+// (rows: score, House, Senate; Federalists start at 221 and 52), so a wave
+// can run as deep as the score does; a 2026-sized wave (Federalist House in
+// the mid-170s, Senate 44) sits in the bottom tenth of bystander runs.
+const MIDTERM_SEATS = {
+    fed_gain:       [[56, 222, 53], [64, 236, 56]],
+    fed_hold:       [[52.5, 218, 50], [56, 221, 52]],
+    fed_loss_house: [[44.5, 190, 50], [52.5, 217, 50]],
+    fed_loss_both:  [[20, 155, 42], [44.5, 189, 49]],
+};
+
+/** Federalist seats for a midterm score inside `result`'s band. */
+function midtermSeats(result, score) {
+    const [[x0, h0, s0], [x1, h1, s1]] = MIDTERM_SEATS[result];
+    const t = Math.max(0, Math.min(1, (score - x0) / (x1 - x0)));
+    return { house: Math.round(h0 + t * (h1 - h0)), senate: Math.round(s0 + t * (s1 - s0)) };
+}
+
 // Pulse and random draws prefer events that have not fired within this many
 // trading days, so the paper does not reprint an item within a couple of quarters.
 const RECENCY_DAYS = 126;
@@ -828,49 +852,32 @@ export class EventEngine {
         // Noise: +-5 (reduced from +-10 to preserve player agency)
         score += (keyedRng(this.seed, 'events.election', day, 'midterm').next() - 0.5) * 10;
 
-        let result, headline, params, effects;
+        let result, headline, params;
 
-        if (score > 55) {
+        if (score > MIDTERM_GAIN) {
             result = 'fed_gain';
             headline = 'Midterm landslide: Federalists expand majority in both chambers; Barron claims mandate';
             params = { mu: 0.03, theta: -0.01, lambda: -0.3 };
-            effects = (world) => {
-                world.congress.senate.federalist = 55;
-                world.congress.senate.farmerLabor = 45;
-                world.congress.house.federalist = 233;
-                world.congress.house.farmerLabor = 202;
-            };
-        } else if (score > 42) {
+        } else if (score > MIDTERM_HOLD) {
             result = 'fed_hold';
             headline = 'Midterms deliver mixed results; Federalists narrowly hold both chambers';
             params = { theta: 0.005 };
-            effects = (world) => {
-                world.congress.senate.federalist = 51;
-                world.congress.senate.farmerLabor = 49;
-                world.congress.house.federalist = 219;
-                world.congress.house.farmerLabor = 216;
-            };
-        } else if (score > 28) {
+        } else if (score > MIDTERM_LOSS_BOTH) {
             result = 'fed_loss_house';
             headline = 'Farmer-Labor flips the House in midterm wave; Federalists retain Senate narrowly';
             params = { mu: -0.02, theta: 0.015, lambda: 0.5 };
-            effects = (world) => {
-                world.congress.senate.federalist = 51;
-                world.congress.senate.farmerLabor = 49;
-                world.congress.house.federalist = 201;
-                world.congress.house.farmerLabor = 234;
-            };
         } else {
             result = 'fed_loss_both';
             headline = 'Midterm wipeout: Farmer-Labor takes House and Senate; Barron\'s agenda stalls completely';
             params = { mu: -0.04, theta: 0.025, lambda: 1.0 };
-            effects = (world) => {
-                world.congress.senate.federalist = 47;
-                world.congress.senate.farmerLabor = 53;
-                world.congress.house.federalist = 193;
-                world.congress.house.farmerLabor = 242;
-            };
         }
+        const seats = midtermSeats(result, score);
+        const effects = (world) => {
+            world.congress.senate.federalist = seats.senate;
+            world.congress.senate.farmerLabor = 100 - seats.senate;
+            world.congress.house.federalist = seats.house;
+            world.congress.house.farmerLabor = 435 - seats.house;
+        };
 
         const event = {
             id: 'midterm_election_' + result,

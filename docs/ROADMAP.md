@@ -67,6 +67,44 @@ feasible.
 - **Shared runs:** shared seeds, a daily edition, the last edition as a keepsake.
   Worlds shared across browsers need portable math.
 
+## From the calibration round (2026-11-25), for a9
+
+The round recalibrated the midterm and the compute curve's demand magnitudes
+(DESIGN's Targets) and drafted three beats. These need a ruling first:
+
+- **Incident disclosure lags are an order of magnitude short.** In the 2026 public record
+  (34 dated cases) the median from occurrence to public is about 90 days, in two
+  channels: a victim or outside evaluator surfaces an external breach in one to four
+  weeks (Hugging Face 7, WorkOS 8, the PyPI upload 12, Epoch 24), while what only the lab
+  sees surfaces in its own reports three to eight months on (the Medicare portal 98, the
+  January break-in ~235, OpenAI's batched misalignment reports 90–330). The ladder's
+  Exp(10, 8, 6, 3) days matches only the fast channel, so the two-track gap and the tip's
+  window are a week where the world's are a season. Proposal: a channel per incident at
+  occurrence (external or internal, on the incidents stream), the internal channel on the
+  order of 90 days, and the reporting regime as what shortens it. It moves the record, the
+  regime's grip pressure and B's alignment fold, so it is its own round: a
+  `CONTROL_TUNING` recheck, then a refit.
+- **The compute index has no volatility of its own.** Polymarket's ladders imply about 40%
+  a year on the near quarters and 60–65% a year out (interquartile ±8% at one month,
+  roughly −40%/+50% at thirteen), and November's print moved on HBM supply, not on the
+  race. Ours moves only on public race news. A mean-reverting supply factor on its own
+  keyed stream (public, so the integrity rule holds) would make the curve an instrument,
+  with backwardation the expected unwinding of a scarce spot. It changes what a compute
+  position is.
+- **The midterm doesn't reach the race.** `desiredRegime` documents a `hawkishElection`
+  push that nothing feeds. The real wave arrived with plans for independent-testing and
+  liability bills and twenty-odd local data-center bans. Feeding it (a Farmer-Labor
+  Congress as an evals push) would route the player's lobbying into the race through the
+  election, an undeclared player channel unless it passes the ledger gate. First decide
+  whether the election is world or channel.
+- **The safety lab listed.** Anthropic went public at about $1.5tn (a trust names four of
+  seven directors; 30-day implied vol in the mid-80s in its first week). We list the
+  frontier lab and keep Polaris in private rounds. HCN's realized vol on bystander runs
+  (31% at released R1, 48% at R2, 60% at R3, 75% at R4) is in range, so nothing changes; a
+  Polaris listing would belong with the financing commitment above, if anywhere.
+- **Prose drafts** marked `PROSE: draft`: `cambria_karras_out` → `cambria_karras_back`
+  (`src/events/china.js`) and a seventh `gov_flail` variant (`src/events/policy.js`).
+
 ## Backlog
 
 - **Instruments:** AI catastrophe bonds on detected S2+ incidents (an S4 cannot pay);

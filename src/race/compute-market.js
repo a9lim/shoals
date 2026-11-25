@@ -87,15 +87,18 @@ const QUARTER = 63;        // QUARTERLY_CYCLE -- quarter length in trading days
 const LADDER_SIZE = 4;     // maturities listed at a time ("3-4 listed at a time, rolling")
 const HORIZON = 1008;      // race clock end (no maturity past the term)
 
-// P4-swappable placeholder: the CURVE STRUCTURE is ratified
-// -- demand uplift (releases + certified rungs + trend), scramble backwardation,
-// and a pure-tail standing strait premium -- but its MAGNITUDES are deliberately
-// left as placeholders (same stance as the Consensus binary quotes); this whole
-// demand/curve model is swapped when belief `B` lands (phase 4). base 100 and the
-// 4-maturity quarterly ladder are ratified.
+// The CURVE STRUCTURE is ratified -- demand uplift (releases + certified rungs +
+// trend), scramble backwardation, and a pure-tail standing strait premium; base
+// 100 and the 4-maturity quarterly ladder too. The demand magnitudes are
+// calibrated (2026-11-25) against the first listed compute curve, Polymarket's
+// ladders on Ornn's rental indices: in a scramble the spot index ran +70% (H100)
+// and +130% (B200) in a year and the curve backwardated about 10% across the
+// first three quarters. Bystander runs: contango early in Act I (the strait
+// tail), flat by its end, about 10% backwardation across the ladder by mid-R2
+// and 15% by R3, spot about +35% a year through R2 and R3.
 const COMPUTE_INDEX_BASE = 100;   // normalized compute-price index base level
-const K_RELEASE = 0.010;          // demand uplift per frontier release (public count)
-const K_CERT = 0.030;             // demand uplift per certified frontier rung (public)
+const K_RELEASE = 0.025;          // demand uplift per frontier release (public count)
+const K_CERT = 0.060;             // demand uplift per certified frontier rung (public)
 const K_TREND = 0.060;            // yearly compute-demand trend (× day/504)
 const SCRAMBLE_COEF = 0.5;        // scramble intensity as a fraction of demand uplift
 const SCRAMBLE_TAU = 180;         // days: backwardation tilt decays over ~9 months

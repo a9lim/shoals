@@ -220,6 +220,8 @@ export const POLICY_EVENTS = [
             'A Russian column probes a border it should not and the administration’s response is a strongly worded letter, physically mailed, a detail the Kremlin releases itself because no one in Washington thought it damaging. Foreign policy has one lobe now, and it is priced in wafers.',
             'OPEC announces a production cut and the market reaction runs through the datacenter complex before it touches an airline — power purchase agreements reprice, a utility CEO uses the phrase "compute basin" unironically, and the barrel is now, functionally, an AI input. The cartel meeting minutes reportedly mention "the training demand" twice.',
             'Bolivia nationalizes a lithium concession and the event surfaces in American markets as one sentence in Cambria’s cost guidance, which is either a sign of resilient supply chains or a sign that only one supply chain matters anymore, and the analysts covering it genuinely cannot tell which.',
+            /* PROSE: draft, awaiting a9 (calibration round, 2026-11-25) */
+            'The White House and the frontier labs sign a voluntary accord: internal evaluations, outside audits, board oversight, enforced by the signatories’ word. That afternoon Barron signs an order directing every agency to stop saying "artificial intelligence" and say "superintelligence." The accord names no auditor. The order comes with a style guide. Within the week the new word appears in eleven Federal Register notices, none of them about anything it describes, and nobody has been funded to check whether the systems are what the word now says they are.',
         ],
         params: {},
         impulse: { xi: 0.003 },   // decaying (P4): the flail is noise; the market trades it anyway

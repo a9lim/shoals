@@ -238,7 +238,8 @@ d ≤ −0.15 → 3 (whoever leads) · Tianxia or open leader → 4 · domestic:
 
 ## Targets
 
-Neutral inputs, no player. `node tools/race-mc.mjs` reports the first three rows.
+Neutral inputs, no player. `node tools/race-mc.mjs` reports the first three rows;
+the last two are measured on bystander headless runs.
 
 | Quantity | Target |
 |---|---|
@@ -248,6 +249,8 @@ Neutral inputs, no player. `node tools/race-mc.mjs` reports the first three rows
 | Runs resolving by extrapolation | ~25% (18–32%); in-horizon fizzles ≈ 0 |
 | Proliferation cap on the heat floor binds | 35–55% of runs |
 | Reader-copier edge over B | positive in Act I, closed by Act III |
+| Midterm (the postwar base rate) | the president's party loses the House ~78%, both chambers ~30%, gains ~7%; a 2026-sized wave (Federalist House in the mid-170s, Senate 44) in ~10% |
+| Compute curve (Polymarket's Ornn ladders, Nov 2026) | contango early in Act I; ~10% backwardation across the ladder by mid-R2, ~15% by R3; spot ~+35% a year through R2–R3 |
 
 **The knife-edge principle** is the guardrail: no outcome may be structurally
 inevitable in either direction. Every family occurs in at least 2% of runs, and at an

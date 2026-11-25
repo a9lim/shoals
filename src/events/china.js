@@ -176,6 +176,36 @@ export const CHINA_EVENTS = [
         impulse: { xi: 0.008 },   // decaying (P4): the chokepoint reminds everyone it chooses
     },
 
+    // ---- The chokepoint's chief, out and back (calibration round, 2026-11-25) ----
+    // Counterintelligence suspicion at the chip layer, and the state as both the
+    // accuser and the reinstater. Flag-gated Poisson draw, fires once
+    // (`world.ai.karrasRecalled`, the fixedpointPublic pattern); the return is a
+    // top-level followup. No mechanics: the compute index reads only public demand
+    // and the strait, so the curve does not move, and the prose says so.
+    {
+        id: 'cambria_karras_out',
+        category: 'china',
+        likelihood: 0.8,
+        magnitude: 'moderate',
+        when: (sim, world) => world.ai.frontierRung >= 2 && !world.ai.karrasRecalled,
+        effects: (world) => { world.ai.karrasRecalled = true; },
+        /* PROSE: draft, awaiting a9 */
+        headline: 'Karras resigns. Cambria’s filing runs four lines: a relationship not disclosed to the board, with an executive at Kallang Capacity, a Singapore broker that resells allocation and on which two agencies keep a file. Nobody will say what is in the file. The CFO is interim chief executive by the close, a former prosecutor runs the board’s investigation, and the call takes three questions about the Austin fab and declines the fourth, which was the only question. Allocation guidance is "unchanged," a word that has never needed saying before. The far compute curve does not move; the fabs are where they were yesterday. HCN gives back a little, because the queue it waits in has nobody at the front.',
+        params: {},
+        impulse: { mu: -0.01, xi: 0.01 },   // decaying (P4): the queue without a front
+        followups: [{ id: 'cambria_karras_back', mtth: 9 }],
+    },
+    {
+        id: 'cambria_karras_back',
+        followupOnly: true,
+        category: 'china',
+        magnitude: 'minor',
+        /* PROSE: draft, awaiting a9 */
+        headline: 'Karras is back. The board that said on Tuesday it had no intention of rehiring votes unanimously on Saturday to restore all three titles, after a week in which, by its own statement, it "received input from senior levels of the government." Barron, on the South Lawn, is more specific: he called the directors himself, several times, and "made the deal." Bowman called the ones he missed. Nobody on either call was from the agencies with the file. The investigation stays open and a compliance committee is formed. By Thursday Commerce has published a rule on remote access to controlled chips through third-country datacenters and added Kallang Capacity to the Entity List, which is how Washington says it believes both stories at once. Asked a week later whether the broker’s executive was an intelligence asset, officials say they have no evidence of it.',
+        params: {},
+        impulse: { mu: 0.006 },   // decaying (P4): relief, priced in the same currency as the scare
+    },
+
     // ---- chinaTrue INTEL beats (P7-3; prose landed 2026-07-24) -----------------
     // "China posterior as tradeable as the timeline". Each of these shells
     // declares `intel: true`: at fire time the canonical `_fireEvent` path resolves

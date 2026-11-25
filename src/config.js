@@ -6,7 +6,7 @@
 // -- The rules a journal replays under --
 // Bump on any change that alters what a journal replays to: a saved run under
 // another version is retired, never replayed.
-export const RULES_VERSION = 1;
+export const RULES_VERSION = 2;
 
 // -- Simulation timing --
 export const TRADING_DAYS_PER_YEAR = 252;
